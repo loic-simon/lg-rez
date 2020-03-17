@@ -24,6 +24,12 @@ def holder_manual():
 
 
 
+@app.route('/sync_TDB', methods=['GET'])
+def holder_sync_TDB():
+    return sync_TDB(request.args)
+
+
+
 
 @app.route('/API_test', methods=['GET', 'POST'])
 def holder_API_test():

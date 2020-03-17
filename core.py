@@ -25,6 +25,31 @@ def infos_tb():
 
 exec(open("./blocs/admin_options.py").read())
 
+def sync_TDB(d):
+    try:
+        r = "sync_TDB:"
+
+        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
+
+            ### COMPORTEMENT OPTION
+            
+            workbook = blocs.gsheets.connect("1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs")  # [DEV NextStep]
+            sheet = workbook.worksheet("Journée en cours")
+            values = sheet.get_all_values()     # Liste de liste des valeurs
+
+            r += values[3][13]
+
+        else:
+            raise ValueError("WRONG OR MISSING PASSWORD!")
+
+    except Exception:
+        r += infos_tb()     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
+
+    finally:
+        return r
+
+
+
 def getsetcell(d, p):
     r = ""
     try:
