@@ -18,17 +18,9 @@ def yikes():
 def holder_admin():
     return admin(request.args, request.form)
 
-@app.route('/manualdelete', methods=['GET', 'POST'])
-def holder_manualdelete():
-    return manualdelete(request.args, request.form)
-    
-@app.route('/viewtable', methods=['GET', 'POST'])
-def holder_viewtable():
-    return viewtable(request.args, request.form)
-    
-@app.route('/getsetcell', methods=['GET', 'POST'])
-def holder_getsetcell():
-    return getsetcell(request.args, request.form)
+@app.route('/manual', methods=['GET'])
+def holder_manual():
+    return manual(request.args)
 
 
 

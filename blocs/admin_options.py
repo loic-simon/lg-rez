@@ -73,7 +73,6 @@ def additem(d, p):
     db.session.commit()
 
     r += "Ajout réussi.\n\n"
-    r += viewtable(d, p)
 
     return r
 
@@ -95,7 +94,5 @@ def delitem(d, p):
         r += "Aucun résultat trouvé. Suppression non effectuée.\n\n"
     except MultipleResultsFound:
         r += "Plusieurs résultats trouvés. Suppression non effectuée.\n\n"
-
-    r += viewtable(d, p)
 
     return r

@@ -65,6 +65,10 @@ def getsetcell(d, p):
 
 ### PANNEAU D'ADMIN
 
+# Options d'administration automatiques (ajout,...) - pour tests/debug seulement !
+def manual(d):
+    return admin(d, d)
+
 def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd notemment) ; p : idem pour les arguments POST (différentes options du panneau)
     try:
         r = "<h1>« Panneau d'administration » (vaguement, hein) LG Rez</h1><hr/>".format(dict(d), dict(p))
@@ -75,9 +79,11 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
             
             if "additem" in p:
                 r += additem(d, p)
+                r += viewtable(d, p)
 
             if "delitem" in p:
                 r += delitem(d, p)
+                r += viewtable(d, p)
 
             if "viewtable" in p:
                 r += viewtable(d, p)
