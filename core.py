@@ -1,6 +1,8 @@
 from __init__ import db, cache_TDB, cache_Chatfuel
 from sqlalchemy.exc import *        # Exceptions générales SQLAlchemy
 from sqlalchemy.orm.exc import *    # Exceptions requêtes SQLAlchemy
+from sqlalchemy.orm.attributes import flag_modified
+
 import blocs.chatfuel, blocs.gsheets
 import string, random
 import sys, traceback
@@ -20,10 +22,145 @@ def infos_tb():
                                          replace('>','&gt;')
     return "<br/><div> AN EXCEPTION HAS BEEN RAISED! <br/><pre>{}</pre></div>".format(tb)
 
+def RepresentsInt(s):
+    try: 
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+
 
 ### OPTIONS DU PANNEAU D'ADMIN
 
 exec(open("./blocs/admin_options.py").read())
+
+def sync_TDB(d):
+    try:
+        r = "sync_TDB:"
+        
+        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
+        
+            ### GÉNÉRALITÉS
+            
+            cols = [str(column.key) for column in globals()["cache_TDB"].__table__.columns]      # Colonnes de cache_TDB
+            
+            cols_SQL_types = {col:type(cache_TDB.__dict__[col].property.columns[0].type).__name__ for col in cols}
+            def transtype(value, col):      # Utilitaire : type un input brut (POST, GET...) selon le type de sa colonne
+            
+                if value == '':
+                    return None
+                elif cols_SQL_types[col] == "String":
+                    return str(value)
+                elif cols_SQL_types[col] in ("Integer", "BigInteger"):
+                    return int(value)
+                elif cols_SQL_types[col] == "Boolean":
+                    return bool(eval(value))        # bool(eval("0")) = bool(0) = False, alors que bool("0") = True
+                else:
+                    raise ValueError("unknown column type")
+                    
+                    
+            ### RÉCUPÉRATION INFOS GSHEET
+            
+            workbook = blocs.gsheets.connect("1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs")  # [DEV NextStep]
+            sheet = workbook.worksheet("Journée en cours")
+            values = sheet.get_all_values()     # Liste de liste des valeurs
+            (NL, NC) = (len(values), len(values[0]))
+            
+            r += "<{}L/{}C>\n".format(NL, NC)
+            
+            head = values[2]
+            TDB_index = {col:head.index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
+            TDB_tampon_index = {col:head.index("tampon_"+col) for col in cols if col != 'messenger_user_id'}    # Idem pour la partie « tampon »
+    
+            users_TDB = []              # Liste des joueurs tels qu'actuellement dans le TDB
+            ids_TDB = []                # messenger_user_ids des différents joueurs du TDB
+            rows_TDB = {}               # Indices des lignes ou sont les différents joueurs du TDB
+            
+            for l in range(NL):
+                L = values[l]
+                id = L[TDB_index["messenger_user_id"]]
+                if (id != "") and RepresentsInt(id):
+                    
+                    joueur = {col:transtype(L[TDB_index[col]], col) for col in cols}
+                    user = cache_TDB(**joueur)
+                    
+                    users_TDB.append(user)
+                    ids_TDB.append(user.messenger_user_id)
+                    rows_TDB[user.messenger_user_id] = l
+                    
+                    
+            ### CHARGEMENT CACHE
+            
+            users_cache = cache_TDB.query.all()     # Liste des joueurs tels qu'actuellement en cache
+            ids_cache = [user.messenger_user_id for user in users_cache]
+                    
+                
+            ### COMPARAISON
+            
+            Modifs = []         # Modifs à porter au TDB : tuple (id - colonne (nom) - valeur)
+            
+            for user in users_cache.copy():                      ## 1. Joueurs dans le cache supprimés du TDB
+                if user.messenger_user_id not in ids_TDB:
+                    users_cache.remove(user)
+                    db.session.delete(user)
+                    r += "\nJoueur dans le cache hors TDB : {}".format(user)
+                    
+            for user in users_TDB:                               ## 2. Joueurs dans le TDB pas encore dans le cache
+                if user.messenger_user_id not in ids_cache:
+                    users_cache.append(user)
+                    db.session.add(user)
+                    r += "\nJoueur dans le TDB hors cache : {}".format(user)
+                    id = user.messenger_user_id
+                    
+                    Modifs.extend( [( id, col, str(user.__dict__[col])+"_EAT" ) for col in cols if col != 'messenger_user_id'] )
+                    
+            # À ce stade, on a les même utilisateurs dans users_TDB et users_cache (mais pas forcément les mêmes infos !)
+                
+            for user_TDB in users_TDB:                           ## 3. Différences
+                user_cache = [user for user in users_cache if user.messenger_user_id==user_TDB.messenger_user_id][0]    # user correspondant dans le cache
+                
+                if user_cache != user_TDB:     # Au moins une différence !
+                    r += "\nJoueur différant entre TDB et cache : {}".format(user_TDB)
+                    id = user_TDB.messenger_user_id
+                    
+                    for col in cols:
+                        if user_cache.__dict__[col] != user_TDB.__dict__[col]:
+                            r += "\n---- Colonne différant : {} (TDB : {}, cache : {})".format(col, user_TDB.__dict__[col], user_cache.__dict__[col])
+                            user_cache.__dict__[col] = user_TDB.__dict__[col]
+                            flag_modified(user_cache, col)
+                            Modifs.append( ( id, col, str(user_TDB.__dict__[col])+"_EAT" ) )
+                            
+                            
+                            
+            ### APPLICATION DES MODIFICATIONS
+            
+            cells_to_update = []
+            for (id, col, v) in Modifs:     # Modification de la partie « tampon » du TDB
+                l = rows_TDB[id] + 1                # gspread indexe à partir de 1 (comme les gsheets, mais bon...)
+                c = TDB_tampon_index[col] + 1
+                
+                cell = sheet.cell(l, c)
+                cell.value = v
+                cells_to_update.append(cell)
+                
+            if cells_to_update != []:
+                sheet.update_cells(cells_to_update)
+                
+                r += "\n\n" + "\n".join([str(m) for m in Modifs])
+                
+            db.session.commit()     # Modification de cache_TDB
+                
+        else:
+            raise ValueError("WRONG OR MISSING PASSWORD!")
+            
+    except Exception:
+        r += infos_tb()     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
+        
+    finally:
+        return r
+
+
 
 def getsetcell(d, p):
     r = ""
@@ -87,6 +224,16 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
 
             if "viewtable" in p:
                 r += viewtable(d, p)
+                
+            
+            if "testupdate" in d:
+                
+                r += "<br/>TEST UPDATE 44444444<br/>"
+                
+                user = cache_TDB.query.filter_by(messenger_user_id=44444444).first()
+                user.nom = "BONSOIR"
+                db.session.commit()
+                
 
 
             ### CHOIX D'UNE OPTION
