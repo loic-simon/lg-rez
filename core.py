@@ -1,7 +1,7 @@
 from __init__ import db, cache_TDB, cache_Chatfuel
 from sqlalchemy.exc import *        # Exceptions générales SQLAlchemy
 from sqlalchemy.orm.exc import *    # Exceptions requêtes SQLAlchemy
-import chatfuel, gsheets
+import blocs.chatfuel, blocs.gsheets
 import string, random
 import sys, traceback
 
@@ -23,7 +23,7 @@ def infos_tb():
 
 ### OPTIONS DU PANNEAU D'ADMIN
 
-exec(open("./admin_options.py").read())
+exec(open("./blocs/admin_options.py").read())
 
 def getsetcell(d, p):
     r = ""
