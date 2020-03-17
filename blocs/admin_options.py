@@ -1,10 +1,10 @@
 
-def html_table(LL):
+def html_table(LL, beg_row, end_row):
     r = "<table style='border:1px solid black; border-collapse: collapse;'>"
     for L in LL:
-        r += "<tr><td style='border:1px solid black; padding:2pt;'>"
+        r += "<tr>{}<td style='border:1px solid black; padding:2pt;'>".format(beg_row)
         r += "</td><td style='border:1px solid black; padding:2pt;'>".join([str(l) for l in L])
-        r += "</td></tr>"
+        r += "</td>{}</tr>".format(end_row)
     r += "</table>"
     return r
 
@@ -42,10 +42,10 @@ def viewtable(d, p):
     nouv = ["""<input type="text" name="{}" size="10cm" value={}>""".format(ee, itemDefault[ee]) for ee in cols] + ["""<input type="submit" name="additem" value="Créer">"""]
 
 
-    r += """<form action="admin?pwd={}" method="post">
-    <input type="hidden" name="table" value="{}">""".format(GLOBAL_PASSWORD, table)
-    r += html_table( [tete] + corps + [nouv] )
-    r += "</form><br />"
+    r += html_table([tete] + corps + [nouv], """<form action="admin?pwd={}" method="post">
+                                                <input type="hidden" name="table" value="{}">""".format(GLOBAL_PASSWORD, table),
+                                            "</form>" )
+    r += "<br />"
 
     return r
 
