@@ -104,57 +104,57 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                 if (id != "") and RepresentsInt(id):
                     
                     joueur = {col:transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
-                    user = cache_TDB(**joueur)
+                    user_TDB = cache_TDB(**joueur)
                     
-                    users_TDB.append(user)
-                    ids_TDB.append(user.messenger_user_id)
-                    rows_TDB[user.messenger_user_id] = l
+                    users_TDB.append(user_TDB)
+                    ids_TDB.append(user_TDB.messenger_user_id)
+                    rows_TDB[user_TDB.messenger_user_id] = l
                     
                     
             ### RÉCUPÉRATION UTILISATEURS CACHE
             
-            users_cache = cache_TDB.query.all()     # Liste des joueurs tels qu'actuellement en cache
-            ids_cache = [user.messenger_user_id for user in users_cache]
+            users_cT = cache_TDB.query.all()     # Liste des joueurs tels qu'actuellement en cache
+            ids_cT = [user_cT.messenger_user_id for user_cT in users_cT]
                     
                 
             ### COMPARAISON
             
             Modifs = []         # Modifs à porter au TDB : tuple (id - colonne (nom) - valeur)
             
-            for user in users_cache.copy():                      ## 1. Joueurs dans le cache supprimés du TDB
-                if user.messenger_user_id not in ids_TDB:
-                    users_cache.remove(user)
-                    db.session.delete(user)
+            for user_cT in users_cT.copy():                      ## 1. Joueurs dans le cache supprimés du TDB
+                if user_cT.messenger_user_id not in ids_TDB:
+                    users_cT.remove(user_cT)
+                    db.session.delete(user_cT)
                     if verbose:
-                        r += "\nJoueur dans le cache hors TDB : {}".format(user)
+                        r += "\nJoueur dans le cache hors TDB : {}".format(user_cT)
                     
-            for user in users_TDB:                               ## 2. Joueurs dans le TDB pas encore dans le cache
-                if user.messenger_user_id not in ids_cache:
-                    users_cache.append(user)
-                    db.session.add(user)
-                    id = user.messenger_user_id
+            for user_cT in users_TDB:                               ## 2. Joueurs dans le TDB pas encore dans le cache
+                if user_cT.messenger_user_id not in ids_cT:
+                    users_cT.append(user_cT)
+                    db.session.add(user_cT)
+                    id = user_cT.messenger_user_id
                     if verbose:
-                        r += "\nJoueur dans le TDB hors cache : {}".format(user)
+                        r += "\nJoueur dans le TDB hors cache : {}".format(user_cT)
                     
-                    Modifs.extend( [( id, col, str(getattr(user, col))+"_EAT" ) for col in cols if col != 'messenger_user_id'] )
+                    Modifs.extend( [( id, col, str(getattr(user_cT, col))+"_EAT" ) for col in cols if col != 'messenger_user_id'] )
                     
-            # À ce stade, on a les même utilisateurs dans users_TDB et users_cache (mais pas forcément les mêmes infos !)
+            # À ce stade, on a les même utilisateurs dans users_TDB et users_cT (mais pas forcément les mêmes infos !)
             
             for user_TDB in users_TDB:                           ## 3. Différences
-                user_cache = [user for user in users_cache if user.messenger_user_id==user_TDB.messenger_user_id][0]    # user correspondant dans le cache
+                user_cT = [user for user in users_cT if user.messenger_user_id==user_TDB.messenger_user_id][0]    # user correspondant dans le cache
                     
-                if user_cache != user_TDB:     # Au moins une différence !
+                if user_cT != user_TDB:     # Au moins une différence !
                     if verbose:
-                        r += "\nJoueur différant entre TDB et cache : {}".format(user_TDB)
+                        r += "\nJoueur différant entre TDB et cache_TDB : {}".format(user_TDB)
                     id = user_TDB.messenger_user_id
                     
                     for col in cols:
-                        if getattr(user_cache, col) != getattr(user_TDB, col):
-                            setattr(user_cache, col, getattr(user_TDB, col))
-                            flag_modified(user_cache, col)
+                        if getattr(user_cT, col) != getattr(user_TDB, col):
+                            setattr(user_cT, col, getattr(user_TDB, col))
+                            flag_modified(user_cT, col)
                             Modifs.append( ( id, col, str(getattr(user_TDB, col))+"_EAT" ) )
                             if verbose:
-                                r += "\n---- Colonne différant : {} (TDB : {}, cache : {})".format(col, getattr(user_TDB, col), getattr(user_cache, col))
+                                r += "\n---- Colonne différant : {} (TDB : {}, cache_TDB : {})".format(col, getattr(user_TDB, col), getattr(user_cT, col))
                                 
                                 
             ### APPLICATION DES MODIFICATIONS
@@ -214,17 +214,17 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
             user_Chatfuel = cache_Chatfuel(**joueur)
             id = user_Chatfuel.messenger_user_id
             
-            # db.session.add(user)
+            # db.session.add(user_Chatfuel)
             # db.session.commit()
             
             
             ### RÉCUPÉRATION UTILISATEURS CACHES
             
-            users_cC = cache_Chatfuel.query.all()     # Liste des joueurs tels qu'actuellement en cache
-            ids_cC = [user.messenger_user_id for user in users_cC]
+            users_cC = cache_Chatfuel.query.all()     # Liste des joueurs tels qu'actuellement en cache côté TDB
+            ids_cC = [user_cC.messenger_user_id for user_cC in users_cC]
             
-            users_cT = cache_TDB.query.all()          # Liste des joueurs tels qu'actuellement en cache
-            ids_cT = [user.messenger_user_id for user in users_cT]
+            users_cT = cache_TDB.query.all()          # Liste des joueurs tels qu'actuellement en cache côté Chatfuel
+            ids_cT = [user_cT.messenger_user_id for user_cT in users_cT]
             
             
             ### COMPARAISON
@@ -248,11 +248,11 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
                 if user_cC != user_Chatfuel:     # Comparaison Chatfuel et cache_Chatfuel. En théorie, il ne devrait jamais y avoir de différence, sauf si quelqu'un s'amuse à modifier un attribut direct dans Chatfuel – ce qu'il ne faut PAS (plus) faire, parce qu'on ré-écrase
                     for col in cols:
                         if getattr(user_cC, col) != getattr(user_Chatfuel, col):
-                            # On écrase : c'est cache qui a raison
+                            # On écrase : c'est cache_Chatfuel qui a raison
                             Modifs_Chatfuel[col] = getattr(user_cC, col)
                             
                             if verbose:
-                                R.append(chatfuel.Text("Différence ENTRE CACHE_CHATFUEL ET CHATFUEL détectée : {} (cache : {}, Chatfuel : {})".format(col, getattr(user_cC, col), getattr(user_Chatfuel, col))))
+                                R.append(chatfuel.Text("Différence ENTRE CACHE_CHATFUEL ET CHATFUEL détectée : {} (cache_Chatfuel : {}, Chatfuel : {})".format(col, getattr(user_cC, col), getattr(user_Chatfuel, col))))
                                 
                                 
                 if user_cC != user_cT:          # Comparaison des caches. C'est là que les modifs apportées au TDB (et synchronisées) sont repérées.
@@ -367,8 +367,8 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
                 
                 r += "<br/>TEST UPDATE 44444444<br/>"
                 
-                user = cache_TDB.query.filter_by(messenger_user_id=44444444).first()
-                user.nom = "BONSOIR"
+                user_cT = cache_TDB.query.filter_by(messenger_user_id=44444444).first()
+                user_cT.nom = "BONSOIR"
                 db.session.commit()
             
             if "oskour" in d:
