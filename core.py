@@ -34,9 +34,9 @@ def RepresentsInt(s):
     except ValueError:
         return False
 
-def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input brut (POST, GET...) selon le type de sa colonne
+def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input brut (POST, GET, JSON de Chatfuel...) selon le type de sa colonne
     try:
-        if value in (None, '', 'None', 'none', 'Null', 'null'):
+        if value in (None, '', 'None', 'none', 'Null', 'null', 'not set', 'non défini'):
             if nullable:
                 return None
             else:
@@ -57,7 +57,15 @@ def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input
     except (ValueError, TypeError):
         raise ValueError("Valeur '{}' incorrecte pour la colonne '{}' (type '{}'/{})".format(value, col, SQL_type, 'NOT NULL' if not nullable else ''))
 
-
+def format_Chatfuel(d):         # Représentation des attributs dans Chatfuel
+    for k,v in d.items():
+        if v == True:
+            d[k] = 1
+        elif v == False:
+            d[k] = 0
+        elif v == None:
+            d[k] = "non défini"
+    return d
 
 
 ### sync_TDB
@@ -135,6 +143,9 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                         
             for user_cT in users_TDB:                               ## 2. Joueurs dans le TDB pas encore dans le cache
                 if user_cT.messenger_user_id not in ids_cT:
+                    if verbose:
+                        r += "\nJoueur dans le TDB hors caches : {}".format(user_cT)
+                        
                     users_cT.append(user_cT)
                     db.session.add(user_cT)
                     id = user_cT.messenger_user_id
@@ -142,9 +153,6 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                     # On doit également l'ajouter à cache_Chatfuel
                     user_cC = cache_Chatfuel(**{col:getattr(user_cT, col) for col in cols})     # Mêmes attributs que user_cT
                     db.session.add(user_cC)
-                    
-                    if verbose:
-                        r += "\nJoueur dans le TDB hors caches : {}".format(user_cT)
                         
                     # Validation dans le TDB
                     Modifs.extend( [( id, col, getattr(user_cT, col) ) for col in cols if col != 'messenger_user_id'] )    # Sans le _EAT parce qu'a priori le joueur est ajouté au TDB avec ses attributs déjà existants
@@ -161,11 +169,12 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                     
                     for col in cols:
                         if getattr(user_cT, col) != getattr(user_TDB, col):
+                            if verbose:
+                                r += "\n---- Colonne différant : {} (TDB : {}, cache_TDB : {})".format(col, getattr(user_TDB, col), getattr(user_cT, col))
+                                
                             setattr(user_cT, col, getattr(user_TDB, col))
                             flag_modified(user_cT, col)
                             Modifs.append( ( id, col, str(getattr(user_TDB, col))+"_EAT" ) )
-                            if verbose:
-                                r += "\n---- Colonne différant : {} (TDB : {}, cache_TDB : {})".format(col, getattr(user_TDB, col), getattr(user_cT, col))
                                 
                                 
             ### APPLICATION DES MODIFICATIONS SUR LE TDB
@@ -174,9 +183,13 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             for (id, col, v) in Modifs:     # Modification de la partie « tampon » du TDB
                 l = rows_TDB[id] + 1                # gspread indexe à partir de 1 (comme les gsheets, mais bon...)
                 c = TDB_tampon_index[col] + 1
+                if v == None:
+                    v = '' 
+                elif v == "None_EAT":
+                    v = "_EAT"
                 
                 cell = sheet.cell(l, c)
-                cell.value = '' if v==None else v
+                cell.value = v
                 cells_to_update.append(cell)
                 
             if cells_to_update != []:
@@ -184,7 +197,10 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                 
                 if verbose:
                     r += "\n\n" + "\n".join([str(m) for m in Modifs])
-                
+                        
+                        
+            ### APPLICATION DES MODIFICATIONS SUR LES BDD cache
+            
             db.session.commit()     # Modification de cache_TDB
             
             
@@ -215,7 +231,8 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
             cols_SQL_types = {col:type(getattr(cache_Chatfuel, col).property.columns[0].type).__name__ for col in cols}
             cols_SQL_nullable = {col:getattr(cache_Chatfuel, col).property.columns[0].nullable for col in cols}
             
-            verbose = ( ("role" in j) and j["role"] == "MJ" )
+            # verbose = ( ("role" in j) and j["role"] == "MJ" )     # verbose auto pour les MJ
+            verbose = ('v' in d)
             if verbose:
                 R.append(chatfuel.Text("Mise à jour en cours (mode verbose activé)"))
                 
@@ -260,30 +277,138 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
                 if user_cC != user_Chatfuel:     # Comparaison Chatfuel et cache_Chatfuel. En théorie, il ne devrait jamais y avoir de différence, sauf si quelqu'un s'amuse à modifier un attribut direct dans Chatfuel – ce qu'il ne faut PAS (plus) faire, parce qu'on ré-écrase
                     for col in cols:
                         if getattr(user_cC, col) != getattr(user_Chatfuel, col):
-                            # On écrase : c'est cache_Chatfuel qui a raison
-                            Modifs_Chatfuel[col] = getattr(user_cC, col)
-                            
                             if verbose:
                                 R.append(chatfuel.Text("Différence ENTRE CACHE_CHATFUEL ET CHATFUEL détectée : {} (cache_Chatfuel : {}, Chatfuel : {})".format(col, getattr(user_cC, col), getattr(user_Chatfuel, col))))
+
+                            # On écrase : c'est cache_Chatfuel qui a raison
+                            Modifs_Chatfuel[col] = getattr(user_cC, col)
                                 
                                 
                 if user_cC != user_cT:          # Comparaison des caches. C'est là que les modifs apportées au TDB (et synchronisées) sont repérées.
                     for col in cols:
                         if getattr(user_cC, col) != getattr(user_cT, col):  # Si différence :
                             
+                            if verbose:
+                                R.append(chatfuel.Text("Différence détectée : {} (TDB : {}, Chatfuel : {})".format(col, getattr(user_cT, col), getattr(user_cC, col))))
+                                
                             # On cale cache_Chatfuel sur cache_TDB :
                             setattr(user_cC, col, getattr(user_cT, col))
                             flag_modified(user_cC, col)
                             
                             # On modifie le TDB pour informer que la MAJ a été effectuée
-                            Modifs_TDB.append( ( id, col, str(getattr(user_cT, col)) ) )
+                            Modifs_TDB.append( ( id, col, getattr(user_cT, col) ) )
                             
                             # On modifie l'attribut dans Chatfuel
                             Modifs_Chatfuel[col] = getattr(user_cT, col)
                             
-                            if verbose:
-                                R.append(chatfuel.Text("Différence détectée : {} (TDB : {}, Chatfuel : {})".format(col, getattr(user_cT, col), getattr(user_cC, col))))
+                            
+            ### COMMENTAIRE DES MODIFICATIONS CHATFUEL (INFORMATION JOUEUR)
+            # L'application des modifications (changement des attributs) se fait directement à l'envoi de la réponse, à la toute fin de cette fonction.
+            
+            if Modifs_Chatfuel != {}:
+                if len(Modifs_Chatfuel) > 8:
+                    raise ValueError("Chatfuel ne peut pas envoyer plus de 10 messages ! Dis aux MJs de se calmer un peu !")
+                    
+                R.append(chatfuel.Text("⚡ Une action divine vient d'apporter quelques modifications à ton existance :"))
+                for col in cols:
+                    if col in Modifs_Chatfuel:
+                        attr = Modifs_Chatfuel[col]
+                        
+                        if col == "inscrit":
+                            if attr:
+                                r = "Tu es maintenant considéré(e) comme participant au jeu."
+                            else:
+                                r = "Tu n'es maintenant plus considéré(e) comme participant au jeu."
+                        elif col == "nom":
+                            r = "Tu t'appelles maintenant {}.".format(attr)
+                        elif col == "chambre":
+                            r = "Tu est maintenant domicilié(e) en {}.".format(attr)
+                        elif col == "statut":
+                            if attr == "mort":
+                                r = "Tu est malheureusement décédé(e) 😥\nÇa arrive même aux meilleurs, en espérant que ta mort ait été belle !"
+                            elif attr == "MV":
+                                r = "Te voilà maintenant réduit(e) au statut de mort-vivant... Un MJ viendra te voir très vite, si ce n'est déjà fait, mais la partie n'est pas finie pour toi !"
+                            elif attr == "vivant":
+                                r = "Tu es maintenant en vie. EN VIE !!!!"
+                            else:
+                                r = "Nouveau statut : {}".format(attr)
+                        elif col == "role":
+                            r = "Ton nouveau rôle, si tu l'acceptes : {} !\nQue ce soit pour un jour ou pour le reste de la partie, renseigne toi en écrivant « {} » en texte libre.".format(attr, attr)
+                        elif col == "camp":                                 # IL FAUDRAIT ICI séparer selon les camps pour un message perso (flemme)
+                            r = "Tu fais maintenant partie du camp « {} ».".format(attr)
+                        elif col == "votantVillage":
+                            if attr:
+                                r = "Tu peux maintenant participer aux votes du village !"
+                            else:
+                                r = "Tu ne peux maintenant plus participer aux votes du village."
+                        elif col == "votantLoups":
+                            if attr:
+                                r = "Tu peux maintenant participer aux votes des loups ! Amuse-toi bien 🐺"
+                            else:
+                                r = "Tu ne peux maintenant plus participer aux votes des loups."
+                        elif col == "roleActif":
+                            if attr:
+                                r = "Tu peux maintenant utiliser le pouvoir associé à ton rôle !"
+                            else:
+                                r = "Tu ne peux maintenant plus utiliser le pouvoir associé à ton rôle."
+                        elif col == "debutRole":
+                            if attr == None:
+                                r = "Tu n'as plus d'horaire de début de rôle..."
+                            else:
+                                r = "Nouveaux horaires ! ⏰\nTu peux maintenant utiliser ton action de rôle à partir de {}h...".format(attr)
+                        elif col == "finRole":
+                            if attr == None:
+                                r = "... ni de fin de rôle."
+                            else:
+                                r = "... et avant {}h.".format(attr)
                                 
+                                
+                        R.append(chatfuel.Text(" - " + r))
+                        
+                R.append(chatfuel.Buttons("⚠ Si tu penses qu'il y a erreur, appelle un MJ au plus vite ! ⚠",
+                                            [chatfuel.Button("show_block", "🏠 Retour menu", "Menu"),
+                                            chatfuel.Button("show_block", "🆘 MJ ALED 🆘", "MJ ALED")
+                                            ]))
+
+            
+            ### APPLICATION DES MODIFICATIONS SUR LE TDB
+            # Bon, il faut se connecter à GSheets, récupérer les IDs, tout ça... C'est un peu long du coup on le fait que si Modifs_TDB est vide
+            
+            if Modifs_TDB != []:
+                workbook = gsheets.connect("1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs")  # [DEV NextStep]
+                sheet = workbook.worksheet("Journée en cours")
+                values = sheet.get_all_values()     # Liste de liste des valeurs
+                (NL, NC) = (len(values), len(values[0]))
+
+                head = values[2]
+                TDB_tampon_index = {col:head.index("tampon_"+col) for col in cols if col != 'messenger_user_id'}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la partie « tampon »
+                
+                rows_TDB = {}               # Indices des lignes ou sont les différents joueurs du TDB
+                
+                for l in range(NL):
+                    L = values[l]
+                    id = L[head.index('messenger_user_id')]
+                    if (id != "") and RepresentsInt(id):
+                        rows_TDB[int(id)] = l
+                        
+                cells_to_update = []
+                for (id, col, v) in Modifs_TDB:     # Modification de la partie « tampon » du TDB
+                    l = rows_TDB[id] + 1                # gspread indexe à partir de 1 (comme les gsheets, mais bon...)
+                    c = TDB_tampon_index[col] + 1
+                    
+                    cell = sheet.cell(l, c)
+                    cell.value = '' if v==None else v
+                    cells_to_update.append(cell)
+                    
+                if cells_to_update != []:
+                    sheet.update_cells(cells_to_update)
+                    
+                
+            ### APPLICATION DES MODIFICATIONS SUR LES BDD cache
+            
+            db.session.commit()     # Modification de cache_TDB
+            
+            
             ### FIN DE LA PROCÉDURE
                 
             if verbose:
@@ -294,59 +419,17 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
             
     except Exception as exc:
         db.session.expunge_all()
-        return chatfuel.ErrorReport(exc, verbose=verbose, message="Une erreur est survenue. Merci d'en informer les MJs !")
+        return chatfuel.ErrorReport(exc, verbose=verbose, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")
         
     else:
-        return chatfuel.Response(R)
+        return chatfuel.Response(R, set_attributes=(format_Chatfuel(Modifs_Chatfuel) or None))
 
 
-
-    
 
 ### OPTIONS DU PANNEAU D'ADMIN
 
 exec(open("./blocs/admin_options.py").read())
 
-
-
-def getsetcell(d):
-    r = ""
-    try:
-        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):
-
-            key = "1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs" if 'k' not in d else d['k']
-
-            workbook = gsheets.connect(key)
-            r += "Classeur : {}\n".format(workbook.title)
-
-            s = 0 if 's' not in d else int(d['s'])
-
-            sheet = workbook.get_worksheet(s)
-            r += "Feuille n°{} ({})\n".format(s, sheet.title)
-
-            if 'a' in d:
-                a = d['a']
-                c = sheet.acell(a)
-                r += "Cellule {} :\n\n".format(a)
-            else:
-                row = 12 if 'r' not in d else int(d['row'])
-                col = 10 if 'c' not in d else int(d['col'])
-                c = sheet.cell(row,col)
-                r += "Ligne {}, colonne {} :\n\n".format(row,col)
-
-            r += c.value
-
-            if 'nv' in d:
-                c.value = d['nv']
-                sheet.update_cells([c])
-
-        else:
-            raise ValueError("WRONG OR MISSING PASSWORD!")
-    except Exception as exc:
-        r += "\n\n AN EXCEPTION HAS BEEN RAISED!\n"
-        r += "{}: {}".format(type(exc).__name__,exc)
-    finally:
-        return r.replace('\n','<br/>')
 
 
 ### PANNEAU D'ADMIN
