@@ -125,18 +125,29 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                 if user_cT.messenger_user_id not in ids_TDB:
                     users_cT.remove(user_cT)
                     db.session.delete(user_cT)
-                    if verbose:
-                        r += "\nJoueur dans le cache hors TDB : {}".format(user_cT)
                     
+                    # On doit également le supprimer de cache_Chatfuel
+                    user_cC = cache_Chatfuel.query.filter_by(messenger_user_id=user_cT.messenger_user_id).first()
+                    db.session.delete(user_cC)
+                    
+                    if verbose:
+                        r += "\nJoueur dans les caches hors TDB : {}".format(user_cT)
+                        
             for user_cT in users_TDB:                               ## 2. Joueurs dans le TDB pas encore dans le cache
                 if user_cT.messenger_user_id not in ids_cT:
                     users_cT.append(user_cT)
                     db.session.add(user_cT)
                     id = user_cT.messenger_user_id
-                    if verbose:
-                        r += "\nJoueur dans le TDB hors cache : {}".format(user_cT)
                     
-                    Modifs.extend( [( id, col, str(getattr(user_cT, col))+"_EAT" ) for col in cols if col != 'messenger_user_id'] )
+                    # On doit également l'ajouter à cache_Chatfuel
+                    user_cC = cache_Chatfuel(**{col:getattr(user_cT, col) for col in cols})     # Mêmes attributs que user_cT
+                    db.session.add(user_cC)
+                    
+                    if verbose:
+                        r += "\nJoueur dans le TDB hors caches : {}".format(user_cT)
+                        
+                    # Validation dans le TDB
+                    Modifs.extend( [( id, col, getattr(user_cT, col) ) for col in cols if col != 'messenger_user_id'] )    # Sans le _EAT parce qu'a priori le joueur est ajouté au TDB avec ses attributs déjà existants
                     
             # À ce stade, on a les même utilisateurs dans users_TDB et users_cT (mais pas forcément les mêmes infos !)
             
@@ -157,7 +168,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                                 r += "\n---- Colonne différant : {} (TDB : {}, cache_TDB : {})".format(col, getattr(user_TDB, col), getattr(user_cT, col))
                                 
                                 
-            ### APPLICATION DES MODIFICATIONS
+            ### APPLICATION DES MODIFICATIONS SUR LE TDB
             
             cells_to_update = []
             for (id, col, v) in Modifs:     # Modification de la partie « tampon » du TDB
@@ -165,7 +176,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                 c = TDB_tampon_index[col] + 1
                 
                 cell = sheet.cell(l, c)
-                cell.value = v
+                cell.value = '' if v==None else v
                 cells_to_update.append(cell)
                 
             if cells_to_update != []:
@@ -175,6 +186,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                     r += "\n\n" + "\n".join([str(m) for m in Modifs])
                 
             db.session.commit()     # Modification de cache_TDB
+            
             
             ### FIN DE LA PROCÉDURE
             
