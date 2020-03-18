@@ -52,6 +52,12 @@ def holder_sync_TDB():
         raise InvalidUsage(r[1], status_code=r[0])
     else:
         return r
+        
+        
+@app.route('/sync_Chatfuel', methods=['GET', 'POST'])
+def holder_sync_Chatfuel():
+    r = sync_Chatfuel(request.args, request.json)
+    return r
 
 
 

@@ -4,7 +4,8 @@ from sqlalchemy.orm.exc import *    # Exceptions requêtes SQLAlchemy
 from sqlalchemy.orm.attributes import flag_modified
 from flask import abort
 
-import blocs.chatfuel, blocs.gsheets
+import blocs.chatfuel as chatfuel
+import blocs.gsheets as gsheets
 import string, random
 import sys, traceback
 
@@ -33,59 +34,65 @@ def RepresentsInt(s):
     except ValueError:
         return False
 
+def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input brut (POST, GET...) selon le type de sa colonne
+    try:
+        if value in (None, '', 'None', 'none', 'Null', 'null'):
+            if nullable:
+                return None
+            else:
+                raise ValueError
+        elif SQL_type == "String":
+            return str(value)
+        elif SQL_type in ("Integer", "BigInteger"):
+            return int(value)
+        elif SQL_type == "Boolean":
+            if value in [1, '1', True, 'true', 'True', 'TRUE', 'vrai', 'Vrai', 'VRAI']:
+                return True 
+            elif value in [0, '0', False, 'false', 'False', 'FALSE', 'faux', 'Faux', 'FAUX']:
+                return False
+            else:
+                raise ValueError()
+        else:
+            raise KeyError("unknown column type for column '{}': '{}''".format(col, SQL_type))
+    except (ValueError, TypeError):
+        raise ValueError("Valeur '{}' incorrecte pour la colonne '{}' (type '{}'/{})".format(value, col, SQL_type, 'NOT NULL' if not nullable else ''))
 
-    
 
-### OPTIONS DU PANNEAU D'ADMIN
 
-exec(open("./blocs/admin_options.py").read())
 
-def sync_TDB(d):
+### sync_TDB
+
+def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
     r = ""
     try:
         verbose = ('v' in d)
         if verbose:
             r += "sync_TDB:"
-        
+            
         if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
-        
+            
             ### GÉNÉRALITÉS
             
-            cols = [str(column.key) for column in globals()["cache_TDB"].__table__.columns]      # Colonnes de cache_TDB
-            
+            cols = [str(column.key) for column in cache_TDB.__table__.columns]      # Colonnes de cache_TDB
             cols_SQL_types = {col:type(getattr(cache_TDB, col).property.columns[0].type).__name__ for col in cols}
-            def transtype(value, col):      # Utilitaire : type un input brut (POST, GET...) selon le type de sa colonne
-                
-                if value == '':
-                    return None
-                elif cols_SQL_types[col] == "String":
-                    return str(value)
-                elif cols_SQL_types[col] in ("Integer", "BigInteger"):
-                    return int(value)
-                elif cols_SQL_types[col] == "Boolean":
-                    if value in [1, '1', True, 'true', 'True', 'TRUE', 'vrai', 'Vrai', 'VRAI']:
-                        return True 
-                    elif value in [0, '0', False, 'false', 'False', 'FALSE', 'faux', 'Faux', 'FAUX']:
-                        return False
-                    else:
-                        raise ValueError("invalid literal for bool(): '{}'".format(value))
-                else:
-                    raise ValueError("unknown column type for column '{}': '{}''".format(col, cols_SQL_types[col]))
-                    
-                    
+            cols_SQL_nullable = {col:getattr(cache_Chatfuel, col).property.columns[0].nullable for col in cols}
+            
             ### RÉCUPÉRATION INFOS GSHEET
             
-            workbook = blocs.gsheets.connect("1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs")  # [DEV NextStep]
+            workbook = gsheets.connect("1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs")  # [DEV NextStep]
             sheet = workbook.worksheet("Journée en cours")
             values = sheet.get_all_values()     # Liste de liste des valeurs
             (NL, NC) = (len(values), len(values[0]))
             
             if verbose:
                 r += "<{}L/{}C>\n".format(NL, NC)
-            
+                
             head = values[2]
             TDB_index = {col:head.index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
             TDB_tampon_index = {col:head.index("tampon_"+col) for col in cols if col != 'messenger_user_id'}    # Idem pour la partie « tampon »
+            
+            
+            # CONVERSION INFOS GSHEET EN UTILISATEURS
             
             users_TDB = []              # Liste des joueurs tels qu'actuellement dans le TDB
             ids_TDB = []                # messenger_user_ids des différents joueurs du TDB
@@ -96,7 +103,7 @@ def sync_TDB(d):
                 id = L[TDB_index["messenger_user_id"]]
                 if (id != "") and RepresentsInt(id):
                     
-                    joueur = {col:transtype(L[TDB_index[col]], col) for col in cols}
+                    joueur = {col:transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
                     user = cache_TDB(**joueur)
                     
                     users_TDB.append(user)
@@ -104,7 +111,7 @@ def sync_TDB(d):
                     rows_TDB[user.messenger_user_id] = l
                     
                     
-            ### CHARGEMENT CACHE
+            ### RÉCUPÉRATION UTILISATEURS CACHE
             
             users_cache = cache_TDB.query.all()     # Liste des joueurs tels qu'actuellement en cache
             ids_cache = [user.messenger_user_id for user in users_cache]
@@ -132,10 +139,10 @@ def sync_TDB(d):
                     Modifs.extend( [( id, col, str(getattr(user, col))+"_EAT" ) for col in cols if col != 'messenger_user_id'] )
                     
             # À ce stade, on a les même utilisateurs dans users_TDB et users_cache (mais pas forcément les mêmes infos !)
-                
+            
             for user_TDB in users_TDB:                           ## 3. Différences
                 user_cache = [user for user in users_cache if user.messenger_user_id==user_TDB.messenger_user_id][0]    # user correspondant dans le cache
-                
+                    
                 if user_cache != user_TDB:     # Au moins une différence !
                     if verbose:
                         r += "\nJoueur différant entre TDB et cache : {}".format(user_TDB)
@@ -148,9 +155,8 @@ def sync_TDB(d):
                             Modifs.append( ( id, col, str(getattr(user_TDB, col))+"_EAT" ) )
                             if verbose:
                                 r += "\n---- Colonne différant : {} (TDB : {}, cache : {})".format(col, getattr(user_TDB, col), getattr(user_cache, col))
-                            
-                            
-                            
+                                
+                                
             ### APPLICATION DES MODIFICATIONS
             
             cells_to_update = []
@@ -169,7 +175,9 @@ def sync_TDB(d):
                     r += "\n\n" + "\n".join([str(m) for m in Modifs])
                 
             db.session.commit()     # Modification de cache_TDB
-                
+            
+            ### FIN DE LA PROCÉDURE
+            
         else:
             raise ValueError("WRONG OR MISSING PASSWORD!")
             
@@ -181,6 +189,53 @@ def sync_TDB(d):
 
 
 
+### sync_Chatfuel
+
+def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en GET (pwd) ; j : dictionnaire équivalent à la requête JSON de Chatfuel
+    r = ""
+    try:
+        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
+                
+            ### GÉNÉRALITÉS
+                
+            cols = [str(column.key) for column in cache_Chatfuel.__table__.columns]      # Colonnes de cache_Chatfuel
+            cols_SQL_types = {col:type(getattr(cache_Chatfuel, col).property.columns[0].type).__name__ for col in cols}
+            cols_SQL_nullable = {col:getattr(cache_Chatfuel, col).property.columns[0].nullable for col in cols}
+                
+            verbose = ( ("role" in j) and j["role"] == "MJ" )
+                
+            ### CONVERSION INFOS CHATFUEL EN UTILISATEURS
+                
+            joueur = {col:transtype(j[col], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
+            user = cache_Chatfuel(**joueur)
+            
+            db.session.add(user)
+            db.session.commit()
+            
+
+            
+                
+            ### FIN DE LA PROCÉDURE
+                
+        else:
+            raise ValueError("WRONG OR MISSING PASSWORD!")
+            
+    except Exception as exc:
+        return chatfuel.ErrorReport(exc, verbose=verbose, message="Une erreur est survenue. Merci d'en informer les MJs !")
+        
+    else:
+        return chatfuel.Response([chatfuel.Text(r)])
+
+
+
+    
+
+### OPTIONS DU PANNEAU D'ADMIN
+
+exec(open("./blocs/admin_options.py").read())
+
+
+
 def getsetcell(d):
     r = ""
     try:
@@ -188,7 +243,7 @@ def getsetcell(d):
 
             key = "1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs" if 'k' not in d else d['k']
 
-            workbook = blocs.gsheets.connect(key)
+            workbook = gsheets.connect(key)
             r += "Classeur : {}\n".format(workbook.title)
 
             s = 0 if 's' not in d else int(d['s'])
@@ -226,7 +281,7 @@ def getsetcell(d):
 # Options d'administration automatiques (ajout,...) - pour tests/debug seulement !
 def manual(d):
     return admin(d, d)
-
+    
 def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd notemment) ; p : idem pour les arguments POST (différentes options du panneau)
     try:
         r = "<h1>« Panneau d'administration » (vaguement, hein) LG Rez</h1><hr/>".format(dict(d), dict(p))
@@ -254,8 +309,12 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
                 user = cache_TDB.query.filter_by(messenger_user_id=44444444).first()
                 user.nom = "BONSOIR"
                 db.session.commit()
-                
-
+            
+            if "oskour" in d:
+                r += "OSKOUR<br/>"
+                db.session.rollback()
+                r += "OSKOUUUUR<br/>"
+            
 
             ### CHOIX D'UNE OPTION
                 

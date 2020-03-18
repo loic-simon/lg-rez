@@ -1,3 +1,4 @@
+import traceback
 
 class ChatfuelBase(dict):
     """Base of all Chatfuel objects.
@@ -54,9 +55,12 @@ class ErrorReport(Response):
     
     Syntax: ErrorReport(exception)"""
     
-    def __init__(self, exc):
-        m1 = Text("WARNING - PYTHON ERROR:")
-        m2 = Text(str(exc))
+    def __init__(self, exc, verbose=False, message="WARNING - PYTHON ERROR:"):
+        m1 = Text(message)
+        if verbose:
+            m2 = Text(traceback.format_exc())
+        else:
+            m2 = Text("{} : {}".format(type(exc).__name__, exc))
         Response.__init__(self, [m1, m2])
 
 
