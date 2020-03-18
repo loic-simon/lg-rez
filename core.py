@@ -182,6 +182,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             raise ValueError("WRONG OR MISSING PASSWORD!")
             
     except Exception as e:
+        db.session.expunge_all()
         return (400, "{}({})".format(type(e).__name__, str(e)))     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
         
     else:
@@ -192,39 +193,99 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 ### sync_Chatfuel
 
 def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en GET (pwd) ; j : dictionnaire équivalent à la requête JSON de Chatfuel
-    r = ""
+    R = []  # Liste des blocs envoyés en réponse
     try:
         if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
-                
+            
             ### GÉNÉRALITÉS
-                
+            
             cols = [str(column.key) for column in cache_Chatfuel.__table__.columns]      # Colonnes de cache_Chatfuel
             cols_SQL_types = {col:type(getattr(cache_Chatfuel, col).property.columns[0].type).__name__ for col in cols}
             cols_SQL_nullable = {col:getattr(cache_Chatfuel, col).property.columns[0].nullable for col in cols}
-                
+            
             verbose = ( ("role" in j) and j["role"] == "MJ" )
+            if verbose:
+                R.append(chatfuel.Text("Mise à jour en cours (mode verbose activé)"))
+                
                 
             ### CONVERSION INFOS CHATFUEL EN UTILISATEURS
-                
+            
             joueur = {col:transtype(j[col], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
-            user = cache_Chatfuel(**joueur)
+            user_Chatfuel = cache_Chatfuel(**joueur)
+            id = user_Chatfuel.messenger_user_id
             
-            db.session.add(user)
-            db.session.commit()
+            # db.session.add(user)
+            # db.session.commit()
             
+            
+            ### RÉCUPÉRATION UTILISATEURS CACHES
+            
+            users_cC = cache_Chatfuel.query.all()     # Liste des joueurs tels qu'actuellement en cache
+            ids_cC = [user.messenger_user_id for user in users_cC]
+            
+            users_cT = cache_TDB.query.all()          # Liste des joueurs tels qu'actuellement en cache
+            ids_cT = [user.messenger_user_id for user in users_cT]
+            
+            
+            ### COMPARAISON
+            
+            Modifs_TDB = []         # Modifs à porter au TDB : tuple (id - colonne (nom) - valeur)
+            Modifs_Chatfuel = {}    # Arguments à mettre à jour
+            
+            if (id not in ids_cC) or (id not in ids_cT):        # Joueur non enregistré
+                R.extend([chatfuel.Text("⚠ Tu n'es pas inscrit dans nos fichiers ! ⚠"),
+                            chatfuel.Buttons("Si tu viens d'arriver, c'est normal. Sinon, appelle un MJ !",
+                                            [chatfuel.Button("show_block", "🆘 MJ ALED 🆘", "MJ ALED"),
+                                            chatfuel.Button("show_block", "🏠 Retour menu", "Menu")])
+                        ])
+            else:
+                if verbose:
+                    R.append(chatfuel.Text("IDs existants."))
 
-            
-                
+                user_cC = [user for user in users_cC if user.messenger_user_id==id][0]    # user correspondant dans cache_Chatfuel
+                user_cT = [user for user in users_cT if user.messenger_user_id==id][0]    # user correspondant dans cache_TDB
+                    
+                if user_cC != user_Chatfuel:     # Comparaison Chatfuel et cache_Chatfuel. En théorie, il ne devrait jamais y avoir de différence, sauf si quelqu'un s'amuse à modifier un attribut direct dans Chatfuel – ce qu'il ne faut PAS (plus) faire, parce qu'on ré-écrase
+                    for col in cols:
+                        if getattr(user_cC, col) != getattr(user_Chatfuel, col):
+                            # On écrase : c'est cache qui a raison
+                            Modifs_Chatfuel[col] = getattr(user_cC, col)
+                            
+                            if verbose:
+                                R.append(chatfuel.Text("Différence ENTRE CACHE_CHATFUEL ET CHATFUEL détectée : {} (cache : {}, Chatfuel : {})".format(col, getattr(user_cC, col), getattr(user_Chatfuel, col))))
+                                
+                                
+                if user_cC != user_cT:          # Comparaison des caches. C'est là que les modifs apportées au TDB (et synchronisées) sont repérées.
+                    for col in cols:
+                        if getattr(user_cC, col) != getattr(user_cT, col):  # Si différence :
+                            
+                            # On cale cache_Chatfuel sur cache_TDB :
+                            setattr(user_cC, col, getattr(user_cT, col))
+                            flag_modified(user_cC, col)
+                            
+                            # On modifie le TDB pour informer que la MAJ a été effectuée
+                            Modifs_TDB.append( ( id, col, str(getattr(user_cT, col)) ) )
+                            
+                            # On modifie l'attribut dans Chatfuel
+                            Modifs_Chatfuel[col] = getattr(user_cT, col)
+                            
+                            if verbose:
+                                R.append(chatfuel.Text("Différence détectée : {} (TDB : {}, Chatfuel : {})".format(col, getattr(user_cT, col), getattr(user_cC, col))))
+                                
             ### FIN DE LA PROCÉDURE
+                
+            if verbose:
+                R.append(chatfuel.Text("Fin de la procédure."))
                 
         else:
             raise ValueError("WRONG OR MISSING PASSWORD!")
             
     except Exception as exc:
+        db.session.expunge_all()
         return chatfuel.ErrorReport(exc, verbose=verbose, message="Une erreur est survenue. Merci d'en informer les MJs !")
         
     else:
-        return chatfuel.Response([chatfuel.Text(r)])
+        return chatfuel.Response(R)
 
 
 
