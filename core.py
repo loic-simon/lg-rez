@@ -87,7 +87,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             
             ### RÉCUPÉRATION INFOS GSHEET
             
-            workbook = gsheets.connect("1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs")  # [DEV NextStep]
+            workbook = gsheets.connect("1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs")  # Tableau de bord
             sheet = workbook.worksheet("Journée en cours")
             values = sheet.get_all_values()     # Liste de liste des valeurs
             (NL, NC) = (len(values), len(values[0]))
@@ -243,9 +243,6 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
             user_Chatfuel = cache_Chatfuel(**joueur)
             id = user_Chatfuel.messenger_user_id
             
-            # db.session.add(user_Chatfuel)
-            # db.session.commit()
-            
             
             ### RÉCUPÉRATION UTILISATEURS CACHES
             
@@ -273,8 +270,10 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
 
                 user_cC = [user for user in users_cC if user.messenger_user_id==id][0]    # user correspondant dans cache_Chatfuel
                 user_cT = [user for user in users_cT if user.messenger_user_id==id][0]    # user correspondant dans cache_TDB
-                    
-                if user_cC != user_Chatfuel:     # Comparaison Chatfuel et cache_Chatfuel. En théorie, il ne devrait jamais y avoir de différence, sauf si quelqu'un s'amuse à modifier un attribut direct dans Chatfuel – ce qu'il ne faut PAS (plus) faire, parce qu'on ré-écrase
+                
+                 # Comparaison Chatfuel et cache_Chatfuel. En théorie, il ne devrait jamais y avoir de différence, sauf si quelqu'un s'amuse à modifier un attribut direct dans Chatfuel – ce qu'il ne faut PAS (plus) faire, parce qu'on ré-écrase
+                
+                if user_cC != user_Chatfuel:    
                     for col in cols:
                         if getattr(user_cC, col) != getattr(user_Chatfuel, col):
                             if verbose:
@@ -283,8 +282,9 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
                             # On écrase : c'est cache_Chatfuel qui a raison
                             Modifs_Chatfuel[col] = getattr(user_cC, col)
                                 
-                                
-                if user_cC != user_cT:          # Comparaison des caches. C'est là que les modifs apportées au TDB (et synchronisées) sont repérées.
+                # Comparaison des caches. C'est là que les modifs apportées au TDB (et synchronisées) sont repérées
+                
+                if user_cC != user_cT:
                     for col in cols:
                         if getattr(user_cC, col) != getattr(user_cT, col):  # Si différence :
                             
@@ -515,23 +515,22 @@ def API_test(d):
     """ Récupère et renvoie une information à Chatfuel """
 
     try:
-        user_TDB = cache_TDB(messenger_user_id = random.randrange(1000000000),
-                            inscrit = True,
-                            nom = d["a_creer"],
-                            chambre = random.randrange(101,800),
-                            statut = "test",
-                            role = "rôle"+str(random.randrange(15)),
-                            camp = "camp"+str(random.randrange(3)),
-                            votantVillage = random.randrange(1),
-                            votantLoups = random.randrange(1))
+        # user_TDB = cache_TDB(messenger_user_id = random.randrange(1000000000),
+        #                     inscrit = True,
+        #                     nom = d["a_creer"],
+        #                     chambre = random.randrange(101,800),
+        #                     statut = "test",
+        #                     role = "rôle"+str(random.randrange(15)),
+        #                     camp = "camp"+str(random.randrange(3)),
+        #                     votantVillage = random.randrange(1),
+        #                     votantLoups = random.randrange(1))
+        # 
+        # db.session.add(user_TDB)
+        # db.session.commit()
+        # 
+        # cont = [e.nom for e in cache_TDB.query.all()]
 
-        db.session.add(user_TDB)
-        db.session.commit()
-
-        cont = [e.nom for e in cache_TDB.query.all()]
-
-        rep= chatfuel.Response([    chatfuel.Text("Contenu de cache_TDB (2) :"),
-                                    chatfuel.Text("\n".join(cont)),
+        rep= chatfuel.Response([    chatfuel.Text("Max length test :"),
                                     # chatfuel.Buttons("Oui", [
                                     #     chatfuel.Button("show_block", "Go menu", "Menu"),
                                     #     chatfuel.Button("web_url", "J'adore", "https://lmfgtf.com")
