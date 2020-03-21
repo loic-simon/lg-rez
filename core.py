@@ -246,10 +246,10 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
             
             ### RÉCUPÉRATION UTILISATEURS CACHES
             
-            users_cC = cache_Chatfuel.query.all()     # Liste des joueurs tels qu'actuellement en cache côté TDB
+            users_cC = cache_Chatfuel.query.all()     # Liste des joueurs tels qu'actuellement en cache côté Chatfuel
             ids_cC = [user_cC.messenger_user_id for user_cC in users_cC]
             
-            users_cT = cache_TDB.query.all()          # Liste des joueurs tels qu'actuellement en cache côté Chatfuel
+            users_cT = cache_TDB.query.all()          # Liste des joueurs tels qu'actuellement en cache côté TDB
             ids_cT = [user_cT.messenger_user_id for user_cT in users_cT]
             
             
@@ -366,8 +366,8 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
                         R.append(chatfuel.Text(" - " + r))
                         
                 R.append(chatfuel.Buttons("⚠ Si tu penses qu'il y a erreur, appelle un MJ au plus vite ! ⚠",
-                                            [chatfuel.Button("show_block", "🏠 Retour menu", "Menu"),
-                                            chatfuel.Button("show_block", "🆘 MJ ALED 🆘", "MJ ALED")
+                                            [chatfuel.Button("show_block", "Retour menu 🏠", "Menu"),
+                                            chatfuel.Button("show_block", "MJ ALED 🆘", "MJ ALED")
                                             ]))
 
             
@@ -423,6 +423,52 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
         
     else:
         return chatfuel.Response(R, set_attributes=(format_Chatfuel(Modifs_Chatfuel) or None))
+
+
+
+### LISTE MORTS ET VIVANTS
+
+def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET (pwd, type)
+    R = []  # Liste des blocs envoyés en réponse
+    try:
+        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
+            
+            tous = cache_Chatfuel.query.all()     # Liste des joueurs tels qu'actuellement en cache
+            NT = len(tous)
+            
+            if "type" in d and d["type"] == "vivants":
+                rep = cache_Chatfuel.query.filter(cache_Chatfuel.statut != "mort").order_by(cache_Chatfuel.nom).all()
+                descr = "en vie"
+                bouton_text = "Joueurs morts ☠"
+                bouton_bloc = "Joueurs morts"
+            elif "type" in d and d["type"] == "morts":
+                rep = cache_Chatfuel.query.filter(cache_Chatfuel.statut == "mort").order_by(cache_Chatfuel.nom).all()
+                descr = "morts" 
+                bouton_text = "Joueurs en vie 🕺"
+                bouton_bloc = "Joueurs en vie"
+            else:
+                raise ValueError('GET["type"] must be "vivants" or "morts"')
+                
+            NR = len(rep)
+            if NR > 0:
+                R.append(chatfuel.Text("Liste des {}/{} joueurs {} :".format(NR, NT, descr)))
+                LJ = [u.nom for u in rep]
+            else:
+                LJ = ["Minute, papillon !"]
+            
+            R.append(chatfuel.Text('\n'.join(LJ)).addQuickReplies([chatfuel.Button("show_block", bouton_text, bouton_bloc),
+                                                                    chatfuel.Button("show_block", "Retour menu 🏠", "Menu")]))
+            
+        else:
+            raise ValueError("WRONG OR MISSING PASSWORD!")
+            
+    except Exception as exc:
+        return chatfuel.ErrorReport(exc, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")
+        
+    else:
+        return chatfuel.Response(R)
+
+    
 
 
 

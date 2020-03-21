@@ -56,8 +56,12 @@ def holder_sync_TDB():
         
 @app.route('/sync_Chatfuel', methods=['GET', 'POST'])
 def holder_sync_Chatfuel():
-    r = sync_Chatfuel(request.args, request.json)
-    return r
+    return sync_Chatfuel(request.args, request.json)
+        
+        
+@app.route('/liste_joueurs', methods=['GET'])
+def holder_liste_joueurs():
+    return liste_joueurs(request.args)
 
 
 
