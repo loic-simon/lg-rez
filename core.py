@@ -16,12 +16,10 @@ GLOBAL_PASSWORD = "C'estSuperSecure!"
 ### UTILITAIRES
 
 def strhtml(r):
-    return r.replace('\n', '<br/>')
+    return r.replace('&','&esp;').replace('\n', '<br/>').replace('<','&lt;').replace('>','&gt;')
 
 def infos_tb(quiet=False):
-    tb = "".join(traceback.format_exc()).replace('&','&esp;').\
-                                         replace('<','&lt;').\
-                                         replace('>','&gt;')
+    tb = strhtml("".join(traceback.format_exc()))
     if quiet:
         return tb
     else:
@@ -179,20 +177,37 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                                 
             ### APPLICATION DES MODIFICATIONS SUR LE TDB
             
-            cells_to_update = []
-            for (id, col, v) in Modifs:     # Modification de la partie « tampon » du TDB
-                l = rows_TDB[id] + 1                # gspread indexe à partir de 1 (comme les gsheets, mais bon...)
-                c = TDB_tampon_index[col] + 1
-                if v == None:
-                    v = '' 
-                elif v == "None_EAT":
-                    v = "_EAT"
+            # Convertit ID et colonne en indices lignes et colonnes (à partir de 0)
+            if Modifs != []:
+                Modifs_rdy = []
+                lm = 0
+                cm = 0
+                for (id, col, v) in Modifs:
+                    l = rows_TDB[id]
+                    if l > lm:
+                        lm = l
+                    c = TDB_tampon_index[col]     # Modification de la partie « tampon » du TDB
+                    if c > cm:
+                        cm = c
+                    if v == None:
+                        v = '' 
+                    elif v == "None_EAT":
+                        v = "_EAT"
+                    Modifs_rdy.append((l, c, v))
                 
-                cell = sheet.cell(l, c)
-                cell.value = v
-                cells_to_update.append(cell)
-                
-            if cells_to_update != []:
+                # Récupère toutes les valeurs sous forme de cellules gspread
+                cells = sheet.range(1, 1, lm+1, cm+1)   # gspread indexe à partir de 1 (comme les gsheets)
+                # raise KeyError(str(cells)) 
+                # raise KeyError("{}/{}".format(lm,cm))
+                # a = ""
+                cells_to_update = []
+                for (l, c, v) in Modifs_rdy:
+                    cell = [cell for cell in filter(lambda cell:cell.col == c+1 and cell.row == l+1, cells)][0]
+                    cell.value = v       # cells : ([<L1C1>, <L1C2>, ..., <L1Ccm>, <L2C1>, <L2C2>, ..., <LlmCcm>]
+                    cells_to_update.append(cell)
+                    # a += "lm:{}/cm:{} - l:{}/c:{} - .row:{}/.col:{}\n".format(lm, cm, l, c, cell.row, cell.col)
+                    
+                # raise KeyError(a)
                 sheet.update_cells(cells_to_update)
                 
                 if verbose:
@@ -210,8 +225,9 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             raise ValueError("WRONG OR MISSING PASSWORD!")
             
     except Exception as e:
-        db.session.expunge_all()
+        db.session.rollback()
         return (400, "{}({})".format(type(e).__name__, str(e)))     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
+        # return (400, "".join(traceback.format_exc()))     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error) 
         
     else:
         return r
@@ -271,9 +287,9 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
                 user_cC = [user for user in users_cC if user.messenger_user_id==id][0]    # user correspondant dans cache_Chatfuel
                 user_cT = [user for user in users_cT if user.messenger_user_id==id][0]    # user correspondant dans cache_TDB
                 
-                 # Comparaison Chatfuel et cache_Chatfuel. En théorie, il ne devrait jamais y avoir de différence, sauf si quelqu'un s'amuse à modifier un attribut direct dans Chatfuel – ce qu'il ne faut PAS (plus) faire, parce qu'on ré-écrase
+                # Comparaison Chatfuel et cache_Chatfuel. En théorie, il ne devrait jamais y avoir de différence, sauf si quelqu'un s'amuse à modifier un attribut direct dans Chatfuel – ce qu'il ne faut PAS (plus) faire, parce qu'on ré-écrase
                 
-                if user_cC != user_Chatfuel:    
+                if user_cC != user_Chatfuel:
                     for col in cols:
                         if getattr(user_cC, col) != getattr(user_Chatfuel, col):
                             if verbose:
@@ -369,12 +385,16 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
                                             [chatfuel.Button("show_block", "Retour menu 🏠", "Menu"),
                                             chatfuel.Button("show_block", "MJ ALED 🆘", "MJ ALED")
                                             ]))
-
+                                            
             
             ### APPLICATION DES MODIFICATIONS SUR LE TDB
             # Bon, il faut se connecter à GSheets, récupérer les IDs, tout ça... C'est un peu long du coup on le fait que si Modifs_TDB est vide
             
             if Modifs_TDB != []:
+                Modifs_rdy = []
+                lm = 0
+                cm = 0
+                
                 workbook = gsheets.connect("1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs")  # [DEV NextStep]
                 sheet = workbook.worksheet("Journée en cours")
                 values = sheet.get_all_values()     # Liste de liste des valeurs
@@ -391,17 +411,29 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
                     if (id != "") and RepresentsInt(id):
                         rows_TDB[int(id)] = l
                         
-                cells_to_update = []
                 for (id, col, v) in Modifs_TDB:     # Modification de la partie « tampon » du TDB
-                    l = rows_TDB[id] + 1                # gspread indexe à partir de 1 (comme les gsheets, mais bon...)
-                    c = TDB_tampon_index[col] + 1
+                    l = rows_TDB[id]                # gspread indexe à partir de 1 (comme les gsheets, mais bon...)
+                    if l > lm:
+                        lm = l
+                    c = TDB_tampon_index[col]
+                    if c > cm:
+                        cm = c
+                    if v == None:
+                        v = '' 
+                    elif v == "None_EAT":
+                        v = "_EAT"
+                    Modifs_rdy.append((l, c, v))
                     
-                    cell = sheet.cell(l, c)
-                    cell.value = '' if v==None else v
+                # Récupère toutes les valeurs sous forme de cellules gspread
+                cells = sheet.range(1, 1, lm+1, cm+1)   # gspread indexe à partir de 1 (comme les gsheets)
+                
+                cells_to_update = []
+                for (l, c, v) in Modifs_rdy:
+                    cell = [cell for cell in filter(lambda cell:cell.col == c+1 and cell.row == l+1, cells)][0]
+                    cell.value = v       # cells : ([<L1C1>, <L1C2>, ..., <L1Ccm>, <L2C1>, <L2C2>, ..., <LlmCcm>]
                     cells_to_update.append(cell)
                     
-                if cells_to_update != []:
-                    sheet.update_cells(cells_to_update)
+                sheet.update_cells(cells_to_update)
                     
                 
             ### APPLICATION DES MODIFICATIONS SUR LES BDD cache
@@ -418,9 +450,11 @@ def sync_Chatfuel(d, j):    # d : pseudo-dictionnaire des arguments passés en G
             raise ValueError("WRONG OR MISSING PASSWORD!")
             
     except Exception as exc:
-        db.session.expunge_all()
-        return chatfuel.ErrorReport(exc, verbose=verbose, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")
-        
+        db.session.rollback()
+        if type(exc).__name__ == "OperationalError":
+            return chatfuel.ErrorReport(Exception("Impossible d'accéder à la BDD, réessaie ! (souvent temporaire)"), verbose=verbose, message="Une erreur technique est survenue 😪\n Erreur :")
+        else:
+            return chatfuel.ErrorReport(exc, verbose=verbose, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")
     else:
         return chatfuel.Response(R, set_attributes=(format_Chatfuel(Modifs_Chatfuel) or None))
 
@@ -463,7 +497,11 @@ def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET 
             raise ValueError("WRONG OR MISSING PASSWORD!")
             
     except Exception as exc:
-        return chatfuel.ErrorReport(exc, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")
+        db.session.rollback()
+        if type(exc).__name__ == "OperationalError":
+            return chatfuel.ErrorReport(Exception("Impossible d'accéder à la BDD, réessaie ! (souvent temporaire)"), verbose=verbose, message="Une erreur technique est survenue 😪\n Erreur :")
+        else:
+            return chatfuel.ErrorReport(exc, verbose=verbose, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")
         
     else:
         return chatfuel.Response(R)
@@ -503,6 +541,21 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
             if "viewtable" in p:
                 r += viewtable(d, p)
                 
+            if "testsheets" in d:
+                workbook = gsheets.connect("1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs")  # [DEV NextStep]
+                sheet = workbook.worksheet("Journée en cours")
+                values = sheet.get_all_values()     # Liste de liste des valeurs
+                
+                r += "<br/>TEST SHEETS.<br/>"
+                r += "<p>values:" + strhtml(str(type(values))) + "</p>"
+                r += "<p>values[8]:" + strhtml(str(type(values[8]))) + "</p>"
+                r += "<p>values[8][8]:" + strhtml(values[8][8]) + "</p><br /><br />"
+                
+                val = sheet.cell(8, 8)
+                r += "<p>val:" + strhtml(str(type(val))) + "</p>"
+                r += "<p>val.value:" + strhtml(str(type(val.value))) + "</p>"
+                r += "<p>dir(val):" + strhtml(str(dir(val))) + "</p><br /><br />"
+
             
             if "testupdate" in d:
                 

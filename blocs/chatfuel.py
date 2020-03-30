@@ -53,7 +53,7 @@ class Response(ChatfuelBase):
 class ErrorReport(Response):
     """Call in place of Response for reporting any Python error to the Chatfuel end user.
     
-    Syntax: ErrorReport(exception)"""
+    Syntax: ErrorReport(exception, verbose=False, message="WARNING - PYTHON ERROR:")"""
     
     def __init__(self, exc, verbose=False, message="WARNING - PYTHON ERROR:"):
         m1 = Text(message)
