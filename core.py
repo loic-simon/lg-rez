@@ -9,6 +9,8 @@ import blocs.gsheets as gsheets
 import string, random
 import sys, traceback
 
+import requests, json
+
 
 GLOBAL_PASSWORD = "C'estSuperSecure!"
 
@@ -126,6 +128,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             ### COMPARAISON
             
             Modifs = []         # Modifs à porter au TDB : tuple (id - colonne (nom) - valeur)
+            Modified_ids = []
             
             for user_cT in users_cT.copy():                      ## 1. Joueurs dans le cache supprimés du TDB
                 if user_cT.messenger_user_id not in ids_TDB:
@@ -172,9 +175,50 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                                 
                             setattr(user_cT, col, getattr(user_TDB, col))
                             flag_modified(user_cT, col)
-                            Modifs.append( ( id, col, str(getattr(user_TDB, col))+"_EAT" ) )
+                            # Modifs.append( ( id, col, str(getattr(user_TDB, col))+"_EAT" ) )
+                            Modifs.append( ( id, col, getattr(user_TDB, col) ) )        # Avec le passage direct à Chatfuel, plus besoin de _EAT. La modif ne sera indiquée dans le TDB que si tout est successful.
+                            if id not in Modified_ids:
+                                Modified_ids.append(id)
                                 
-                                
+
+
+            ### MODIFICATIONS DANS CHATFUEL DIRECT (WIP)
+            
+            if Modified_ids != []:
+                BOT_ID = "5be9b3b70ecd9f4c8cab45e0"
+                CHATFUEL_TOKEN = "mELtlMAHYqR0BvgEiMq8zVek3uYUK3OJMbtyrdNPTrQB9ndV0fM7lWTFZbM4MZvD"
+                CHATFUEL_TAG = "CONFIRMED_EVENT_UPDATE"
+                
+                params_r = {"chatfuel_token" : CHATFUEL_TOKEN,
+                            "chatfuel_message_tag" : CHATFUEL_TAG,
+                            "chatfuel_block_name" : "Sync"}
+                        
+                for id in Modified_ids:
+                    
+                    # if id == 2033317286706583:      # PROVISOIRE : ne trigger que sur moi
+                    
+                    attrs = {}
+                    for (idM, col, v) in Modifs:
+                        if id == idM:
+                            attrs[col] = v
+                            attrs["sync_{}".format(col)] = True
+                            
+                    params = format_Chatfuel(attrs)
+                    for k,v in params_r.items():
+                        params[k] = v
+                        
+                    url_params = "&".join(["{}={}".format(k,v) for k,v in params.items()])
+                    
+                    rep = requests.post("https://api.chatfuel.com/bots/{}/users/{}/send?{}".format(BOT_ID, id, url_params))
+                    rep = rep.json()
+                    
+                    if "code" in rep:
+                        raise Exception("Erreur d'envoi Chatfuel Broadcast API. Réessaie.")
+                    else:
+                        if not rep["success"]:
+                            raise Exception("Chatfuel Broadcast API a renvoyé une erreur : {}".format(rep["result"]))
+
+
             ### APPLICATION DES MODIFICATIONS SUR LE TDB
             
             # Convertit ID et colonne en indices lignes et colonnes (à partir de 0)
@@ -193,6 +237,8 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                         v = '' 
                     elif v == "None_EAT":
                         v = "_EAT"
+                    elif v == "None":
+                        v = ""
                     Modifs_rdy.append((l, c, v))
                 
                 # Récupère toutes les valeurs sous forme de cellules gspread
@@ -467,16 +513,16 @@ def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET 
     try:
         if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
             
-            tous = cache_Chatfuel.query.all()     # Liste des joueurs tels qu'actuellement en cache
+            tous = cache_TDB.query.all()     # Liste des joueurs tels qu'actuellement en cache
             NT = len(tous)
             
             if "type" in d and d["type"] == "vivants":
-                rep = cache_Chatfuel.query.filter(cache_Chatfuel.statut != "mort").order_by(cache_Chatfuel.nom).all()
+                rep = cache_TDB.query.filter(cache_TDB.statut != "mort").order_by(cache_TDB.nom).all()
                 descr = "en vie"
                 bouton_text = "Joueurs morts ☠"
                 bouton_bloc = "Joueurs morts"
             elif "type" in d and d["type"] == "morts":
-                rep = cache_Chatfuel.query.filter(cache_Chatfuel.statut == "mort").order_by(cache_Chatfuel.nom).all()
+                rep = cache_TDB.query.filter(cache_TDB.statut == "mort").order_by(cache_TDB.nom).all()
                 descr = "morts" 
                 bouton_text = "Joueurs en vie 🕺"
                 bouton_bloc = "Joueurs en vie"
@@ -645,3 +691,43 @@ def API_test(d):
 
     finally:
         return rep
+
+
+def Hermes_test(d):
+    r = "<h1>Hermes test.</h1><hr/><br/>"
+    try:
+
+        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
+
+            ### COMPORTEMENT OPTION
+
+            BOT_ID = "5be9b3b70ecd9f4c8cab45e0"
+            CHATFUEL_TOKEN = "mELtlMAHYqR0BvgEiMq8zVek3uYUK3OJMbtyrdNPTrQB9ndV0fM7lWTFZbM4MZvD"
+            CHATFUEL_TAG = "CONFIRMED_EVENT_UPDATE"
+            id = 2033317286706583
+            bloc = d["bloc"] if "bloc" in d else "Sync"
+            
+            
+            params = {"chatfuel_token" : CHATFUEL_TOKEN,
+                      "chatfuel_message_tag" : CHATFUEL_TAG,
+                      "chatfuel_block_name" : bloc}
+                      
+            for k,v in d.items():
+                if k[:4] == "sync":
+                    params[k] = v
+                    
+            r += "Requête : <pre>{}</pre>".format(json.dumps(params, indent=4))
+            
+            url_params = "&".join(["{}={}".format(k,v) for k,v in params.items()])
+            
+            rep = requests.post("https://api.chatfuel.com/bots/{}/users/{}/send?{}".format(BOT_ID, id, url_params))
+            r += "<br /><br />Réponse : <pre>{}</pre>".format(rep.text)
+
+        else:
+            raise ValueError("WRONG OR MISSING PASSWORD!")
+
+    except Exception:
+        r += infos_tb()     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
+
+    finally:
+        return r

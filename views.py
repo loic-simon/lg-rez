@@ -69,3 +69,7 @@ def holder_liste_joueurs():
 @app.route('/API_test', methods=['GET', 'POST'])
 def holder_API_test():
     return API_test(request.json)
+
+@app.route('/Hermes_test', methods=['GET'])
+def holder_Hermes_test():
+    return Hermes_test(request.args)
