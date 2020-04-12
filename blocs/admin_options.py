@@ -2,9 +2,9 @@
 def html_table(LL, beg_row, end_row):
     r = "<table style='border:1px solid black; border-collapse: collapse;'>"
     for L in LL:
-        r += "<tr>{}<td style='border:1px solid black; padding:2pt;'>".format(beg_row)
+        r += f"<tr>{beg_row}<td style='border:1px solid black; padding:2pt;'>"
         r += "</td><td style='border:1px solid black; padding:2pt;'>".join([str(l) for l in L])
-        r += "</td>{}</tr>".format(end_row)
+        r += f"</td>{end_row}</tr>"
     r += "</table>"
     return r
 
@@ -13,15 +13,15 @@ def viewtable(d, p):
     r = ""
 
     table = p["table"]
-    r += "<h2>Table : {}</h2>".format(table)
+    r += f"<h2>Table : {table}</h2>"
 
     cols = [column.key for column in globals()[table].__table__.columns]
     LE = globals()[table].query.all()
     LE = [[ e.__dict__[k] for k in cols ] for e in LE]
 
-    tete = ["<b>{}</b>".format(ee) for ee in cols] + ["Action"]
+    tete = [f"<b>{ee}</b>" for ee in cols] + ["Action"]
 
-    delButton = lambda x:"""<form action="admin?pwd={}" method="post"> <input type="hidden" name="table" value="{}"> <input type="hidden" name="id" value="{}"> <input type="submit" name="delitem" value="Suppr">""".format(GLOBAL_PASSWORD, table, x)
+    delButton = lambda x:f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post"> <input type="hidden" name="table" value="{table}"> <input type="hidden" name="id" value="{x}"> <input type="submit" name="delitem" value="Suppr">"""
 
     corps = [e + [delButton(e[cols.index("messenger_user_id")])] for e in LE]
 
@@ -39,12 +39,13 @@ def viewtable(d, p):
                     "finRole": None,
             }
 
-    nouv = ["""<input type="text" name="{}" size="10cm" value={}>""".format(ee, itemDefault[ee]) for ee in cols] + ["""<input type="submit" name="additem" value="Créer">"""]
+    nouv = [f"""<input type="text" name="{ee}" size="10cm" value={itemDefault[ee]}>""" for ee in cols] + ["""<input type="submit" name="additem" value="Créer">"""]
 
 
-    r += html_table([tete] + corps + [nouv], """<form action="admin?pwd={}" method="post">
-                                                <input type="hidden" name="table" value="{}">""".format(GLOBAL_PASSWORD, table),
-                                            "</form>" )
+    r += html_table([tete] + corps + [nouv],
+                    f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">
+                        <input type="hidden" name="table" value="{table}">""",
+                    "</form>")
     r += "<br />"
 
     return r
@@ -54,8 +55,8 @@ def additem(d, p):
     r = ""
 
     table = p["table"]
-    r += "<h2>Ajout d'élément</h2>".format(table)
-    r += "Table : {}\n\n".format(table)
+    r += "<h2>Ajout d'élément</h2>"
+    r += f"Table : {table}\n\n"
 
     user_TDB = globals()[table](
                         messenger_user_id = p["messenger_user_id"],
@@ -82,8 +83,8 @@ def delitem(d, p):
 
     table = p["table"]
     id = p["id"]
-    r += "<h2>Suppression d'élément</h2>".format(table)
-    r += "Table : {}, ID : {}\n\n".format(table, id)
+    r += "<h2>Suppression d'élément</h2>"
+    r += f"Table : {table}, ID : {id}\n\n"
 
     try:
         user_TDB = globals()[table].query.filter_by(messenger_user_id=id).one()

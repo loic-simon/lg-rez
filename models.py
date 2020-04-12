@@ -21,7 +21,7 @@ class cache_TDB(db.Model):
     finRole = db.Column(db.Integer(), nullable=True)
 
     def __repr__(self):
-        return "<cache_TDB ({}/{})>".format(self.messenger_user_id, self.nom)
+        return f"<cache_TDB ({self.messenger_user_id}/{self.nom})>"
 
     def __init__(self, messenger_user_id, inscrit, nom, chambre, statut, role, camp, votantVillage, votantLoups, roleActif=None, debutRole=None, finRole=None):
         self.messenger_user_id = messenger_user_id

@@ -25,7 +25,7 @@ def infos_tb(quiet=False):
     if quiet:
         return tb
     else:
-        return "<br/><div> AN EXCEPTION HAS BEEN RAISED! <br/><pre>{}</pre></div>".format(tb)
+        return f"<br/><div> AN EXCEPTION HAS BEEN RAISED! <br/><pre>{tb}</pre></div>"
 
 def RepresentsInt(s):
     try: 
@@ -53,9 +53,9 @@ def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input
             else:
                 raise ValueError()
         else:
-            raise KeyError("unknown column type for column '{}': '{}''".format(col, SQL_type))
+            raise KeyError(f"unknown column type for column '{col}': '{SQL_type}''")
     except (ValueError, TypeError):
-        raise ValueError("Valeur '{}' incorrecte pour la colonne '{}' (type '{}'/{})".format(value, col, SQL_type, 'NOT NULL' if not nullable else ''))
+        raise ValueError(f"Valeur '{value}' incorrecte pour la colonne '{col}' (type '{SQL_type}'/{'NOT NULL' if not nullable else ''})")
 
 def format_Chatfuel(d):         # Représentation des attributs dans Chatfuel
     for k,v in d.items():
@@ -93,7 +93,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             (NL, NC) = (len(values), len(values[0]))
             
             if verbose:
-                r += "<{}L/{}C>\n".format(NL, NC)
+                r += f"<{NL}L/{NC}C>\n"
                 
             head = values[2]
             TDB_index = {col:head.index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
@@ -140,12 +140,12 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                     # db.session.delete(user_cC)
                     
                     if verbose:
-                        r += "\nJoueur dans les caches hors TDB : {}".format(user_cache)
+                        r += f"\nJoueur dans les caches hors TDB : {user_cache}"
                         
             for user_cache in users_TDB:                               ## 2. Joueurs dans le TDB pas encore dans le cache
                 if user_cache.messenger_user_id not in ids_cache:
                     if verbose:
-                        r += "\nJoueur dans le TDB hors caches : {}".format(user_cache)
+                        r += f"\nJoueur dans le TDB hors caches : {user_cache}"
                         
                     users_cache.append(user_cache)
                     db.session.add(user_cache)
@@ -165,13 +165,13 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                     
                 if user_cache != user_TDB:     # Au moins une différence !
                     if verbose:
-                        r += "\nJoueur différant entre TDB et cache_TDB : {}".format(user_TDB)
+                        r += f"\nJoueur différant entre TDB et cache_TDB : {user_TDB}"
                     id = user_TDB.messenger_user_id
                     
                     for col in cols:
                         if getattr(user_cache, col) != getattr(user_TDB, col):
                             if verbose:
-                                r += "\n---- Colonne différant : {} (TDB : {}, cache_TDB : {})".format(col, getattr(user_TDB, col), getattr(user_cache, col))
+                                r += f"\n---- Colonne différant : {col} (TDB : {getattr(user_TDB, col)}, cache_TDB : {getattr(user_cache, col)})"
                                 
                             setattr(user_cache, col, getattr(user_TDB, col))
                             flag_modified(user_cache, col)
@@ -199,15 +199,15 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                     for (idM, col, v) in Modifs:
                         if id == idM:
                             attrs[col] = v
-                            attrs["sync_{}".format(col)] = True
+                            attrs[f"sync_{col}"] = True
                             
                     params = format_Chatfuel(attrs)
                     for k,v in params_r.items():
                         params[k] = v
                         
-                    url_params = "&".join(["{}={}".format(k,v) for k,v in params.items()])
+                    url_params = "&".join([f"{k}={v}" for k,v in params.items()])
                     
-                    rep = requests.post("https://api.chatfuel.com/bots/{}/users/{}/send?{}".format(BOT_ID, id, url_params))
+                    rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{id}/send?{url_params}")
                     rep = rep.json()
                     
                     if "code" in rep:
@@ -215,7 +215,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                     else:
                         if not rep["success"]:
                             pass
-                            # raise Exception("Chatfuel Broadcast API a renvoyé une erreur : {}".format(rep["result"]))
+                            # raise Exception(f"Chatfuel Broadcast API a renvoyé une erreur : {rep["result"]}")
 
 
             ### APPLICATION DES MODIFICATIONS SUR LE TDB
@@ -243,14 +243,14 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                 # Récupère toutes les valeurs sous forme de cellules gspread
                 cells = sheet.range(1, 1, lm+1, cm+1)   # gspread indexe à partir de 1 (comme les gsheets)
                 # raise KeyError(str(cells)) 
-                # raise KeyError("{}/{}".format(lm,cm))
+                # raise KeyError(f"{lm}/{cm}")
                 # a = ""
                 cells_to_update = []
                 for (l, c, v) in Modifs_rdy:
                     cell = [cell for cell in filter(lambda cell:cell.col == c+1 and cell.row == l+1, cells)][0]
                     cell.value = v       # cells : ([<L1C1>, <L1C2>, ..., <L1Ccm>, <L2C1>, <L2C2>, ..., <LlmCcm>]
                     cells_to_update.append(cell)
-                    # a += "lm:{}/cm:{} - l:{}/c:{} - .row:{}/.col:{}\n".format(lm, cm, l, c, cell.row, cell.col)
+                    # a += f"lm:{lm}/cm:{cm} - l:{l}/c:{c} - .row:{cell.row}/.col:{cell.col}\n"
                     
                 # raise KeyError(a)
                 sheet.update_cells(cells_to_update)
@@ -271,7 +271,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             
     except Exception as e:
         db.session.rollback()
-        return (400, "{}({})".format(type(e).__name__, str(e)))     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
+        return (400, f"{type(e).__name__}({str(e)})")     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
         # return (400, "".join(traceback.format_exc()))     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error) 
         
     else:
@@ -303,7 +303,7 @@ def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET 
                 
             NR = len(rep)
             if NR > 0:
-                R.append(chatfuel.Text("Liste des {}/{} joueurs {} :".format(NR, NT, descr)))
+                R.append(chatfuel.Text(f"Liste des {NR}/{NT} joueurs {descr} :"))
                 LJ = [u.nom for u in rep]
             else:
                 LJ = ["Minute, papillon !"]
@@ -342,7 +342,7 @@ def manual(d):
     
 def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd notemment) ; p : idem pour les arguments POST (différentes options du panneau)
     try:
-        r = "<h1>« Panneau d'administration » (vaguement, hein) LG Rez</h1><hr/>".format(dict(d), dict(p))
+        r = "<h1>« Panneau d'administration » (vaguement, hein) LG Rez</h1><hr/>"
 
         if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
 
@@ -391,8 +391,8 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
 
             ### CHOIX D'UNE OPTION
                 
-            r += """<hr/><br />
-                    <form action="admin?pwd={}" method="post">
+            r += f"""<hr/><br />
+                    <form action="admin?pwd={GLOBAL_PASSWORD}" method="post">
                         <div>
                             <fieldset>
                                 <legend>Voir une table</legend>
@@ -403,18 +403,18 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
                             </fieldset>
                         </div>
                     </form>
-            """.format(GLOBAL_PASSWORD)
+            """
 
 
             ### ARGUMENTS BRUTS (pour débug)
             
-            r += """<br/><hr/><br/>
+            r += f"""<br/><hr/><br/>
                 <div>
                     <i>
-                        GET args:{} <br/>
-                        POST args:{}
+                        GET args:{dict(d)} <br/>
+                        POST args:{dict(p)}
                     </i>
-                </div>""".format(dict(d), dict(p))
+                </div>"""
 
         else:
             raise ValueError("WRONG OR MISSING PASSWORD!")
@@ -488,12 +488,12 @@ def Hermes_test(d):
                 if k[:4] == "sync":
                     params[k] = v
                     
-            r += "Requête : <pre>{}</pre>".format(json.dumps(params, indent=4))
+            r += f"Requête : <pre>{json.dumps(params, indent=4)}</pre>"
             
-            url_params = "&".join(["{}={}".format(k,v) for k,v in params.items()])
+            url_params = "&".join([f"{k}={v}" for k,v in params.items()])
             
-            rep = requests.post("https://api.chatfuel.com/bots/{}/users/{}/send?{}".format(BOT_ID, id, url_params))
-            r += "<br /><br />Réponse : <pre>{}</pre>".format(rep.text)
+            rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{id}/send?{url_params}")
+            r += f"<br /><br />Réponse : <pre>{rep.text}</pre>"
 
         else:
             raise ValueError("WRONG OR MISSING PASSWORD!")

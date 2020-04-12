@@ -10,7 +10,7 @@ class ChatfuelBase(dict):
         self.contents = "None"
     
     def __repr__(self):
-        return "<Chatfuel{}: {}>".format(type(self).__name__, repr(self.contents))
+        return f"<Chatfuel{type(self).__name__}: {repr(self.contents)}>"
 
 
 class Response(ChatfuelBase):
@@ -28,7 +28,7 @@ class Response(ChatfuelBase):
         try:
             for m in Messages:
                 if not isinstance(m, ChatfuelMessage):
-                    raise TypeError("All elements of LQR must be instances of ChatfuelMessage. Received: {}".format(type(m)))
+                    raise TypeError(f"All elements of LQR must be instances of ChatfuelMessage. Received: {type(m)}")
         except TypeError:
             raise TypeError("Argument of Response must be a subscriptable of instances of ChatfuelMessage.")
         
@@ -38,7 +38,7 @@ class Response(ChatfuelBase):
         if set_attributes != None:
             if isinstance(set_attributes, dict):
                 self["set_attributes"] = set_attributes
-                self.contents += "(set_attributes:{})".format(set_attributes.keys())
+                self.contents += f"(set_attributes:{set_attributes.keys()})"
             else:
                 raise TypeError("Optionnal argument set_attributes must be an instance of dict")
         
@@ -47,7 +47,7 @@ class Response(ChatfuelBase):
                 self["redirect_to_blocks"] = [redirect_to_blocks]
             else:
                 self["redirect_to_blocks"] = redirect_to_blocks
-            self.contents += "(redirect_to:{})".format(set_attributes.keys())
+            self.contents += f"(redirect_to:{set_attributes.keys()})"
 
 
 class ErrorReport(Response):
@@ -60,7 +60,7 @@ class ErrorReport(Response):
         if verbose:
             m2 = Text(traceback.format_exc())
         else:
-            m2 = Text("{} : {}".format(type(exc).__name__, exc))
+            m2 = Text(f"{type(exc).__name__} : {exc}")
         Response.__init__(self, [m1, m2])
 
 
@@ -96,12 +96,12 @@ class Button(ChatfuelBase):
                 self["phone_number"] = bact
             else:
                 self["url"] = bact
-            self.contents = "{} ({}:{})".format(btitle,btype,bact)
+            self.contents = f"{btitle} ({btype}:{bact})"
             
             if ((btype == "show_block") or (btype == "json_plugin_url")) and (set_attributes != None):
                 if isinstance(set_attributes, dict):
                     self["set_attributes"] = set_attributes
-                    self.contents += "(set_attributes:{})".format(set_attributes.keys())
+                    self.contents += f"(set_attributes:{set_attributes.keys()})"
                 else:
                     raise TypeError("Optionnal argument set_attributes must be an instance of dict")
         else:
@@ -122,16 +122,16 @@ class ChatfuelMessage(ChatfuelBase):
             
         try:
             if len(LQR) < 1 or len(LQR) > 11:
-                raise ValueError("min 1 to max 11 quick replies per addQuickReplies block required. Received: {}".format(len(LQR)))
+                raise ValueError(f"min 1 to max 11 quick replies per addQuickReplies block required. Received: {len(LQR)}")
             else:
                 for QR in LQR:
                     if not isinstance(QR, Button):
-                        raise TypeError("All elements of LQR must be instances of Button. Received: {}".format(type(QR)))
+                        raise TypeError(f"All elements of LQR must be instances of Button. Received: {type(QR)}")
         except TypeError:
             raise TypeError("addQuickReplies argument must be a non-empty subscriptable of Button objets.")
                         
         self["quick_replies"] = list(LQR)
-        self.contents += " + {}".format(list(LQR))
+        self.contents += f" + {list(LQR)}"
             
         if (not process_text_by_ai) or (save_to_attribute != None):     # Options
             self["quick_reply_options"] = {}
@@ -140,7 +140,7 @@ class ChatfuelMessage(ChatfuelBase):
                 self.contents += "(NO AI)"
             if save_to_attribute != None:
                 self["quick_reply_options"]["text_attribute_name"] = save_to_attribute        
-                self.contents += "(SAVE TO {})".format(save_to_attribute)
+                self.contents += f"(SAVE TO {save_to_attribute})"
                 
         return self
     
@@ -232,11 +232,11 @@ class Buttons(ChatfuelMessage):
         ChatfuelBase.__init__(self)
         try:
             if len(LB) < 1 or len(LB) > 3:
-                raise ValueError("min 1 to max 3 buttons per Buttons block required. Received: {}".format(len(LB)))
+                raise ValueError(f"min 1 to max 3 buttons per Buttons block required. Received: {len(LB)}")
             else:
                 for b in LB:
                     if not isinstance(b, Button):
-                        raise TypeError("All elements of LB must be instances of Button. Received: {}".format(type(b)))
+                        raise TypeError(f"All elements of LB must be instances of Button. Received: {type(b)}")
         except TypeError:
             raise TypeError("2nd argument of Buttons must be a non-empty subscriptable of Button objets")
             
@@ -246,7 +246,7 @@ class Buttons(ChatfuelMessage):
                                 "template_type": "button",
                                 "buttons": list(LB)
                               }}
-        self.contents = "{} >{}".format(text,list(LB))
+        self.contents = f"{text} >{list(LB)}"
 
 
 
@@ -282,7 +282,7 @@ class QuickReply(ChatfuelBase):
             else:
                 self["type"] = QRtype
                 self["url"] = QRarg
-            self.contents = "{} ({}:{})".format(QRtitle,QRtype,QRarg)
+            self.contents = f"{QRtitle} ({QRtype}:{QRarg})"
         else:
             raise TypeError("Unknow quick reply type. See QuickReply.QR_TYPES for allowed types.")
 
