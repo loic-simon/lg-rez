@@ -25,10 +25,6 @@ def handle_invalid_usage(error):
 def index():
     return "Hello world !"
 
-@app.route('/yikes/', methods=['GET', 'POST'])
-def yikes():
-    return "YIIIIIIKES"
-
 
 @app.route('/admin', methods=['GET', 'POST'])
 def holder_admin():
@@ -38,10 +34,6 @@ def holder_admin():
 def holder_manual():
     return manual(request.args)
 
-
-@app.route('/getsetcell', methods=['GET'])
-def holder_getsetcell():
-    return getsetcell(request.args)
 
 
 
@@ -54,9 +46,9 @@ def holder_sync_TDB():
         return r
         
         
-@app.route('/sync_Chatfuel', methods=['GET', 'POST'])
-def holder_sync_Chatfuel():
-    return sync_Chatfuel(request.args, request.json)
+# @app.route('/sync_Chatfuel', methods=['GET', 'POST'])
+# def holder_sync_Chatfuel():
+#     return sync_Chatfuel(request.args, request.json)
         
         
 @app.route('/liste_joueurs', methods=['GET'])
