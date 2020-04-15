@@ -71,7 +71,7 @@ def viewcron(d, p):
 
 
 def restart_site(d, p):
-    r = "<h2>Redémarrage du site WTF</h2>"
+    r = "<h2>Redémarrage du site</h2>"
 
     rep = requests.get('https://api.alwaysdata.com/v1/site/', auth=(ALWAYSDATA_API_KEY, ''), data={})
     if rep:
@@ -84,9 +84,8 @@ def restart_site(d, p):
         # site_id = 594325
     else:
         raise ValueError(f"Request Error (HTTP code {rep.status_code})")
-
-    dic = {"restart":True}
-    rep = requests.patch(f"https://api.alwaysdata.com/v1/site/{site_id}/", auth=(ALWAYSDATA_API_KEY, ''), json=dic)
+    
+    rep = requests.post(f"https://api.alwaysdata.com/v1/site/{site_id}/restart/", auth=(ALWAYSDATA_API_KEY, ''))
     
     if rep:
         r += f"<pre>{rep.text}</pre>"

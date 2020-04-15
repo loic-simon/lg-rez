@@ -380,7 +380,7 @@ def cron_call(d):
             users = cache_TDB.query.filter_by(**criteres).all()     # Liste des joueurs répondant aux cirtères
             
             if verbose:
-                r += f"Utilisateur(s) répondant au critère : <pre>{html_escape(users)}</pre><br/>"
+                r += f"Utilisateur(s) répondant au critère : <pre>{html_escape(users)}</pre>"
                 
                 
             ### MODIFICATIONS DANS CHATFUEL DIRECT
@@ -397,7 +397,7 @@ def cron_call(d):
                     rep = rep.json()
                     
                     if verbose:
-                        r += f"Envoi job <code>{job}</code> à l'utilisateur <code>{html_escape(user)}</code><br/>"
+                        r += f"<br/>Envoi job <code>{job}</code> à l'utilisateur <code>{html_escape(user)}</code>"
                     
                     if "code" in rep:
                         raise Exception("Erreur d'envoi Chatfuel Broadcast API. Réessaie.")
