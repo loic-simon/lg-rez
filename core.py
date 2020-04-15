@@ -14,14 +14,27 @@ import requests, json
 
 GLOBAL_PASSWORD = "C'estSuperSecure!"
 
+BOT_ID = "5be9b3b70ecd9f4c8cab45e0"
+CHATFUEL_TOKEN = "mELtlMAHYqR0BvgEiMq8zVek3uYUK3OJMbtyrdNPTrQB9ndV0fM7lWTFZbM4MZvD"
+CHATFUEL_TAG = "CONFIRMED_EVENT_UPDATE"
+
+jobs = ["open_cond", "remind_cond", "close_cond",
+        "open_maire", "remind_maire", "close_maire",
+        "open_loups", "remind_loups", "close_loups",
+        "open_action", "remind_action", "close_action",
+        ]
+
 
 ### UTILITAIRES
 
 def strhtml(r):
     return r.replace('&','&esp;').replace('\n', '<br/>').replace('<','&lt;').replace('>','&gt;')
 
+def html_escape(r):
+    return str(r).replace('&','&esp;').replace('<','&lt;').replace('>','&gt;')
+
 def infos_tb(quiet=False):
-    tb = strhtml("".join(traceback.format_exc()))
+    tb = traceback.format_exc()
     if quiet:
         return tb
     else:
@@ -184,11 +197,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
             ### MODIFICATIONS DANS CHATFUEL DIRECT
             
-            if Modified_ids != []:
-                BOT_ID = "5be9b3b70ecd9f4c8cab45e0"
-                CHATFUEL_TOKEN = "mELtlMAHYqR0BvgEiMq8zVek3uYUK3OJMbtyrdNPTrQB9ndV0fM7lWTFZbM4MZvD"
-                CHATFUEL_TAG = "CONFIRMED_EVENT_UPDATE"
-                
+            if Modified_ids:
                 params_r = {"chatfuel_token" : CHATFUEL_TOKEN,
                             "chatfuel_message_tag" : CHATFUEL_TAG,
                             "chatfuel_block_name" : "Sync"}
@@ -205,9 +214,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                     for k,v in params_r.items():
                         params[k] = v
                         
-                    url_params = "&".join([f"{k}={v}" for k,v in params.items()])
-                    
-                    rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{id}/send?{url_params}")
+                    rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{id}/send", params=params)
                     rep = rep.json()
                     
                     if "code" in rep:
@@ -215,13 +222,13 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                     else:
                         if not rep["success"]:
                             pass
-                            # raise Exception(f"Chatfuel Broadcast API a renvoyé une erreur : {rep["result"]}")
+                            # raise Exception(f"""Chatfuel Broadcast API a renvoyé une erreur : {rep["result"]}""")
 
 
             ### APPLICATION DES MODIFICATIONS SUR LE TDB
             
             # Convertit ID et colonne en indices lignes et colonnes (à partir de 0)
-            if Modifs != []:
+            if Modifs:
                 Modifs_rdy = []
                 lm = 0
                 cm = 0
@@ -285,11 +292,11 @@ def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET 
     try:
         if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
             
-            tous = cache_TDB.query.all()     # Liste des joueurs tels qu'actuellement en cache
+            tous = cache_TDB.query.filter(cache_TDB.statut.in_(["vivant","MV","mort"])).all()     # Liste des joueurs tels qu'actuellement en cache
             NT = len(tous)
             
             if "type" in d and d["type"] == "vivants":
-                rep = cache_TDB.query.filter(cache_TDB.statut != "mort").order_by(cache_TDB.nom).all()
+                rep = cache_TDB.query.filter(cache_TDB.statut.in_(["vivant","MV"])).order_by(cache_TDB.nom).all()
                 descr = "en vie"
                 bouton_text = "Joueurs morts ☠"
                 bouton_bloc = "Joueurs morts"
@@ -324,7 +331,97 @@ def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET 
     else:
         return chatfuel.Response(R)
 
-    
+
+### APPEL D'UNE TÂCHE PLANIFIÉE
+
+def cron_call(d):
+    r = ""
+    try:
+        verbose = ('v' in d)
+        
+        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
+            
+            ### GÉNÉRALITÉS
+            
+            def get_criteres(job):
+                if job.endswith("cond") or job.endswith("maire"):
+                    return {"inscrit": True, "votantVillage": True}
+                elif job.endswith("loups"):
+                    return {"inscrit": True, "votantLoups": True}
+                elif job.endswith("action"):
+                    if ("heure" in d) and RepresentsInt(d["heure"]) and (0 <= (heure := int(d["heure"])) < 24):
+                        if job.startswith("open"):
+                            return {"inscrit": True, "roleActif": True, "debutRole": heure}
+                        else:
+                            return {"inscrit": True, "roleActif": True, "finRole": heure}
+                    else:
+                        raise ValueError("""Bad usage: required argument "heure" not in GET or incorrect""")
+                else:
+                    raise ValueError(f"""Cannot associate criteria to job {job}""")
+                    
+                    
+            ### DÉTECTION TÂCHE À FAIRE ET CRITÈRES ASSOCIÉS
+            
+            if ("job" in d) and (d["job"] in jobs):         # jobs : défini en début de fichier, car utile dans admin
+                job = d["job"]
+                if "test" in d:
+                    criteres = {"messenger_user_id": 2033317286706583}   # Loïc, pour tests
+                else:
+                    criteres = get_criteres(job)
+            else:
+                raise ValueError("""Bad usage: required argument "job" not in GET or incorrect""")
+                
+            if verbose:
+                r += f"""Job : <code>{job}</code><br/>Critère : <code>{html_escape(criteres)}</code><br/><br/>"""
+                
+                
+            ### RÉCUPÉRATION UTILISATEURS CACHE
+            
+            users = cache_TDB.query.filter_by(**criteres).all()     # Liste des joueurs répondant aux cirtères
+            
+            if verbose:
+                r += f"Utilisateur(s) répondant au critère : <pre>{html_escape(users)}</pre><br/>"
+                
+                
+            ### MODIFICATIONS DANS CHATFUEL DIRECT
+            
+            if users:
+                params = {"chatfuel_token": CHATFUEL_TOKEN,
+                          "chatfuel_message_tag": CHATFUEL_TAG,
+                          "chatfuel_block_name": "Tâche planifiée",
+                          "job": job
+                          }
+                          
+                for user in users:
+                    rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{user.messenger_user_id}/send", params=params)
+                    rep = rep.json()
+                    
+                    if verbose:
+                        r += f"Envoi job <code>{job}</code> à l'utilisateur <code>{html_escape(user)}</code><br/>"
+                    
+                    if "code" in rep:
+                        raise Exception("Erreur d'envoi Chatfuel Broadcast API. Réessaie.")
+                    else:
+                        if not rep["success"]:
+                            raise Exception(f"""Chatfuel Broadcast API a renvoyé une erreur : {rep["result"]}""")
+
+            ### FIN DE LA PROCÉDURE
+            
+        else:
+            raise ValueError("WRONG OR MISSING PASSWORD!")
+            
+    except Exception as e:
+        if verbose:
+            if "return_tb" in d:
+                return traceback.format_exc()
+            else:
+                return (400, "".join(traceback.format_exc()))     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error) 
+        else:
+            return (400, f"{type(e).__name__}({str(e)})")     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
+
+    else:
+        return r
+
 
 
 
@@ -374,15 +471,23 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
                 r += "<p>val.value:" + strhtml(str(type(val.value))) + "</p>"
                 r += "<p>dir(val):" + strhtml(str(dir(val))) + "</p><br /><br />"
 
-            
-            if "testupdate" in d:
-                
-                r += "<br/>TEST UPDATE 44444444<br/>"
-                
-                user_cache = cache_TDB.query.filter_by(messenger_user_id=44444444).first()
-                user_cache.nom = "BONSOIR"
-                db.session.commit()
-            
+            if "addcron" in p:
+                r += addcron(d, p)
+                r += viewcron(d, p)
+
+            if "delcron" in p:
+                r += delcron(d, p)
+                r += viewcron(d, p)
+
+            if "viewcron" in p:
+                r += viewcron(d, p)
+
+            if "sendjob" in p:
+                r += sendjob(d, p)
+
+            if "restart_site" in p:
+                r += restart_site(d, p)
+
             if "oskour" in d:
                 r += "OSKOUR<br/>"
                 db.session.rollback()
@@ -390,20 +495,30 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
             
 
             ### CHOIX D'UNE OPTION
-                
+            
             r += f"""<hr/><br />
                     <form action="admin?pwd={GLOBAL_PASSWORD}" method="post">
                         <div>
-                            <fieldset>
-                                <legend>Voir une table</legend>
+                            <fieldset><legend>Voir une table</legend>
                                 Table : 
-                                <label for="cache_TDB">cache_TDB </label> <input type="radio" name="table" value="cache_TDB" id="cache_TDB"> / 
-                                <!-- <label for="cache_Chatfuel">cache_Chatfuel </label> <input type="radio" name="table" value="cache_Chatfuel" id="cache_Chatfuel"> -->
+                                <label for="cache_TDB">cache_TDB </label> <input type="radio" name="table" value="cache_TDB" id="cache_TDB" checked> 
                                 <input type="submit" name="viewtable", value="Voir la table">
+                            </fieldset>
+                            <br />
+                            <fieldset><legend>Options Alwaysdata</legend>
+                                <label for="viewcron">Tâches automatisées (cron) :</label> <input type="submit" name="viewcron" id="viewcron" value="Voir les tâches"> <br />
+                                <label for="restart_site">Restart le site :</label> <input type="submit" name="restart_site" id="restart_site" value="Restart">
+                            </fieldset>
+                            <br />
+                            <fieldset><legend>Envoyer une tâche</legend>
+                                <label for="job">Tâche :</label> <select name="job" id="job">{''.join([f"<option value='{j}'>{j}</option>" for j in jobs])}</select> / 
+                                <label for="heure">Heure (si *_action) :</label> <input type="number" name="heure" id="heure" min=0 max=23> / 
+                                <label for="test">Mode test</label> <input type="checkbox" name="test" id="test"> / 
+                                </label> <input type="submit" name="sendjob" value="Envoyer">
                             </fieldset>
                         </div>
                     </form>
-            """
+                 """
 
 
             ### ARGUMENTS BRUTS (pour débug)
@@ -473,9 +588,6 @@ def Hermes_test(d):
 
             ### COMPORTEMENT OPTION
 
-            BOT_ID = "5be9b3b70ecd9f4c8cab45e0"
-            CHATFUEL_TOKEN = "mELtlMAHYqR0BvgEiMq8zVek3uYUK3OJMbtyrdNPTrQB9ndV0fM7lWTFZbM4MZvD"
-            CHATFUEL_TAG = "CONFIRMED_EVENT_UPDATE"
             id = 2033317286706583
             bloc = d["bloc"] if "bloc" in d else "Sync"
             
@@ -490,9 +602,7 @@ def Hermes_test(d):
                     
             r += f"Requête : <pre>{json.dumps(params, indent=4)}</pre>"
             
-            url_params = "&".join([f"{k}={v}" for k,v in params.items()])
-            
-            rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{id}/send?{url_params}")
+            rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{id}/send", params=params)
             r += f"<br /><br />Réponse : <pre>{rep.text}</pre>"
 
         else:

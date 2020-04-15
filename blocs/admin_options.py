@@ -1,11 +1,98 @@
 
-def html_table(LL, beg_row, end_row):
+def html_table(LL, first_row=None, row_start="", row_end=""):
     r = "<table style='border:1px solid black; border-collapse: collapse;'>"
-    for L in LL:
-        r += f"<tr>{beg_row}<td style='border:1px solid black; padding:2pt;'>"
+    for L in [[f"<b>{e}</b>" for e in first_row]] + LL:
+        r += f"<tr>{row_start}<td style='border:1px solid black; padding:2pt;'>"
         r += "</td><td style='border:1px solid black; padding:2pt;'>".join([str(l) for l in L])
-        r += f"</td>{end_row}</tr>"
+        r += f"</td>{row_end}</tr>"
     r += "</table>"
+    return r
+
+
+ALWAYSDATA_API_KEY = "f73dc3407a1949a8b0a7efd1b374f9c4"
+
+def viewcron(d, p):
+    r = "<h2>Tâches planifiées alwaysdata</h2>"
+
+    dic = {}
+    rep = requests.get('https://api.alwaysdata.com/v1/job/', auth=(ALWAYSDATA_API_KEY, ''), json=dic)
+    
+    if rep:
+        # r += f"<pre>{rep.text}</pre><hr />"
+        # r += f"<pre>{str(type(rep.json()))}</pre><hr />"
+        try:
+            lst = rep.json()
+        except:
+            lst = []
+    else:
+        raise ValueError(f"Request Error (HTTP code {rep.status_code})")
+
+    keys = list(lst[0].keys())
+    
+    delButton = lambda id:f"""<input type="hidden" name="id" value="{id}"><input type="submit" name="delcron" value="Suppr">"""
+    
+    corps = [[dic[k] for k in keys] + [delButton(dic["id"])] for dic in lst]
+    
+    fieldProperties = {"id": None,
+                       "href": None,
+                       "type": ["TYPE_URLS", "TYPE_COMMAND"],
+                       "date_type": ["DAILY", "FREQUENCY", "CRONTAB"],
+                       "argument": ''.join(random.choices(string.ascii_letters + string.digits, k=6)),
+                       "is_disabled": False,
+                       "daily_time": f"{random.randrange(24)}:{random.randrange(60)}",
+                       "frequency": "",
+                       "frequency_period": ["", "minute", "hour", "day", "week", "month"],
+                       "crontab_syntax": "",
+                       }
+                       
+    def champ(k, arg):
+        if arg is None:
+            return "<i>readonly</i>"
+        elif isinstance(arg, bool):
+            return f"""<input type="checkbox" name="{k}" {"checked" if arg else ""}>"""
+        elif isinstance(arg, str):
+            return f"""<input type="text" name="{k}" size="{len(arg) if arg != "" else 10}" value="{arg}">"""
+        elif isinstance(arg, int):
+            return f"""<input type="number" name="{k}" value="{arg}">"""
+        elif isinstance(arg, list):
+            options = ''.join([f"""<option value="{a}">{a}</option>""" for a in arg])
+            return f"""<select name="{k}">{options}</select>"""
+        else:
+            return "Unknow field property."
+            
+    nouv = [champ(k, fieldProperties[k]) for k in keys] + ["""<input type="submit" name="addcron" value="Créer">"""]
+
+    r += html_table(corps + [nouv],
+                    keys + ["Action"],
+                    f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">""",
+                    "</form>")
+    
+    return r
+
+
+def restart_site(d, p):
+    r = "<h2>Redémarrage du site WTF</h2>"
+
+    rep = requests.get('https://api.alwaysdata.com/v1/site/', auth=(ALWAYSDATA_API_KEY, ''), data={})
+    if rep:
+        # r += f"<pre>{rep.text}</pre><hr />"
+        # r += f"<pre>{str(type(rep.json()))}</pre><hr />"
+        try:
+            site_id = rep.json()[0]["id"]
+        except:
+            site_id = 0
+        # site_id = 594325
+    else:
+        raise ValueError(f"Request Error (HTTP code {rep.status_code})")
+
+    dic = {"restart":True}
+    rep = requests.patch(f"https://api.alwaysdata.com/v1/site/{site_id}/", auth=(ALWAYSDATA_API_KEY, ''), json=dic)
+    
+    if rep:
+        r += f"<pre>{rep.text}</pre>"
+    else:
+        raise ValueError(f"Request Error (HTTP code {rep.status_code})")
+        
     return r
 
 
@@ -19,30 +106,31 @@ def viewtable(d, p):
     LE = globals()[table].query.all()
     LE = [[ e.__dict__[k] for k in cols ] for e in LE]
 
-    tete = [f"<b>{ee}</b>" for ee in cols] + ["Action"]
+    tete = [ee for ee in cols] + ["Action"]
 
     delButton = lambda x:f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post"> <input type="hidden" name="table" value="{table}"> <input type="hidden" name="id" value="{x}"> <input type="submit" name="delitem" value="Suppr">"""
 
     corps = [e + [delButton(e[cols.index("messenger_user_id")])] for e in LE]
 
-    itemDefault = { "messenger_user_id": random.randrange(1000000000),
-                    "inscrit": True,
-                    "nom": ''.join(random.choices(string.ascii_uppercase + string.digits, k=6)),
-                    "chambre": random.randrange(101,800),
-                    "statut": "test",
-                    "role": "rôle"+str(random.randrange(15)),
-                    "camp": "camp"+str(random.randrange(3)),
-                    "votantVillage": random.randrange(1),
-                    "votantLoups": random.randrange(1),
-                    "roleActif": None,
-                    "debutRole": None,
-                    "finRole": None,
-            }
+    itemDefault = {"messenger_user_id": random.randrange(1000000000),
+                   "inscrit": True,
+                   "nom": ''.join(random.choices(string.ascii_uppercase + string.digits, k=6)),
+                   "chambre": random.randrange(101,800),
+                   "statut": "test",
+                   "role": "rôle"+str(random.randrange(15)),
+                   "camp": "camp"+str(random.randrange(3)),
+                   "votantVillage": random.randrange(1),
+                   "votantLoups": random.randrange(1),
+                   "roleActif": None,
+                   "debutRole": None,
+                   "finRole": None,
+                   }
 
     nouv = [f"""<input type="text" name="{ee}" size="10cm" value={itemDefault[ee]}>""" for ee in cols] + ["""<input type="submit" name="additem" value="Créer">"""]
 
 
-    r += html_table([tete] + corps + [nouv],
+    r += html_table(corps + [nouv],
+                    tete,
                     f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">
                         <input type="hidden" name="table" value="{table}">""",
                     "</form>")
@@ -97,3 +185,62 @@ def delitem(d, p):
         r += "Plusieurs résultats trouvés. Suppression non effectuée.\n\n"
 
     return r
+
+
+def addcron(d, p):
+    r = "<h2>Ajout de tâche planifiée alwaysdata</h2>"
+    
+    dic = {"type": p["type"],
+           "date_type": p["date_type"],
+           "argument": p["argument"],
+           "is_disabled": ("is_disabled" in p),
+           "daily_time": p["daily_time"] or None,       # Syntaxe incroyable : si p["daily_time"] == "", évalué comme False ==> passe à None, sinon p["daily_time"]
+           "frequency": p["frequency"] or None,
+           "frequency_period": p["frequency_period"] or None,
+           "crontab_syntax": p["crontab_syntax"] or None,
+           }
+           
+    r += f"Requête : <pre>{dic}</pre><hr />"
+           
+    rep = requests.post('https://api.alwaysdata.com/v1/job/', auth=(f'{ALWAYSDATA_API_KEY} account=lg-rez', ''), json=dic)
+    
+    if rep:
+        r += f"<pre>{rep.text}</pre><br />"
+        r += "Ajout réussi.<hr />"
+    else:
+        raise ValueError(f"Request Error (HTTP code {rep.status_code})")
+        
+    return r
+
+
+def delcron(d, p):
+    r = "<h2>Suppression de tâche planifiée alwaysdata</h2>"
+    
+    id = p["id"]
+    r += f"ID à supprimer : <code>{id}</code>"
+           
+    rep = requests.delete(f'https://api.alwaysdata.com/v1/job/{id}/', auth=(f'{ALWAYSDATA_API_KEY} account=lg-rez', ''))
+    
+    if rep:
+        r += f"<pre>{rep.text}</pre><br />"
+        r += "Suppression réussie.<hr />"
+    else:
+        raise ValueError(f"Request Error (HTTP code {rep.status_code})")
+        
+    return r
+
+
+def sendjob(d, p):
+    r = "<h2>Envoi de tâche</h2>"
+    
+    dic = {"pwd": d["pwd"],
+           "job": p["job"],
+           "heure": p["heure"] if "heure" in p else None,
+           "test": ("test" in p),
+           "v": True,               # mode Verbose
+           "return_tb": True,       # retourne le TB en cas d'exception
+          }
+          
+    r += cron_call(dic)
+    
+    return r + "<br/><br/>"

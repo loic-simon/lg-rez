@@ -49,8 +49,17 @@ def holder_sync_TDB():
 # @app.route('/sync_Chatfuel', methods=['GET', 'POST'])
 # def holder_sync_Chatfuel():
 #     return sync_Chatfuel(request.args, request.json)
-        
-        
+    
+    
+@app.route('/cron_call', methods=['GET'])
+def holder_cron_call():
+    r = cron_call(request.args)
+    if isinstance(r, tuple) and isinstance(r[0],int) and isinstance(r[1],str):
+        raise InvalidUsage(r[1], status_code=r[0])
+    else:
+        return r
+    
+    
 @app.route('/liste_joueurs', methods=['GET'])
 def holder_liste_joueurs():
     return liste_joueurs(request.args)
