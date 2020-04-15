@@ -14,8 +14,7 @@ ALWAYSDATA_API_KEY = "f73dc3407a1949a8b0a7efd1b374f9c4"
 def viewcron(d, p):
     r = "<h2>Tâches planifiées alwaysdata</h2>"
 
-    dic = {}
-    rep = requests.get('https://api.alwaysdata.com/v1/job/', auth=(ALWAYSDATA_API_KEY, ''), json=dic)
+    rep = requests.get('https://api.alwaysdata.com/v1/job/', auth=(ALWAYSDATA_API_KEY, ''))
     
     if rep:
         # r += f"<pre>{rep.text}</pre><hr />"
@@ -37,9 +36,9 @@ def viewcron(d, p):
                        "href": None,
                        "type": ["TYPE_URLS", "TYPE_COMMAND"],
                        "date_type": ["DAILY", "FREQUENCY", "CRONTAB"],
-                       "argument": ''.join(random.choices(string.ascii_letters + string.digits, k=6)),
+                       "argument": f"https://lg-rez.alwaysdata.net/cron_call?pwd={GLOBAL_PASSWORD}&job=open_maire&heure=17",
                        "is_disabled": False,
-                       "daily_time": f"{random.randrange(24)}:{random.randrange(60)}",
+                       "daily_time": f"{random.randrange(24):02}:{random.randrange(60):02}",
                        "frequency": "",
                        "frequency_period": ["", "minute", "hour", "day", "week", "month"],
                        "crontab_syntax": "",
@@ -61,7 +60,7 @@ def viewcron(d, p):
             return "Unknow field property."
             
     nouv = [champ(k, fieldProperties[k]) for k in keys] + ["""<input type="submit" name="addcron" value="Créer">"""]
-
+    
     r += html_table(corps + [nouv],
                     keys + ["Action"],
                     f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">""",

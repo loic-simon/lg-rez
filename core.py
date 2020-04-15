@@ -1,18 +1,22 @@
-from __init__ import db, cache_TDB
+import sys
+import time
+import traceback
+import string
+import random
+import requests
+import json
+
 from sqlalchemy.exc import *        # Exceptions générales SQLAlchemy
 from sqlalchemy.orm.exc import *    # Exceptions requêtes SQLAlchemy
 from sqlalchemy.orm.attributes import flag_modified
 from flask import abort
 
+from __init__ import db, cache_TDB
 import blocs.chatfuel as chatfuel
 import blocs.gsheets as gsheets
-import string, random
-import sys, traceback
-
-import requests, json
 
 
-GLOBAL_PASSWORD = "C'estSuperSecure!"
+GLOBAL_PASSWORD = "C'estSuperSecure\!"
 
 BOT_ID = "5be9b3b70ecd9f4c8cab45e0"
 CHATFUEL_TOKEN = "mELtlMAHYqR0BvgEiMq8zVek3uYUK3OJMbtyrdNPTrQB9ndV0fM7lWTFZbM4MZvD"
@@ -23,6 +27,8 @@ jobs = ["open_cond", "remind_cond", "close_cond",
         "open_loups", "remind_loups", "close_loups",
         "open_action", "remind_action", "close_action",
         ]
+
+MAX_TRIES = 5
 
 
 ### UTILITAIRES
@@ -337,11 +343,14 @@ def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET 
 def cron_call(d):
     r = ""
     try:
-        verbose = ('v' in d)
+        verbose = ("v" in d)
+        testmode = ("test" in d)
         
         if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
             
             ### GÉNÉRALITÉS
+            
+            log = ""
             
             def get_criteres(job):
                 if job.endswith("cond") or job.endswith("maire"):
@@ -349,40 +358,61 @@ def cron_call(d):
                 elif job.endswith("loups"):
                     return {"inscrit": True, "votantLoups": True}
                 elif job.endswith("action"):
-                    if ("heure" in d) and RepresentsInt(d["heure"]) and (0 <= (heure := int(d["heure"])) < 24):
-                        if job.startswith("open"):
-                            return {"inscrit": True, "roleActif": True, "debutRole": heure}
-                        else:
-                            return {"inscrit": True, "roleActif": True, "finRole": heure}
+                    if ("heure" in d) and RepresentsInt(d["heure"]):
+                        heure = int(d["heure"]) % 24
                     else:
-                        raise ValueError("""Bad usage: required argument "heure" not in GET or incorrect""")
+                        if job.startswith("open"):
+                            heure = int(time.strftime("%H"))
+                        else:
+                            heure = (int(time.strftime("%H")) + 1) % 24
+                    if job.startswith("open"):
+                        return {"inscrit": True, "roleActif": True, "debutRole": heure}
+                    else:
+                        return {"inscrit": True, "roleActif": True, "finRole": heure}
                 else:
                     raise ValueError(f"""Cannot associate criteria to job {job}""")
                     
                     
             ### DÉTECTION TÂCHE À FAIRE ET CRITÈRES ASSOCIÉS
             
+            log +=  f"> {time.ctime()} (verbose={verbose}, testmode={testmode}) – "
+            
             if ("job" in d) and (d["job"] in jobs):         # jobs : défini en début de fichier, car utile dans admin
                 job = d["job"]
-                if "test" in d:
-                    criteres = {"messenger_user_id": 2033317286706583}   # Loïc, pour tests
-                else:
-                    criteres = get_criteres(job)
+                if verbose:
+                    r += f"""Job : <code>{job}</code><br/>"""
+                    
+                log +=  f"job : {job} -> "
+                
+                criteres = get_criteres(job)
+                if verbose:
+                    r += f"""Critères : <code>{html_escape(criteres)}</code><br/>"""
+                    
+                if testmode:
+                    criteres_test = {"messenger_user_id": 2033317286706583}   # Loïc, pour tests
+                    if verbose:
+                        r += f"""Critères MODE TEST, réellement appliqués : <code>{html_escape(criteres_test)}</code><br/>"""
+                        
             else:
                 raise ValueError("""Bad usage: required argument "job" not in GET or incorrect""")
-                
-            if verbose:
-                r += f"""Job : <code>{job}</code><br/>Critère : <code>{html_escape(criteres)}</code><br/><br/>"""
                 
                 
             ### RÉCUPÉRATION UTILISATEURS CACHE
             
             users = cache_TDB.query.filter_by(**criteres).all()     # Liste des joueurs répondant aux cirtères
-            
             if verbose:
-                r += f"Utilisateur(s) répondant au critère : <pre>{html_escape(users)}</pre>"
-                
-                
+                str_users = str(users).replace(', ',',\n ')
+                r += f"<br/>Utilisateur(s) répondant aux critères : <pre>{html_escape(str_users)}</pre>"
+
+            if testmode:
+                users = cache_TDB.query.filter_by(**criteres_test).all()    # on écrase par les utilisateur MODE TEST
+                if verbose:
+                    str_users = str(users).replace(', ',',\n ')
+                    r += f"<br/>Utilisateur(s) répondant aux critères MODE TEST : <pre>{html_escape(str_users)}</pre>"
+                    
+            log += f"{len(users)} utilisateurs trouvés\n"
+            
+            
             ### MODIFICATIONS DANS CHATFUEL DIRECT
             
             if users:
@@ -393,11 +423,26 @@ def cron_call(d):
                           }
                           
                 for user in users:
-                    rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{user.messenger_user_id}/send", params=params)
+                    rep = False
+                    tries = 0
+                    while (not rep) and (tries < MAX_TRIES):
+                        rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{user.messenger_user_id}/send", params=params)
+                        tries += 1
+                        if not rep:
+                            time.sleep(5)
+                            
+                    if tries == MAX_TRIES:
+                        log += f"    - !!! Impossible d'envoyer à l'utilisateur {user} ({MAX_TRIES} tentatives)" 
+                        if verbose:
+                            r += f"<br/>!!! Impossible d'envoyer le job <code>{job}</code> à l'utilisateur <code>{html_escape(user)}</code> ({MAX_TRIES} tentatives)"
+                        continue
+                        
                     rep = rep.json()
                     
                     if verbose:
-                        r += f"<br/>Envoi job <code>{job}</code> à l'utilisateur <code>{html_escape(user)}</code>"
+                        r += f"<br/>Envoi job <code>{job}</code> à l'utilisateur <code>{html_escape(user)}</code> – {tries} tentative(s)"
+                        
+                    log +=  f"    - Envoi à {user} : OK, {tries} tentative(s)\n"
                     
                     if "code" in rep:
                         raise Exception("Erreur d'envoi Chatfuel Broadcast API. Réessaie.")
@@ -407,10 +452,14 @@ def cron_call(d):
 
             ### FIN DE LA PROCÉDURE
             
+            log += "\n"
+            
         else:
             raise ValueError("WRONG OR MISSING PASSWORD!")
             
     except Exception as e:
+        log += "\n{traceback.format_exc()}"
+        
         if verbose:
             if "return_tb" in d:
                 return traceback.format_exc()
@@ -421,7 +470,10 @@ def cron_call(d):
 
     else:
         return r
-
+        
+    finally:
+        with open(f"logs/cron_call/{time.strftime('%Y-%m-%d')}.log", 'a+') as f:
+            f.write(log)
 
 
 
