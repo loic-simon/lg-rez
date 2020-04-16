@@ -16,11 +16,13 @@ import blocs.chatfuel as chatfuel
 import blocs.gsheets as gsheets
 
 
-GLOBAL_PASSWORD = "C'estSuperSecure\!"
+GLOBAL_PASSWORD = "CestSuperSecure\!"
 
 BOT_ID = "5be9b3b70ecd9f4c8cab45e0"
 CHATFUEL_TOKEN = "mELtlMAHYqR0BvgEiMq8zVek3uYUK3OJMbtyrdNPTrQB9ndV0fM7lWTFZbM4MZvD"
 CHATFUEL_TAG = "CONFIRMED_EVENT_UPDATE"
+
+ALWAYSDATA_API_KEY = "f73dc3407a1949a8b0a7efd1b374f9c4"
 
 jobs = ["open_cond", "remind_cond", "close_cond",
         "open_maire", "remind_maire", "close_maire",
@@ -342,6 +344,7 @@ def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET 
 
 def cron_call(d):
     r = ""
+    log = ""
     try:
         verbose = ("v" in d)
         testmode = ("test" in d)
@@ -349,8 +352,6 @@ def cron_call(d):
         if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
             
             ### GÉNÉRALITÉS
-            
-            log = ""
             
             def get_criteres(job):
                 if job.endswith("cond") or job.endswith("maire"):
@@ -458,7 +459,7 @@ def cron_call(d):
             raise ValueError("WRONG OR MISSING PASSWORD!")
             
     except Exception as e:
-        log += "\n{traceback.format_exc()}"
+        log += f"\n> {time.ctime()} - Error, exiting:\n{traceback.format_exc()}\n\n"
         
         if verbose:
             if "return_tb" in d:
@@ -507,21 +508,6 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
 
             if "viewtable" in p:
                 r += viewtable(d, p)
-                
-            if "testsheets" in d:
-                workbook = gsheets.connect("1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs")  # [DEV NextStep]
-                sheet = workbook.worksheet("Journée en cours")
-                values = sheet.get_all_values()     # Liste de liste des valeurs
-                
-                r += "<br/>TEST SHEETS.<br/>"
-                r += "<p>values:" + strhtml(str(type(values))) + "</p>"
-                r += "<p>values[8]:" + strhtml(str(type(values[8]))) + "</p>"
-                r += "<p>values[8][8]:" + strhtml(values[8][8]) + "</p><br /><br />"
-                
-                val = sheet.cell(8, 8)
-                r += "<p>val:" + strhtml(str(type(val))) + "</p>"
-                r += "<p>val.value:" + strhtml(str(type(val.value))) + "</p>"
-                r += "<p>dir(val):" + strhtml(str(dir(val))) + "</p><br /><br />"
 
             if "addcron" in p:
                 r += addcron(d, p)
@@ -539,7 +525,26 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
 
             if "restart_site" in p:
                 r += restart_site(d, p)
-
+                
+            if "viewlogs" in p:
+                r += viewlogs(d, p)
+                
+                
+            if "testsheets" in d:
+                workbook = gsheets.connect("1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs")  # [DEV NextStep]
+                sheet = workbook.worksheet("Journée en cours")
+                values = sheet.get_all_values()     # Liste de liste des valeurs
+                
+                r += "<br/>TEST SHEETS.<br/>"
+                r += "<p>values:" + strhtml(str(type(values))) + "</p>"
+                r += "<p>values[8]:" + strhtml(str(type(values[8]))) + "</p>"
+                r += "<p>values[8][8]:" + strhtml(values[8][8]) + "</p><br /><br />"
+                
+                val = sheet.cell(8, 8)
+                r += "<p>val:" + strhtml(str(type(val))) + "</p>"
+                r += "<p>val.value:" + strhtml(str(type(val.value))) + "</p>"
+                r += "<p>dir(val):" + strhtml(str(dir(val))) + "</p><br /><br />"
+                
             if "oskour" in d:
                 r += "OSKOUR<br/>"
                 db.session.rollback()
@@ -558,15 +563,19 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
                             </fieldset>
                             <br />
                             <fieldset><legend>Options Alwaysdata</legend>
-                                <label for="viewcron">Tâches automatisées (cron) :</label> <input type="submit" name="viewcron" id="viewcron" value="Voir les tâches"> <br />
                                 <label for="restart_site">Restart le site :</label> <input type="submit" name="restart_site" id="restart_site" value="Restart">
                             </fieldset>
                             <br />
-                            <fieldset><legend>Envoyer une tâche</legend>
+                            <fieldset><legend>Tâches planifiées</legend>
+                                <input type="submit" name="viewcron" id="viewcron" value="Voir les tâches"> <br />
+                                
                                 <label for="job">Tâche :</label> <select name="job" id="job">{''.join([f"<option value='{j}'>{j}</option>" for j in jobs])}</select> / 
                                 <label for="heure">Heure (si *_action) :</label> <input type="number" name="heure" id="heure" min=0 max=23> / 
                                 <label for="test">Mode test</label> <input type="checkbox" name="test" id="test"> / 
-                                </label> <input type="submit" name="sendjob" value="Envoyer">
+                                <input type="submit" name="sendjob" value="Envoyer"> <br/>
+                                
+                                <label for="d">Vérifier les logs du : </label> <input type="number" name="d" id="d" min=1 max=31 value={time.strftime('%d')}>/<input type="number" name="m" id="m" min=1 max=12 value={time.strftime('%m')}>/<input type="number" name="Y" id="Y" min=2020 max={time.strftime('%Y')} value={time.strftime('%Y')}>
+                                <input type="submit" name="viewlogs" value="Lire">
                             </fieldset>
                         </div>
                     </form>
@@ -642,8 +651,7 @@ def Hermes_test(d):
 
             id = 2033317286706583
             bloc = d["bloc"] if "bloc" in d else "Sync"
-            
-            
+                        
             params = {"chatfuel_token" : CHATFUEL_TOKEN,
                       "chatfuel_message_tag" : CHATFUEL_TAG,
                       "chatfuel_block_name" : bloc}

@@ -9,8 +9,6 @@ def html_table(LL, first_row=None, row_start="", row_end=""):
     return r
 
 
-ALWAYSDATA_API_KEY = "f73dc3407a1949a8b0a7efd1b374f9c4"
-
 def viewcron(d, p):
     r = "<h2>Tâches planifiées alwaysdata</h2>"
 
@@ -21,6 +19,7 @@ def viewcron(d, p):
         # r += f"<pre>{str(type(rep.json()))}</pre><hr />"
         try:
             lst = rep.json()
+            lst.sort(key=lambda d:d["id"])
         except:
             lst = []
     else:
@@ -242,3 +241,18 @@ def sendjob(d, p):
     r += cron_call(dic)
     
     return r + "<br/><br/>"
+    
+    
+def viewlogs(d, p):
+    fich = f"{p['Y']}-{p['m']}-{p['d']}"
+    
+    r = f"<h2>Logs de cron_call – {fich}</h2>"
+        
+    try:
+        with open(f"logs/cron_call/{fich}.log") as f:
+            r += f"<pre>{html_escape(f.read())}</pre>"
+
+    except FileNotFoundError:
+        r += "Pas de log pour ce jour.<br/><br/>"
+        
+    return r
