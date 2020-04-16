@@ -1,4 +1,6 @@
 
+### UTILITAIRES
+
 def html_table(LL, first_row=None, row_start="", row_end=""):
     r = "<table style='border:1px solid black; border-collapse: collapse;'>"
     for L in [[f"<b>{e}</b>" for e in first_row]] + LL:
@@ -9,89 +11,8 @@ def html_table(LL, first_row=None, row_start="", row_end=""):
     return r
 
 
-def viewcron(d, p):
-    r = "<h2>Tâches planifiées alwaysdata</h2>"
 
-    rep = requests.get('https://api.alwaysdata.com/v1/job/', auth=(ALWAYSDATA_API_KEY, ''))
-    
-    if rep:
-        # r += f"<pre>{rep.text}</pre><hr />"
-        # r += f"<pre>{str(type(rep.json()))}</pre><hr />"
-        try:
-            lst = rep.json()
-            lst.sort(key=lambda d:d["id"])
-        except:
-            lst = []
-    else:
-        raise ValueError(f"Request Error (HTTP code {rep.status_code})")
-
-    keys = list(lst[0].keys())
-    
-    delButton = lambda id:f"""<input type="hidden" name="id" value="{id}"><input type="submit" name="delcron" value="Suppr">"""
-    
-    corps = [[dic[k] for k in keys] + [delButton(dic["id"])] for dic in lst]
-    
-    fieldProperties = {"id": None,
-                       "href": None,
-                       "type": ["TYPE_URLS", "TYPE_COMMAND"],
-                       "date_type": ["DAILY", "FREQUENCY", "CRONTAB"],
-                       "argument": f"https://lg-rez.alwaysdata.net/cron_call?pwd={GLOBAL_PASSWORD}&job=open_maire&heure=17",
-                       "is_disabled": False,
-                       "daily_time": f"{random.randrange(24):02}:{random.randrange(60):02}",
-                       "frequency": "",
-                       "frequency_period": ["", "minute", "hour", "day", "week", "month"],
-                       "crontab_syntax": "",
-                       }
-                       
-    def champ(k, arg):
-        if arg is None:
-            return "<i>readonly</i>"
-        elif isinstance(arg, bool):
-            return f"""<input type="checkbox" name="{k}" {"checked" if arg else ""}>"""
-        elif isinstance(arg, str):
-            return f"""<input type="text" name="{k}" size="{len(arg) if arg != "" else 10}" value="{arg}">"""
-        elif isinstance(arg, int):
-            return f"""<input type="number" name="{k}" value="{arg}">"""
-        elif isinstance(arg, list):
-            options = ''.join([f"""<option value="{a}">{a}</option>""" for a in arg])
-            return f"""<select name="{k}">{options}</select>"""
-        else:
-            return "Unknow field property."
-            
-    nouv = [champ(k, fieldProperties[k]) for k in keys] + ["""<input type="submit" name="addcron" value="Créer">"""]
-    
-    r += html_table(corps + [nouv],
-                    keys + ["Action"],
-                    f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">""",
-                    "</form>")
-    
-    return r
-
-
-def restart_site(d, p):
-    r = "<h2>Redémarrage du site</h2>"
-
-    rep = requests.get('https://api.alwaysdata.com/v1/site/', auth=(ALWAYSDATA_API_KEY, ''), data={})
-    if rep:
-        # r += f"<pre>{rep.text}</pre><hr />"
-        # r += f"<pre>{str(type(rep.json()))}</pre><hr />"
-        try:
-            site_id = rep.json()[0]["id"]
-        except:
-            site_id = 0
-        # site_id = 594325
-    else:
-        raise ValueError(f"Request Error (HTTP code {rep.status_code})")
-    
-    rep = requests.post(f"https://api.alwaysdata.com/v1/site/{site_id}/restart/", auth=(ALWAYSDATA_API_KEY, ''))
-    
-    if rep:
-        r += f"<pre>{rep.text}</pre>"
-    else:
-        raise ValueError(f"Request Error (HTTP code {rep.status_code})")
-        
-    return r
-
+### BASE DE DONNÉES
 
 def viewtable(d, p):
     r = ""
@@ -184,6 +105,62 @@ def delitem(d, p):
     return r
 
 
+
+### TÂCHES PLANIFIÉES
+
+def viewcron(d, p):
+    r = "<h2>Tâches planifiées alwaysdata</h2>"
+
+    lst = getjobs()     # Récupération de la liste des tâches
+    
+    # for dic in lst[10:]:
+    #     requests.patch(f'https://api.alwaysdata.com/v1/job/{dic["id"]}/', auth=(ALWAYSDATA_API_KEY, ''), json={'argument':dic['argument'].replace("\\!","")})
+    #     time.sleep(0.1)
+
+    keys = list(lst[0].keys())
+    
+    delButton = lambda id:f"""<input type="hidden" name="id" value="{id}"><input type="submit" name="delcron" value="Suppr">"""
+    switchButton = lambda id,is_disabled:f"""<input type="hidden" name="id" value="{id}">{'' if is_disabled else '<input type="hidden" name="disable">'}<input type="submit" name="disablecron" value=" {'Activer' if is_disabled else 'Désactiver'}">"""
+    
+    corps = [[dic[k] for k in keys] + [delButton(dic["id"]) + switchButton(dic["id"], dic["is_disabled"])] for dic in lst]
+    
+    fieldProperties = {"id": None,
+                       "href": None,
+                       "type": ["TYPE_URLS", "TYPE_COMMAND"],
+                       "date_type": ["DAILY", "FREQUENCY", "CRONTAB"],
+                       "argument": f"https://lg-rez.alwaysdata.net/cron_call?pwd={GLOBAL_PASSWORD}&job=open_maire&heure=17",
+                       "is_disabled": False,
+                       "daily_time": f"{random.randrange(24):02}:{random.randrange(60):02}",
+                       "frequency": "",
+                       "frequency_period": ["", "minute", "hour", "day", "week", "month"],
+                       "crontab_syntax": "",
+                       }
+                       
+    def champ(k, arg):
+        if arg is None:
+            return "<i>readonly</i>"
+        elif isinstance(arg, bool):
+            return f"""<input type="checkbox" name="{k}" {"checked" if arg else ""}>"""
+        elif isinstance(arg, str):
+            return f"""<input type="text" name="{k}" size="{len(arg) if arg != "" else 10}" value="{arg}">"""
+        elif isinstance(arg, int):
+            return f"""<input type="number" name="{k}" value="{arg}">"""
+        elif isinstance(arg, list):
+            options = ''.join([f"""<option value="{a}">{a}</option>""" for a in arg])
+            return f"""<select name="{k}">{options}</select>"""
+        else:
+            return "Unknow field property."
+            
+    nouv = [champ(k, fieldProperties[k]) for k in keys] + ["""<input type="submit" name="addcron" value="Créer">"""]
+    
+    r += html_table(corps + [nouv],
+                    keys + ["Action"],
+                    f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">""",
+                    "</form>")
+    
+    return r
+
+
 def addcron(d, p):
     r = "<h2>Ajout de tâche planifiée alwaysdata</h2>"
     
@@ -216,11 +193,33 @@ def delcron(d, p):
     id = p["id"]
     r += f"ID à supprimer : <code>{id}</code>"
            
-    rep = requests.delete(f'https://api.alwaysdata.com/v1/job/{id}/', auth=(f'{ALWAYSDATA_API_KEY} account=lg-rez', ''))
+    rep = requests.delete(f'https://api.alwaysdata.com/v1/job/{id}/', auth=(ALWAYSDATA_API_KEY, ''))
     
     if rep:
         r += f"<pre>{rep.text}</pre><br />"
         r += "Suppression réussie.<hr />"
+    else:
+        raise ValueError(f"Request Error (HTTP code {rep.status_code})")
+        
+    return r
+
+
+def disablecron(d, p, id=False):
+    r = "<h2>Désactivation/activation de tâche planifiée alwaysdata</h2>"
+    
+    if not id:
+        id = p["id"]
+    disable = ("disable" in p)
+    
+    r += f"ID : <code>{id}</code> / action : <code>{'disable' if disable else 'enable'}</code>"
+           
+    rep = requests.patch(f'https://api.alwaysdata.com/v1/job/{id}/', 
+                         auth=(ALWAYSDATA_API_KEY, ''), 
+                         json={"id":id, "is_disabled":disable})
+    
+    if rep:
+        r += f"<pre>{rep.text}</pre>"
+        r += f"{'Désactivation' if disable else 'Activation'} réussie.<hr />"
     else:
         raise ValueError(f"Request Error (HTTP code {rep.status_code})")
         
@@ -233,18 +232,24 @@ def sendjob(d, p):
     dic = {"pwd": d["pwd"],
            "job": p["job"],
            "heure": p["heure"] if "heure" in p else None,
-           "test": ("test" in p),
+           # "test": ("test" in p),
            "v": True,               # mode Verbose
            "return_tb": True,       # retourne le TB en cas d'exception
           }
+          
+    if "test" in p:
+        dic["test"] = True
           
     r += cron_call(dic)
     
     return r + "<br/><br/>"
     
     
+    
+### AUTRES FONCTIONNALITÉS
+
 def viewlogs(d, p):
-    fich = f"{p['Y']}-{p['m']}-{p['d']}"
+    fich = f"{p['Y']:0>4}-{p['m']:0>2}-{p['d']:0>2}"
     
     r = f"<h2>Logs de cron_call – {fich}</h2>"
         
@@ -254,5 +259,30 @@ def viewlogs(d, p):
 
     except FileNotFoundError:
         r += "Pas de log pour ce jour.<br/><br/>"
+        
+    return r
+
+
+def restart_site(d, p):
+    r = "<h2>Redémarrage du site</h2>"
+
+    rep = requests.get('https://api.alwaysdata.com/v1/site/', auth=(ALWAYSDATA_API_KEY, ''), data={})
+    if rep:
+        # r += f"<pre>{rep.text}</pre><hr />"
+        # r += f"<pre>{str(type(rep.json()))}</pre><hr />"
+        try:
+            site_id = rep.json()[0]["id"]
+        except:
+            site_id = 0
+        # site_id = 594325
+    else:
+        raise ValueError(f"Request Error (HTTP code {rep.status_code})")
+    
+    rep = requests.post(f"https://api.alwaysdata.com/v1/site/{site_id}/restart/", auth=(ALWAYSDATA_API_KEY, ''))
+    
+    if rep:
+        r += f"<pre>{rep.text}</pre>"
+    else:
+        raise ValueError(f"Request Error (HTTP code {rep.status_code})")
         
     return r

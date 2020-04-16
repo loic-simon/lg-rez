@@ -16,7 +16,7 @@ import blocs.chatfuel as chatfuel
 import blocs.gsheets as gsheets
 
 
-GLOBAL_PASSWORD = "CestSuperSecure\!"
+GLOBAL_PASSWORD = "CestSuperSecure"
 
 BOT_ID = "5be9b3b70ecd9f4c8cab45e0"
 CHATFUEL_TOKEN = "mELtlMAHYqR0BvgEiMq8zVek3uYUK3OJMbtyrdNPTrQB9ndV0fM7lWTFZbM4MZvD"
@@ -88,6 +88,18 @@ def format_Chatfuel(d):         # Représentation des attributs dans Chatfuel
             d[k] = "non défini"
     return d
 
+def getjobs():                  # Récupère la liste des tâches planifiées sur l'API alwaysdata
+    rep = requests.get('https://api.alwaysdata.com/v1/job/', auth=(ALWAYSDATA_API_KEY, ''))
+    
+    if rep:
+        try:
+            lst = rep.json()
+        except:
+            lst = []
+    else:
+        raise ValueError(f"Request Error (HTTP code {rep.status_code})")
+        
+    return lst
 
 ### sync_TDB
 
@@ -334,7 +346,7 @@ def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET 
         if type(exc).__name__ == "OperationalError":
             return chatfuel.ErrorReport(Exception("Impossible d'accéder à la BDD, réessaie ! (souvent temporaire)"), verbose=verbose, message="Une erreur technique est survenue 😪\n Erreur :")
         else:
-            return chatfuel.ErrorReport(exc, verbose=verbose, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")
+            return chatfuel.ErrorReport(exc, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")
         
     else:
         return chatfuel.Response(R)
@@ -362,10 +374,10 @@ def cron_call(d):
                     if ("heure" in d) and RepresentsInt(d["heure"]):
                         heure = int(d["heure"]) % 24
                     else:
-                        if job.startswith("open"):
-                            heure = int(time.strftime("%H"))
-                        else:
+                        if job.startswith("remind"):
                             heure = (int(time.strftime("%H")) + 1) % 24
+                        else:
+                            heure = int(time.strftime("%H"))
                     if job.startswith("open"):
                         return {"inscrit": True, "roleActif": True, "debutRole": heure}
                     else:
@@ -491,12 +503,15 @@ def manual(d):
     return admin(d, d)
     
 def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd notemment) ; p : idem pour les arguments POST (différentes options du panneau)
+    r = ""
     try:
-        r = "<h1>« Panneau d'administration » (vaguement, hein) LG Rez</h1><hr/>"
-
         if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
+            r += f"""<h1><a href="admin?pwd={GLOBAL_PASSWORD}">Panneau d'administration LG Rez</a></h1><hr/>"""
 
-            ### COMPORTEMENT OPTION
+            ### BASE DE DONNÉES
+            
+            if "viewtable" in p:
+                r += viewtable(d, p)
             
             if "additem" in p:
                 r += additem(d, p)
@@ -505,9 +520,12 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
             if "delitem" in p:
                 r += delitem(d, p)
                 r += viewtable(d, p)
-
-            if "viewtable" in p:
-                r += viewtable(d, p)
+                
+                
+            # TÂCHES PLANIFIÉES
+            
+            if "viewcron" in p:
+                r += viewcron(d, p)
 
             if "addcron" in p:
                 r += addcron(d, p)
@@ -517,18 +535,29 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
                 r += delcron(d, p)
                 r += viewcron(d, p)
 
-            if "viewcron" in p:
+            if "disablecron" in p:
+                r += disablecron(d, p)
                 r += viewcron(d, p)
+
+            if "disablecron" in d:      # LORSQUE appelé depuis les statuts
+                ids = d["id"].split(',')    # permet de modifier plusieurs ids d'un coup
+                for id in ids:
+                    r += disablecron(d, d, id)
+                
+                
+            # AUTRES FONCTIONNALITÉS
 
             if "sendjob" in p:
                 r += sendjob(d, p)
-
-            if "restart_site" in p:
-                r += restart_site(d, p)
                 
             if "viewlogs" in p:
                 r += viewlogs(d, p)
+            
+            if "restart_site" in p:
+                r += restart_site(d, p)
                 
+                
+            # FONCTIONNALITÉS DEBUG
                 
             if "testsheets" in d:
                 workbook = gsheets.connect("1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs")  # [DEV NextStep]
@@ -549,15 +578,66 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
                 r += "OSKOUR<br/>"
                 db.session.rollback()
                 r += "OSKOUUUUR<br/>"
-            
-
+                
+                
+            ### STATUTS
+                
+            if ("statuts" in p) or (not p):   # si statuts demandés, ou si rien passé en POST
+                r += f"<br />{time.ctime()} – Statuts :"
+                
+                # On récupère les tâches planifiées
+                lst = getjobs()
+                    
+                taches = {}
+                for job in jobs:
+                    taches[job] = [j for j in lst if job in j["argument"]]      # toutes les tâches liées au job donné
+                    
+                def phrase(tchs):
+                    critere = all([j["is_disabled"] for j in tchs])         # toutes tâches désactivées
+                    
+                    def red(s):    return f"<font color='red'><b>{s}</b></font>"
+                    def green(s):  return f"<font color='green'><b>{s}</b></font>"
+                    
+                    ids = ','.join([str(t["id"]) for t in tchs])
+                    url = f"admin?pwd={GLOBAL_PASSWORD}&disablecron&id={ids}"
+                    
+                    return f"""{red("Désactivé") if critere else green("Activé")} – {f"<a href='{url}'>Activer</a>" if critere else f"<a href='{url}&disable'>Désactiver</a>"}"""
+                    
+                r += f"""<ul>
+                        <li>Vote condamné (Lu-Ve) :
+                            <ul>
+                                <li>Ouverture : {phrase(taches["open_cond"])}</li>
+                                <li>Fermeture : {phrase(taches["remind_cond"] + taches["close_cond"])}</li>
+                            </ul>
+                        </li><br />
+                        <li>Vote maire :
+                            <ul>
+                                <li>Ouverture : {phrase(taches["open_maire"])}</li>
+                                <li>Fermeture : {phrase(taches["remind_maire"] + taches["close_maire"])}</li>
+                            </ul>
+                        </li><br />
+                        <li>Vote loups (Di-Je) :
+                            <ul>
+                                <li>Ouverture : {phrase(taches["open_loups"])}</li>
+                                <li>Fermeture : {phrase(taches["remind_loups"] + taches["close_loups"])}</li>
+                            </ul>
+                        </li><br />
+                        <li>Actions de rôle (Lu-Ve 0-18h + Di-Je 19-23h) :
+                            <ul>
+                                <li>Ouverture : {phrase(taches["open_action"])}</li>
+                                <li>Fermeture : {phrase(taches["remind_action"] + taches["close_action"])}</li>
+                            </ul>
+                        </li></ul><br />"""
+                        
+                        
+                        
             ### CHOIX D'UNE OPTION
             
-            r += f"""<hr/><br />
+            r += f"""<hr /><br />
                     <form action="admin?pwd={GLOBAL_PASSWORD}" method="post">
                         <div>
                             <fieldset><legend>Voir une table</legend>
-                                Table : 
+                                Table :     
                                 <label for="cache_TDB">cache_TDB </label> <input type="radio" name="table" value="cache_TDB" id="cache_TDB" checked> 
                                 <input type="submit" name="viewtable", value="Voir la table">
                             </fieldset>
@@ -574,7 +654,7 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
                                 <label for="test">Mode test</label> <input type="checkbox" name="test" id="test"> / 
                                 <input type="submit" name="sendjob" value="Envoyer"> <br/>
                                 
-                                <label for="d">Vérifier les logs du : </label> <input type="number" name="d" id="d" min=1 max=31 value={time.strftime('%d')}>/<input type="number" name="m" id="m" min=1 max=12 value={time.strftime('%m')}>/<input type="number" name="Y" id="Y" min=2020 max={time.strftime('%Y')} value={time.strftime('%Y')}>
+                                <label for="d">Consulter les logs du : </label> <input type="number" name="d" id="d" min=1 max=31 value={time.strftime('%d')}>/<input type="number" name="m" id="m" min=1 max=12 value={time.strftime('%m')}>/<input type="number" name="Y" id="Y" min=2020 max={time.strftime('%Y')} value={time.strftime('%Y')}>
                                 <input type="submit" name="viewlogs" value="Lire">
                             </fieldset>
                         </div>
