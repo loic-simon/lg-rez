@@ -112,6 +112,7 @@ def viewcron(d, p):
     r = "<h2>Tâches planifiées alwaysdata</h2>"
 
     lst = getjobs()     # Récupération de la liste des tâches
+    lst.sort(key=lambda x:x["id"])
     
     # for dic in lst[10:]:
     #     requests.patch(f'https://api.alwaysdata.com/v1/job/{dic["id"]}/', auth=(ALWAYSDATA_API_KEY, ''), json={'argument':dic['argument'].replace("\\!","")})

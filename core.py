@@ -106,7 +106,8 @@ def getjobs():                  # Récupère la liste des tâches planifiées su
 def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
     r = ""
     try:
-        verbose = ('v' in d)
+        verbose = ('v' in d)        # Messages d'erreur/... détaillés
+        silent = ('s' in d)         # Ne prévient pas les joueurs des modifications
         if verbose:
             r += "sync_TDB:"
             
@@ -117,6 +118,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             cols = [str(column.key) for column in cache_TDB.__table__.columns]      # Colonnes de cache_TDB
             cols_SQL_types = {col:type(getattr(cache_TDB, col).property.columns[0].type).__name__ for col in cols}
             cols_SQL_nullable = {col:getattr(cache_TDB, col).property.columns[0].nullable for col in cols}
+            
             
             ### RÉCUPÉRATION INFOS GSHEET
             
@@ -156,8 +158,8 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             
             users_cache = cache_TDB.query.all()     # Liste des joueurs tels qu'actuellement en cache
             ids_cache = [user_cache.messenger_user_id for user_cache in users_cache]
-                    
-                
+            
+            
             ### COMPARAISON
             
             Modifs = []         # Modifs à porter au TDB : tuple (id - colonne (nom) - valeur)
@@ -215,9 +217,9 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                                 
 
 
-            ### MODIFICATIONS DANS CHATFUEL DIRECT
+            ### MODIFICATIONS DANS CHATFUEL DIRECT (envoi d'un message aux gens)
             
-            if Modified_ids:
+            if Modified_ids and not silent:
                 params_r = {"chatfuel_token" : CHATFUEL_TOKEN,
                             "chatfuel_message_tag" : CHATFUEL_TAG,
                             "chatfuel_block_name" : "Sync"}
@@ -247,12 +249,12 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
             ### APPLICATION DES MODIFICATIONS SUR LE TDB
             
-            # Convertit ID et colonne en indices lignes et colonnes (à partir de 0)
             if Modifs:
                 Modifs_rdy = []
                 lm = 0
                 cm = 0
                 for (id, col, v) in Modifs:
+                    # Convertit ID et colonne en indices lignes et colonnes (à partir de 0)
                     l = rows_TDB[id]
                     if l > lm:
                         lm = l
@@ -414,14 +416,14 @@ def cron_call(d):
             
             users = cache_TDB.query.filter_by(**criteres).all()     # Liste des joueurs répondant aux cirtères
             if verbose:
-                str_users = str(users).replace(', ',',\n ')
-                r += f"<br/>Utilisateur(s) répondant aux critères : <pre>{html_escape(str_users)}</pre>"
+                str_users = str(users).replace(', ', ',\n ')
+                r += f"<br/>Utilisateur(s) répondant aux critères ({len(users)}) : <pre>{html_escape(str_users)}</pre>"
 
             if testmode:
                 users = cache_TDB.query.filter_by(**criteres_test).all()    # on écrase par les utilisateur MODE TEST
                 if verbose:
                     str_users = str(users).replace(', ',',\n ')
-                    r += f"<br/>Utilisateur(s) répondant aux critères MODE TEST : <pre>{html_escape(str_users)}</pre>"
+                    r += f"<br/>Utilisateur(s) répondant aux critères MODE TEST ({len(users)}) : <pre>{html_escape(str_users)}</pre>"
                     
             log += f"{len(users)} utilisateurs trouvés\n"
             
@@ -652,7 +654,7 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
                                 <label for="job">Tâche :</label> <select name="job" id="job">{''.join([f"<option value='{j}'>{j}</option>" for j in jobs])}</select> / 
                                 <label for="heure">Heure (si *_action) :</label> <input type="number" name="heure" id="heure" min=0 max=23> / 
                                 <label for="test">Mode test</label> <input type="checkbox" name="test" id="test"> / 
-                                <input type="submit" name="sendjob" value="Envoyer"> <br/>
+                                <input type="submit" name="sendjob" value="Envoyer"> <br/><br/>
                                 
                                 <label for="d">Consulter les logs du : </label> <input type="number" name="d" id="d" min=1 max=31 value={time.strftime('%d')}>/<input type="number" name="m" id="m" min=1 max=12 value={time.strftime('%m')}>/<input type="number" name="Y" id="Y" min=2020 max={time.strftime('%Y')} value={time.strftime('%Y')}>
                                 <input type="submit" name="viewlogs" value="Lire">
