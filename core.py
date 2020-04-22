@@ -219,10 +219,10 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
             ### MODIFICATIONS DANS CHATFUEL DIRECT (envoi d'un message aux gens)
             
-            if Modified_ids and not silent:
+            if Modified_ids:
                 params_r = {"chatfuel_token" : CHATFUEL_TOKEN,
                             "chatfuel_message_tag" : CHATFUEL_TAG,
-                            "chatfuel_block_name" : "Sync"}
+                            "chatfuel_block_name" : "Sync_silent" if silent else "Sync"}
                         
                 for id in Modified_ids:
                     
@@ -230,7 +230,8 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                     for (idM, col, v) in Modifs:
                         if id == idM:
                             attrs[col] = v
-                            attrs[f"sync_{col}"] = True
+                            if not silent:
+                                attrs[f"sync_{col}"] = True
                             
                     params = format_Chatfuel(attrs)
                     for k,v in params_r.items():
