@@ -1,3 +1,5 @@
+# Ce fichier est une partie de core.py, séparée pour plus de lisibilité. Il contient tous les « blocs » du panneau d'admin
+
 
 ### UTILITAIRES
 
@@ -9,7 +11,6 @@ def html_table(LL, first_row=None, row_start="", row_end=""):
         r += f"</td>{row_end}</tr>"
     r += "</table>"
     return r
-
 
 
 ### BASE DE DONNÉES
@@ -32,7 +33,7 @@ def viewtable(d, p):
 
     itemDefault = {"messenger_user_id": random.randrange(1000000000),
                    "inscrit": True,
-                   "nom": ''.join(random.choices(string.ascii_uppercase + string.digits, k=6)),
+                   "nom": ''.join(random.choices(string.ascii_uppercase + string.digits + " ", k=6)),
                    "chambre": random.randrange(101,800),
                    "statut": "test",
                    "role": "rôle"+str(random.randrange(15)),
@@ -103,7 +104,6 @@ def delitem(d, p):
         r += "Plusieurs résultats trouvés. Suppression non effectuée.\n\n"
 
     return r
-
 
 
 ### TÂCHES PLANIFIÉES
@@ -246,7 +246,6 @@ def sendjob(d, p):
     return r + "<br/><br/>"
     
     
-    
 ### AUTRES FONCTIONNALITÉS
 
 def viewlogs(d, p):
@@ -286,4 +285,56 @@ def restart_site(d, p):
     else:
         raise ValueError(f"Request Error (HTTP code {rep.status_code})")
         
+    return r
+
+
+# STATUTS
+
+def show_statuts(d, p):
+    r = f"<br />{time.ctime()} – Statuts :"
+    
+    # On récupère les tâches planifiées
+    lst = getjobs()
+        
+    taches = {}
+    for job in jobs:
+        taches[job] = [j for j in lst if job in j["argument"]]      # toutes les tâches liées au job donné
+        
+    def phrase(tchs):
+        critere = all([j["is_disabled"] for j in tchs])         # toutes tâches désactivées
+        
+        def red(s):    return f"<font color='red'><b>{s}</b></font>"
+        def green(s):  return f"<font color='green'><b>{s}</b></font>"
+        
+        ids = ','.join([str(t["id"]) for t in tchs])
+        url = f"admin?pwd={GLOBAL_PASSWORD}&disablecron&id={ids}"
+        
+        return f"""{red("Désactivé") if critere else green("Activé")} – {f"<a href='{url}'>Activer</a>" if critere else f"<a href='{url}&disable'>Désactiver</a>"}"""
+        
+    r += f"""<ul>
+            <li>Vote condamné (Lu-Ve) :
+                <ul>
+                    <li>Ouverture : {phrase(taches["open_cond"])}</li>
+                    <li>Fermeture : {phrase(taches["remind_cond"] + taches["close_cond"])}</li>
+                </ul>
+            </li><br />
+            <li>Vote maire :
+                <ul>
+                    <li>Ouverture : {phrase(taches["open_maire"])}</li>
+                    <li>Fermeture : {phrase(taches["remind_maire"] + taches["close_maire"])}</li>
+                </ul>
+            </li><br />
+            <li>Vote loups (Di-Je) :
+                <ul>
+                    <li>Ouverture : {phrase(taches["open_loups"])}</li>
+                    <li>Fermeture : {phrase(taches["remind_loups"] + taches["close_loups"])}</li>
+                </ul>
+            </li><br />
+            <li>Actions de rôle (Lu-Ve 0-18h + Di-Je 19-23h) :
+                <ul>
+                    <li>Ouverture : {phrase(taches["open_action"])}</li>
+                    <li>Fermeture : {phrase(taches["remind_action"] + taches["close_action"])}</li>
+                </ul>
+            </li></ul><br />"""
+            
     return r

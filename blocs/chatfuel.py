@@ -75,12 +75,13 @@ class Button(ChatfuelBase):
         - "json_plugin_url": redirect user to any other backend API apeg
         - "phone_number"
         
-    For types "show_block" and "json_plugin_url", the optionnal argument "set_attributes" can be used to set user attributes. Syntax: dict {attibute1:value1, attibute2:value2...}"""
+    For types "show_block", "json_plugin_url" and "" (no action), the optionnal argument "set_attributes" can be used to set user attributes. Syntax: dict {attibute1:value1, attibute2:value2...}"""
 
     BUTTON_TYPES = ["show_block",
                     "web_url",
                     "json_plugin_url",
-                    "phone_number"]
+                    "phone_number",
+                    ""]
                     
     def __init__(self, btype, btitle, bact, set_attributes=None):
         ChatfuelBase.__init__(self)
@@ -94,11 +95,11 @@ class Button(ChatfuelBase):
                     self["block_names"] = bact
             elif btype == "phone_number":   # Special phone aspect
                 self["phone_number"] = bact
-            else:
+            elif btype.endswith("url"):
                 self["url"] = bact
             self.contents = f"{btitle} ({btype}:{bact})"
             
-            if ((btype == "show_block") or (btype == "json_plugin_url")) and (set_attributes != None):
+            if btype in ["show_block", "json_plugin_url", ""] and set_attributes:
                 if isinstance(set_attributes, dict):
                     self["set_attributes"] = set_attributes
                     self.contents += f"(set_attributes:{set_attributes.keys()})"

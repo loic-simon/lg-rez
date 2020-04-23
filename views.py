@@ -63,13 +63,31 @@ def holder_cron_call():
 @app.route('/liste_joueurs', methods=['GET'])
 def holder_liste_joueurs():
     return liste_joueurs(request.args)
+    
+    
+@app.route('/choix_cible', methods=['GET', 'POST'])
+def holder_choix_cible():
+    return choix_cible(request.args, request.json, request.url_root)
+    
+@app.route('/envoi_mp', methods=['GET', 'POST'])
+def holder_envoi_mp():
+    r = envoi_mp(request.args, request.json)
+    if isinstance(r, tuple) and isinstance(r[0],int) and isinstance(r[1],str):
+        raise InvalidUsage(r[1], status_code=r[0])
+    else:
+        return r
+        
+        
+@app.route('/media_renderer', methods=['GET', 'POST'])
+def holder_media_renderer():
+    return media_renderer(request.args, request.json)
 
 
 
 
 @app.route('/API_test', methods=['GET', 'POST'])
 def holder_API_test():
-    return API_test(request.json)
+    return API_test(request.args, request.json)
 
 @app.route('/Hermes_test', methods=['GET'])
 def holder_Hermes_test():

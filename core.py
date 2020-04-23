@@ -1,20 +1,22 @@
-import sys
-import time
-import traceback
-import string
-import random
-import requests
-import json
+import time             # Accès à date/heure actuelle
+import traceback        # Récupération des messages d'erreur Python, pour les afficher plutôt que planter le site
+import random           # Génération de nombres aléatoires, choix aléatoires...
+import string           # Génération de texte aléatoire      
+import difflib          # Contient SequenceMatcher : déterminer les chaînes de caractères les plus ressemblantes
+import requests         # Requêtes HTML (GET, POST...)
+import json             # JSON -> dictionnaire et inversement, pour échange données
+import unidecode        # Comparaison de chaînes en enlèvant les accents
 
-from sqlalchemy.exc import *        # Exceptions générales SQLAlchemy
-from sqlalchemy.orm.exc import *    # Exceptions requêtes SQLAlchemy
-from sqlalchemy.orm.attributes import flag_modified
-from flask import abort
+from sqlalchemy.exc import *                            # Exceptions générales SQLAlchemy
+from sqlalchemy.orm.exc import *                        # Exceptions requêtes SQLAlchemy
+from sqlalchemy.orm.attributes import flag_modified     # Permet de "signaler" les entrées modifiées, à commit en base
 
-from __init__ import db, cache_TDB
-import blocs.chatfuel as chatfuel
-import blocs.gsheets as gsheets
+import blocs.chatfuel as chatfuel       # Envoi de blocs à Chatfuel (maison)
+import blocs.gsheets as gsheets         # Connection à Google Sheets (maison)
+from __init__ import db, cache_TDB      # Récupération BDD
 
+
+# CONSTANTES
 
 GLOBAL_PASSWORD = "CestSuperSecure"
 
@@ -101,7 +103,8 @@ def getjobs():                  # Récupère la liste des tâches planifiées su
         
     return lst
 
-### sync_TDB
+
+### SYNCHRONISATION DU TABLEAU DE BORD
 
 def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
     r = ""
@@ -272,17 +275,13 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                 
                 # Récupère toutes les valeurs sous forme de cellules gspread
                 cells = sheet.range(1, 1, lm+1, cm+1)   # gspread indexe à partir de 1 (comme les gsheets)
-                # raise KeyError(str(cells)) 
-                # raise KeyError(f"{lm}/{cm}")
-                # a = ""
                 cells_to_update = []
+                
                 for (l, c, v) in Modifs_rdy:
                     cell = [cell for cell in filter(lambda cell:cell.col == c+1 and cell.row == l+1, cells)][0]
                     cell.value = v       # cells : ([<L1C1>, <L1C2>, ..., <L1Ccm>, <L2C1>, <L2C2>, ..., <LlmCcm>]
                     cells_to_update.append(cell)
-                    # a += f"lm:{lm}/cm:{cm} - l:{l}/c:{c} - .row:{cell.row}/.col:{cell.col}\n"
                     
-                # raise KeyError(a)
                 sheet.update_cells(cells_to_update)
                 
                 if verbose:
@@ -308,7 +307,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
         return r
 
 
-### LISTE MORTS ET VIVANTS
+### LISTES MORTS ET VIVANTS
 
 def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET (pwd, type)
     R = []  # Liste des blocs envoyés en réponse
@@ -492,11 +491,146 @@ def cron_call(d):
             f.write(log)
 
 
+### LISTE MORTS ET VIVANTS
 
+def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET (pwd, type)
+    R = []  # Liste des blocs envoyés en réponse
+    try:
+        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
+            
+            tous = cache_TDB.query.filter(cache_TDB.statut.in_(["vivant","MV","mort"])).all()     # Liste des joueurs tels qu'actuellement en cache
+            NT = len(tous)
+            
+            if "type" in d and d["type"] == "vivants":
+                rep = cache_TDB.query.filter(cache_TDB.statut.in_(["vivant","MV"])).order_by(cache_TDB.nom).all()
+                descr = "en vie"
+                bouton_text = "Joueurs morts ☠"
+                bouton_bloc = "Joueurs morts"
+            elif "type" in d and d["type"] == "morts":
+                rep = cache_TDB.query.filter(cache_TDB.statut == "mort").order_by(cache_TDB.nom).all()
+                descr = "morts" 
+                bouton_text = "Joueurs en vie 🕺"
+                bouton_bloc = "Joueurs en vie"
+            else:
+                raise ValueError('GET["type"] must be "vivants" or "morts"')
+                
+            NR = len(rep)
+            if NR > 0:
+                R.append(chatfuel.Text(f"Liste des {NR}/{NT} joueurs {descr} :"))
+                LJ = [u.nom for u in rep]
+            else:
+                LJ = ["Minute, papillon !"]
+            
+            R.append(chatfuel.Text('\n'.join(LJ)).addQuickReplies([chatfuel.Button("show_block", bouton_text, bouton_bloc),
+                                                                    chatfuel.Button("show_block", "Retour menu 🏠", "Menu")]))
+            
+        else:
+            raise ValueError("WRONG OR MISSING PASSWORD!")
+            
+    except Exception as exc:
+        db.session.rollback()
+        if type(exc).__name__ == "OperationalError":
+            return chatfuel.ErrorReport(Exception("Impossible d'accéder à la BDD, réessaie ! (souvent temporaire)"), verbose=verbose, message="Une erreur technique est survenue 😪\n Erreur :")
+        else:
+            return chatfuel.ErrorReport(exc, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")
+        
+    else:
+        return chatfuel.Response(R)
+
+
+### ENVOI MESSAGE À UN JOUEUR (beta)
+
+def choix_cible(d, p, url_root):
+    R = []          # Liste des blocs envoyés en réponse
+    attrs = None    # Attributs à modifier
+    try:
+        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
+            
+            SM = difflib.SequenceMatcher()                      # Création du comparateur de chaînes
+            slug1 = unidecode.unidecode(p["cible"]).lower()     # Cible en minuscule et sans accents
+            SM.set_seq1(slug1)                                  # Première chaîne à comparer : cible demandée
+            
+            vivants = cache_TDB.query.filter(cache_TDB.statut.in_(["vivant","MV"])).all()
+            scores = []
+            
+            for joueur in vivants:
+                slug2 = unidecode.unidecode(joueur.nom).lower()
+                SM.set_seq2(slug2)                              # Pour chaque joueur, on compare la cible à son nom (en non accentué)
+                score = SM.ratio()                              # On calcule la ressemblance    
+                if score == 1:                                  # Cas particulier : joueur demandé correspondant exactement à un en BDD
+                    break
+                scores.append((joueur.nom, joueur.messenger_user_id, score))
+                
+            if score == 1:      # Joueur demandé correspondant exactement à un en BDD
+                attrs = {"cible": joueur.messenger_user_id}      # On définit directement la cible (et on envoie aucun bloc)
+                
+            else:               # Si pas de joueur correspondant parfaitement
+                bests = [(nom, id) for (nom, id, score) in sorted(scores, key=lambda x:x[2], reverse=True)]  # Meilleurs noms, dans l'ordre
+                boutons = [chatfuel.Button("", nom, "", set_attributes={"cible": id}) for (nom, id) in bests[:5]]
+                R.append(chatfuel.Text("Joueurs trouvés :").addQuickReplies(boutons))
+                
+        else:
+            raise ValueError("WRONG OR MISSING PASSWORD!")
+            
+    except Exception as exc:
+        return chatfuel.ErrorReport(exc, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")
+        
+    else:
+        return chatfuel.Response(R, set_attributes=attrs)
+
+
+def envoi_mp(d, p):
+    try:
+        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
+            id = p["cible_id"]
+            
+            message = p["message"]
+            is_image = message.split("?")[0].lower().endswith(("gif","png","jpg"))
+            
+            params = {"chatfuel_token" : CHATFUEL_TOKEN,
+                      "chatfuel_message_tag" : CHATFUEL_TAG,
+                      "chatfuel_block_name" : "RéceptionMessage",
+                      "message": message,
+                      "is_image": is_image,
+                      "sender": p["sender"],
+                      "sender_id": p["sender_id"],
+                      }
+                      
+            rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{id}/send", params=params)
+            rep = rep.json()
+            
+            if "code" in rep:
+                raise Exception("Erreur d'envoi Chatfuel Broadcast API. Réessaie.")
+                
+        else:
+            raise ValueError("WRONG OR MISSING PASSWORD!")
+            
+    except Exception as exc:
+        return (400, f"{type(e).__name__}({str(e)})")
+        
+    else:
+        return """{"success":"ok"}"""
+        
+        
+        
+def media_renderer(d, p):
+    R = []          # Liste des blocs envoyés en réponse
+    try:
+        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
+            R.append(chatfuel.Image(p["media"]).addQuickReplies([chatfuel.Button("show_block", "Retour menu 🏠", "Menu"),
+                                                                 chatfuel.Button("show_block", "Répondre 📤", "Envoi MP")]))
+        else:
+            raise ValueError("WRONG OR MISSING PASSWORD!")
+    except Exception as e:
+        return chatfuel.ErrorReport(exc, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")        
+    else:
+        return chatfuel.Response(R)
+
+            
+            
 ### OPTIONS DU PANNEAU D'ADMIN
 
-exec(open("./blocs/admin_options.py").read())
-
+exec(open("./blocs/admin_options.py").read())       # Come si le code de admin_options était écrit ici (séparé pour plus de lisibilité)
 
 
 ### PANNEAU D'ADMIN
@@ -504,6 +638,7 @@ exec(open("./blocs/admin_options.py").read())
 # Options d'administration automatiques (ajout,...) - pour tests/debug seulement !
 def manual(d):
     return admin(d, d)
+    
     
 def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd notemment) ; p : idem pour les arguments POST (différentes options du panneau)
     r = ""
@@ -523,7 +658,6 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
             if "delitem" in p:
                 r += delitem(d, p)
                 r += viewtable(d, p)
-                
                 
             # TÂCHES PLANIFIÉES
             
@@ -547,7 +681,6 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
                 for id in ids:
                     r += disablecron(d, d, id)
                 
-                
             # AUTRES FONCTIONNALITÉS
 
             if "sendjob" in p:
@@ -559,80 +692,24 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
             if "restart_site" in p:
                 r += restart_site(d, p)
                 
-                
             # FONCTIONNALITÉS DEBUG
                 
             if "testsheets" in d:
                 workbook = gsheets.connect("1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs")  # [DEV NextStep]
                 sheet = workbook.worksheet("Journée en cours")
                 values = sheet.get_all_values()     # Liste de liste des valeurs
-                
                 r += "<br/>TEST SHEETS.<br/>"
-                r += "<p>values:" + strhtml(str(type(values))) + "</p>"
-                r += "<p>values[8]:" + strhtml(str(type(values[8]))) + "</p>"
                 r += "<p>values[8][8]:" + strhtml(values[8][8]) + "</p><br /><br />"
-                
-                val = sheet.cell(8, 8)
-                r += "<p>val:" + strhtml(str(type(val))) + "</p>"
-                r += "<p>val.value:" + strhtml(str(type(val.value))) + "</p>"
-                r += "<p>dir(val):" + strhtml(str(dir(val))) + "</p><br /><br />"
-                
+
             if "oskour" in d:
                 r += "OSKOUR<br/>"
                 db.session.rollback()
                 r += "OSKOUUUUR<br/>"
                 
-                
             ### STATUTS
                 
             if ("statuts" in p) or (not p):   # si statuts demandés, ou si rien passé en POST
-                r += f"<br />{time.ctime()} – Statuts :"
-                
-                # On récupère les tâches planifiées
-                lst = getjobs()
-                    
-                taches = {}
-                for job in jobs:
-                    taches[job] = [j for j in lst if job in j["argument"]]      # toutes les tâches liées au job donné
-                    
-                def phrase(tchs):
-                    critere = all([j["is_disabled"] for j in tchs])         # toutes tâches désactivées
-                    
-                    def red(s):    return f"<font color='red'><b>{s}</b></font>"
-                    def green(s):  return f"<font color='green'><b>{s}</b></font>"
-                    
-                    ids = ','.join([str(t["id"]) for t in tchs])
-                    url = f"admin?pwd={GLOBAL_PASSWORD}&disablecron&id={ids}"
-                    
-                    return f"""{red("Désactivé") if critere else green("Activé")} – {f"<a href='{url}'>Activer</a>" if critere else f"<a href='{url}&disable'>Désactiver</a>"}"""
-                    
-                r += f"""<ul>
-                        <li>Vote condamné (Lu-Ve) :
-                            <ul>
-                                <li>Ouverture : {phrase(taches["open_cond"])}</li>
-                                <li>Fermeture : {phrase(taches["remind_cond"] + taches["close_cond"])}</li>
-                            </ul>
-                        </li><br />
-                        <li>Vote maire :
-                            <ul>
-                                <li>Ouverture : {phrase(taches["open_maire"])}</li>
-                                <li>Fermeture : {phrase(taches["remind_maire"] + taches["close_maire"])}</li>
-                            </ul>
-                        </li><br />
-                        <li>Vote loups (Di-Je) :
-                            <ul>
-                                <li>Ouverture : {phrase(taches["open_loups"])}</li>
-                                <li>Fermeture : {phrase(taches["remind_loups"] + taches["close_loups"])}</li>
-                            </ul>
-                        </li><br />
-                        <li>Actions de rôle (Lu-Ve 0-18h + Di-Je 19-23h) :
-                            <ul>
-                                <li>Ouverture : {phrase(taches["open_action"])}</li>
-                                <li>Fermeture : {phrase(taches["remind_action"] + taches["close_action"])}</li>
-                            </ul>
-                        </li></ul><br />"""
-                        
-                        
+                r += show_statuts(d, p)                        
                         
             ### CHOIX D'UNE OPTION
             
@@ -664,7 +741,6 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
                     </form>
                  """
 
-
             ### ARGUMENTS BRUTS (pour débug)
             
             r += f"""<br/><hr/><br/>
@@ -685,37 +761,19 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
         return r
 
 
+### FONCTIONS TEST
 
-
-def API_test(d):
+def API_test(d, p):
     """ Récupère et renvoie une information à Chatfuel """
 
     try:
-        # user_TDB = cache_TDB(messenger_user_id = random.randrange(1000000000),
-        #                     inscrit = True,
-        #                     nom = d["a_creer"],
-        #                     chambre = random.randrange(101,800),
-        #                     statut = "test",
-        #                     role = "rôle"+str(random.randrange(15)),
-        #                     camp = "camp"+str(random.randrange(3)),
-        #                     votantVillage = random.randrange(1),
-        #                     votantLoups = random.randrange(1))
-        # 
-        # db.session.add(user_TDB)
-        # db.session.commit()
-        # 
-        # cont = [e.nom for e in cache_TDB.query.all()]
 
-        rep= chatfuel.Response([    chatfuel.Text("Max length test :"),
-                                    # chatfuel.Buttons("Oui", [
-                                    #     chatfuel.Button("show_block", "Go menu", "Menu"),
-                                    #     chatfuel.Button("web_url", "J'adore", "https://lmfgtf.com")
-                                    #     ]),
-                                    chatfuel.Text("Parfait. Doublement parfait.")
-                                    ],
-                                set_attributes={"a":1,"b":2}#,
+        rep= chatfuel.Response([chatfuel.Text(f"d:{d}"),
+                                chatfuel.Text(f"p:{p}")
+                                ],
+                                #set_attributes={"a":1,"b":2}#,
                                 # redirect_to_blocks="Menu"
-                                )
+                               )
 
     except Exception as exc:
         rep = chatfuel.ErrorReport(exc)
