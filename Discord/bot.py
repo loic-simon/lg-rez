@@ -4,8 +4,10 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-import annexe
-import IA
+import tools
+import bdd_connect
+
+from features import annexe, IA
 
 # Récupération du token du bot et de l'ID du serveur
 load_dotenv()
@@ -25,8 +27,7 @@ async def on_ready():
 
     guild = bot.get_guild(GUILD_ID)
 
-    print(f"{bot.user} connecté au serveur « {guild.name} » (id : {guild.id})\n"
-    )
+    print(f"{bot.user} connecté au serveur « {guild.name} » (id : {guild.id})\n")
 
     members = "\n - ".join([member.name for member in guild.members])
     print(f"Guild Members:\n - {members}")
@@ -58,10 +59,22 @@ async def on_message(message):
 
 
 # Commandes définies dans les fichiers annexes !
-@bot.command(name="test")
+@bot.command()
 async def test(ctx):
     rep = annexe.test(ctx)
     await ctx.send(rep)
+
+@bot.command()
+async def testbdd(ctx):
+    await ctx.send(bdd_connect.testbdd(ctx))
+
+@bot.command()
+async def rename(ctx):
+    await ctx.send(bdd_connect.rename(ctx))
+
+@bot.command()
+async def do(ctx):
+    await ctx.send(bdd_connect.do(ctx))
 
 
 # Trigger si erreur dans une commande
