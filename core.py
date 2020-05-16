@@ -125,7 +125,12 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             
             ### RÉCUPÉRATION INFOS GSHEET
             
-            workbook = gsheets.connect("1D5AWRmdGRWzzZU9S665U7jgx7U5LwvaxkD8lKQeLiFs")  # Tableau de bord
+            if "sheet_id" in d:
+                SHEET_ID = d["sheet_id"]
+            else:
+                raise ValueError("""Argument "sheet_id" manquant dans GET""")
+            
+            workbook = gsheets.connect(SHEET_ID)  # Tableau de bord
             sheet = workbook.worksheet("Journée en cours")
             values = sheet.get_all_values()     # Liste de liste des valeurs
             (NL, NC) = (len(values), len(values[0]))
