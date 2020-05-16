@@ -4,6 +4,10 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
+import annexe
+import IA
+
+
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 GUILD_ID = int(os.getenv("DISCORD_GUILD_ID"))
@@ -33,7 +37,7 @@ async def on_ready():
 async def on_member_join(member):
     await member.create_dm()
     await member.dm_channel.send(
-        f'Hi {member.name}, welcome to my Discord server!'
+        f"Hi {member.name}, welcome to my Discord server!"
     )
 
 
@@ -42,9 +46,16 @@ async def on_message(message):
     if message.author == bot.user:           # Sécurité pour éviter les boucles infinies
         return
 
-    if 'lange' in message.content.lower():
-        response = "LE LANGE !!!!!"
-        await message.channel.send(response)
+    rep = IA.main(message.content)
+    
+    if rep:                     # Si l'IA a un truc à dire
+        await message.channel.send(rep)
+
+
+@bot.command(name="test")
+async def holder_test(ctx):
+    rep = annexe.test(ctx)
+    await ctx.send(rep)
 
 
 bot.run(TOKEN)
