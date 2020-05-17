@@ -1,4 +1,5 @@
 import os
+import logging
 
 import discord
 from discord.ext import commands
@@ -8,6 +9,9 @@ import tools
 import bdd_connect
 
 from features import annexe, IA
+
+
+logging.basicConfig(level=logging.INFO)
 
 # Récupération du token du bot et de l'ID du serveur
 load_dotenv()
@@ -49,7 +53,8 @@ async def on_message(message):
     if message.author == bot.user:          # Sécurité pour éviter les boucles infinies
         return
     
-    await bot.process_commands(message)     # On trigger toutes les commandes
+    ctx = await bot.get_context(message)
+    await bot.invoke(ctx)                   # On trigger toutes les commandes
 
     if not message.content.startswith(COMMAND_PREFIX):      # Si pas une commande (+ conditions sur les channels ? à venir), on appelle l'IA
         rep = IA.main(message.content)
