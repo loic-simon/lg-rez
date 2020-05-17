@@ -1,6 +1,6 @@
 import tools
 
-def test(ctx):
+async def test(ctx):
     arg = tools.command_arg(ctx)    # Arguments de la commande (sans le !test)
     auteur = ctx.author.name
     salon = ctx.channel.name if hasattr(ctx.channel, "name") else f"DMChannel de {ctx.channel.recipient.name}"
@@ -8,6 +8,8 @@ def test(ctx):
     # pref = ctx.prefix
     # com = ctx.command
     # ivkw = ctx.invoked_with
+    
+    await tools.log(ctx, "Alors, ça log ?")
     
     return tools.code_bloc(
         f"arg = {arg}\n"

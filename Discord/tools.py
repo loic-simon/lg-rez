@@ -1,7 +1,15 @@
+import discord.utils
+
 # Analyse de l'entrée de la commande
 
 def command_arg(ctx):        # sépare la commande en trois blocs ["!rename", "cible", "nom"]
     return ctx.message.content.split(maxsplit=1)[1]
+
+
+# Log dans #logs
+
+async def log(ctx, message):
+    await discord.utils.get(ctx.guild.channels, name="logs").send(message)
 
 
 # Formattage de texte dans Discord

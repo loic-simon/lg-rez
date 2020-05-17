@@ -12,13 +12,13 @@ exec(open("../models.py").read())
 db.init_app(app)
     
     
-def testbdd(ctx):
+async def testbdd(ctx):
     tous = cache_TDB.query.all()
     ret = '\n - '.join([u.nom for u in tous])
     return tools.code_bloc(f"Liste des joueurs :\n - {ret}")
 
 
-def rename(ctx):
+async def rename(ctx):
     mots = ctx.message.content.split(maxsplit=2)    # sépare la commande en trois blocs ["!rename", "cible", "nom"]
     id = int(mots[1].strip())
     nom = mots[2].strip()
@@ -32,18 +32,3 @@ def rename(ctx):
         u.nom = nom
         db.session.commit()
         return tools.code_bloc(f"Joueur {oldnom} renommé en {nom}.")
-
-
-def do(ctx):
-    txt = tools.command_arg(ctx)
-    
-    class Answer():
-        def __init__(self):
-            object.__init__(self)
-            self.rep = ""
-        
-    a = Answer()
-    
-    exec(f"a.rep = {txt}", globals(), locals())
-
-    return f"Entrée : {tools.code(txt)}\nSortie :\n{a.rep}"

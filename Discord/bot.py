@@ -11,7 +11,7 @@ import bdd_connect
 from features import annexe, IA
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 
 # Récupération du token du bot et de l'ID du serveur
 load_dotenv()
@@ -37,7 +37,7 @@ async def on_ready():
     print(f"Guild Members:\n - {members}")
 
     channels = "\n - ".join([channel.name for channel in guild.channels if isinstance(channel, discord.TextChannel)])
-    print(f"\nChannels:\n - {channels}")
+    print(f"\nChannels:\n - {channels}\n")
 
 
 # Trigger à l'arrivée d'un membre sur le serveur
@@ -57,7 +57,7 @@ async def on_message(message):
     await bot.invoke(ctx)                   # On trigger toutes les commandes
 
     if not message.content.startswith(COMMAND_PREFIX):      # Si pas une commande (+ conditions sur les channels ? à venir), on appelle l'IA
-        rep = IA.main(message.content)
+        rep = await IA.main(message.content)
 
         if rep:                     # Si l'IA a un truc à dire
             await message.channel.send(rep)
@@ -66,20 +66,28 @@ async def on_message(message):
 # Commandes définies dans les fichiers annexes !
 @bot.command()
 async def test(ctx):
-    rep = annexe.test(ctx)
+    rep = await annexe.test(ctx)
     await ctx.send(rep)
 
 @bot.command()
 async def testbdd(ctx):
-    await ctx.send(bdd_connect.testbdd(ctx))
+    await ctx.send(await bdd_connect.testbdd(ctx))
 
 @bot.command()
 async def rename(ctx):
-    await ctx.send(bdd_connect.rename(ctx))
+    await ctx.send(await bdd_connect.rename(ctx))
 
 @bot.command()
 async def do(ctx):
-    await ctx.send(bdd_connect.do(ctx))
+    txt = tools.command_arg(ctx)
+    
+    class Answer():
+        def __init__(self):
+            self.rep = ""        
+    a = Answer()
+    
+    exec(f"a.rep = {txt}", globals(), locals())
+    await ctx.send(f"Entrée : {tools.code(txt)}\nSortie :\n{a.rep}")
 
 
 # Trigger si erreur dans une commande

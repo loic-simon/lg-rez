@@ -1,5 +1,5 @@
 import tools 
 
-def main(txt):
+async def main(txt):
     if 'lange' in txt.lower():
         return "LE LANGE !!!!!"
