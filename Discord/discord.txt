@@ -58,3 +58,27 @@ Maire (?)
 Joueurs en vie
 Joueurs morts
 @everyone
+
+
+
+Structure BDD :
+
+-> table Joueurs
+	discord_id 		chambre			role 			statut 			camp		votantVillage		votantLoups
+	##								#
+	
+-> table Rôles
+	role			camp			description		brief
+	##
+
+-> table Relations
+	id random 		roleA 			roleB
+	##				#				#
+
+-> table BaseActions
+	action			trigger_debut	trigger_fin		base_cooldown	type 	lieu	interactionNotaire		interactionGardien		Mage		params 		
+	##
+	
+-> table Actions
+	id random		joueur			action			cooldown		charges
+	##				#				#
