@@ -5,12 +5,7 @@ Code : https://github.com/loic-simon/lg-rez
 
 
 Le bot tourne en permanence sur le serveur alwaysdata. Pour publier son code, il faut d'abord le transférer : 
-	cd {racine du projet}
-	scp -o User=lg-rez Discord/features/* ssh-lg-rez.alwaysdata.net:~/www/Discord/features
-	}fQ%9J37a
-
-	Ou, si fichiers dans Discord modifiés (bot.py notamment),
-	scp -o User=lg-rez Discord/*  ssh-lg-rez.alwaysdata.net:~/www/Discord
+	scp -ro User=lg-rez Discord/*  ssh-lg-rez.alwaysdata.net:~/www/Discord
 	}fQ%9J37a
 
 
@@ -22,34 +17,34 @@ Puis redémarrer le bot :
 
 Idée d'organisation des salons :
 
-v INFORMATION			visible : @everyone, écriture : Bot, MJs
+v INFORMATION					visible : @everyone, écriture : Bot, MJs
     # bienvenue
     # règles
     # rôles
 
-v L'ANTRE DES MJS		visible/écriture : Bot, MJs
-    # bot			(pour partler avec le bot ou lui ordonner des actions)
-    # logs			(écriture : Bot only, pour garder une trace de tout)
+v L'ANTRE DES MJS				visible/écriture : Bot, MJs
+    # bot						(pour partler avec le bot ou lui ordonner des actions)
+    # logs						(écriture : Bot only, pour garder une trace de tout)
     # général
     #...
 
-v CONVERSATION BOT		visible/écriture : {joueur concerné}, Bot, MJs
-    # conv-bot-prenom-nom	(créé à l'inscription)
+v CONVERSATION BOT				visible/écriture : {joueur concerné}, Bot, MJs
+    # conv-bot-prenom-nom		(créé à l'inscription)
     #...
 
-v CONVERSATIONS CAMPS		visibles/écriture : {joueurs concernés}, Bot, MJs
+v CONVERSATIONS CAMPS			visibles/écriture : {joueurs concernés}, Bot, MJs
     # tanière-des-loups (?)
     # crypte-du-nécromancien
     # bureau-des-exorcistes
 
-v BOUDOIRS			idem mais créés sur demande aux MJs (peut-être fusionner ?)
-    # information-boudoirs	(sauf ce salon - visible : Joueurs inscrits, écriture : Bot, MJs)
+v BOUDOIRS						idem mais créés sur demande aux MJs (peut-être fusionner ?)
+    # information-boudoirs		(sauf ce salon - visible : Joueurs inscrits, écriture : Bot, MJs)
     # mairie
     # pcc
     # la-rose-divoire
 
-v PLACE DU VILLAGE		visibles : Joueurs inscrits, écriture : Joueurs en vie, Bot, MJs
-    # annonces			(sauf ce salon en écriture : Bot, MJs)
+v PLACE DU VILLAGE				visibles : Joueurs inscrits, écriture : Joueurs en vie, Bot, MJs
+    # annonces					(sauf ce salon en écriture : Bot, MJs)
     # haros
     # débats
     # spam
