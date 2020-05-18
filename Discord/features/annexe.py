@@ -96,6 +96,4 @@ class Annexe(commands.Cog):
                 user_end_time = r.horaire_fin
                 user_side = r.camp
                 user_descript = r.description_longue
-                await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\n
-                Ton action est entre : {user_begin_time} et {user_end_time}\n
-                Ton role consiste en :\n {user_descript}"))
+                await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action est entre : {user_begin_time} et {user_end_time}\nTon role consiste en :\n {user_descript}"))
