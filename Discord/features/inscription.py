@@ -2,7 +2,6 @@ from discord.ext import commands
 import tools
 from bdd_connect import db, cache_TDB
 
-@bot.event
 async def main(bot, member):
     for chan in member.guild.channels:
         if chan.topic == f"{member.id}":
