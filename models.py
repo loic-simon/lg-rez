@@ -57,9 +57,9 @@ class role_BDD(db.Model) :
     ChangementCible = db.Column(db.Boolean(), nullable = True)              #True, False ou None
 
     InteractionNotaire = db.Column(db.String(32), nullable = True)         #Oui, Non, Conditionnel, Potion, Rapport; None si récursif
-    InteractionGardien = db.Column(db.String(32), nullable = True)         #Oui, Non, Conditionnel, Taverne, Feu, MaisonClose, Précis, Cimetière, None si recursif
+    InteractionGardien = db.Column(db.String(32), nullable = True)         #Oui, Non, Conditionnel, Taverne, Feu, MaisonClose, Précis, Cimetière, Loups, None si recursif
 
-    def __init__(self, nom_du_role, description_courte, description_longue, camp, horaire_debut, horaire_fin, Lieu, Type, InteractionG, InteractionN, ChangementCible) :
+    def __init__(self, nom_du_role, description_courte, description_longue, camp, horaire_debut, horaire_fin, Lieu, Type, ) :
         self.nom_du_role = nom_du_role
         self.camp = camp
 
@@ -72,9 +72,9 @@ class role_BDD(db.Model) :
         self.Lieu = Lieu
         self.Type = Type
 
-        self.InteractionGardien = InteractionG
-        self.InteractionNotaire = InteractionN
+        #self.InteractionGardien = InteractionG
+        #self.InteractionNotaire = InteractionN
 
-        self.ChangementCible = ChangementCible
+        #self.ChangementCible = ChangementCible
 
 db.create_all()
