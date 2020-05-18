@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import tools
 import bdd_connect
 
-from features import annexe, IA
+from features import annexe, IA, inscription
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -44,11 +44,12 @@ async def on_ready():
     print(f"\nChannels:\n - {channels}\n")
 
 
-# Trigger à l'arrivée d'un membre sur le serveur
+# Trigger à l'arrivée d'un membre sur le serveur, crée un channel à son nom
 @bot.event
 async def on_member_join(member):
     await member.create_dm()
     await member.dm_channel.send(f"Hi {member.name}, welcome to my Discord server!")
+    await inscription.main()
 
 
 # Trigger à chaque message
@@ -56,7 +57,7 @@ async def on_member_join(member):
 async def on_message(message):
     if message.author == bot.user:          # Sécurité pour éviter les boucles infinies
         return
-    
+
     ctx = await bot.get_context(message)
     await bot.invoke(ctx)                   # On trigger toutes les commandes
 
@@ -68,7 +69,7 @@ async def on_message(message):
 
 
 
-# Commandes définies dans les fichiers annexes ! 
+# Commandes définies dans les fichiers annexes !
 #   (un cog par fichier dans features, sauf IA.py)
 
 bot.add_cog(annexe.Annexe(bot))
@@ -78,12 +79,12 @@ bot.add_cog(annexe.Annexe(bot))
 @bot.command()
 @commands.has_role("MJ")
 async def do(ctx, *, txt):
-    
+
     class Answer():
         def __init__(self):
-            self.rep = ""        
+            self.rep = ""
     a = Answer()
-    
+
     exec(f"a.rep = {txt}", globals(), locals())
     await ctx.send(f"Entrée : {tools.code(txt)}\nSortie :\n{a.rep}")
 
