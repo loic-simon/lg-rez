@@ -23,6 +23,10 @@ GUILD_ID = int(os.getenv("DISCORD_GUILD_ID"))
 COMMAND_PREFIX = "!"
 bot = commands.Bot(command_prefix=COMMAND_PREFIX, description="Bonjour")
 
+@bot.check
+async def globally_block_dms(ctx):
+    return ctx.guild is not None
+
 
 # Trigger au démarrage du bot
 @bot.event
@@ -63,23 +67,17 @@ async def on_message(message):
             await message.channel.send(rep)
 
 
-# Commandes définies dans les fichiers annexes !
-@bot.command()
-async def test(ctx):
-    rep = await annexe.test(ctx)
-    await ctx.send(rep)
+
+# Commandes définies dans les fichiers annexes ! 
+#   (un cog par fichier dans features, sauf IA.py)
+
+bot.add_cog(annexe.Annexe(bot))
+
+
 
 @bot.command()
-async def testbdd(ctx):
-    await ctx.send(await bdd_connect.testbdd(ctx))
-
-@bot.command()
-async def rename(ctx):
-    await ctx.send(await bdd_connect.rename(ctx))
-
-@bot.command()
-async def do(ctx):
-    txt = tools.command_arg(ctx)
+@commands.has_role("MJ")
+async def do(ctx, *, txt):
     
     class Answer():
         def __init__(self):
@@ -96,5 +94,5 @@ async def on_command_error(ctx, error):
     await ctx.send(f"{type(error).__name__}: {str(error)}")
 
 
-# Exécute le tout (bloquant, rien n'es exécuté après)
+# Exécute le tout (bloquant, rien n'est exécuté après)
 bot.run(TOKEN)

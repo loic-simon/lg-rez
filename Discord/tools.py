@@ -1,9 +1,19 @@
 import discord.utils
+import discord.ext.commands
 
-# Analyse de l'entrée de la commande
 
-def command_arg(ctx):        # sépare la commande en trois blocs ["!rename", "cible", "nom"]
-    return ctx.message.content.split(maxsplit=1)[1]
+# Récupération rapide
+
+get = discord.utils.get
+
+def channel(ctx, nom):
+    return get(ctx.guild.channels, name=nom)
+
+def role(ctx, nom):
+    return get(ctx.guild.roles, name=nom)
+
+def member(ctx, nom):
+    return get(ctx.guild.members, display_name=nom)
 
 
 # Log dans #logs
@@ -29,7 +39,7 @@ def strike(s):
 def code(s):
     return f"`{s}`"
     
-def code_bloc(s, langage=None):
+def code_bloc(s, langage=""):
     return f"```{langage}\n{s}```"
     
 def quote(s):
