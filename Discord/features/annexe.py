@@ -1,6 +1,8 @@
 from discord.ext import commands
 import tools
 from bdd_connect import db, cache_TDB
+import traceback
+
 
 class Annexe(commands.Cog):
     """Annexe : commandes annexes aux usages divers"""
