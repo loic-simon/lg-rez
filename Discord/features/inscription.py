@@ -16,8 +16,7 @@ async def main(bot, member):
     await chan.send(f"Bienvenue {member.mention}, laisse moi t'aider à t'inscrire !\n Pour commencer, qui es-tu ?")
 
     def checkChan(m):
-        return m.channel = chan
+        return m.channel == chan
 
     vraiNom = await bot.wait_for('message', check = checkChan)
     await edit(nick = f"{vraiNom}")
-    
