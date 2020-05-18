@@ -13,4 +13,10 @@ async def main(bot, member):
 
     await chan.set_permissions(member, read_messages = True, send_messages=True)
 
-    await chan.send(f"yousk2 {member.mention}")
+    await chan.send(f"Bienvenue {member.mention}, laisse moi t'aider à t'inscrire !\n Pour commencer, qui es-tu ?")
+
+    def checkChan(m):
+        return m.channel == chan
+
+    vraiNom = await bot.wait_for('message', check = checkChan)
+    await edit(nick = f"{vraiNom}")
