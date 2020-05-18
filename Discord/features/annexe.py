@@ -52,4 +52,4 @@ class Annexe(commands.Cog):
             u.nom = nom
             db.session.commit()
             await ctx.send(tools.code_bloc(f"Joueur {oldnom} renommé en {nom}."))
-        #ceci est un testbdd
+        #ceci est un testbdd 2.0
