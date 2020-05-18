@@ -42,8 +42,6 @@ class cache_TDB(db.Model):
         self.finRole = finRole
 
 
-db.create_all()
-
 class role_BDD(db.Model) :
     nom_du_role = db.Column(db.String(32), primary_key = True)
     description_courte = db.Column(db.String(140), nullable = False)
@@ -51,4 +49,15 @@ class role_BDD(db.Model) :
     camp = db.Column(db.String(32), nullable = False)
     horaire_debut = db.Column(db.Integer(), nullable = False)
     horaire_fin = db.Column(db.Integer(), nullable = False)
-    interaction = db.Column(None) #NON
+
+    def __init__(self, nom_du_role, description_courte, description_longue, camp, horaire_debut, horaire_fin) :
+        self.nom_du_role = nom_du_role
+        self.camp = camp
+
+        self.description_courte = description_courte
+        self.description_longue = description_longue
+
+        self.horaire_debut = horaire_debut
+        self.horaire_fin = horaire_fin
+
+db.create_all()
