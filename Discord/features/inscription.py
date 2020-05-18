@@ -9,7 +9,7 @@ async def main(bot, member):
 
     print(f"{member.id}")
 
-    chan = await member.guild.create_text_channel(f"conv-bot-{member.name}", category = tools.get(member.guild.channels, name="CONVERSATION BOT"), topic=f"{member.id}") #Crée le channel "perso-nom" avec le topic "member.id"
+    chan = await member.guild.create_text_channel(f"conv-bot-{member.name}", category = tools.get(member.guild.channels, name="conversation bot"), topic=f"{member.id}") #Crée le channel "perso-nom" avec le topic "member.id"
 
     await chan.set_permissions(member, read_messages = True, send_messages=True)
 
