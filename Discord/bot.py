@@ -89,6 +89,12 @@ async def do(ctx, *, txt):
     await ctx.send(f"Entrée : {tools.code(txt)}\nSortie :\n{a.rep}")
 
 
+@bot.command()
+@commands.has_role("MJ")
+async def main(ctx):
+    await inscription.main(bot, ctx.author)
+
+
 # Trigger si erreur dans une commande
 @bot.event
 async def on_command_error(ctx, error):
