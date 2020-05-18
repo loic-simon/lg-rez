@@ -44,13 +44,22 @@ class cache_TDB(db.Model):
 
 class role_BDD(db.Model) :
     nom_du_role = db.Column(db.String(32), primary_key = True)
+    camp = db.Column(db.String(32), nullable = False)                       #Loups, Solitaire, Nécros, Villageois
+
     description_courte = db.Column(db.String(140), nullable = False)
     description_longue = db.Column(db.String(280), nullable = False)
-    camp = db.Column(db.String(32), nullable = False)
-    horaire_debut = db.Column(db.Integer(), nullable = False)
-    horaire_fin = db.Column(db.Integer(), nullable = False)
 
-    def __init__(self, nom_du_role, description_courte, description_longue, camp, horaire_debut, horaire_fin) :
+    horaire_debut = db.Column(db.Integer(), nullable = True)                #Au format HHMM ou None
+    horaire_fin = db.Column(db.Integer(), nullable = True)                  #Au format HHMM ou None
+    Lieu = db.Column(db.String(32), nullable = True)                        #Distance/Physique/Lieu/Contact/Conditionnel/None/Public
+
+    Type = db.Column(db.String(32), nullable = False)                       #Quotidien, Unique, <Nombre>, Passif, Conditionnel, Hebdomadaire, Bicircadien, Special
+    ChangementCible = db.Column(db.Boolean(), nullable = True)              #True, False ou None
+
+    InteractionNotaire = db.Column(db.String(32), nullable = True)         #Oui, Non, Conditionnel, Potion, Rapport; None si récursif
+    InteractionGardien = db.Column(db.String(32), nullable = True)         #Oui, Non, Conditionnel, Taverne, Feu, MaisonClose, Précis, Cimetière, None si recursif
+
+    def __init__(self, nom_du_role, description_courte, description_longue, camp, horaire_debut, horaire_fin, Lieu, Type, InteractionG, InteractionN, ChangementCible) :
         self.nom_du_role = nom_du_role
         self.camp = camp
 
@@ -59,5 +68,13 @@ class role_BDD(db.Model) :
 
         self.horaire_debut = horaire_debut
         self.horaire_fin = horaire_fin
+
+        self.Lieu = Lieu
+        self.Type = Type
+
+        self.InteractionGardien = InteractionG
+        self.InteractionNotaire = InteractionN
+
+        self.ChangementCible = ChangementCible
 
 db.create_all()
