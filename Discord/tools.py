@@ -18,7 +18,7 @@ def role(arg, nom):         # Renvoie le rôle nom. arg peut être de type Conte
     if hasattr(arg, "roles"):
         return get(arg.roles, name=nom)
     elif hasattr(arg, "guild"):
-        return get(ctx.guild.roles, name=nom)
+        return get(arg.guild.roles, name=nom)
     else:
         return TypeError("tools.role : Impossible de remonter aux rôles depuis l'argument trasmis")
 
@@ -26,15 +26,15 @@ def member(arg, nom):       # Renvoie le membre @member. arg peut être de type 
     if hasattr(arg, "members"):
         return get(arg.members, display_name=nom)
     elif hasattr(arg, "guild"):
-        return get(ctx.guild.members, display_name=nom)
+        return get(arg.guild.members, display_name=nom)
     else:
         return TypeError("tools.member : Impossible de remonter aux membres depuis l'argument trasmis")
 
 
 # Log dans #logs
 
-async def log(ctx, message):
-    await channel(ctx, "logs").send(message)
+async def log(arg, message):
+    await channel(arg, "logs").send(message)
 
 
 # Formattage de texte dans Discord

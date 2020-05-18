@@ -82,3 +82,6 @@ Structure BDD :
 -> table Actions
 	id random		joueur			action			cooldown		charges
 	##				#				#
+
+
+du --si -hd 5 ~ | grep '^\s*[0-9\.]\+M' | sort -rn | sed '1d' 
