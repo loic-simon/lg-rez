@@ -91,7 +91,7 @@ async def do(ctx, *, txt):
 
 @bot.command()
 @commands.has_role("MJ")
-async def main(ctx):
+async def inscription(ctx):
     await inscription.main(bot, ctx.author)
 
 
