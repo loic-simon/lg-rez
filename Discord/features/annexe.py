@@ -57,3 +57,5 @@ class Annexe(commands.Cog):
     @commands.command()
     async def role(self, ctx) :
         """Affiche la liste des roles""" #création de la BDD role dans models.py
+        pass
+        
