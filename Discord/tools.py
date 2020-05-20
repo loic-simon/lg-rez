@@ -31,13 +31,13 @@ def member(arg, nom):       # Renvoie le membre @member. arg peut être de type 
         return TypeError("tools.member : Impossible de remonter aux membres depuis l'argument trasmis")
 
 #Teste si le message contient un mot de la liste trigWords, les mots de trigWords doivent etre en minuscule
-def checkTrig(m,trigWords):
+async def checkTrig(m,trigWords):
     for i in trigWords:
         if m.content == i:
             return True
     return False
 
-    
+
 # Log dans #logs
 
 async def log(arg, message):
