@@ -2,6 +2,8 @@ from discord.ext import commands
 import tools
 from bdd_connect import db, cache_TDB
 import traceback
+import models
+
 
 class Informations(commands.Cog):
     """Informations : Commandes que les joueurs peuvent utilisés régulièrement"""
