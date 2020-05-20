@@ -77,4 +77,7 @@ class role_BDD(db.Model) :
 
         #self.ChangementCible = ChangementCible
 
+Tables = {"cache_TDB":cache_TDB,
+          "role_BDD":role_BDD,
+          }
 db.create_all()
