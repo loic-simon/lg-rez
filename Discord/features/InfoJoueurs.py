@@ -6,7 +6,7 @@ import traceback
 class Informations(commands.Cog):
     """Informations : Commandes que les joueurs peuvent utilisés régulièrement"""
 
-@commands.command()
+    @commands.command()
     async def roles(self, ctx, nom_camp = "all") :
         """Affiche la liste des rôles,
         L'option nom_camp permet de lister les rôles d'un camp spécifique
