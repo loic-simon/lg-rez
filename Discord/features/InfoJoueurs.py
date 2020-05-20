@@ -56,13 +56,13 @@ class Informations(commands.Cog):
                     user_side = r.camp
                     user_descript = r.description_longue
                     user_short = r.description_courte
-                    if Details == "long" AND user_begin_time != None:
+                    if Details == "long" and user_begin_time != None:
                         await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action est entre : {user_begin_time} et {user_end_time}\nTon role consiste en :\n {user_descript}"))
-                    elif Details == "court" AND user_begin_time != None:
+                    elif Details == "court" and user_begin_time != None:
                         await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action est entre : {user_begin_time} et {user_end_time}\nTon role consiste en :\n {user_short}"))
-                    elif Details == "long" AND user_begin_time == None:
+                    elif Details == "long" and user_begin_time == None:
                         await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action n'a pas d'heure\nTon role consiste en :\n {user_descript}"))
-                    elif Details == "court" AND user_begin_time == None:
+                    elif Details == "court" and user_begin_time == None:
                         await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action n'a pas d'heure\nTon role consiste en :\n {user_short}"))
                     else :
                         await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role}\nEt utilise les bons arguments (voir !help MonRole pour plus de détails)"))
