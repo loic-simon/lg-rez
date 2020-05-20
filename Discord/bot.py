@@ -47,8 +47,6 @@ async def on_ready():
 # Trigger à l'arrivée d'un membre sur le serveur, crée un channel à son nom
 @bot.event
 async def on_member_join(member):
-    await member.create_dm()
-    await member.dm_channel.send(f"Hi {member.name}, welcome to my Discord server!")
     await inscription.main(bot,member)
 
 

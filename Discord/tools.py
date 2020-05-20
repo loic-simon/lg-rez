@@ -26,27 +26,27 @@ async def log(ctx, message):
 
 def bold(s):
     return f"**{s}**"
-    
+
 def ital(s):
     return f"*{s}*"
-    
+
 def soul(s):
     return f"__{s}__"
-    
+
 def strike(s):
     return f"~~{s}~~"
 
 def code(s):
     return f"`{s}`"
-    
+
 def code_bloc(s, langage=""):
     return f"```{langage}\n{s}```"
-    
+
 def quote(s):
     return f"> {s}"
-    
+
 def quote_bloc(s):
     return f">>> {s}"
-    
+
 def spoiler(s):
     return f"||{s}||"
