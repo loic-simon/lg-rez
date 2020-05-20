@@ -94,7 +94,7 @@ async def do(ctx, *, txt):
 
 
 @bot.command()
-@commands.has_role("MJ")
+#@commands.has_role("MJ")
 async def co(ctx):
     """lance un test d'inscription comme si on se connectait au serv pour la première fois"""
     await inscription.main(bot, ctx.author)
