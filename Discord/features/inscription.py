@@ -5,7 +5,6 @@ from bdd_connect import db, cache_TDB
 trigYesNo = {"oui","non","o","n","yes","no","y","n"}
 
 repOui = {"oui","o","yes","y"}
-repNon =
 
 async def main(bot, member):
     if chan := tools.get(member.guild.text_channels, topic=f"{member.id}"):

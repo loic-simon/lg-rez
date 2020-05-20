@@ -30,6 +30,9 @@ def member(arg, nom):       # Renvoie le membre @member. arg peut être de type 
     else:
         return TypeError("tools.member : Impossible de remonter aux membres depuis l'argument trasmis")
 
+#Teste si le message contient un mot de la liste trigWords, les mots de trigWords doivent etre en minuscule
+def checkTrig(m,trigWords):
+    return (m.context.lower() in trigWords)
 
 # Log dans #logs
 
