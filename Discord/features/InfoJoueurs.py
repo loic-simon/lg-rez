@@ -1,6 +1,7 @@
 from discord.ext import commands
 import tools
-from bdd_connect import db, cache_TDB, role_BDD
+from bdd_connect import db, cache_TDB
+from models import role_BDD
 import traceback
 
 
