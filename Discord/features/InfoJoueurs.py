@@ -14,8 +14,8 @@ class Informations(commands.Cog):
         L'option nom_camp permet de lister les rôles d'un camp spécifique
         Valeurs possibles pour nom_camp : all, Loups, Villageois, Solitaire, Nécros""" #création de la BDD role dans models.py
         if nom_camp == "all" :
-        tous = role_BDD.query.all()
-        ret = '\n - '.join([r.nom_du_role for r in tous])
+            tous = role_BDD.query.all()
+            ret = '\n - '.join([r.nom_du_role for r in tous])
         elif nom_camp == "Loups" :
             liste = role_BDD.query.filter_by(camp="Loups")
             ret = '\n - '.join([r.nom_du_role for r in liste])
