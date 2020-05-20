@@ -27,17 +27,20 @@ async def main(bot, member):
     ##await tools.log(member,vraiNom.content)
 
     await chan.edit(name = f"conv-bot-{vraiNom.content}")
-    await member.edit(nick = f"{vraiNom.content}")
+    if member.role.name != "MJ":
+        await member.edit(nick = f"{vraiNom.content}")
+
+    await chan.send("Habite-tu à la rez ? (O/N)")
 
     def checkTrigChan(m): #Check que le message soit une reponse oui/non et qu'elle soit dans le bon channel et pas le bon auteur
         return checkChan(m) and tools.checkTrig(m,trigYesNo)
 
-    await chan.send("Habite-tu à la rez ? (O/N)")
-    rep = await bot.wait_for('message', check=checkTrigChan)
+    rep = await bot.wait_for('message', check=checkChan)
 
     if a_la_rez := rep.content.lower() in repOui:
-        chambre = (await bot.wait_for('message', check=checkChan)).contient
+        await chan.send("Alors quelle est ta chambre ?")
+        chambre = (await bot.wait_for('message', check=checkChan)).content
     else:
         chambre = "XXX (chambre MJ)"
 
-    await tools.log(member, f"A la rez = {a_la_rez} et chambre = {chambre}")
+    await chan.send(f"A la rez = {a_la_rez} et chambre = {chambre}")
