@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 import tools
 import bdd_connect
 
-from features import annexe, IA, inscription
+from features import annexe, IA, inscription, InfoJoueurs, roles_bdd
 
 
 logging.basicConfig(level=logging.WARNING)

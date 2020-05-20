@@ -9,5 +9,5 @@ def connect(key="1jsruJoeQ4LSbh8RlRGmiyDNGsoWZewqDKPd12M9jj20"):
 
     # Open the workbook
     workbook = client.open_by_key(key)
-    
+
     return workbook
