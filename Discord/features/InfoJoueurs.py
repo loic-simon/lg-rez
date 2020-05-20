@@ -1,8 +1,8 @@
 from discord.ext import commands
 import tools
-from bdd_connect import db, cache_TDB
+from bdd_connect import db, cache_TDB, role_BDD
 import traceback
-import models
+
 
 
 class Informations(commands.Cog):
