@@ -8,12 +8,9 @@ repOui = {"oui","o","yes","y"}
 
 async def main(bot, member):
     if chan := tools.get(member.guild.text_channels, topic=f"{member.id}"):
-        await chan.send(f"Tu as déjà un channel à ton nom, {member.mention}")
-        return
-
-    #print(f"{member.id}")
-
-    chan = await member.guild.create_text_channel(f"conv-bot-{member.name}", category = tools.channel(member, "CONVERSATION BOT"), topic=f"{member.id}") # Crée le channel "perso-nom" avec le topic "member.id"
+        await chan.send(f"Tu as déjà un channel à ton nom, {member.mention}, par ici !")
+    else:
+        chan = await member.guild.create_text_channel(f"conv-bot-{member.name}", category = tools.channel(member, "CONVERSATION BOT"), topic=f"{member.id}") # Crée le channel "perso-nom" avec le topic "member.id"
 
     await chan.set_permissions(member, read_messages=True, send_messages=True)
 
@@ -27,8 +24,9 @@ async def main(bot, member):
     ##await tools.log(member,vraiNom.content)
 
     await chan.edit(name = f"conv-bot-{vraiNom.content}")
-    if not member.has_role("MJ"):
+    if not tools.role(member,"MJ") in member.roles:
         await member.edit(nick = f"{vraiNom.content}")
+
 
     await chan.send("Habite-tu à la rez ? (O/N)")
 
