@@ -1,5 +1,6 @@
 import os
 import logging
+import traceback
 
 import discord
 from discord.ext import commands
@@ -55,16 +56,21 @@ async def on_member_join(member):
 async def on_message(message):
     if message.author == bot.user:          # Sécurité pour éviter les boucles infinies
         return
+        
+    try:
+        ctx = await bot.get_context(message)
+        await bot.invoke(ctx)                   # On trigger toutes les commandes
 
-    ctx = await bot.get_context(message)
-    await bot.invoke(ctx)                   # On trigger toutes les commandes
+        if not message.content.startswith(COMMAND_PREFIX):      # Si pas une commande (+ conditions sur les channels ? à venir), on appelle l'IA
+            rep = await IA.main(message.content)
 
-    if not message.content.startswith(COMMAND_PREFIX):      # Si pas une commande (+ conditions sur les channels ? à venir), on appelle l'IA
-        rep = await IA.main(message.content)
-
-        if rep:                     # Si l'IA a un truc à dire
-            await message.channel.send(rep)
-
+            if rep:                     # Si l'IA a un truc à dire
+                await message.channel.send(rep)
+    except:
+        await tools.log(message, (
+            f"{tools.role(message, 'MJ').mention} ALED : Exception Python !"
+            f"{tools.code_bloc(traceback.format_exc())}"
+        ))
 
 
 # Commandes définies dans les fichiers annexes !
