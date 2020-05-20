@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 import tools
 import bdd_connect
 
-from features import annexe, IA, inscription
+from features import annexe, IA, inscription, InfoJoueurs, roles_bdd
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -56,7 +56,7 @@ async def on_member_join(member):
 async def on_message(message):
     if message.author == bot.user:          # Sécurité pour éviter les boucles infinies
         return
-        
+
     try:
         ctx = await bot.get_context(message)
         await bot.invoke(ctx)                   # On trigger toutes les commandes
