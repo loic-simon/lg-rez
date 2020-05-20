@@ -27,7 +27,7 @@ async def main(bot, member):
     ##await tools.log(member,vraiNom.content)
 
     await chan.edit(name = f"conv-bot-{vraiNom.content}")
-    if member.role.name != "MJ":
+    if not member.has_role("MJ"):
         await member.edit(nick = f"{vraiNom.content}")
 
     await chan.send("Habite-tu à la rez ? (O/N)")
