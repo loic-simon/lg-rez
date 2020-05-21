@@ -175,16 +175,13 @@ def viewcron(d, p):
     lst = getjobs()     # Récupération de la liste des tâches
     lst.sort(key=lambda x:x["id"])
 
-    # for dic in lst[10:]:
-    #     requests.patch(f'https://api.alwaysdata.com/v1/job/{dic["id"]}/', auth=(ALWAYSDATA_API_KEY, ''), json={'argument':dic['argument'].replace("\\!","")})
-    #     time.sleep(0.1)
-
     keys = list(lst[0].keys())
 
-    delButton = lambda id:f"""<input type="hidden" name="id" value="{id}"><input type="submit" name="delcron" value="Suppr">"""
-    switchButton = lambda id,is_disabled:f"""<input type="hidden" name="id" value="{id}">{'' if is_disabled else '<input type="hidden" name="disable">'}<input type="submit" name="disablecron" value=" {'Activer' if is_disabled else 'Désactiver'}">"""
-
-    corps = [[dic[k] for k in keys] + [delButton(dic["id"]) + switchButton(dic["id"], dic["is_disabled"])] for dic in lst]
+    def boutons(id, is_disabled):
+        return (f"""<input type="hidden" name="id" value=\"{id}"><input type="submit" name="delcron" value="Suppr">"""
+                f"""<input type="hidden" name="id" value="{id}">{'' if is_disabled else '<input type="hidden" name="disable">'}<input type="submit" name="disablecron" value=" {'Activer' if is_disabled else 'Désactiver'}">""")
+                
+    corps = [[dic[k] for k in keys] + [boutons(dic["id"], dic["is_disabled"])] for dic in lst]
 
     fieldProperties = {"id": None,
                        "href": None,
@@ -215,10 +212,12 @@ def viewcron(d, p):
 
     nouv = [champ(k, fieldProperties[k]) for k in keys] + ["""<input type="submit" name="addcron" value="Créer">"""]
 
-    r += html_table(corps + [nouv],
-                    keys + ["Action"],
-                    f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">""",
-                    "</form>")
+    r += html_table(corps,
+                    first_row = keys + ["Action"],
+                    repeat_header = True,
+                    very_last_row = nouv,
+                    row_start = f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">""",
+                    row_end = "</form>")
 
     return r
 

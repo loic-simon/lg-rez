@@ -1,3 +1,4 @@
+import os
 import time             # Accès à date/heure actuelle
 import traceback        # Récupération des messages d'erreur Python, pour les afficher plutôt que planter le site
 import random           # Génération de nombres aléatoires, choix aléatoires...
@@ -7,6 +8,7 @@ import requests         # Requêtes HTML (GET, POST...)
 import json             # JSON -> dictionnaire et inversement, pour échange données
 import unidecode        # Comparaison de chaînes en enlèvant les accents
 
+from dotenv import load_dotenv
 import sqlalchemy.ext
 from sqlalchemy.exc import *                            # Exceptions générales SQLAlchemy
 from sqlalchemy.orm.exc import *                        # Exceptions requêtes SQLAlchemy
@@ -14,19 +16,21 @@ from sqlalchemy.orm.attributes import flag_modified     # Permet de "signaler" l
 
 import blocs.chatfuel as chatfuel       # Envoi de blocs à Chatfuel (maison)
 import blocs.gsheets as gsheets         # Connection à Google Sheets (maison)
+import blocs.webhook as webhook
 from blocs.bdd_tools import *           # En théorie faut pas faire ça, mais là ça m'arrange
 from __init__ import db, Tables      # Récupération BDD
 Joueurs = Tables["Joueurs"]
 
 # CONSTANTES
 
-GLOBAL_PASSWORD = "CestSuperSecure"
+load_dotenv()
+GLOBAL_PASSWORD = os.getenv("GLOBAL_PASSWORD")
 
-BOT_ID = "5be9b3b70ecd9f4c8cab45e0"
-CHATFUEL_TOKEN = "mELtlMAHYqR0BvgEiMq8zVek3uYUK3OJMbtyrdNPTrQB9ndV0fM7lWTFZbM4MZvD"
-CHATFUEL_TAG = "CONFIRMED_EVENT_UPDATE"
+BOT_ID = os.getenv("BOT_ID")
+CHATFUEL_TOKEN = os.getenv("CHATFUEL_TOKEN")
+CHATFUEL_TAG = os.getenv("CHATFUEL_TAG")
 
-ALWAYSDATA_API_KEY = "f73dc3407a1949a8b0a7efd1b374f9c4"
+ALWAYSDATA_API_KEY = os.getenv("ALWAYSDATA_API_KEY")
 
 jobs = ["open_cond", "remind_cond", "close_cond",
         "open_maire", "remind_maire", "close_maire",
@@ -119,32 +123,32 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
             head = values[2]
             TDB_index = {col:head.index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
-            TDB_tampon_index = {col:head.index("tampon_"+col) for col in cols if col != 'messenger_user_id'}    # Idem pour la partie « tampon »
+            TDB_tampon_index = {col:head.index("tampon_"+col) for col in cols if col != 'discord_id'}    # Idem pour la partie « tampon »
 
 
             # CONVERSION INFOS GSHEET EN UTILISATEURS
 
             users_TDB = []              # Liste des joueurs tels qu'actuellement dans le TDB
-            ids_TDB = []                # messenger_user_ids des différents joueurs du TDB
+            ids_TDB = []                # discord_ids des différents joueurs du TDB
             rows_TDB = {}               # Indices des lignes ou sont les différents joueurs du TDB
 
             for l in range(NL):
                 L = values[l]
-                id = L[TDB_index["messenger_user_id"]]
+                id = L[TDB_index["discord_id"]]
                 if (id != "") and RepresentsInt(id):
 
                     joueur = {col:transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
                     user_TDB = Joueurs(**joueur)
 
                     users_TDB.append(user_TDB)
-                    ids_TDB.append(user_TDB.messenger_user_id)
-                    rows_TDB[user_TDB.messenger_user_id] = l
+                    ids_TDB.append(user_TDB.discord_id)
+                    rows_TDB[user_TDB.discord_id] = l
 
 
             ### RÉCUPÉRATION UTILISATEURS CACHE
 
             users_cache = Joueurs.query.all()     # Liste des joueurs tels qu'actuellement en cache
-            ids_cache = [user_cache.messenger_user_id for user_cache in users_cache]
+            ids_cache = [user_cache.discord_id for user_cache in users_cache]
 
 
             ### COMPARAISON
@@ -153,52 +157,43 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             Modified_ids = []
 
             for user_cache in users_cache.copy():                      ## 1. Joueurs dans le cache supprimés du TDB
-                if user_cache.messenger_user_id not in ids_TDB:
+                if user_cache.discord_id not in ids_TDB:
                     users_cache.remove(user_cache)
                     db.session.delete(user_cache)
-
-                    # On doit également le supprimer de cache_Chatfuel
-                    # user_cC = cache_Chatfuel.query.filter_by(messenger_user_id=user_cache.messenger_user_id).first()
-                    # db.session.delete(user_cC)
 
                     if verbose:
                         r += f"\nJoueur dans les caches hors TDB : {user_cache}"
 
             for user_cache in users_TDB:                               ## 2. Joueurs dans le TDB pas encore dans le cache
-                if user_cache.messenger_user_id not in ids_cache:
+                if user_cache.discord_id not in ids_cache:
                     if verbose:
                         r += f"\nJoueur dans le TDB hors caches : {user_cache}"
 
                     users_cache.append(user_cache)
                     db.session.add(user_cache)
-                    id = user_cache.messenger_user_id
-
-                    # On doit également l'ajouter à cache_Chatfuel
-                    # user_cC = cache_Chatfuel(**{col:getattr(user_cache, col) for col in cols})     # Mêmes attributs que user_cache
-                    # db.session.add(user_cC)
+                    id = user_cache.discord_id
 
                     # Validation dans le TDB
-                    Modifs.extend( [( id, col, getattr(user_cache, col) ) for col in cols if col != 'messenger_user_id'] )    # Sans le _EAT parce qu'a priori le joueur est ajouté au TDB avec ses attributs déjà existants
+                    Modifs.extend( [( id, col, getattr(user_cache, col) ) for col in cols if col != 'discord_id'] )
 
             # À ce stade, on a les même utilisateurs dans users_TDB et users_cache (mais pas forcément les mêmes infos !)
 
             for user_TDB in users_TDB:                           ## 3. Différences
-                user_cache = [user for user in users_cache if user.messenger_user_id==user_TDB.messenger_user_id][0]    # user correspondant dans le cache
+                user_cache = [user for user in users_cache if user.discord_id==user_TDB.discord_id][0]    # user correspondant dans le cache
 
                 if user_cache != user_TDB:     # Au moins une différence !
                     if verbose:
                         r += f"\nJoueur différant entre TDB et Joueurs : {user_TDB}"
-                    id = user_TDB.messenger_user_id
+                    id = user_TDB.discord_id
 
                     for col in cols:
                         if getattr(user_cache, col) != getattr(user_TDB, col):
                             if verbose:
                                 r += f"\n---- Colonne différant : {col} (TDB : {getattr(user_TDB, col)}, Joueurs : {getattr(user_cache, col)})"
 
-                            setattr(user_cache, col, getattr(user_TDB, col))
+                            setattr(user_cache, col, getattr(user_TDB, col))        # on modifie le cache (= BDD Joueurs)
                             flag_modified(user_cache, col)
-                            # Modifs.append( ( id, col, str(getattr(user_TDB, col))+"_EAT" ) )
-                            Modifs.append( ( id, col, getattr(user_TDB, col) ) )        # Avec le passage direct à Chatfuel, plus besoin de _EAT. La modif ne sera indiquée dans le TDB que si tout est successful.
+                            Modifs.append( ( id, col, getattr(user_TDB, col) ) )
                             if id not in Modified_ids:
                                 Modified_ids.append(id)
 
@@ -207,34 +202,38 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             ### MODIFICATIONS DANS CHATFUEL DIRECT (envoi d'un message aux gens)
 
             if Modified_ids:
-                params_r = {"chatfuel_token" : CHATFUEL_TOKEN,
-                            "chatfuel_message_tag" : CHATFUEL_TAG,
-                            "chatfuel_block_name" : "Sync_silent" if silent else "Sync"}
+                dico = {id:{col:v for (idM, col, v) in Modifs if idM == id} for id in Modified_ids}
+                
+                # for id in Modified_ids:                 # On parcourt les joueurs à modifier
+                    # 
+                    # attrs = {}
+                    # for (idM, col, v) in Modifs:
+                    #     if id == idM:                   # Modifs liées au joueur en cours
+                    #         attrs[col] = v
+                    #         if not silent:
+                    #             attrs[f"sync_{col}"] = True
+                    # 
+                    # params = format_Chatfuel(attrs)
+                    # for k,v in params_r.items():
+                    #     params[k] = v
+                    # 
+                    # rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{id}/send", params=params)
+                    # rep = rep.json()
+                    # 
+                    # if "code" in rep:
+                    #     raise Exception("Erreur d'envoi Chatfuel Broadcast API. Réessaie.")
+                    # else:
+                    #     if not rep["success"]:
+                    #         pass
+                    #         # raise Exception(f"""Chatfuel Broadcast API a renvoyé une erreur : {rep["result"]}""")
 
-                for id in Modified_ids:
-
-                    attrs = {}
-                    for (idM, col, v) in Modifs:
-                        if id == idM:
-                            attrs[col] = v
-                            if not silent:
-                                attrs[f"sync_{col}"] = True
-
-                    params = format_Chatfuel(attrs)
-                    for k,v in params_r.items():
-                        params[k] = v
-
-                    rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{id}/send", params=params)
-                    rep = rep.json()
-
-                    if "code" in rep:
-                        raise Exception("Erreur d'envoi Chatfuel Broadcast API. Réessaie.")
-                    else:
-                        if not rep["success"]:
-                            pass
-                            # raise Exception(f"""Chatfuel Broadcast API a renvoyé une erreur : {rep["result"]}""")
-
-
+                message = f"!sync{'_silent' if silent else ''} {json.dumps(dico)}"
+                rep = webhook.send(message, "sync")
+                if not rep:
+                    raise Exception(f"L'envoi du webhook Discord a échoué : {rep} {rep.text}")
+                    
+                    
+                    
             ### APPLICATION DES MODIFICATIONS SUR LE TDB
 
             if Modifs:
@@ -251,8 +250,6 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                         cm = c
                     if v == None:
                         v = ''
-                    elif v == "None_EAT":
-                        v = "_EAT"
                     elif v == "None":
                         v = ""
                     Modifs_rdy.append((l, c, v))
@@ -388,7 +385,7 @@ def cron_call(d):
                     r += f"""Critères : <code>{html_escape(criteres)}</code><br/>"""
 
                 if testmode:
-                    criteres_test = {"messenger_user_id": 2033317286706583}   # Loïc, pour tests
+                    criteres_test = {"discord_id": 2033317286706583}   # Loïc, pour tests
                     if verbose:
                         r += f"""Critères MODE TEST, réellement appliqués : <code>{html_escape(criteres_test)}</code><br/>"""
 
@@ -425,7 +422,7 @@ def cron_call(d):
                     rep = False
                     tries = 0
                     while (not rep) and (tries < MAX_TRIES):
-                        rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{user.messenger_user_id}/send", params=params)
+                        rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{user.discord_id}/send", params=params)
                         tries += 1
                         if not rep:
                             time.sleep(5)
@@ -543,10 +540,10 @@ def choix_cible(d, p, url_root):
                 score = SM.ratio()                              # On calcule la ressemblance
                 if score == 1:                                  # Cas particulier : joueur demandé correspondant exactement à un en BDD
                     break
-                scores.append((joueur.nom, joueur.messenger_user_id, score))
+                scores.append((joueur.nom, joueur.discord_id, score))
 
             if score == 1:      # Joueur demandé correspondant exactement à un en BDD
-                attrs = {"cible": joueur.messenger_user_id}      # On définit directement la cible (et on envoie aucun bloc)
+                attrs = {"cible": joueur.discord_id}      # On définit directement la cible (et on envoie aucun bloc)
 
             else:               # Si pas de joueur correspondant parfaitement
                 bests = [(nom, id) for (nom, id, score) in sorted(scores, key=lambda x:x[2], reverse=True)]  # Meilleurs noms, dans l'ordre

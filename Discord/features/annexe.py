@@ -46,7 +46,7 @@ class Annexe(commands.Cog):
         """Renommer quelqu'un à partir de son ID"""
 
         try:
-            u = Joueurs.query.filter_by(messenger_user_id=id).one()
+            u = Joueurs.query.filter_by(discord_id=id).one()
         except:
             await ctx.send(tools.code_bloc(f"Cible {id} non trouvée\n{traceback.format_exc()}"))
         else:

@@ -38,7 +38,7 @@ def member(arg, nom):       # Renvoie le membre @member. arg peut être de type 
 
 def private_chan(arg, member):
     chan = f"""conv-bot-{member.display_name.lower().replace(" ","-").replace("'", "")}"""       # PROVISOIRE !!!
-    # chan = Tables["Joueurs"].query.filter_by(messenger_user_id=member.id).one().chan_name
+    # chan = Tables["Joueurs"].query.filter_by(discord_id=member.id).one().chan_name
     return channel(arg, chan)
 
 

@@ -3,7 +3,7 @@ import enum
 # Create database connection object
 
 class Joueurs(db.Model):
-    messenger_user_id = db.Column(db.BigInteger(), primary_key=True)
+    discord_id = db.Column(db.BigInteger(), primary_key=True)
     inscrit = db.Column(db.Boolean(), nullable=False)
 
     nom = db.Column(db.String(32), nullable=False)
@@ -21,10 +21,10 @@ class Joueurs(db.Model):
     finRole = db.Column(db.Integer(), nullable=True)
 
     def __repr__(self):
-        return f"<Joueurs ({self.messenger_user_id}/{self.nom})>"
+        return f"<Joueurs ({self.discord_id}/{self.nom})>"
 
-    def __init__(self, messenger_user_id, inscrit, nom, chambre, statut, role, camp, votantVillage, votantLoups, roleActif=None, debutRole=None, finRole=None):
-        self.messenger_user_id = messenger_user_id
+    def __init__(self, discord_id, inscrit, nom, chambre, statut, role, camp, votantVillage, votantLoups, roleActif=None, debutRole=None, finRole=None):
+        self.discord_id = discord_id
         self.inscrit = inscrit
 
         self.nom = nom
