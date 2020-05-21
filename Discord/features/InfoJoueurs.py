@@ -1,6 +1,6 @@
 from discord.ext import commands
 import tools
-from bdd_connect import db, cache_TDB
+from bdd_connect import db, Joueurs
 import traceback
 
 
@@ -14,19 +14,19 @@ class Informations(commands.Cog):
         L'option nom_camp permet de lister les rôles d'un camp spécifique
         Valeurs possibles pour nom_camp : all, Loups, Villageois, Solitaire, Nécros""" #création de la BDD role dans models.py
         if nom_camp == "all" :
-            tous = role_BDD.query.all()
+            tous = Roles.query.all()
             ret = '\n - '.join([r.nom_du_role for r in tous])
         elif nom_camp == "Loups" :
-            liste = role_BDD.query.filter_by(camp="Loups")
+            liste = Roles.query.filter_by(camp="Loups")
             ret = '\n - '.join([r.nom_du_role for r in liste])
         elif nom_camp == "Villageois" :
-            liste = role_BDD.query.filter_by(camp="Villageois")
+            liste = Roles.query.filter_by(camp="Villageois")
             ret = '\n - '.join([r.nom_du_role for r in liste])
         elif nom_camp == "Solitaire" :
-            liste = role_BDD.query.filter_by(camp="Solitaire")
+            liste = Roles.query.filter_by(camp="Solitaire")
             ret = '\n - '.join([r.nom_du_role for r in liste])
         elif nom_camp == "Nécros" :
-            liste = role_BDD.query.filter_by(camp="Nécros")
+            liste = Roles.query.filter_by(camp="Nécros")
             ret = '\n - '.join([r.nom_du_role for r in liste])
         else :
             await ctx.send(tools.code_bloc(f"Cible {nom_camp} non trouvée\n{traceback.format_exc()}"))
@@ -40,7 +40,7 @@ class Informations(commands.Cog):
         Valeurs possibles pour Details : court, long, role"""
         nom_user = ctx.author.display_name
         try :
-            u = cache_TDB.query.filter_by(nom = nom_user).one()
+            u = Joueurs.query.filter_by(nom = nom_user).one()
         except :
             await ctx.send(tools.code_bloc(f"Le joueur {nom_user} n'a pas été trouvé\n{traceback.format_exc()}"))
         else :
@@ -49,7 +49,7 @@ class Informations(commands.Cog):
                 await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role}"))
             else :
                 try :
-                    r = role_BDD.query.filter_by(role = user_role).one()
+                    r = Roles.query.filter_by(role = user_role).one()
                 except :
                     await ctx.send(tools.code_bloc(f"Votre rôle : {user_role} n'existe pas\n{traceback.format_exc()}"))
                 else :

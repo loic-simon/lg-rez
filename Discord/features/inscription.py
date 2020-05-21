@@ -1,6 +1,6 @@
 from discord.ext import commands
 import tools
-from bdd_connect import db, cache_TDB
+from bdd_connect import db, Joueurs
 
 trigYesNo = {"oui","non","o","n","yes","no","y","n"}
 

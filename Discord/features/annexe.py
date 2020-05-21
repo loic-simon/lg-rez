@@ -1,6 +1,6 @@
 from discord.ext import commands
 import tools
-from bdd_connect import db, cache_TDB
+from bdd_connect import db, Joueurs
 import traceback
 
 
@@ -35,7 +35,7 @@ class Annexe(commands.Cog):
     async def testbdd(self, ctx):
         """Test BDD"""
 
-        tous = cache_TDB.query.all()
+        tous = Joueurs.query.all()
         ret = '\n - '.join([u.nom for u in tous])
         await ctx.send(tools.code_bloc(f"Liste des joueurs :\n - {ret}"))
 
@@ -46,7 +46,7 @@ class Annexe(commands.Cog):
         """Renommer quelqu'un à partir de son ID"""
 
         try:
-            u = cache_TDB.query.filter_by(messenger_user_id=id).one()
+            u = Joueurs.query.filter_by(messenger_user_id=id).one()
         except:
             await ctx.send(tools.code_bloc(f"Cible {id} non trouvée\n{traceback.format_exc()}"))
         else:

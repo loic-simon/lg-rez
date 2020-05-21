@@ -1,5 +1,8 @@
+from functools import wraps
+
 import discord.utils
 import discord.ext.commands
+
 from bdd_connect import db, Tables
 
 # Récupération rapide
@@ -35,7 +38,7 @@ def member(arg, nom):       # Renvoie le membre @member. arg peut être de type 
 
 def private_chan(arg, member):
     chan = f"""conv-bot-{member.display_name.lower().replace(" ","-").replace("'", "")}"""       # PROVISOIRE !!!
-    # chan = Tables["cache_TDB"].query.filter_by(messenger_user_id=member.id).one().chan_name
+    # chan = Tables["Joueurs"].query.filter_by(messenger_user_id=member.id).one().chan_name
     return channel(arg, chan)
 
 
@@ -43,17 +46,18 @@ def private_chan(arg, member):
 # (utilisable que dans un Cog, de toute façon tout devra être cogé à terme)
 
 def private(cmd):
-    async def new_cmd(self, ctx, *args, **kwargs):
-        if not ctx.channel.name.startswith("conv-bot-"):
+    
+    @wraps(cmd)
+    async def new_cmd(self, ctx, *args, **kwargs):              # Cette commande est renvoyée à la place de cmd
+        if not ctx.channel.name.startswith("conv-bot-"):        # Si pas déjà dans une conv bot :
         # if not member.has_role("MJ") and not ctx.channel.name.beginswith("conv-bot-"):
-            await ctx.message.delete()
-            ctx.channel = private_chan(ctx, ctx.author)
-            await ctx.send(f"{quote(ctx.message.content)}\n"
+            await ctx.message.delete()                          # On supprime le message,
+            ctx.channel = private_chan(ctx, ctx.author)         # On remplace le chan dans le contexte d'appel par le chan privé,
+            await ctx.send(f"{quote(ctx.message.content)}\n"    # On envoie un warning dans le chan privé,
                            f"{ctx.author.mention} :warning: Cette commande est interdite en dehors de ta conv privée ! :warning:\n"
                            f"J'ai supprimé ton message, et j'exécute la commande ici :")
-        return await cmd(self, ctx, *args, **kwargs)
+        return await cmd(self, ctx, *args, **kwargs)            # Et on appelle cmd, avec le contexte modifié !
         
-    new_cmd.__name__ = cmd.__name__
     return new_cmd
 
 

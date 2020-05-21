@@ -16,7 +16,7 @@ import blocs.chatfuel as chatfuel       # Envoi de blocs à Chatfuel (maison)
 import blocs.gsheets as gsheets         # Connection à Google Sheets (maison)
 from blocs.bdd_tools import *           # En théorie faut pas faire ça, mais là ça m'arrange
 from __init__ import db, Tables      # Récupération BDD
-cache_TDB = Tables["cache_TDB"]
+Joueurs = Tables["Joueurs"]
 
 # CONSTANTES
 
@@ -97,9 +97,9 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
             ### GÉNÉRALITÉS
 
-            cols = get_cols(cache_TDB)
-            cols_SQL_types = get_SQL_types(cache_TDB)
-            cols_SQL_nullable = get_SQL_nullable(cache_TDB)
+            cols = get_cols(Joueurs)
+            cols_SQL_types = get_SQL_types(Joueurs)
+            cols_SQL_nullable = get_SQL_nullable(Joueurs)
 
 
             ### RÉCUPÉRATION INFOS GSHEET
@@ -134,7 +134,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                 if (id != "") and RepresentsInt(id):
 
                     joueur = {col:transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
-                    user_TDB = cache_TDB(**joueur)
+                    user_TDB = Joueurs(**joueur)
 
                     users_TDB.append(user_TDB)
                     ids_TDB.append(user_TDB.messenger_user_id)
@@ -143,7 +143,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
             ### RÉCUPÉRATION UTILISATEURS CACHE
 
-            users_cache = cache_TDB.query.all()     # Liste des joueurs tels qu'actuellement en cache
+            users_cache = Joueurs.query.all()     # Liste des joueurs tels qu'actuellement en cache
             ids_cache = [user_cache.messenger_user_id for user_cache in users_cache]
 
 
@@ -187,13 +187,13 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
                 if user_cache != user_TDB:     # Au moins une différence !
                     if verbose:
-                        r += f"\nJoueur différant entre TDB et cache_TDB : {user_TDB}"
+                        r += f"\nJoueur différant entre TDB et Joueurs : {user_TDB}"
                     id = user_TDB.messenger_user_id
 
                     for col in cols:
                         if getattr(user_cache, col) != getattr(user_TDB, col):
                             if verbose:
-                                r += f"\n---- Colonne différant : {col} (TDB : {getattr(user_TDB, col)}, cache_TDB : {getattr(user_cache, col)})"
+                                r += f"\n---- Colonne différant : {col} (TDB : {getattr(user_TDB, col)}, Joueurs : {getattr(user_cache, col)})"
 
                             setattr(user_cache, col, getattr(user_TDB, col))
                             flag_modified(user_cache, col)
@@ -274,7 +274,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
             ### APPLICATION DES MODIFICATIONS SUR LES BDD cache
 
-            db.session.commit()     # Modification de cache_TDB
+            db.session.commit()     # Modification de Joueurs
 
 
             ### FIN DE LA PROCÉDURE
@@ -298,16 +298,16 @@ def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET 
     try:
         if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
 
-            tous = cache_TDB.query.filter(cache_TDB.statut.in_(["vivant","MV","mort"])).all()     # Liste des joueurs tels qu'actuellement en cache
+            tous = Joueurs.query.filter(Joueurs.statut.in_(["vivant","MV","mort"])).all()     # Liste des joueurs tels qu'actuellement en cache
             NT = len(tous)
 
             if "type" in d and d["type"] == "vivants":
-                rep = cache_TDB.query.filter(cache_TDB.statut.in_(["vivant","MV"])).order_by(cache_TDB.nom).all()
+                rep = Joueurs.query.filter(Joueurs.statut.in_(["vivant","MV"])).order_by(Joueurs.nom).all()
                 descr = "en vie"
                 bouton_text = "Joueurs morts ☠"
                 bouton_bloc = "Joueurs morts"
             elif "type" in d and d["type"] == "morts":
-                rep = cache_TDB.query.filter(cache_TDB.statut == "mort").order_by(cache_TDB.nom).all()
+                rep = Joueurs.query.filter(Joueurs.statut == "mort").order_by(Joueurs.nom).all()
                 descr = "morts"
                 bouton_text = "Joueurs en vie 🕺"
                 bouton_bloc = "Joueurs en vie"
@@ -398,13 +398,13 @@ def cron_call(d):
 
             ### RÉCUPÉRATION UTILISATEURS CACHE
 
-            users = cache_TDB.query.filter_by(**criteres).all()     # Liste des joueurs répondant aux cirtères
+            users = Joueurs.query.filter_by(**criteres).all()     # Liste des joueurs répondant aux cirtères
             if verbose:
                 str_users = str(users).replace(', ', ',\n ')
                 r += f"<br/>Utilisateur(s) répondant aux critères ({len(users)}) : <pre>{html_escape(str_users)}</pre>"
 
             if testmode:
-                users = cache_TDB.query.filter_by(**criteres_test).all()    # on écrase par les utilisateur MODE TEST
+                users = Joueurs.query.filter_by(**criteres_test).all()    # on écrase par les utilisateur MODE TEST
                 if verbose:
                     str_users = str(users).replace(', ',',\n ')
                     r += f"<br/>Utilisateur(s) répondant aux critères MODE TEST ({len(users)}) : <pre>{html_escape(str_users)}</pre>"
@@ -482,16 +482,16 @@ def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET 
     try:
         if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
 
-            tous = cache_TDB.query.filter(cache_TDB.statut.in_(["vivant","MV","mort"])).all()     # Liste des joueurs tels qu'actuellement en cache
+            tous = Joueurs.query.filter(Joueurs.statut.in_(["vivant","MV","mort"])).all()     # Liste des joueurs tels qu'actuellement en cache
             NT = len(tous)
 
             if "type" in d and d["type"] == "vivants":
-                rep = cache_TDB.query.filter(cache_TDB.statut.in_(["vivant","MV"])).order_by(cache_TDB.nom).all()
+                rep = Joueurs.query.filter(Joueurs.statut.in_(["vivant","MV"])).order_by(Joueurs.nom).all()
                 descr = "en vie"
                 bouton_text = "Joueurs morts ☠"
                 bouton_bloc = "Joueurs morts"
             elif "type" in d and d["type"] == "morts":
-                rep = cache_TDB.query.filter(cache_TDB.statut == "mort").order_by(cache_TDB.nom).all()
+                rep = Joueurs.query.filter(Joueurs.statut == "mort").order_by(Joueurs.nom).all()
                 descr = "morts"
                 bouton_text = "Joueurs en vie 🕺"
                 bouton_bloc = "Joueurs en vie"
@@ -534,7 +534,7 @@ def choix_cible(d, p, url_root):
             slug1 = unidecode.unidecode(p["cible"]).lower()     # Cible en minuscule et sans accents
             SM.set_seq1(slug1)                                  # Première chaîne à comparer : cible demandée
 
-            vivants = cache_TDB.query.filter(cache_TDB.statut.in_(["vivant","MV"])).all()
+            vivants = Joueurs.query.filter(Joueurs.statut.in_(["vivant","MV"])).all()
             scores = []
 
             for joueur in vivants:

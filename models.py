@@ -2,7 +2,7 @@ import enum
 
 # Create database connection object
 
-class cache_TDB(db.Model):
+class Joueurs(db.Model):
     messenger_user_id = db.Column(db.BigInteger(), primary_key=True)
     inscrit = db.Column(db.Boolean(), nullable=False)
 
@@ -21,7 +21,7 @@ class cache_TDB(db.Model):
     finRole = db.Column(db.Integer(), nullable=True)
 
     def __repr__(self):
-        return f"<cache_TDB ({self.messenger_user_id}/{self.nom})>"
+        return f"<Joueurs ({self.messenger_user_id}/{self.nom})>"
 
     def __init__(self, messenger_user_id, inscrit, nom, chambre, statut, role, camp, votantVillage, votantLoups, roleActif=None, debutRole=None, finRole=None):
         self.messenger_user_id = messenger_user_id
@@ -42,7 +42,7 @@ class cache_TDB(db.Model):
         self.finRole = finRole
 
 
-class role_BDD(db.Model) :
+class Roles(db.Model) :
     nom_du_role = db.Column(db.String(32), primary_key = True)
     camp = db.Column(db.String(32), nullable = False)                       #Loups, Solitaire, Nécros, Villageois
 
@@ -77,7 +77,7 @@ class role_BDD(db.Model) :
 
         #self.ChangementCible = ChangementCible
 
-Tables = {"cache_TDB":cache_TDB,
-          "role_BDD":role_BDD,
+Tables = {"Joueurs":Joueurs,
+          "Roles":Roles,
           }
 db.create_all()
