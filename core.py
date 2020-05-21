@@ -14,6 +14,7 @@ from sqlalchemy.orm.attributes import flag_modified     # Permet de "signaler" l
 
 import blocs.chatfuel as chatfuel       # Envoi de blocs à Chatfuel (maison)
 import blocs.gsheets as gsheets         # Connection à Google Sheets (maison)
+from blocs.bdd_tools import *           # En théorie faut pas faire ça, mais là ça m'arrange
 from __init__ import db, Tables      # Récupération BDD
 cache_TDB = Tables["cache_TDB"]
 
@@ -49,7 +50,7 @@ def infos_tb(quiet=False):
     if quiet:
         return tb
     else:
-        return f"<br/><div> AN EXCEPTION HAS BEEN RAISED! <br/><pre>{tb}</pre></div>"
+        return f"<br/><div> AN EXCEPTION HAS BEEN RAISED! <br/><pre>{html_escape(tb)}</pre></div>"
 
 def RepresentsInt(s):
     try:
@@ -57,29 +58,6 @@ def RepresentsInt(s):
         return True
     except ValueError:
         return False
-
-def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input brut (POST, GET, JSON de Chatfuel...) selon le type de sa colonne
-    try:
-        if value in (None, '', 'None', 'none', 'Null', 'null', 'not set', 'non défini'):
-            if nullable:
-                return None
-            else:
-                raise ValueError
-        elif SQL_type == "String":
-            return str(value)
-        elif SQL_type in ("Integer", "BigInteger"):
-            return int(value)
-        elif SQL_type == "Boolean":
-            if value in [1, '1', True, 'true', 'True', 'TRUE', 'vrai', 'Vrai', 'VRAI']:
-                return True
-            elif value in [0, '0', False, 'false', 'False', 'FALSE', 'faux', 'Faux', 'FAUX']:
-                return False
-            else:
-                raise ValueError()
-        else:
-            raise KeyError(f"unknown column type for column '{col}': '{SQL_type}''")
-    except (ValueError, TypeError):
-        raise ValueError(f"Valeur '{value}' incorrecte pour la colonne '{col}' (type '{SQL_type}'/{'NOT NULL' if not nullable else ''})")
 
 def format_Chatfuel(d):         # Représentation des attributs dans Chatfuel
     for k,v in d.items():
@@ -119,9 +97,9 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
             ### GÉNÉRALITÉS
 
-            cols = [str(column.key) for column in cache_TDB.__table__.columns]      # Colonnes de cache_TDB
-            cols_SQL_types = {col:type(getattr(cache_TDB, col).property.columns[0].type).__name__ for col in cols}
-            cols_SQL_nullable = {col:getattr(cache_TDB, col).property.columns[0].nullable for col in cols}
+            cols = get_cols(cache_TDB)
+            cols_SQL_types = get_SQL_types(cache_TDB)
+            cols_SQL_nullable = get_SQL_nullable(cache_TDB)
 
 
             ### RÉCUPÉRATION INFOS GSHEET
@@ -653,9 +631,14 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
             r += f"""<h1><a href="admin?pwd={GLOBAL_PASSWORD}">Panneau d'administration LG Rez</a></h1><hr/>"""
 
             ### BASE DE DONNÉES
-
+            
             if "viewtable" in p:
                 r += viewtable(d, p)
+                
+            for k in p.keys():
+                if k.startswith("viewtable-sort"):
+                    [_, sort_col, sort_asc] = k.split(':')
+                    r += viewtable(d, p, sort_col, sort_asc=="asc")
 
             if "additem" in p:
                 r += additem(d, p)
@@ -663,6 +646,10 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
 
             if "delitem" in p:
                 r += delitem(d, p)
+                r += viewtable(d, p)
+
+            if "editem" in p:
+                r += editem(d, p)
                 r += viewtable(d, p)
 
             # TÂCHES PLANIFIÉES

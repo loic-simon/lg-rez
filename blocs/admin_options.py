@@ -3,9 +3,19 @@
 
 ### UTILITAIRES
 
-def html_table(LL, first_row=None, row_start="", row_end=""):
+def html_table(LL, first_row=None, second_row=None, last_row=None, repeat_header=False, very_last_row=None, row_start="", row_end=""):
     r = "<table style='border:1px solid black; border-collapse: collapse;'>"
-    for L in [[f"<b>{e}</b>" for e in first_row]] + LL:
+    if second_row:
+        LL.insert(0, [f"<i>{e}</i>" for e in second_row])
+    if first_row:
+        LL.insert(0, [f"<b>{e}</b>" for e in first_row])
+    if last_row:
+        LL.append([f"<b>{e}</b>" for e in last_row])
+    if repeat_header:
+        LL.append([f"<b>{e}</b>" for e in first_row])
+    if very_last_row:
+        LL.append(very_last_row)
+    for L in LL:
         r += f"<tr>{row_start}<td style='border:1px solid black; padding:2pt;'>"
         r += "</td><td style='border:1px solid black; padding:2pt;'>".join([str(l) for l in L])
         r += f"</td>{row_end}</tr>"
@@ -15,93 +25,144 @@ def html_table(LL, first_row=None, row_start="", row_end=""):
 
 ### BASE DE DONNÉES
 
-def viewtable(d, p):
+def viewtable(d, p, sort_col=None, sort_asc=None):
     r = ""
 
-    table = p["table"]
-    r += f"<h2>Table : {table}</h2>"
+    table = Tables[p["table"]]
+    r += f"<h2>Table : {table.__name__}</h2>"
 
-    cols = [column.key for column in Tables[table].__table__.columns]
-    LE = Tables[table].query.all()
-    LE = [[ e.__dict__[k] for k in cols ] for e in LE]
+    cols = get_cols(table)
+    primary_col = get_primary_col(table)
+    SQL_type = get_SQL_types(table, detail=True)
 
-    tete = [ee for ee in cols] + ["Action"]
+    def HTMLform_type(SQL_type):
+        SQL_type_name = type(SQL_type).__name__
+        map_types = {"String": "text",
+                     "Integer": "number",
+                     "BigInteger": "number",
+                     "Boolean": "checkbox",
+                     }
+        try:
+            return map_types[SQL_type_name]
+        except KeyError:
+            raise KeyError(f"unknown column type: '{SQL_type_name}''")
 
-    delButton = lambda x:f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post"> <input type="hidden" name="table" value="{table}"> <input type="hidden" name="id" value="{x}"> <input type="submit" name="delitem" value="Suppr">"""
+    def HTMLform_value(SQL_type, value):
+        SQL_type_name = type(SQL_type).__name__
+        map_values = {"String": f"""{f'value="{value}"' if value else ""} size="10cm" """,
+                      "Integer": f"""{f'value={value}' if value else ""} style="width:1.5cm" """,
+                      "BigInteger": f"""{f'value={value}' if value else ""} style="width:4cm" """,
+                      "Boolean": "checked" if str(value).lower() == "true" else "",
+                      }
+        try:
+            return map_values[SQL_type_name]
+        except KeyError:
+            raise KeyError(f"unknown column type: '{SQL_type_name}''")
 
-    corps = [e + [delButton(e[cols.index("messenger_user_id")])] for e in LE]
+    if sort_col:
+        if sort_asc:
+            LE = table.query.order_by(getattr(table, sort_col)).all()
+        else:
+            LE = table.query.order_by(getattr(table, sort_col).desc()).all()
+    else:
+        LE = table.query.all()
+    LE = [{col:getattr(e, col) for col in cols} for e in LE]
 
-    itemDefault = {"messenger_user_id": random.randrange(1000000000),
-                   "inscrit": True,
-                   "nom": ''.join(random.choices(string.ascii_uppercase + string.digits + " ", k=6)),
-                   "chambre": random.randrange(101,800),
-                   "statut": "test",
-                   "role": "rôle"+str(random.randrange(15)),
-                   "camp": "camp"+str(random.randrange(3)),
-                   "votantVillage": random.randrange(1),
-                   "votantLoups": random.randrange(1),
-                   "roleActif": None,
-                   "debutRole": None,
-                   "finRole": None,
-                   }
+    def boutons(value):
+        return (f"""<input type="submit" name="editem" value="Édit">"""
+                f"""<input type="submit" name="delitem" value="Suppr">""")
 
-    nouv = [f"""<input type="text" name="{ee}" size="10cm" value={itemDefault[ee]}>""" for ee in cols] + ["""<input type="submit" name="additem" value="Créer">"""]
+    corps = [[f"""<input type=\"{HTMLform_type(SQL_type[col])}" name=\"{col}" {HTMLform_value(SQL_type[col], val)} {"readonly" if col == primary_col else ""}>""" for (col, val) in d.items()] + [boutons(d[primary_col])] for d in LE]
 
+    nouv = [f"""<input type=\"{HTMLform_type(SQL_type[col])}" name=\"{col}" {HTMLform_value(SQL_type[col], "")}>""" for col in cols] + ["""<input type="submit" name="additem" value="Créer">"""]
 
-    r += html_table(corps + [nouv],
-                    tete,
-                    f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">
-                        <input type="hidden" name="table" value="{table}">""",
-                    "</form>")
+    def actual_sort(col, asc):
+        return """disabled style="background-color:yellow;" """ if col == sort_col and asc == sort_asc else ""
+    first_row = [(f"""{col} <input type=submit name="viewtable-sort:{col}:asc" value="&and;" {actual_sort(col, True)}>"""
+                  f"""<input type=submit name="viewtable-sort:{col}:desc" value="&or;" {actual_sort(col, False)}>""") for col in cols] + ["""Action <input type=submit name="viewtable" value="&times;">"""]
+
+    r += html_table(corps,
+                    # first_row = cols + ["Action"],
+                    first_row = first_row,
+                    second_row = [SQL_type[col] for col in cols] + [""],
+                    repeat_header = True,
+                    very_last_row = nouv,
+                    row_start = (f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">"""
+                                 f"""<input type="hidden" name="table" value=\"{table.__name__}">"""
+                                 f"""<input type="hidden" name="primary_col" value=\"{primary_col}">"""),
+                    row_end = "</form>")
     r += "<br />"
 
     return r
 
 
 def additem(d, p):
-    r = ""
+    r = "<h2>Ajout d'élément</h2>"
 
-    table = p["table"]
-    r += "<h2>Ajout d'élément</h2>"
-    r += f"Table : {table}\n\n"
+    table = Tables[p["table"]]
+    r += f"Table : {table.__name__}\n\n"
+    
+    cols = get_cols(table)
+    SQL_type = get_SQL_types(table)
+    SQL_nullable = get_SQL_nullable(table)
 
-    user_TDB = Tables[table](
-                        messenger_user_id = p["messenger_user_id"],
-                        inscrit = bool(eval(p["inscrit"])),
-                        nom = p["nom"],
-                        chambre = p["chambre"],
-                        statut = p["statut"],
-                        role = p["role"],
-                        camp = p["camp"],
-                        votantVillage = bool(eval(p["votantVillage"])),
-                        votantLoups = bool(eval(p["votantLoups"]))
-                        )
+    args = {col:transtype(p[col] if col in p else False, col, SQL_type[col], SQL_nullable[col]) for col in cols}
 
-    db.session.add(user_TDB)
+    user = table(**args)
+    db.session.add(user)
     db.session.commit()
 
     r += "Ajout réussi.\n\n"
-
     return r
 
 
 def delitem(d, p):
-    r = ""
+    r = "<h2>Suppression d'élément</h2>"
 
-    table = p["table"]
-    id = p["id"]
-    r += "<h2>Suppression d'élément</h2>"
-    r += f"Table : {table}, ID : {id}\n\n"
+    table = Tables[p["table"]]
+    id = {p["primary_col"]:p[p["primary_col"]]}
+    r += f"Table : {table.__name__}, ID : {id}<br/><br/>"
 
     try:
-        user_TDB = Tables[table].query.filter_by(messenger_user_id=id).one()
-        db.session.delete(user_TDB)
+        user = table.query.filter_by(**id).one()
+        db.session.delete(user)
         db.session.commit()
-        r += "Suppression effectuée.\n\n"
+        r += "Suppression effectuée.<br/><br/>"
     except NoResultFound:
-        r += "Aucun résultat trouvé. Suppression non effectuée.\n\n"
+        r += "Aucun résultat trouvé. Suppression non effectuée.<br/><br/>"
     except MultipleResultsFound:
-        r += "Plusieurs résultats trouvés. Suppression non effectuée.\n\n"
+        r += "Plusieurs résultats trouvés. Suppression non effectuée.<br/><br/>"
+
+    return r
+
+
+def editem(d, p):
+    r = "<h2>Modification d'élément</h2>"
+
+    table = Tables[p["table"]]
+    id = {p["primary_col"]:p[p["primary_col"]]}
+    r += f"Table : {table.__name__}, ID : {id}<br/><ul>"
+    
+    cols = get_cols(table)
+    SQL_type = get_SQL_types(table)
+    SQL_nullable = get_SQL_nullable(table)
+
+    args = {col:transtype(p[col] if col in p else False, col, SQL_type[col], SQL_nullable[col]) for col in cols}
+
+    try:
+        user = table.query.filter_by(**id).one()
+        for col in cols:
+            if (old := getattr(user, col)) != (new := args[col]):
+                r += f"<li>{col} : {old} &rarr; {new}</li>"
+                setattr(user, col, new)
+                flag_modified(user, col)
+        r += "</ul>"
+        db.session.commit()
+        r += "Modification effectuée.<br/><br/>"
+    except NoResultFound:
+        r += "Aucun résultat trouvé. Modification non effectuée.<br/><br/>"
+    except MultipleResultsFound:
+        r += "Plusieurs résultats trouvés. Modification non effectuée.<br/><br/>"
 
     return r
 
