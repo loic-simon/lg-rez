@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 import tools
 import bdd_connect
 
-from features import annexe, IA, inscription, InfoJoueurs
+from features import annexe, IA, inscription, InfoJoueurs, sync
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -78,6 +78,7 @@ async def on_message(message):
 
 bot.add_cog(annexe.Annexe(bot))
 bot.add_cog(InfoJoueurs.Informations(bot))
+bot.add_cog(sync.Sync(bot))
 
 
 @bot.command()

@@ -34,10 +34,12 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
     cols = get_cols(table)
     primary_col = get_primary_col(table)
     SQL_type = get_SQL_types(table, detail=True)
+    SQL_nullable = {col:val if type(SQL_type[col]).__name__ != "Boolean" else True for (col, val) in get_SQL_nullable(table).items()}
 
     def HTMLform_type(SQL_type):
         SQL_type_name = type(SQL_type).__name__
         map_types = {"String": "text",
+                     "Text": "text",
                      "Integer": "number",
                      "BigInteger": "number",
                      "Boolean": "checkbox",
@@ -50,6 +52,7 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
     def HTMLform_value(SQL_type, value):
         SQL_type_name = type(SQL_type).__name__
         map_values = {"String": f"""{f'value="{value}"' if value else ""} size="10cm" """,
+                      "Text": f"""{f'value="{value}"' if value else ""} size="20cm" """,
                       "Integer": f"""{f'value={value}' if value else ""} style="width:1.5cm" """,
                       "BigInteger": f"""{f'value={value}' if value else ""} style="width:4cm" """,
                       "Boolean": "checked" if str(value).lower() == "true" else "",
@@ -72,9 +75,9 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
         return (f"""<input type="submit" name="editem" value="Édit">"""
                 f"""<input type="submit" name="delitem" value="Suppr">""")
 
-    corps = [[f"""<input type=\"{HTMLform_type(SQL_type[col])}" name=\"{col}" {HTMLform_value(SQL_type[col], val)} {"readonly" if col == primary_col else ""}>""" for (col, val) in d.items()] + [boutons(d[primary_col])] for d in LE]
+    corps = [[f"""<input type=\"{HTMLform_type(SQL_type[col])}" name=\"{col}" {HTMLform_value(SQL_type[col], val)} {"readonly" if col == primary_col else ""} {"" if SQL_nullable[col] else "required"}>""" for (col, val) in d.items()] + [boutons(d[primary_col])] for d in LE]
 
-    nouv = [f"""<input type=\"{HTMLform_type(SQL_type[col])}" name=\"{col}" {HTMLform_value(SQL_type[col], "")}>""" for col in cols] + ["""<input type="submit" name="additem" value="Créer">"""]
+    nouv = [f"""<input type=\"{HTMLform_type(SQL_type[col])}" name=\"{col}" {HTMLform_value(SQL_type[col], "")} {"" if SQL_nullable[col] else "required"}>""" for col in cols] + ["""<input type="submit" name="additem" value="Créer">"""]
 
     def actual_sort(col, asc):
         return """disabled style="background-color:yellow;" """ if col == sort_col and asc == sort_asc else ""
@@ -84,7 +87,7 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
     r += html_table(corps,
                     # first_row = cols + ["Action"],
                     first_row = first_row,
-                    second_row = [SQL_type[col] for col in cols] + [""],
+                    second_row = [f"""{SQL_type[col]}{"" if SQL_nullable[col] else "*"}""" for col in cols] + [""],
                     repeat_header = True,
                     very_last_row = nouv,
                     row_start = (f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">"""

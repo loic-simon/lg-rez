@@ -101,7 +101,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
             ### GÉNÉRALITÉS
 
-            cols = get_cols(Joueurs)
+            cols = [col for col in get_cols(Joueurs) if not col.startswith('_')]    # On élimine les colonnes locales
             cols_SQL_types = get_SQL_types(Joueurs)
             cols_SQL_nullable = get_SQL_nullable(Joueurs)
 
@@ -137,12 +137,11 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                 id = L[TDB_index["discord_id"]]
                 if (id != "") and RepresentsInt(id):
 
-                    joueur = {col:transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
-                    user_TDB = Joueurs(**joueur)
+                    user_TDB = {col:transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
 
                     users_TDB.append(user_TDB)
-                    ids_TDB.append(user_TDB.discord_id)
-                    rows_TDB[user_TDB.discord_id] = l
+                    ids_TDB.append(user_TDB["discord_id"])
+                    rows_TDB[user_TDB["discord_id"]] = l
 
 
             ### RÉCUPÉRATION UTILISATEURS CACHE
@@ -165,37 +164,34 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                         r += f"\nJoueur dans les caches hors TDB : {user_cache}"
 
             for user_cache in users_TDB:                               ## 2. Joueurs dans le TDB pas encore dans le cache
-                if user_cache.discord_id not in ids_cache:
-                    if verbose:
-                        r += f"\nJoueur dans le TDB hors caches : {user_cache}"
-
-                    users_cache.append(user_cache)
-                    db.session.add(user_cache)
-                    id = user_cache.discord_id
-
-                    # Validation dans le TDB
-                    Modifs.extend( [( id, col, getattr(user_cache, col) ) for col in cols if col != 'discord_id'] )
+                if user_cache["discord_id"] not in ids_cache:
+                    # if verbose:
+                    #     r += f"\nJoueur dans le TDB hors caches : {user_cache}"
+                    # 
+                    # users_cache.append(user_cache)
+                    # db.session.add(user_cache)
+                    # id = user_cache.discord_id
+                    # 
+                    # # Validation dans le TDB
+                    # Modifs.extend( [( id, col, getattr(user_cache, col) ) for col in cols if col != 'discord_id'] )
+                    raise ValueError(f"Joueur {user_cache} hors BDD : vérifier processus d'inscription")
 
             # À ce stade, on a les même utilisateurs dans users_TDB et users_cache (mais pas forcément les mêmes infos !)
 
             for user_TDB in users_TDB:                           ## 3. Différences
-                user_cache = [user for user in users_cache if user.discord_id==user_TDB.discord_id][0]    # user correspondant dans le cache
+                id = user_TDB["discord_id"]
+                user_cache = [user for user in users_cache if user.discord_id == user_TDB["discord_id"]][0]    # user correspondant dans le cache
 
-                if user_cache != user_TDB:     # Au moins une différence !
-                    if verbose:
-                        r += f"\nJoueur différant entre TDB et Joueurs : {user_TDB}"
-                    id = user_TDB.discord_id
+                for col in cols:
+                    if getattr(user_cache, col) != user_TDB[col]:
+                        if verbose:
+                            r += f"\n---- Colonne différant : {col} (TDB : {user_TDB[col]}, Joueurs : {getattr(user_cache, col)})"
 
-                    for col in cols:
-                        if getattr(user_cache, col) != getattr(user_TDB, col):
-                            if verbose:
-                                r += f"\n---- Colonne différant : {col} (TDB : {getattr(user_TDB, col)}, Joueurs : {getattr(user_cache, col)})"
-
-                            setattr(user_cache, col, getattr(user_TDB, col))        # on modifie le cache (= BDD Joueurs)
-                            flag_modified(user_cache, col)
-                            Modifs.append( ( id, col, getattr(user_TDB, col) ) )
-                            if id not in Modified_ids:
-                                Modified_ids.append(id)
+                        setattr(user_cache, col, user_TDB[col])        # on modifie le cache (= BDD Joueurs)
+                        flag_modified(user_cache, col)
+                        Modifs.append( (id, col, user_TDB[col]) )
+                        if id not in Modified_ids:
+                            Modified_ids.append(id)
 
 
 
@@ -203,29 +199,6 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
             if Modified_ids:
                 dico = {id:{col:v for (idM, col, v) in Modifs if idM == id} for id in Modified_ids}
-                
-                # for id in Modified_ids:                 # On parcourt les joueurs à modifier
-                    # 
-                    # attrs = {}
-                    # for (idM, col, v) in Modifs:
-                    #     if id == idM:                   # Modifs liées au joueur en cours
-                    #         attrs[col] = v
-                    #         if not silent:
-                    #             attrs[f"sync_{col}"] = True
-                    # 
-                    # params = format_Chatfuel(attrs)
-                    # for k,v in params_r.items():
-                    #     params[k] = v
-                    # 
-                    # rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{id}/send", params=params)
-                    # rep = rep.json()
-                    # 
-                    # if "code" in rep:
-                    #     raise Exception("Erreur d'envoi Chatfuel Broadcast API. Réessaie.")
-                    # else:
-                    #     if not rep["success"]:
-                    #         pass
-                    #         # raise Exception(f"""Chatfuel Broadcast API a renvoyé une erreur : {rep["result"]}""")
 
                 message = f"!sync{'_silent' if silent else ''} {json.dumps(dico)}"
                 rep = webhook.send(message, "sync")
@@ -281,9 +254,11 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
     except Exception as e:
         db.session.rollback()
-        return (400, f"{type(e).__name__}({str(e)})")     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
-        # return (400, "".join(traceback.format_exc()))     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
-
+        if verbose:     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
+            return (400, "".join(traceback.format_exc()))     
+        else:  
+            return (400, f"{type(e).__name__}({str(e)})")
+            
     else:
         return r
 

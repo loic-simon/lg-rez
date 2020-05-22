@@ -4,7 +4,8 @@ import enum
 
 class Joueurs(db.Model):
     discord_id = db.Column(db.BigInteger(), primary_key=True)
-    inscrit = db.Column(db.Boolean(), nullable=False)
+    _chan_name = db.Column(db.String(42), nullable=False)
+    # inscrit = db.Column(db.Boolean(), nullable=False)
 
     nom = db.Column(db.String(32), nullable=False)
     chambre = db.Column(db.String(200), nullable=False)
@@ -15,17 +16,21 @@ class Joueurs(db.Model):
 
     votantVillage = db.Column(db.Boolean(), nullable=False)
     votantLoups = db.Column(db.Boolean(), nullable=False)
-
     roleActif = db.Column(db.Boolean(), nullable=True)
-    debutRole = db.Column(db.Integer(), nullable=True)
-    finRole = db.Column(db.Integer(), nullable=True)
+    # debutRole = db.Column(db.Integer(), nullable=True)
+    # finRole = db.Column(db.Integer(), nullable=True)
 
+    _voteVillage = db.Column(db.String(200), nullable=True)
+    _voteMaire = db.Column(db.String(200), nullable=True)
+    _actionRole = db.Column(db.Text(), nullable=True)
+    
     def __repr__(self):
         return f"<Joueurs ({self.discord_id}/{self.nom})>"
 
-    def __init__(self, discord_id, inscrit, nom, chambre, statut, role, camp, votantVillage, votantLoups, roleActif=None, debutRole=None, finRole=None):
+    def __init__(self, discord_id, _chan_name, nom, chambre, statut, role, camp, votantVillage, votantLoups, roleActif=None, _voteVillage=None, _voteMaire=None, _actionRole=None):
         self.discord_id = discord_id
-        self.inscrit = inscrit
+        self._chan_name = _chan_name
+        # self.inscrit = inscrit
 
         self.nom = nom
         self.chambre = chambre
@@ -36,10 +41,13 @@ class Joueurs(db.Model):
 
         self.votantVillage = votantVillage
         self.votantLoups = votantLoups
-
         self.roleActif = roleActif
-        self.debutRole = debutRole
-        self.finRole = finRole
+        # self.debutRole = debutRole
+        # self.finRole = finRole
+    
+        self._voteVillage = _voteVillage
+        self._voteMaire = _voteVillage
+        self._actionRole = _voteVillage
 
 
 class Roles(db.Model) :
