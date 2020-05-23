@@ -72,6 +72,26 @@ def checkRole(member,nom : str):
     role = role(user, nom)
     return role in member.roles
 
+#Permet de boucler question -> réponse tant que la réponse vérifie pas les critères nécessaires dans chan
+async def boucleMessage(bot, chan, inMessage, conditionSortie, trigCheck = lambda m : m.channel==chan, repMessage="none"):
+    """
+    Permet de lancer une boucle question/réponse tant que la réponse ne vérifie pas conditionSortie
+    chan est le channel dans lequel lancer la boucle
+    trigCheck est la condition de détection du message dans le bot.wait_for
+    inMessage est le premier message envoyé pour demander une réponse
+    repMessage permet de définir un message de boucle différent du message d'accueil (identique si défini sur "none" ou non renseigné)
+    """
+
+
+    if repMessage=="none":
+        repMessage = inMessage
+    await chan.send(inMessage)
+    rep = await bot.wait_for('message', check=trigCheck)
+    while not conditionSortie(rep):
+        await chan.send(repMessage)
+        rep = await bot.wait_for('message', check=trigCheck)
+    return rep
+
 # Log dans #logs
 
 async def log(arg, message):

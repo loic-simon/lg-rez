@@ -6,7 +6,6 @@ trigYesNo = {"oui","non","o","n","yes","no","y","n"}
 
 repOui = {"oui","o","yes","y"}
 
-
 async def main(bot, member):
     if chan := tools.get(member.guild.text_channels, topic=f"{member.id}"):
         await chan.send(f"Tu as déjà un channel à ton nom, {member.mention}, par ici !")
@@ -37,11 +36,13 @@ async def main(bot, member):
     def checkTrigChan(m): #Check que le message soit une reponse oui/non et qu'elle soit dans le bon channel et pas le bon auteur
         return checkChan(m) and tools.checkTrig(m,trigYesNo)
 
-    rep = await bot.wait_for('message', check=checkChan)
+    rep = await bot.wait_for('message', check=checkTrigChan)
+
+    def sortieNumRez(m):
+        return len(m.content)<200 #Longueur de chambre de rez maximale
 
     if a_la_rez := rep.content.lower() in repOui:
-        await chan.send("Alors quelle est ta chambre ?")
-        chambre = (await bot.wait_for('message', check=checkChan)).content
+        chambre = (await tools.boucleMessage(bot, chan, "Alors, quelle est ta chambre ?", sortieNumRez, checkChan, repMessage="Désolé, ce n'est pas un numéro de chambre valide, réessaie...")).content
     else:
         chambre = "XXX (chambre MJ)"
 

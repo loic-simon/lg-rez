@@ -28,6 +28,7 @@ bot = commands.Bot(command_prefix=COMMAND_PREFIX, description="Bonjour")
 async def globally_block_dms(ctx):
     return ctx.guild is not None
 
+#bot.add_check(commands.max_concurrency(1, per=commands.BucketType.user))
 
 # Trigger au démarrage du bot
 @bot.event
@@ -95,7 +96,8 @@ async def do(ctx, *, txt):
 
 
 @bot.command()
-#@commands.has_role("MJ")
+@commands.has_role("MJ")
+@commands.max_concurrency(1, per=commands.BucketType.user)
 async def co(ctx):
     """lance un test d'inscription comme si on se connectait au serv pour la première fois"""
     await inscription.main(bot, ctx.author)
