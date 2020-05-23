@@ -7,6 +7,9 @@ import traceback
 class Annexe(commands.Cog):
     """Annexe : commandes annexes aux usages divers"""
 
+    def __init__(self, bot):
+        self.bot = bot
+
     @commands.command()
     @commands.has_role("MJ")
     async def test(self, ctx, *, arg):
@@ -28,6 +31,14 @@ class Annexe(commands.Cog):
             f"salon = {salon}\n"
             f"serveur = {serveur}"
         ))
+        
+        
+    @commands.command()
+    @commands.has_role("MJ")
+    async def testreact(self, ctx, *reacts):
+        message = await ctx.send(tools.code_bloc(f"REACT TO THAT!\nReacts: {' - '.join(reacts)}"))
+        react = await tools.wait_for_react_clic(self.bot, message)
+        await ctx.send(tools.code_bloc(f"REACTED : {react}"))
 
 
     @commands.command()
@@ -37,7 +48,7 @@ class Annexe(commands.Cog):
 
         tous = Joueurs.query.all()
         ret = '\n - '.join([u.nom for u in tous])
-        await ctx.send(tools.code_bloc(f"Liste des joueurs :\n - {ret}"))
+        message = await ctx.send(tools.code_bloc(f"Liste des joueurs :\n - {ret}"))
 
 
     @commands.command()

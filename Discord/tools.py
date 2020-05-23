@@ -34,8 +34,16 @@ def member(arg, nom):       # Renvoie le membre @member. arg peut être de type 
     else:
         return TypeError("tools.member : Impossible de remonter aux membres depuis l'argument trasmis")
 
+def get_emoji(arg, nom):        # Renvoie l'emoji :nom:. arg peut être de type Context, Guild, User/Member, Channel
+    if hasattr(arg, "emojis"):
+        return get(arg.emojis, name=nom)
+    elif hasattr(arg, "guild"):
+        return get(arg.guild.emojis, name=nom)
+    else:
+        return TypeError("tools.member : Impossible de remonter aux emojis depuis l'argument trasmis")
 
-# Renvoie le channel privé d'un utilisateur
+
+# Renvoie le channel privé d'un utilisateur.
 
 def private_chan(member):
     chan_id = Tables["Joueurs"].query.filter_by(discord_id=member.id).one()._chan_id
@@ -59,6 +67,30 @@ def private(cmd):
         return await cmd(self, ctx, *args, **kwargs)            # Et on appelle cmd, avec le contexte modifié !
 
     return new_cmd
+
+
+# Demande une réaction dans un choix (vrai/faux par défaut)
+
+async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}):
+    """Ajoute les reacts dans emojis à message, attend que quelqu'un appuie sur une, puis renvoie :
+        - soit le nom de l'emoji si emoji est une liste ;
+        - soit la valeur associée si emoji est un dictionnaire."""
+    
+    if not isinstance(emojis, dict):        # Si emoji est une liste, on en fait un dictionnaire
+        emojis = {emoji:emoji for emoji in emojis}
+        
+    for emoji in emojis:                    # On ajoute les emojis
+        await message.add_reaction(emoji)
+        
+    emojis_names = [emoji.name if hasattr(emoji, "name") else emoji for emoji in emojis]
+    def react_check(react):                 # Check : bon message, pas un autre emoji, et pas react du bot
+        return (react.message_id == message.id) and (react.emoji.name in emojis_names) and (react.user_id != bot.user.id)
+        
+    react = await bot.wait_for('raw_reaction_add', check=react_check)
+    await message.clear_reactions()         # On finit par supprimer les emojis
+    return emojis[react.emoji.name]
+
+
 
 
 
