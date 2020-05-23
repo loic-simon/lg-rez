@@ -5,6 +5,7 @@ import discord.ext.commands
 
 from bdd_connect import db, Tables
 
+
 # Récupération rapide
 
 get = discord.utils.get
@@ -36,17 +37,16 @@ def member(arg, nom):       # Renvoie le membre @member. arg peut être de type 
 
 # Renvoie le channel privé d'un utilisateur
 
-def private_chan(arg, member):
-    chan = f"""conv-bot-{member.display_name.lower().replace(" ","-").replace("'", "")}"""       # PROVISOIRE !!!
-    # chan = Tables["Joueurs"].query.filter_by(discord_id=member.id).one().chan_name
-    return channel(arg, chan)
+def private_chan(member):
+    chan_id = Tables["Joueurs"].query.filter_by(discord_id=member.id).one()._chan_id
+    return get(member.guild.channels, id=chan_id)
 
 
 # DÉCORATEUR : supprime le message et exécute la commande dans la conv privée si elle a été appellée ailleurs
 # (utilisable que dans un Cog, de toute façon tout devra être cogé à terme)
 
 def private(cmd):
-    
+
     @wraps(cmd)
     async def new_cmd(self, ctx, *args, **kwargs):              # Cette commande est renvoyée à la place de cmd
         if not ctx.channel.name.startswith("conv-bot-"):        # Si pas déjà dans une conv bot :
@@ -57,7 +57,7 @@ def private(cmd):
                            f"{ctx.author.mention} :warning: Cette commande est interdite en dehors de ta conv privée ! :warning:\n"
                            f"J'ai supprimé ton message, et j'exécute la commande ici :")
         return await cmd(self, ctx, *args, **kwargs)            # Et on appelle cmd, avec le contexte modifié !
-        
+
     return new_cmd
 
 
@@ -67,12 +67,10 @@ def private(cmd):
 def checkTrig(m,trigWords):
     return m.content in trigWords
 
-
 # Teste si user possède le role roles
 def checkRole(member,nom : str):
     role = role(user, nom)
     return role in member.roles
-
 
 # Log dans #logs
 

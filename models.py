@@ -4,7 +4,7 @@ import enum
 
 class Joueurs(db.Model):
     discord_id = db.Column(db.BigInteger(), primary_key=True)
-    _chan_name = db.Column(db.String(42), nullable=False)
+    _chan_id = db.Column(db.String(42), nullable=False)
     # inscrit = db.Column(db.Boolean(), nullable=False)
 
     nom = db.Column(db.String(32), nullable=False)
@@ -23,13 +23,13 @@ class Joueurs(db.Model):
     _voteVillage = db.Column(db.String(200), nullable=True)
     _voteMaire = db.Column(db.String(200), nullable=True)
     _actionRole = db.Column(db.Text(), nullable=True)
-    
+
     def __repr__(self):
         return f"<Joueurs ({self.discord_id}/{self.nom})>"
 
-    def __init__(self, discord_id, _chan_name, nom, chambre, statut, role, camp, votantVillage, votantLoups, roleActif=None, _voteVillage=None, _voteMaire=None, _actionRole=None):
+    def __init__(self, discord_id, _chan_id, nom, chambre, statut, role, camp, votantVillage, votantLoups, roleActif=None, _voteVillage=None, _voteMaire=None, _actionRole=None):
         self.discord_id = discord_id
-        self._chan_name = _chan_name
+        self._chan_id = _chan_id
         # self.inscrit = inscrit
 
         self.nom = nom
@@ -44,7 +44,7 @@ class Joueurs(db.Model):
         self.roleActif = roleActif
         # self.debutRole = debutRole
         # self.finRole = finRole
-    
+
         self._voteVillage = _voteVillage
         self._voteMaire = _voteVillage
         self._actionRole = _voteVillage

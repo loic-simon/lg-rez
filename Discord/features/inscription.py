@@ -6,9 +6,13 @@ trigYesNo = {"oui","non","o","n","yes","no","y","n"}
 
 repOui = {"oui","o","yes","y"}
 
+
 async def main(bot, member):
     if chan := tools.get(member.guild.text_channels, topic=f"{member.id}"):
         await chan.send(f"Tu as déjà un channel à ton nom, {member.mention}, par ici !")
+    elif len(Joueurs.query.filter_by(discord_id=member.id).all())>0:
+        await tools.private_chan(member).send(f"Saloww ! {member.mention} tu es déjà inscrit, viens un peu ici enculé !")
+        return
     else:
         chan = await member.guild.create_text_channel(f"conv-bot-{member.name}", category = tools.channel(member, "CONVERSATION BOT"), topic=f"{member.id}") # Crée le channel "perso-nom" avec le topic "member.id"
 
@@ -17,7 +21,7 @@ async def main(bot, member):
     await chan.send(f"Bienvenue {member.mention}, laisse moi t'aider à t'inscrire !\n Pour commencer, qui es-tu ?")
 
     def checkChan(m): #Check que le message soit envoyé par l'utilisateur et dans son channel perso
-        return m.channel == chan and m.author == member
+        return m.channel == chan and m.author == member and m.content[0]!=bot.command_prefix
 
     vraiNom = await bot.wait_for('message', check=checkChan)
 
@@ -42,3 +46,9 @@ async def main(bot, member):
         chambre = "XXX (chambre MJ)"
 
     await chan.send(f"A la rez = {a_la_rez} et chambre = {chambre}")
+
+    db.session.add(Joueurs(member.id, chan.id, member.display_name, chambre, "vivant", "Non attribué", "Non attribué", True, False))
+    db.session.commit()
+
+    await chan.edit(topic = "Ta conversation privée avec le bot, c'est ici que tout se passera !")
+    await chan.send("Tu es maintenant inscrit, installe toi confortablement, la partie va bientôt commencer !")
