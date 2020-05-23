@@ -31,17 +31,20 @@ async def main(bot, member):
         await member.edit(nick = f"{vraiNom.content}")
 
 
-    await chan.send("Habite-tu à la rez ? (O/N)")
+    message = await chan.send("Habite-tu à la rez ? (O/N)")
 
     def checkTrigChan(m): #Check que le message soit une reponse oui/non et qu'elle soit dans le bon channel et pas le bon auteur
         return checkChan(m) and tools.checkTrig(m,trigYesNo)
 
-    rep = await bot.wait_for('message', check=checkTrigChan)
+    #rep = await bot.wait_for('message', check=checkTrigChan) #Utile avant l'arrivée des reacts
+    #a_la_rez = rep.content.lower() in repOui
+
+    a_la_rez = await tools.wait_for_react_clic(bot, message)
 
     def sortieNumRez(m):
         return len(m.content)<200 #Longueur de chambre de rez maximale
 
-    if a_la_rez := rep.content.lower() in repOui:
+    if a_la_rez:
         chambre = (await tools.boucleMessage(bot, chan, "Alors, quelle est ta chambre ?", sortieNumRez, checkChan, repMessage="Désolé, ce n'est pas un numéro de chambre valide, réessaie...")).content
     else:
         chambre = "XXX (chambre MJ)"

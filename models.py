@@ -85,7 +85,70 @@ class Roles(db.Model) :
 
         #self.ChangementCible = ChangementCible
 
+
+
+class BaseActions(db.Models):
+    action = db.Column(db.String(64), primary_key = True)
+    trigger_debut = db.Column(db.Integer(), nullable = True)
+    trigger_fin = db.Column(db.Integer(), nullable = True)
+
+    base_cooldown = db.Column(db.Integer(), nullable = True)
+    type  = db.Column(db.String(32), nullable = False) #Quotidien, Unique, <Nombre>, Passif, Conditionnel, Hebdomadaire, Bicircadien, Special
+    lieu = db.Column(db.String(32), nullable = True) #Distance/Physique/Lieu/Contact/Conditionnel/None/Public
+
+    interaction_notaire = db.Column(db.String(32), nullable = True)         #Oui, Non, Conditionnel, Potion, Rapport; None si récursif
+    interaction_gardien = db.Column(db.String(32), nullable = True)         #Oui, Non, Conditionnel, Taverne, Feu, MaisonClose, Précis, Cimetière, Loups, None si recursif
+    mage = db.Column(db.String(32), nullable = True)                       #Oui, Non, changement de cible, etc
+
+    params = db.Column(db.String(32), nullable = True)
+
+    def __init__(self, action, trigger_debut, trigger_fin, base_cooldown, type, lieu, interaction_notaire, interaction_gardien, mage, params):
+        self.action = action
+        self.trigger_debut = trigger_debut
+        self.trigger_fin = trigger_fin
+
+        self.base_cooldown = base_cooldown
+        self.type = type #Quotidien, Unique, <Nombre>, Passif, Conditionnel, Hebdomadaire, Bicircadien, Special
+        self.lieu = lieu #Distance/Physique/Lieu/Contact/Conditionnel/None/Public
+
+        self.interaction_notaire = interaction_notaire         #Oui, Non, Conditionnel, Potion, Rapport; None si récursif
+        self.interaction_gardien = interaction_gardien         #Oui, Non, Conditionnel, Taverne, Feu, MaisonClose, Précis, Cimetière, Loups, None si recursif
+        self.mage = mage                       #Oui, Non, changement de cible, etc
+
+        self.params = params
+
+
+
+class Actions(db.Models):
+    entry_num = db.Column(db.Integer(), primary_key = True)
+    discord_id = db.Column(db.BigInteger(), nullable = False)
+    action = db.Column(db.String(32), nullable = False)
+
+    cible_id = db.Column(db.BigInteger(), nullable = True)
+    cible2_id = db.Column(db.BigInteger(), nullable = True)
+
+    charges = db.Column(db.Integer(), nullable = True)
+    cooldown = db.Column(db.Integer(), nullable = True)
+
+    #treated = db.Column(db.Boolean(), nullable = False)
+
+    def __init__(self, entry_num, discord_id, action, cible_id, cible2_id, treated):
+        self.entry_num = entry_num #Incrémenter auto
+        self.discord_id = discord_id
+        self.action = action #Nom de l'action en rapport avec la table BaseActions
+
+        self.cible_id = cible_id
+        self.cible2_id = cible2_id
+
+        self.charges = charges      #Nombre de charges restantes (mettre à Null si toujours dispo)
+        self.cooldown = cooldown    #Cooldown restant pour l'action (Null si pas de cooldown)
+
+        #self.treated = treated
+
 Tables = {"Joueurs":Joueurs,
           "Roles":Roles,
+          "BaseActions":BaseActions,
+          "Actions":Actions
           }
+
 db.create_all()

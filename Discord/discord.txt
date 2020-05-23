@@ -4,27 +4,27 @@ Code : https://github.com/loic-simon/lg-rez
 	C'est le code général (toutes les fonctions qui interfaçaient Chatfuel, qui devront être modifiées) ; le code spécifique au bot est dans le dossier Discord
 
 
-Le bot tourne en permanence sur le serveur alwaysdata. Pour publier son code, il faut d'abord le transférer : 
+Le bot tourne en permanence sur le serveur alwaysdata. Pour publier son code, il faut d'abord le transférer :
 	- Unix (après apt-get install sshpass):
 		sshpass -p '}fQ%9J37a' scp -ro User=lg-rez Discord/* ssh-lg-rez.alwaysdata.net:~/www/Discord
-		
+
 	- Windows :
 		scp -ro User=lg-rez Discord/* ssh-lg-rez.alwaysdata.net:~/www/Discord
 		}fQ%9J37a
-		
+
 
 Puis redémarrer le bot :
 	- Unix (après apt-get install sshpass):
 		sshpass -p '}fQ%9J37a' ssh -l lg-rez ssh-lg-rez.alwaysdata.net ./reboot_bot.sh
-		
+
 	- Windows :
 		ssh -l lg-rez ssh-lg-rez.alwaysdata.net ./reboot_bot.sh
 		}fQ%9J37a
-		
-		
+
+
 On peut bien sûr enchaîner le tout :
 	sshpass -p '}fQ%9J37a' scp -ro User=lg-rez Discord/* ssh-lg-rez.alwaysdata.net:~/www/Discord && sshpass -p '}fQ%9J37a' ssh -l lg-rez ssh-lg-rez.alwaysdata.net ./reboot_bot.sh
-	
+
 
 Idée d'organisation des salons :
 
@@ -77,7 +77,7 @@ Structure BDD :
 -> table Joueurs
 	discord_id 		nom		chambre		statut		role  	camp	votantVillage	votantLoups		roleActif	_voteVillage	_voteMaire		_actionRole
 	##												#
-	
+
 -> table Rôles
 	role			camp			description		brief
 	##
@@ -87,12 +87,12 @@ Structure BDD :
 	##				#				#
 
 -> table BaseActions
-	action			trigger_debut	trigger_fin		base_cooldown	type 	lieu	interactionNotaire		interactionGardien		Mage		params 		
+	action			trigger_debut	trigger_fin		base_cooldown	type 	lieu	interactionNotaire		interactionGardien		Mage		params
 	##
-	
+
 -> table Actions
-	id random		joueur			action			cooldown		charges
-	##				#				#
+	id random		joueur			action	cible    cible2		cooldown		charges    traité
+	##				#				#																											{True, False}
 
 
-du --si -hd 5 ~ | grep '^\s*[0-9\.]\+M' | sort -rn | sed '1d' 
+du --si -hd 5 ~ | grep '^\s*[0-9\.]\+M' | sort -rn | sed '1d'
