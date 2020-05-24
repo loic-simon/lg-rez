@@ -37,7 +37,7 @@ class Annexe(commands.Cog):
     @commands.has_role("MJ")
     async def testreact(self, ctx, *reacts):
         message = await ctx.send(tools.code_bloc(f"REACT TO THAT!\nReacts: {' - '.join(reacts)}"))
-        react = await tools.wait_for_react_clic(self.bot, message)
+        react = await tools.wait_for_react_clic(self.bot, message, ["🔴", "🟠", "🟢"])
         await ctx.send(tools.code_bloc(f"REACTED : {react}"))
 
 

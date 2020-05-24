@@ -3,7 +3,6 @@ import tools
 from bdd_connect import db, Joueurs
 
 trigYesNo = {"oui","non","o","n","yes","no","y","n"}
-
 repOui = {"oui","o","yes","y"}
 
 async def main(bot, member):
@@ -20,7 +19,7 @@ async def main(bot, member):
     await chan.send(f"Bienvenue {member.mention}, laisse moi t'aider à t'inscrire !\n Pour commencer, qui es-tu ?")
 
     def checkChan(m): #Check que le message soit envoyé par l'utilisateur et dans son channel perso
-        return m.channel == chan and m.author == member and m.content[0]!=bot.command_prefix
+        return m.channel == chan and m.author == member and not m.content.startswith(bot.command_prefix)
 
     vraiNom = await bot.wait_for('message', check=checkChan)
 
@@ -33,16 +32,17 @@ async def main(bot, member):
 
     message = await chan.send("Habite-tu à la rez ? (O/N)")
 
-    def checkTrigChan(m): #Check que le message soit une reponse oui/non et qu'elle soit dans le bon channel et pas le bon auteur
-        return checkChan(m) and tools.checkTrig(m,trigYesNo)
+    # def checkTrigChan(m): #Check que le message soit une reponse oui/non et qu'elle soit dans le bon channel et pas le bon auteur
+    #     return checkChan(m) and tools.checkTrig(m,trigYesNo)
 
     #rep = await bot.wait_for('message', check=checkTrigChan) #Utile avant l'arrivée des reacts
     #a_la_rez = rep.content.lower() in repOui
 
-    a_la_rez = await tools.wait_for_react_clic(bot, message)
+    rep = await tools.wait_for_react_clic(bot, message, text_filter=lambda s:s.lower() in trigYesNo)
+    a_la_rez = (rep is True) or (isinstance(rep, str) and rep.lower() in repOui)
 
     def sortieNumRez(m):
-        return len(m.content)<200 #Longueur de chambre de rez maximale
+        return len(m.content) < 200 #Longueur de chambre de rez maximale
 
     if a_la_rez:
         chambre = (await tools.boucleMessage(bot, chan, "Alors, quelle est ta chambre ?", sortieNumRez, checkChan, repMessage="Désolé, ce n'est pas un numéro de chambre valide, réessaie...")).content
@@ -50,9 +50,11 @@ async def main(bot, member):
         chambre = "XXX (chambre MJ)"
 
     await chan.send(f"A la rez = {a_la_rez} et chambre = {chambre}")
-
+    
     db.session.add(Joueurs(member.id, chan.id, member.display_name, chambre, "vivant", "Non attribué", "Non attribué", True, False))
     db.session.commit()
 
-    await chan.edit(topic = "Ta conversation privée avec le bot, c'est ici que tout se passera !")
+    await member.add_roles(tools.role(member, "Joueur en vie"))
+
+    await chan.edit(topic="Ta conversation privée avec le bot, c'est ici que tout se passera !")
     await chan.send("Tu es maintenant inscrit, installe toi confortablement, la partie va bientôt commencer !")

@@ -4,7 +4,7 @@ import enum
 
 class Joueurs(db.Model):
     discord_id = db.Column(db.BigInteger(), primary_key=True)
-    _chan_id = db.Column(db.String(42), nullable=False)
+    _chan_id = db.Column(db.BigInteger(), nullable=False)
     # inscrit = db.Column(db.Boolean(), nullable=False)
 
     nom = db.Column(db.String(32), nullable=False)
@@ -87,7 +87,7 @@ class Roles(db.Model) :
 
 
 
-class BaseActions(db.Models):
+class BaseActions(db.Model):
     action = db.Column(db.String(64), primary_key = True)
     trigger_debut = db.Column(db.Integer(), nullable = True)
     trigger_fin = db.Column(db.Integer(), nullable = True)
@@ -119,7 +119,7 @@ class BaseActions(db.Models):
 
 
 
-class Actions(db.Models):
+class Actions(db.Model):
     entry_num = db.Column(db.Integer(), primary_key = True)
     discord_id = db.Column(db.BigInteger(), nullable = False)
     action = db.Column(db.String(32), nullable = False)
