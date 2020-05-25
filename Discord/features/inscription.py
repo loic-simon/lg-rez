@@ -12,19 +12,19 @@ repOui = {"oui","o","yes","y"}
 
 async def main(bot, member):
     ### Vérification si le joueur est déjà inscrit / en cours et création chan privé si nécessaire
-    
+
     if chan := tools.get(member.guild.text_channels, topic=f"{member.id}"):     # Inscription en cours
         await chan.send(f"Tu as déjà un channel à ton nom, {member.mention}, par ici !")
     elif len(Joueurs.query.filter_by(discord_id=member.id).all())>0:            # Inscription finie
         await tools.private_chan(member).send(f"Saloww ! {member.mention} tu es déjà inscrit, viens un peu ici enculé !")
         return
     else:
-        chan = await member.guild.create_text_channel(f"conv-bot-{member.name}", category=tools.channel(member, "CONVERSATION BOT"), topic=f"{member.id}") # Crée le channel "perso-nom" avec le topic "member.id"
+        chan = await member.guild.create_text_channel(f"conv-bot-{member.name}", category=tools.channel(member, "CONVERSATION BOT"), topic=f"{member.id}") # Crée le channel "conv-bot-nom" avec le topic "member.id"
         await chan.set_permissions(member, read_messages=True, send_messages=True)
 
-        
-    ### Récupération nom et renommages 
-    
+
+    ### Récupération nom et renommages
+
     await chan.send(f"Bienvenue {member.mention}, laisse moi t'aider à t'inscrire !\n Pour commencer, qui es-tu ?")
 
     def checkChan(m): #Check que le message soit envoyé par l'utilisateur et dans son channel perso
@@ -52,19 +52,19 @@ async def main(bot, member):
         chambre = "XXX (chambre MJ)"
 
     await chan.send(f"A la rez = {a_la_rez} et chambre = {chambre}")
-    
+
     await chan.trigger_typing()     # On envoie un indicateur d'écriture pour informer le joueur que le bot réfléchit (enlevé auto après 10s ou au prochain message)
-    
-    
+
+
     ### Ajout à la BDD
-    
+
     joueur = Joueurs(member.id, chan.id, member.display_name, chambre, "vivant", "Non attribué", "Non attribué", True, False, True)
     db.session.add(joueur)
     db.session.commit()
 
 
     ### Ajout au TDB
-    
+
     cols = [col for col in bdd_tools.get_cols(Joueurs) if not col.startswith('_')]    # On élimine les colonnes locales
 
     load_dotenv()
@@ -83,10 +83,10 @@ async def main(bot, member):
     for l in range(NL):
         if values[l][TDB_index["discord_id"]].isdigit():    # Si il y a un vrai ID dans la colonne ID, ligne l
             plv = l + 1
-    
+
     Modifs = [(plv, TDB_index[col], getattr(joueur, col)) for col in TDB_index] + [(plv, TDB_tampon_index[col], getattr(joueur, col)) for col in TDB_tampon_index]   # Modifs : toutes les colonnes de la partie principale + du cache
     gsheets.update(sheet, Modifs)
-    
+
 
     ### Grant accès aux channels joueurs et information
 

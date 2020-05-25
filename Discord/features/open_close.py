@@ -17,9 +17,9 @@ def get_criteres(quoi, qui):
             else:
                 heure = int(time.strftime("%H"))
                 if quoi == "open":
-                    return {"roleActif": True, "debutRole": heure}
+                    return {"role_actif": True, "heure_debut": heure}
                 else:
-                    return {"roleActif": True, "finRole": heure}
+                    return {"role_actif": True, "fin_role": heure}
     else:
         raise ValueError(f"""Cannot associate criteria to job {quoi}_{qui}""")
 
@@ -36,7 +36,7 @@ class OpenClose(commands.Cog):
 
         if qui in ["cond", "maire", "loups", "action"]:         # jobs : défini en début de fichier, car utile dans admin
             criteres = get_criteres("open", qui)
-            
+
             await ctx.send(tools.code_bloc(f"""Critères : {criteres}<br/>"""))
         else:
             raise ValueError(f"""Argument \"{qui}" invalide""")
@@ -57,7 +57,7 @@ class OpenClose(commands.Cog):
 
         if qui in ["cond", "maire", "loups", "action"]:         # jobs : défini en début de fichier, car utile dans admin
             criteres = get_criteres("close", qui)
-            
+
             await ctx.send(tools.code_bloc(f"""Critères : {criteres}<br/>"""))
         else:
             raise ValueError(f"""Argument \"{qui}" invalide""")
@@ -78,7 +78,7 @@ class OpenClose(commands.Cog):
 
         if qui in ["cond", "maire", "loups", "action"]:         # jobs : défini en début de fichier, car utile dans admin
             criteres = get_criteres("remind", qui)
-            
+
             await ctx.send(tools.code_bloc(f"""Critères : {criteres}<br/>"""))
         else:
             raise ValueError(f"""Argument \"{qui}" invalide""")
