@@ -75,7 +75,7 @@ Joueurs morts
 Structure BDD :
 
 -> table Joueurs
-	discord_id 		nom		chambre		statut		role  	camp	votantVillage	votantLoups		roleActif	_voteVillage	_voteMaire		_actionRole
+	discord_id 		nom		chambre		statut		role  	camp	votant_village	votant_loups		roleActif	_voteVillage	_voteMaire		_actionRole
 	##												#
 
 -> table Rôles

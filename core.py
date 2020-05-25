@@ -158,10 +158,10 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
             for user_TDB in users_TDB:                              ## Différences
                 id = user_TDB["discord_id"]
-                
+
                 if id not in ids_cache:             # Si joueur dans le cache pas dans le TDB
                     raise ValueError(f"Joueur {user_TDB['nom']} hors BDD : vérifier processus d'inscription")
-                    
+
                 user_cache = [user for user in users_cache if user.discord_id == id][0]     # user correspondant dans le cache
 
                 for col in cols:
@@ -181,12 +181,12 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             if Modifs:
                 dico = {id:{col:v for (idM, col, v) in Modifs if idM == id} for id in Modified_ids}
                 message = f"!sync{'_silent' if silent else ''} {json.dumps(dico)}"      # On transfère les infos sous forme de JSON (dictionnaire sérialisé)
-                
+
                 rep = webhook.send(message, "sync")
                 if not rep:
                     raise Exception(f"L'envoi du webhook Discord a échoué : {rep} {rep.text}")
-                    
-                    
+
+
             ### APPLICATION DES MODIFICATIONS SUR LE TDB
 
             if Modifs:
@@ -212,9 +212,9 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
         db.session.rollback()
         if verbose:     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
             return f"{strhtml(r)}<br/><br/><pre>{traceback.format_exc()}</pre>"
-        else:  
+        else:
             return (400, f"{type(e).__name__}({str(e)})")
-            
+
     else:
         return r
 
@@ -229,7 +229,7 @@ def cron_call(d):
                 job = d["job"]
 
                 quoi, qui = job.split('_')      # "open_loups" -> "open", "loups"
-                
+
                 heure = d["heure"] if "heure" in d and d["heure"].isdigit() else ""
 
                 rep = webhook.send(f"!{quoi} {qui} {heure}", "tp")      # Envoi Webhook Discord
@@ -308,10 +308,10 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
             r += f"""<h1><a href="admin?pwd={GLOBAL_PASSWORD}">Panneau d'administration LG Rez</a></h1><hr/>"""
 
             ### BASE DE DONNÉES
-            
+
             if "viewtable" in p:
                 r += viewtable(d, p)
-                
+
             for k in p.keys():
                 if k.startswith("viewtable-sort"):
                     [_, sort_col, sort_asc] = k.split(':')
