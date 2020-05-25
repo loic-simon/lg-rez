@@ -14,10 +14,10 @@ from sqlalchemy.exc import *                            # Exceptions générales
 from sqlalchemy.orm.exc import *                        # Exceptions requêtes SQLAlchemy
 from sqlalchemy.orm.attributes import flag_modified     # Permet de "signaler" les entrées modifiées, à commit en base
 
-import blocs.chatfuel as chatfuel       # Envoi de blocs à Chatfuel (maison)
-import blocs.gsheets as gsheets         # Connection à Google Sheets (maison)
-import blocs.webhook as webhook
-from blocs.bdd_tools import *           # En théorie faut pas faire ça, mais là ça m'arrange
+import Discord.blocs.chatfuel as chatfuel       # Envoi de blocs à Chatfuel (maison)
+import Discord.blocs.gsheets as gsheets         # Connection à Google Sheets (maison)
+import Discord.blocs.webhook as webhook
+from Discord.blocs.bdd_tools import *           # En théorie faut pas faire ça, mais là ça m'arrange
 from __init__ import db, Tables      # Récupération BDD
 Joueurs = Tables["Joueurs"]
 
@@ -44,7 +44,7 @@ MAX_TRIES = 5
 ### UTILITAIRES
 
 def strhtml(r):
-    return r.replace('&','&esp;').replace('\n', '<br/>').replace('<','&lt;').replace('>','&gt;')
+    return r.replace('&','&esp;').replace('<','&lt;').replace('>','&gt;').replace('\n', '<br/>')
 
 def html_escape(r):
     return str(r).replace('&','&esp;').replace('<','&lt;').replace('>','&gt;')
@@ -55,13 +55,6 @@ def infos_tb(quiet=False):
         return tb
     else:
         return f"<br/><div> AN EXCEPTION HAS BEEN RAISED! <br/><pre>{html_escape(tb)}</pre></div>"
-
-def RepresentsInt(s):
-    try:
-        int(s)
-        return True
-    except ValueError:
-        return False
 
 def format_Chatfuel(d):         # Représentation des attributs dans Chatfuel
     for k,v in d.items():
@@ -113,17 +106,17 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             else:
                 raise ValueError("""Argument "sheet_id" manquant dans GET""")
 
-            workbook = gsheets.connect(SHEET_ID)  # Tableau de bord
+            workbook = gsheets.connect(SHEET_ID)    # Tableau de bord
             sheet = workbook.worksheet("Journée en cours")
-            values = sheet.get_all_values()     # Liste de liste des valeurs
+            values = sheet.get_all_values()         # Liste de liste des valeurs des cellules
             (NL, NC) = (len(values), len(values[0]))
 
             if verbose:
                 r += f"<{NL}L/{NC}C>\n"
 
-            head = values[2]
+            head = values[2]            # Ligne d'en-têtes (noms des colonnes) = 3e ligne du TDB
             TDB_index = {col:head.index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
-            TDB_tampon_index = {col:head.index("tampon_"+col) for col in cols if col != 'discord_id'}    # Idem pour la partie « tampon »
+            TDB_tampon_index = {col:head.index(f"tampon_{col}") for col in cols if col != 'discord_id'}    # Idem pour la partie « tampon »
 
 
             # CONVERSION INFOS GSHEET EN UTILISATEURS
@@ -133,15 +126,15 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             rows_TDB = {}               # Indices des lignes ou sont les différents joueurs du TDB
 
             for l in range(NL):
-                L = values[l]
-                id = L[TDB_index["discord_id"]]
-                if (id != "") and RepresentsInt(id):
-
+                L = values[l]           # On parcourt les lignes du TDB
+                id_cell = L[TDB_index["discord_id"]]
+                if id_cell.isdigit():        # Si la cellule contient bien un ID (que des chiffres, et pas vide)
+                    id = int(id_cell)
                     user_TDB = {col:transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
-
+                        # Dictionnaire correspondant à l'utilisateur
                     users_TDB.append(user_TDB)
-                    ids_TDB.append(user_TDB["discord_id"])
-                    rows_TDB[user_TDB["discord_id"]] = l
+                    ids_TDB.append(id)
+                    rows_TDB[id] = l
 
 
             ### RÉCUPÉRATION UTILISATEURS CACHE
@@ -155,88 +148,51 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             Modifs = []         # Modifs à porter au TDB : tuple (id - colonne (nom) - valeur)
             Modified_ids = []
 
-            for user_cache in users_cache.copy():                      ## 1. Joueurs dans le cache supprimés du TDB
+            for user_cache in users_cache.copy():                   ## Joueurs dans le cache supprimés du TDB
                 if user_cache.discord_id not in ids_TDB:
                     users_cache.remove(user_cache)
                     db.session.delete(user_cache)
-
                     if verbose:
-                        r += f"\nJoueur dans les caches hors TDB : {user_cache}"
+                        r += f"\nJoueur dans le cache hors TDB : {user_cache}"
 
-            for user_cache in users_TDB:                               ## 2. Joueurs dans le TDB pas encore dans le cache
-                if user_cache["discord_id"] not in ids_cache:
-                    # if verbose:
-                    #     r += f"\nJoueur dans le TDB hors caches : {user_cache}"
-                    # 
-                    # users_cache.append(user_cache)
-                    # db.session.add(user_cache)
-                    # id = user_cache.discord_id
-                    # 
-                    # # Validation dans le TDB
-                    # Modifs.extend( [( id, col, getattr(user_cache, col) ) for col in cols if col != 'discord_id'] )
-                    raise ValueError(f"Joueur {user_cache} hors BDD : vérifier processus d'inscription")
 
-            # À ce stade, on a les même utilisateurs dans users_TDB et users_cache (mais pas forcément les mêmes infos !)
-
-            for user_TDB in users_TDB:                           ## 3. Différences
+            for user_TDB in users_TDB:                              ## Différences
                 id = user_TDB["discord_id"]
-                user_cache = [user for user in users_cache if user.discord_id == user_TDB["discord_id"]][0]    # user correspondant dans le cache
+                
+                if id not in ids_cache:             # Si joueur dans le cache pas dans le TDB
+                    raise ValueError(f"Joueur {user_TDB['nom']} hors BDD : vérifier processus d'inscription")
+                    
+                user_cache = [user for user in users_cache if user.discord_id == id][0]     # user correspondant dans le cache
 
                 for col in cols:
-                    if getattr(user_cache, col) != user_TDB[col]:
+                    if getattr(user_cache, col) != user_TDB[col]:   # Si <col> diffère entre TDB et cache
                         if verbose:
                             r += f"\n---- Colonne différant : {col} (TDB : {user_TDB[col]}, Joueurs : {getattr(user_cache, col)})"
 
-                        setattr(user_cache, col, user_TDB[col])        # on modifie le cache (= BDD Joueurs)
-                        flag_modified(user_cache, col)
-                        Modifs.append( (id, col, user_TDB[col]) )
+                        setattr(user_cache, col, user_TDB[col])     # On modifie le cache (= BDD Joueurs)
+                        flag_modified(user_cache, col)              # On indique à SQLAlchemy la modification
+                        Modifs.append( (id, col, user_TDB[col]) )   # On ajoute les modifs
                         if id not in Modified_ids:
                             Modified_ids.append(id)
 
 
+            ### ENVOI WEBHOOK DISCORD
 
-            ### MODIFICATIONS DANS CHATFUEL DIRECT (envoi d'un message aux gens)
-
-            if Modified_ids:
+            if Modifs:
                 dico = {id:{col:v for (idM, col, v) in Modifs if idM == id} for id in Modified_ids}
-
-                message = f"!sync{'_silent' if silent else ''} {json.dumps(dico)}"
+                message = f"!sync{'_silent' if silent else ''} {json.dumps(dico)}"      # On transfère les infos sous forme de JSON (dictionnaire sérialisé)
+                
                 rep = webhook.send(message, "sync")
                 if not rep:
                     raise Exception(f"L'envoi du webhook Discord a échoué : {rep} {rep.text}")
                     
                     
-                    
             ### APPLICATION DES MODIFICATIONS SUR LE TDB
 
             if Modifs:
-                Modifs_rdy = []
-                lm = 0
-                cm = 0
-                for (id, col, v) in Modifs:
-                    # Convertit ID et colonne en indices lignes et colonnes (à partir de 0)
-                    l = rows_TDB[id]
-                    if l > lm:
-                        lm = l
-                    c = TDB_tampon_index[col]     # Modification de la partie « tampon » du TDB
-                    if c > cm:
-                        cm = c
-                    if v == None:
-                        v = ''
-                    elif v == "None":
-                        v = ""
-                    Modifs_rdy.append((l, c, v))
-
-                # Récupère toutes les valeurs sous forme de cellules gspread
-                cells = sheet.range(1, 1, lm+1, cm+1)   # gspread indexe à partir de 1 (comme les gsheets)
-                cells_to_update = []
-
-                for (l, c, v) in Modifs_rdy:
-                    cell = [cell for cell in filter(lambda cell:cell.col == c+1 and cell.row == l+1, cells)][0]
-                    cell.value = v       # cells : ([<L1C1>, <L1C2>, ..., <L1Ccm>, <L2C1>, <L2C2>, ..., <LlmCcm>]
-                    cells_to_update.append(cell)
-
-                sheet.update_cells(cells_to_update)
+                Modifs_lc = [(rows_TDB[id], TDB_tampon_index[col], v) for (id, col, v) in Modifs]
+                    # On transforme les infos en coordonnées dans le TDB : ID -> ligne et col -> colonne,
+                gsheets.update(sheet, Modifs_lc)
 
                 if verbose:
                     r += "\n\n" + "\n".join([str(m) for m in Modifs])
@@ -255,59 +211,12 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
     except Exception as e:
         db.session.rollback()
         if verbose:     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
-            return (400, "".join(traceback.format_exc()))     
+            return f"{strhtml(r)}<br/><br/><pre>{traceback.format_exc()}</pre>"
         else:  
             return (400, f"{type(e).__name__}({str(e)})")
             
     else:
         return r
-
-
-### LISTES MORTS ET VIVANTS
-
-def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET (pwd, type)
-    R = []  # Liste des blocs envoyés en réponse
-    try:
-        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
-
-            tous = Joueurs.query.filter(Joueurs.statut.in_(["vivant","MV","mort"])).all()     # Liste des joueurs tels qu'actuellement en cache
-            NT = len(tous)
-
-            if "type" in d and d["type"] == "vivants":
-                rep = Joueurs.query.filter(Joueurs.statut.in_(["vivant","MV"])).order_by(Joueurs.nom).all()
-                descr = "en vie"
-                bouton_text = "Joueurs morts ☠"
-                bouton_bloc = "Joueurs morts"
-            elif "type" in d and d["type"] == "morts":
-                rep = Joueurs.query.filter(Joueurs.statut == "mort").order_by(Joueurs.nom).all()
-                descr = "morts"
-                bouton_text = "Joueurs en vie 🕺"
-                bouton_bloc = "Joueurs en vie"
-            else:
-                raise ValueError('GET["type"] must be "vivants" or "morts"')
-
-            NR = len(rep)
-            if NR > 0:
-                R.append(chatfuel.Text(f"Liste des {NR}/{NT} joueurs {descr} :"))
-                LJ = [u.nom for u in rep]
-            else:
-                LJ = ["Minute, papillon !"]
-
-            R.append(chatfuel.Text('\n'.join(LJ)).addQuickReplies([chatfuel.Button("show_block", bouton_text, bouton_bloc),
-                                                                    chatfuel.Button("show_block", "Retour menu 🏠", "Menu")]))
-
-        else:
-            raise ValueError("WRONG OR MISSING PASSWORD!")
-
-    except Exception as exc:
-        db.session.rollback()
-        if type(exc).__name__ == "OperationalError":
-            return chatfuel.ErrorReport(Exception("Impossible d'accéder à la BDD, réessaie ! (souvent temporaire)"), verbose=verbose, message="Une erreur technique est survenue 😪\n Erreur :")
-        else:
-            return chatfuel.ErrorReport(exc, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")
-
-    else:
-        return chatfuel.Response(R)
 
 
 ### APPEL D'UNE TÂCHE PLANIFIÉE
@@ -329,7 +238,7 @@ def cron_call(d):
                 elif job.endswith("loups"):
                     return {"inscrit": True, "votantLoups": True}
                 elif job.endswith("action"):
-                    if ("heure" in d) and RepresentsInt(d["heure"]):
+                    if ("heure" in d) and d["heure"].isdigit():
                         heure = int(d["heure"]) % 24
                     else:
                         if job.startswith("remind"):
@@ -447,53 +356,6 @@ def cron_call(d):
             f.write(log)
 
 
-### LISTE MORTS ET VIVANTS
-
-def liste_joueurs(d):    # d : pseudo-dictionnaire des arguments passés en GET (pwd, type)
-    R = []  # Liste des blocs envoyés en réponse
-    try:
-        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
-
-            tous = Joueurs.query.filter(Joueurs.statut.in_(["vivant","MV","mort"])).all()     # Liste des joueurs tels qu'actuellement en cache
-            NT = len(tous)
-
-            if "type" in d and d["type"] == "vivants":
-                rep = Joueurs.query.filter(Joueurs.statut.in_(["vivant","MV"])).order_by(Joueurs.nom).all()
-                descr = "en vie"
-                bouton_text = "Joueurs morts ☠"
-                bouton_bloc = "Joueurs morts"
-            elif "type" in d and d["type"] == "morts":
-                rep = Joueurs.query.filter(Joueurs.statut == "mort").order_by(Joueurs.nom).all()
-                descr = "morts"
-                bouton_text = "Joueurs en vie 🕺"
-                bouton_bloc = "Joueurs en vie"
-            else:
-                raise ValueError('GET["type"] must be "vivants" or "morts"')
-
-            NR = len(rep)
-            if NR > 0:
-                R.append(chatfuel.Text(f"Liste des {NR}/{NT} joueurs {descr} :"))
-                LJ = [u.nom for u in rep]
-            else:
-                LJ = ["Minute, papillon !"]
-
-            R.append(chatfuel.Text('\n'.join(LJ)).addQuickReplies([chatfuel.Button("show_block", bouton_text, bouton_bloc),
-                                                                    chatfuel.Button("show_block", "Retour menu 🏠", "Menu")]))
-
-        else:
-            raise ValueError("WRONG OR MISSING PASSWORD!")
-
-    except Exception as exc:
-        db.session.rollback()
-        if type(exc).__name__ == "OperationalError":
-            return chatfuel.ErrorReport(Exception("Impossible d'accéder à la BDD, réessaie ! (souvent temporaire)"), verbose=verbose, message="Une erreur technique est survenue 😪\n Erreur :")
-        else:
-            return chatfuel.ErrorReport(exc, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")
-
-    else:
-        return chatfuel.Response(R)
-
-
 ### ENVOI MESSAGE À UN JOUEUR (beta)
 
 def choix_cible(d, p, url_root):
@@ -535,58 +397,10 @@ def choix_cible(d, p, url_root):
         return chatfuel.Response(R, set_attributes=attrs)
 
 
-def envoi_mp(d, p):
-    try:
-        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
-            id = p["cible_id"]
-
-            message = p["message"]
-            is_image = message.split("?")[0].lower().endswith(("gif","png","jpg"))
-
-            params = {"chatfuel_token" : CHATFUEL_TOKEN,
-                      "chatfuel_message_tag" : CHATFUEL_TAG,
-                      "chatfuel_block_name" : "RéceptionMessage",
-                      "message": message,
-                      "is_image": is_image,
-                      "sender": p["sender"],
-                      "sender_id": p["sender_id"],
-                      }
-
-            rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{id}/send", params=params)
-            rep = rep.json()
-
-            if "code" in rep:
-                raise Exception("Erreur d'envoi Chatfuel Broadcast API. Réessaie.")
-
-        else:
-            raise ValueError("WRONG OR MISSING PASSWORD!")
-
-    except Exception as exc:
-        return (400, f"{type(e).__name__}({str(e)})")
-
-    else:
-        return """{"success":"ok"}"""
-
-
-
-def media_renderer(d, p):
-    R = []          # Liste des blocs envoyés en réponse
-    try:
-        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
-            R.append(chatfuel.Image(p["media"]).addQuickReplies([chatfuel.Button("show_block", "Retour menu 🏠", "Menu"),
-                                                                 chatfuel.Button("show_block", "Répondre 📤", "Envoi MP")]))
-        else:
-            raise ValueError("WRONG OR MISSING PASSWORD!")
-    except Exception as e:
-        return chatfuel.ErrorReport(exc, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")
-    else:
-        return chatfuel.Response(R)
-
-
 
 ### OPTIONS DU PANNEAU D'ADMIN
 
-exec(open("./blocs/admin_options.py").read())       # Come si le code de admin_options était écrit ici (séparé pour plus de lisibilité)
+exec(open("./Discord/blocs/admin_options.py").read())       # Come si le code de admin_options était écrit ici (séparé pour plus de lisibilité)
 
 
 ### PANNEAU D'ADMIN

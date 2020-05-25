@@ -1,6 +1,3 @@
-import traceback
-import tools
-
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
