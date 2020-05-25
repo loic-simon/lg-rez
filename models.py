@@ -14,20 +14,20 @@ class Joueurs(db.Model):
     role = db.Column(db.String(32), nullable=False)
     camp = db.Column(db.String(32), nullable=False)
 
-    votantVillage = db.Column(db.Boolean(), nullable=False)
-    votantLoups = db.Column(db.Boolean(), nullable=False)
-    roleActif = db.Column(db.Boolean(), nullable=True)
+    votant_village = db.Column(db.Boolean(), nullable=False)
+    votant_loups = db.Column(db.Boolean(), nullable=False)
+    role_actif = db.Column(db.Boolean(), nullable=True)
     # debutRole = db.Column(db.Integer(), nullable=True)
     # finRole = db.Column(db.Integer(), nullable=True)
 
-    _voteVillage = db.Column(db.String(200), nullable=True)
-    _voteMaire = db.Column(db.String(200), nullable=True)
-    _actionRole = db.Column(db.Text(), nullable=True)
+    _vote_village = db.Column(db.String(200), nullable=True)
+    _vote_maire = db.Column(db.String(200), nullable=True)
+    _action_role = db.Column(db.Text(), nullable=True)
 
     def __repr__(self):
         return f"<Joueurs ({self.discord_id}/{self.nom})>"
 
-    def __init__(self, discord_id, _chan_id, nom, chambre, statut, role, camp, votantVillage, votantLoups, roleActif=None, _voteVillage=None, _voteMaire=None, _actionRole=None):
+    def __init__(self, discord_id, _chan_id, nom, chambre, statut, role, camp, votant_village, votant_loups, role_actif=None, _vote_village=None, _vote_maire=None, _action_role=None):
         self.discord_id = discord_id
         self._chan_id = _chan_id
         # self.inscrit = inscrit
@@ -39,15 +39,15 @@ class Joueurs(db.Model):
         self.role = role
         self.camp = camp
 
-        self.votantVillage = votantVillage
-        self.votantLoups = votantLoups
-        self.roleActif = roleActif
+        self.votant_village = votant_village
+        self.votant_loups = votant_loups
+        self.role_actif = role_actif
         # self.debutRole = debutRole
         # self.finRole = finRole
 
-        self._voteVillage = _voteVillage
-        self._voteMaire = _voteVillage
-        self._actionRole = _voteVillage
+        self._vote_village = _vote_village
+        self._vote_maire = _vote_village
+        self._action_role = _vote_village
 
 
 class Roles(db.Model) :
@@ -57,15 +57,15 @@ class Roles(db.Model) :
     description_courte = db.Column(db.String(140), nullable = False)
     description_longue = db.Column(db.String(280), nullable = False)
 
-    horaire_debut = db.Column(db.Integer(), nullable = True)                #Au format HHMM ou None
-    horaire_fin = db.Column(db.Integer(), nullable = True)                  #Au format HHMM ou None
-    Lieu = db.Column(db.String(32), nullable = True)                        #Distance/Physique/Lieu/Contact/Conditionnel/None/Public
+    horaire_debut = db.Column(db.Time(), nullable = True)                #Au format HHMM ou None
+    horaire_fin = db.Column(db.Time(), nullable = True)                  #Au format HHMM ou None
+    lieu = db.Column(db.String(32), nullable = True)                        #Distance/Physique/Lieu/Contact/Conditionnel/None/Public
 
-    Type = db.Column(db.String(32), nullable = False)                       #Quotidien, Unique, <Nombre>, Passif, Conditionnel, Hebdomadaire, Bicircadien, Special
-    ChangementCible = db.Column(db.Boolean(), nullable = True)              #True, False ou None
+    type = db.Column(db.String(32), nullable = False)                       #Quotidien, Unique, <Nombre>, Passif, Conditionnel, Hebdomadaire, Bicircadien, Special
+    changement_cible = db.Column(db.Boolean(), nullable = True)              #True, False ou None
 
-    InteractionNotaire = db.Column(db.String(32), nullable = True)         #Oui, Non, Conditionnel, Potion, Rapport; None si récursif
-    InteractionGardien = db.Column(db.String(32), nullable = True)         #Oui, Non, Conditionnel, Taverne, Feu, MaisonClose, Précis, Cimetière, Loups, None si recursif
+    #InteractionNotaire = db.Column(db.String(32), nullable = True)         #Oui, Non, Conditionnel, Potion, Rapport; None si récursif
+    #InteractionGardien = db.Column(db.String(32), nullable = True)         #Oui, Non, Conditionnel, Taverne, Feu, MaisonClose, Précis, Cimetière, Loups, None si recursif
 
     def __init__(self, nom_du_role, description_courte, description_longue, camp, horaire_debut, horaire_fin, Lieu, Type, ) :
         self.nom_du_role = nom_du_role
@@ -77,23 +77,23 @@ class Roles(db.Model) :
         self.horaire_debut = horaire_debut
         self.horaire_fin = horaire_fin
 
-        self.Lieu = Lieu
-        self.Type = Type
+        self.Lieu = lieu
+        self.Type = type
 
-        #self.InteractionGardien = InteractionG
-        #self.InteractionNotaire = InteractionN
+        #self.interaction_gardien = interaction_gardien
+        #self.interaction_notaire = interaction_notaire
 
-        #self.ChangementCible = ChangementCible
+        #self.changement_cible = changement_cible
 
 
 
 class BaseActions(db.Model):
     action = db.Column(db.String(64), primary_key = True)
-    trigger_debut = db.Column(db.Integer(), nullable = True)
-    trigger_fin = db.Column(db.Integer(), nullable = True)
+    trigger_debut = db.Column(db.Time(), nullable = True)
+    trigger_fin = db.Column(db.Time(), nullable = True)
 
     base_cooldown = db.Column(db.Integer(), nullable = True)
-    type  = db.Column(db.String(32), nullable = False) #Quotidien, Unique, <Nombre>, Passif, Conditionnel, Hebdomadaire, Bicircadien, Special
+    role_actif  = db.Column(db.Boolean(), nullable = False) #Définit si l'action est active(peut être utilisé par le joueur, même sous certaines conditions) ou passif (auto, AUCUNE influence du joueur)
     lieu = db.Column(db.String(32), nullable = True) #Distance/Physique/Lieu/Contact/Conditionnel/None/Public
 
     interaction_notaire = db.Column(db.String(32), nullable = True)         #Oui, Non, Conditionnel, Potion, Rapport; None si récursif
@@ -127,8 +127,8 @@ class Actions(db.Model):
     cible_id = db.Column(db.BigInteger(), nullable = True)
     cible2_id = db.Column(db.BigInteger(), nullable = True)
 
-    charges = db.Column(db.Integer(), nullable = True)
-    cooldown = db.Column(db.Integer(), nullable = True)
+    charges = db.Column(db.Integer(), nullable = True) #Nombrede charges RESTANTES sur l'action, infini si nombre négatif
+    cooldown = db.Column(db.Integer(), nullable = True) #Cooldown restant à l'action, 0=utilisable, negatif=toujours utilisable
 
     #treated = db.Column(db.Boolean(), nullable = False)
 
