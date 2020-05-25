@@ -101,7 +101,7 @@ class BaseActions(db.Model):
 
     params = db.Column(db.String(32), nullable = True)
 
-    def __init__(self, action, trigger_debut, trigger_fin, heure_debut, heure_fins, base_cooldown, type, lieu, interaction_notaire, interaction_gardien, mage, params):
+    def __init__(self, action, trigger_debut, trigger_fin, heure_debut, heure_fin, base_cooldown, role_actif, lieu, interaction_notaire, interaction_gardien, mage, params):
         self.action = action
         self.trigger_debut = trigger_debut
         self.trigger_fin = trigger_fin
@@ -110,7 +110,9 @@ class BaseActions(db.Model):
         self.heure_fin = heure_fin
 
         self.base_cooldown = base_cooldown
-        self.type = type #Quotidien, Unique, <Nombre>, Passif, Conditionnel, Hebdomadaire, Bicircadien, Special
+        self.role_actif = role_actif
+        
+        # self.type = type #Quotidien, Unique, <Nombre>, Passif, Conditionnel, Hebdomadaire, Bicircadien, Special
         self.lieu = lieu #Distance/Physique/Lieu/Contact/Conditionnel/None/Public
 
         self.interaction_notaire = interaction_notaire         #Oui, Non, Conditionnel, Potion, Rapport; None si récursif
@@ -130,11 +132,11 @@ class Actions(db.Model):
     cible2_id = db.Column(db.BigInteger(), nullable = True)
 
     charges = db.Column(db.Integer(), nullable = True) #Nombrede charges RESTANTES sur l'action, infini si None
-    cooldown = db.Column(db.Integer(), nullable = True) #Cooldown restant à l'action, 0=utilisable, None=toujours utilisable
+    cooldown = db.Column(db.Integer(), nullable = False) #Cooldown restant à l'action, 0=utilisable, None=toujours utilisable
 
     #treated = db.Column(db.Boolean(), nullable = False)
 
-    def __init__(self, entry_num, player_id, action, cible_id, cible2_id, treated):
+    def __init__(self, entry_num, player_id, action, cible_id, cible2_id, charges, cooldown):
         self.entry_num = entry_num #Incrémenter auto
         self.player_id = player_id
         self.action = action #Nom de l'action en rapport avec la table BaseActions

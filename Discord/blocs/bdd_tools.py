@@ -1,3 +1,4 @@
+import datetime
 
 def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input brut (BDD, POST, GET...) selon le type de sa colonne
     try:
@@ -17,6 +18,9 @@ def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input
                 return False
             else:
                 raise ValueError()
+        elif SQL_type == "Time":
+            h, m = value.split(':')
+            return datetime.time(int(h), int(m))
         else:
             raise KeyError(f"unknown column type for column '{col}': '{SQL_type}'")
     except (ValueError, TypeError):

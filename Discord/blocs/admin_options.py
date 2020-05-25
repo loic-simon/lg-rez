@@ -43,6 +43,7 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
                      "Integer": "number",
                      "BigInteger": "number",
                      "Boolean": "checkbox",
+                     "Time": "time",
                      }
         try:
             return map_types[SQL_type_name]
@@ -53,9 +54,10 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
         SQL_type_name = type(SQL_type).__name__
         map_values = {"String": f"""{f'value="{value}"' if value else ""} size="10cm" """,
                       "Text": f"""{f'value="{value}"' if value else ""} size="20cm" """,
-                      "Integer": f"""{f'value={value}' if value else ""} style="width:1.5cm" """,
-                      "BigInteger": f"""{f'value={value}' if value else ""} style="width:4cm" """,
+                      "Integer": f"""{f'value={value}' if value is not None else ""} style="width:1.5cm" """,
+                      "BigInteger": f"""{f'value={value}' if value is not None else ""} style="width:4cm" """,
                       "Boolean": "checked" if str(value).lower() == "true" else "",
+                      "Time": f"value={value}" if value else "",
                       }
         try:
             return map_values[SQL_type_name]
