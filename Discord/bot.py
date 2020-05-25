@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 import tools
 import bdd_connect
 
-from features import annexe, IA, inscription, informations, sync, open_close
+from features import annexe, IA, inscription, InfoJoueurs, sync
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -78,9 +78,8 @@ async def on_message(message):
 #   (un cog par fichier dans features, sauf IA.py)
 
 bot.add_cog(annexe.Annexe(bot))
-bot.add_cog(informations.Informations(bot))
+bot.add_cog(InfoJoueurs.Informations(bot))
 bot.add_cog(sync.Sync(bot))
-bot.add_cog(open_close.OpenClose(bot))
 
 
 @bot.command()
