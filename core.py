@@ -223,137 +223,28 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
 def cron_call(d):
     r = ""
-    log = ""
     try:
-        verbose = ("v" in d)
-        testmode = ("test" in d)
-
         if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
-
-            ### GÉNÉRALITÉS
-
-            def get_criteres(job):
-                if job.endswith("cond") or job.endswith("maire"):
-                    return {"inscrit": True, "votantVillage": True}
-                elif job.endswith("loups"):
-                    return {"inscrit": True, "votantLoups": True}
-                elif job.endswith("action"):
-                    if ("heure" in d) and d["heure"].isdigit():
-                        heure = int(d["heure"]) % 24
-                    else:
-                        if job.startswith("remind"):
-                            heure = (int(time.strftime("%H")) + 1) % 24
-                        else:
-                            heure = int(time.strftime("%H"))
-                    if job.startswith("open"):
-                        return {"inscrit": True, "roleActif": True, "debutRole": heure}
-                    else:
-                        return {"inscrit": True, "roleActif": True, "finRole": heure}
-                else:
-                    raise ValueError(f"""Cannot associate criteria to job {job}""")
-
-
-            ### DÉTECTION TÂCHE À FAIRE ET CRITÈRES ASSOCIÉS
-
-            log +=  f"> {time.ctime()} (verbose={verbose}, testmode={testmode}) – "
-
-            if ("job" in d) and (d["job"] in jobs):         # jobs : défini en début de fichier, car utile dans admin
+            if ("job" in d) and (d["job"] in jobs):             # jobs : défini en début de fichier, car utile dans admin
                 job = d["job"]
-                if verbose:
-                    r += f"""Job : <code>{job}</code><br/>"""
 
-                log +=  f"job : {job} -> "
+                quoi, qui = job.split('_')      # "open_loups" -> "open", "loups"
+                
+                heure = d["heure"] if "heure" in d and d["heure"].isdigit() else ""
 
-                criteres = get_criteres(job)
-                if verbose:
-                    r += f"""Critères : <code>{html_escape(criteres)}</code><br/>"""
-
-                if testmode:
-                    criteres_test = {"discord_id": 2033317286706583}   # Loïc, pour tests
-                    if verbose:
-                        r += f"""Critères MODE TEST, réellement appliqués : <code>{html_escape(criteres_test)}</code><br/>"""
-
+                rep = webhook.send(f"!{quoi} {qui} {heure}", "tp")      # Envoi Webhook Discord
+                if not rep:
+                    raise Exception(f"L'envoi du webhook Discord a échoué : {rep} {rep.text}")
             else:
                 raise ValueError("""Bad usage: required argument "job" not in GET or incorrect""")
-
-
-            ### RÉCUPÉRATION UTILISATEURS CACHE
-
-            users = Joueurs.query.filter_by(**criteres).all()     # Liste des joueurs répondant aux cirtères
-            if verbose:
-                str_users = str(users).replace(', ', ',\n ')
-                r += f"<br/>Utilisateur(s) répondant aux critères ({len(users)}) : <pre>{html_escape(str_users)}</pre>"
-
-            if testmode:
-                users = Joueurs.query.filter_by(**criteres_test).all()    # on écrase par les utilisateur MODE TEST
-                if verbose:
-                    str_users = str(users).replace(', ',',\n ')
-                    r += f"<br/>Utilisateur(s) répondant aux critères MODE TEST ({len(users)}) : <pre>{html_escape(str_users)}</pre>"
-
-            log += f"{len(users)} utilisateurs trouvés\n"
-
-
-            ### MODIFICATIONS DANS CHATFUEL DIRECT
-
-            if users:
-                params = {"chatfuel_token": CHATFUEL_TOKEN,
-                          "chatfuel_message_tag": CHATFUEL_TAG,
-                          "chatfuel_block_name": "Tâche planifiée",
-                          "job": job
-                          }
-
-                for user in users:
-                    rep = False
-                    tries = 0
-                    while (not rep) and (tries < MAX_TRIES):
-                        rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{user.discord_id}/send", params=params)
-                        tries += 1
-                        if not rep:
-                            time.sleep(5)
-
-                    if tries == MAX_TRIES:
-                        log += f"    - !!! Impossible d'envoyer à l'utilisateur {user} ({MAX_TRIES} tentatives)"
-                        if verbose:
-                            r += f"<br/>!!! Impossible d'envoyer le job <code>{job}</code> à l'utilisateur <code>{html_escape(user)}</code> ({MAX_TRIES} tentatives)"
-                        continue
-
-                    rep = rep.json()
-
-                    if verbose:
-                        r += f"<br/>Envoi job <code>{job}</code> à l'utilisateur <code>{html_escape(user)}</code> – {tries} tentative(s)"
-
-                    log +=  f"    - Envoi à {user} : OK, {tries} tentative(s)\n"
-
-                    if "code" in rep:
-                        raise Exception("Erreur d'envoi Chatfuel Broadcast API. Réessaie.")
-                    else:
-                        if not rep["success"]:
-                            raise Exception(f"""Chatfuel Broadcast API a renvoyé une erreur : {rep["result"]}""")
-
-            ### FIN DE LA PROCÉDURE
-
-            log += "\n"
-
         else:
             raise ValueError("WRONG OR MISSING PASSWORD!")
 
     except Exception as e:
-        log += f"\n> {time.ctime()} - Error, exiting:\n{traceback.format_exc()}\n\n"
-
-        if verbose:
-            if "return_tb" in d:
-                return traceback.format_exc()
-            else:
-                return (400, "".join(traceback.format_exc()))     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
-        else:
-            return (400, f"{type(e).__name__}({str(e)})")     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
+        return (400, f"{type(e).__name__}({str(e)})")
 
     else:
         return r
-
-    finally:
-        with open(f"logs/cron_call/{time.strftime('%Y-%m-%d')}.log", 'a+') as f:
-            f.write(log)
 
 
 ### ENVOI MESSAGE À UN JOUEUR (beta)
