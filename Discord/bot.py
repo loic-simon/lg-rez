@@ -80,7 +80,6 @@ async def on_message(message):
 bot.add_cog(annexe.Annexe(bot))
 bot.add_cog(InfoJoueurs.Informations(bot))
 bot.add_cog(sync.Sync(bot))
-bot.add_cog(open_close.OpenClose(bot))
 
 
 @bot.command()
