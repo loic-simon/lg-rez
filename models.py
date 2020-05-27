@@ -47,7 +47,7 @@ class Joueurs(db.Model):
 
 
 class Roles(db.Model) :
-    nom_du_role = db.Column(db.String(32), primary_key = True)
+    nom = db.Column(db.String(32), primary_key = True)
     camp = db.Column(db.String(32), nullable = False)                       #Loups, Solitaire, Nécros, Villageois
 
     description_courte = db.Column(db.String(140), nullable = False)
@@ -63,8 +63,8 @@ class Roles(db.Model) :
     #InteractionNotaire = db.Column(db.String(32), nullable = True)         #Oui, Non, Conditionnel, Potion, Rapport; None si récursif
     #InteractionGardien = db.Column(db.String(32), nullable = True)         #Oui, Non, Conditionnel, Taverne, Feu, MaisonClose, Précis, Cimetière, Loups, None si recursif
 
-    def __init__(self, nom_du_role,camp, description_courte, description_longue) :
-        self.nom_du_role = nom_du_role
+    def __init__(self, nom, camp, description_courte, description_longue) :
+        self.nom = nom
         self.camp = camp
 
         self.description_courte = description_courte

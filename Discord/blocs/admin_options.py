@@ -16,9 +16,9 @@ def html_table(LL, first_row=None, second_row=None, last_row=None, repeat_header
     if very_last_row:
         LL.append(very_last_row)
     for L in LL:
-        r += f"<tr>{row_start}<td style='border:1px solid black; padding:2pt;'>"
-        r += "</td><td style='border:1px solid black; padding:2pt;'>".join([str(l) for l in L])
-        r += f"</td>{row_end}</tr>"
+        r += f"<tr>{row_start}<td style='border:1px solid black; padding:2pt;'><nobr>"
+        r += "</nobr></td><td style='border:1px solid black; padding:2pt;'><nobr>".join([str(l) for l in L])
+        r += f"</nobr></td>{row_end}</tr>"
     r += "</table>"
     return r
 
@@ -79,7 +79,7 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
 
     corps = [[f"""<input type=\"{HTMLform_type(SQL_type[col])}" name=\"{col}" {HTMLform_value(SQL_type[col], val)} {"readonly" if col == primary_col else ""} {"" if SQL_nullable[col] else "required"}>""" for (col, val) in d.items()] + [boutons(d[primary_col])] for d in LE]
 
-    nouv = [f"""<input type=\"{HTMLform_type(SQL_type[col])}" name=\"{col}" {HTMLform_value(SQL_type[col], "")} {"" if SQL_nullable[col] else "required"}>""" for col in cols] + ["""<input type="submit" name="additem" value="Créer">"""]
+    nouv = [f"""<input type=\"{HTMLform_type(SQL_type[col])}" name=\"{col}" {HTMLform_value(SQL_type[col], None)} {"" if SQL_nullable[col] else "required"}>""" for col in cols] + ["""<input type="submit" name="additem" value="Créer">"""]
 
     def actual_sort(col, asc):
         return """disabled style="background-color:yellow;" """ if col == sort_col and asc == sort_asc else ""

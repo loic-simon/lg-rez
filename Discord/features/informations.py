@@ -15,19 +15,19 @@ class Informations(commands.Cog):
         Valeurs possibles pour nom_camp : all, Loups, Villageois, Solitaire, Nécros""" #création de la BDD role dans models.py
         if nom_camp == "all" :
             tous = Roles.query.all()
-            ret = '\n - '.join([r.nom_du_role for r in tous])
+            ret = '\n - '.join([r.nom for r in tous])
         elif nom_camp == "Loups" :
             liste = Roles.query.filter_by(camp="Loups")
-            ret = '\n - '.join([r.nom_du_role for r in liste])
+            ret = '\n - '.join([r.nom for r in liste])
         elif nom_camp == "Villageois" :
             liste = Roles.query.filter_by(camp="Villageois")
-            ret = '\n - '.join([r.nom_du_role for r in liste])
+            ret = '\n - '.join([r.nom for r in liste])
         elif nom_camp == "Solitaire" :
             liste = Roles.query.filter_by(camp="Solitaire")
-            ret = '\n - '.join([r.nom_du_role for r in liste])
+            ret = '\n - '.join([r.nom for r in liste])
         elif nom_camp == "Nécros" :
             liste = Roles.query.filter_by(camp="Nécros")
-            ret = '\n - '.join([r.nom_du_role for r in liste])
+            ret = '\n - '.join([r.nom for r in liste])
         else :
             await ctx.send(tools.code_bloc(f"Cible {nom_camp} non trouvée\n{traceback.format_exc()}"))
 
