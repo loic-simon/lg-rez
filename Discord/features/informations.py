@@ -1,6 +1,7 @@
 from discord.ext import commands
+import unidecode
 import tools
-from bdd_connect import db, Joueurs
+from bdd_connect import db, Joueurs, Roles
 import traceback
 
 
@@ -9,29 +10,32 @@ class Informations(commands.Cog):
     """Informations : Commandes que les joueurs peuvent utilisés régulièrement"""
 
     @commands.command()
-    async def roles(self, ctx, nom_camp = "all") :
+    async def roles(self, ctx, nom_camp="all") :
         """Affiche la liste des rôles,
         L'option nom_camp permet de lister les rôles d'un camp spécifique
         Valeurs possibles pour nom_camp : all, Loups, Villageois, Solitaire, Nécros""" #création de la BDD role dans models.py
-        if nom_camp == "all" :
+        nom_camp = unidecode.unidecode(nom_camp.lower())
+        if nom_camp == "all":
             tous = Roles.query.all()
             ret = '\n - '.join([r.nom for r in tous])
-        elif nom_camp == "Loups" :
-            liste = Roles.query.filter_by(camp="Loups")
+        elif "loup" in nom_camp:
+            liste = Roles.query.filter_by(camp="loups")
             ret = '\n - '.join([r.nom for r in liste])
-        elif nom_camp == "Villageois" :
-            liste = Roles.query.filter_by(camp="Villageois")
+        elif "villag" in nom_camp:
+            liste = Roles.query.filter_by(camp="village")
             ret = '\n - '.join([r.nom for r in liste])
-        elif nom_camp == "Solitaire" :
-            liste = Roles.query.filter_by(camp="Solitaire")
+        elif "solit" in nom_camp:
+            liste = Roles.query.filter_by(camp="solitaire")
             ret = '\n - '.join([r.nom for r in liste])
-        elif nom_camp == "Nécros" :
-            liste = Roles.query.filter_by(camp="Nécros")
+        elif "necro" in nom_camp:
+            liste = Roles.query.filter_by(camp="nécro")
             ret = '\n - '.join([r.nom for r in liste])
         else :
             await ctx.send(tools.code_bloc(f"Cible {nom_camp} non trouvée\n{traceback.format_exc()}"))
+            return
 
         await ctx.send(tools.code_bloc(f"Liste des roles dans le camp {nom_camp}: \n - {ret}"))
+
 
     @commands.command()
     async def MonRole(self, ctx, Details = "court") :

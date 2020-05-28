@@ -1,4 +1,5 @@
 import os
+import asyncio
 import logging
 import traceback
 
@@ -9,7 +10,7 @@ from dotenv import load_dotenv
 import tools
 import bdd_connect
 
-from features import annexe, IA, inscription, informations, sync, open_close
+from features import annexe, IA, inscription, informations, sync, open_close, remplissage_bdd
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -81,6 +82,8 @@ bot.add_cog(annexe.Annexe(bot))
 bot.add_cog(informations.Informations(bot))
 bot.add_cog(sync.Sync(bot))
 bot.add_cog(open_close.OpenClose(bot))
+bot.add_cog(remplissage_bdd.RemplissageBDD(bot))
+
 
 @bot.command()
 @commands.has_role("MJ")
@@ -92,6 +95,9 @@ async def do(ctx, *, txt):
     a = Answer()
 
     exec(f"a.rep = {txt}", globals(), locals())
+    if asyncio.iscoroutine(a.rep):
+        a.rep = await a.rep
+        
     await ctx.send(f"Entrée : {tools.code(txt)}\nSortie :\n{a.rep}")
 
 

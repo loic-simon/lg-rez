@@ -12,9 +12,9 @@ def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input
         elif SQL_type in ("Integer", "BigInteger"):
             return int(value)
         elif SQL_type == "Boolean":
-            if value in [1, '1', True, 'true', 'True', 'TRUE', 'vrai', 'Vrai', 'VRAI', 'on', 'On', 'ON']:
+            if value in [True, 1] or (isinstance(value, str) and value.lower() in ['true', 'vrai', 'on', 'oui', 'yes']):
                 return True
-            elif value in [0, '0', False, 'false', 'False', 'FALSE', 'faux', 'Faux', 'FAUX', 'off', 'Off', 'OFF']:
+            elif value in [False, 0] or (isinstance(value, str) and value.lower() in ['false', 'faux', 'off', 'non', 'no']):
                 return False
             else:
                 raise ValueError()

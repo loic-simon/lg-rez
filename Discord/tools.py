@@ -72,13 +72,25 @@ def private(cmd):
 
 # Demande une réaction dans un choix (vrai/faux par défaut)
 
-async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, process_text=True, text_filter=lambda s:True):
-    """Ajoute les reacts dans emojis à message, attend que quelqu'un appuie sur une, puis retourne :
+async def yes_no(bot, message):
+    """Ajoute les reacts ✅ et ❎, et renvoie True ou False en fonction de l'emoji cliqué OU de la réponse textuelle détectée."""
+    yes_words = ["oui", "o", "yes", "y", "1", "true"]
+    yes_no_words = yes_words + ["non", "n", "no", "n", "0", "false"]
+    return await wait_for_react_clic(
+        bot, message, emojis={"✅":True, "❎":False}, process_text=True, 
+        text_filter=lambda s:s.lower() in yes_no_words, post_converter=lambda s:s.lower() in yes_words)
+
+
+async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, process_text=False, 
+                              text_filter=lambda s:True, post_converter=None):
+    """Ajoute les reacts dans emojis à message, attend que quelqu'un appuie sur une, puis renvoie :
         - soit le nom de l'emoji si emoji est une liste ;
         - soit la valeur associée si emoji est un dictionnaire.
         
-    Si process_text=True, détecte aussi la réponse par message et retourne ledit message."""
-    
+    Si process_text=True, détecte aussi la réponse par message et retourne ledit message (défaut False).
+    De plus, si text_filter (fonction str -> bool) est défini, ne réagit qu'aux messages pour lesquels text_filter(message) = True.
+    De plus, si post_converter (fonction str -> ?) est défini, le message détecté est passé dans cette fonction avant d'être renvoyé."""
+        
     if not isinstance(emojis, dict):        # Si emoji est une liste, on en fait un dictionnaire
         emojis = {emoji:emoji for emoji in emojis}
         
@@ -96,22 +108,26 @@ async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, pr
         def message_check(mess):                # Check MESSAGE : bon channel, pas du bot, et filtre (optionnel)
             return (mess.channel == message.channel) and (mess.author != bot.user) and text_filter(mess.content)
         tasks.append(asyncio.create_task(bot.wait_for('message', check=message_check), name="mess"))
-    
+        
     done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)      # On lance
     done = list(done)[0]
         
     if done.get_name() == "react":
         ret = emojis[done.result().emoji.name]      # Si clic sur react, done.result = react
-    else:
-        ret = done.result().content                 # Si envoi de message, done.result = message
         
-    for emoji in emojis:
-        await message.remove_reaction(emoji, bot.user)         # On finit par supprimer les emojis mis par le bot
+        for emoji in emojis:
+            await message.remove_reaction(emoji, bot.user)         # On finit par supprimer les emojis mis par le bot
+            
+    else:
+        mess = done.result().content                # Si envoi de message, done.result = message
+        if post_converter:
+            ret = post_converter(mess)              
+        else:
+            ret = mess
+            
+        await message.clear_reactions()
         
     return ret
-
-
-
 
 
 # Teste si le message contient un mot de la liste trigWords, les mots de trigWords doivent etre en minuscule

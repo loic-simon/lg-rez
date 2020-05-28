@@ -52,7 +52,8 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
 
     def HTMLform_value(SQL_type, value):
         SQL_type_name = type(SQL_type).__name__
-        map_values = {"String": f"""{f'value="{value}"' if value else ""} size="10cm" """,
+        maxcar = int(str(SQL_type)[8:-1]) if SQL_type_name == 'String' else 0
+        map_values = {"String": f"""{f'value="{value}"' if value else ""} size=\"{min(0.4*maxcar, 60)}cm" """,
                       "Text": f"""{f'value="{value}"' if value else ""} size="20cm" """,
                       "Integer": f"""{f'value={value}' if value is not None else ""} style="width:1.5cm" """,
                       "BigInteger": f"""{f'value={value}' if value is not None else ""} style="width:4cm" """,
@@ -83,7 +84,7 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
 
     def actual_sort(col, asc):
         return """disabled style="background-color:yellow;" """ if col == sort_col and asc == sort_asc else ""
-    first_row = [(f"""{col} <input type=submit name="viewtable-sort:{col}:asc" value="&and;" {actual_sort(col, True)}>"""
+    first_row = [(f"""{col}<br/><input type=submit name="viewtable-sort:{col}:asc" value="&and;" {actual_sort(col, True)}>"""
                   f"""<input type=submit name="viewtable-sort:{col}:desc" value="&or;" {actual_sort(col, False)}>""") for col in cols] + ["""Action <input type=submit name="viewtable" value="&times;">"""]
 
     r += html_table(corps,

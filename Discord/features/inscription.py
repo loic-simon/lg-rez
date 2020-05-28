@@ -7,8 +7,6 @@ import tools
 from bdd_connect import db, Joueurs
 from blocs import gsheets, bdd_tools
 
-trigYesNo = {"oui","non","o","n","yes","no","y","n"}
-repOui = {"oui","o","yes","y"}
 
 async def main(bot, member):
     ### Vérification si le joueur est déjà inscrit / en cours et création chan privé si nécessaire
@@ -38,10 +36,7 @@ async def main(bot, member):
 
     ### Récupération chambre
 
-    message = await chan.send("Habite-tu à la rez ? (O/N)")
-
-    rep = await tools.wait_for_react_clic(bot, message, text_filter=lambda s:s.lower() in trigYesNo)
-    a_la_rez = (rep is True) or (isinstance(rep, str) and rep.lower() in repOui)
+    a_la_rez = await tools.yes_no(bot, await chan.send("Habite-tu à la rez ?"))
 
     def sortieNumRez(m):
         return len(m.content) < 200 #Longueur de chambre de rez maximale
