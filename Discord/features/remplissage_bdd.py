@@ -43,25 +43,35 @@ class RemplissageBDD(commands.Cog):
         SHEET_ID = os.getenv("ROLES_SHEET_ID")
         workbook = gsheets.connect(SHEET_ID)    # Tableau de bord
         
-        for table in ["Roles", "BaseActions", "BaseActionsRoles"]:
-            await ctx.send(f"Remplissage de la table {tools.code(table)}...")
+        for table_name in ["Roles", "BaseActions", "BaseActionsRoles"]:
+            await ctx.send(f"Remplissage de la table {tools.code(table_name)}...")
             async with ctx.typing():
-            
-                sheet = workbook.worksheet(table)
+                
+                sheet = workbook.worksheet(table_name)
                 values = sheet.get_all_values()         # Liste de liste des valeurs des cellules
                 
-                cols = [col for col in bdd_tools.get_cols(Tables[table]) if not col.startswith('_')]    # On élimine les colonnes locales
-                SQL_types = bdd_tools.get_SQL_types(Tables[table])
-                SQL_nullable = bdd_tools.get_SQL_nullable(Tables[table])
+                table = Tables[table_name]
+                cols = bdd_tools.get_cols(table)
+                SQL_types = bdd_tools.get_SQL_types(table)
+                SQL_nullable = bdd_tools.get_SQL_nullable(table)
+                primary_col = bdd_tools.get_primary_col(table)
 
                 cols_index = {col:values[0].index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
                 
+                existants = {getattr(item, primary_col):item for item in table.query.all()}
+                
                 for L in values[1:]:
                     args = {col:bdd_tools.transtype(L[cols_index[col]], col, SQL_types[col], SQL_nullable[col]) for col in cols}
-                    role = Tables[table](**args)
-                    db.session.add(role)
+                    id = args[primary_col]
+                    if id in existants:
+                        for col in cols:
+                            if getattr(existants[id], col) != args[col]:
+                                setattr(existants[id], col, args[col])
+                                bdd_tools.flag_modified(existants[id], col)
+                    else:
+                        db.session.add(table(**args))
                     
                 db.session.commit()
                     
-            await ctx.send(f"Table {tools.code(table)} remplie !")
-            await tools.log(ctx, f"Table {tools.code(table)} remplie !")
+            await ctx.send(f"Table {tools.code(table_name)} remplie !")
+            await tools.log(ctx, f"Table {tools.code(table_name)} remplie !")

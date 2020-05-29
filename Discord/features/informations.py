@@ -34,14 +34,14 @@ class Informations(commands.Cog):
             await ctx.send(tools.code_bloc(f"Cible {nom_camp} non trouvée\n{traceback.format_exc()}"))
             return
 
-        await ctx.send(tools.code_bloc(f"Liste des roles dans le camp {nom_camp}: \n - {ret}"))
+        await ctx.send(tools.code_bloc(f"Liste des rôles dans le camp {nom_camp} : \n - {ret}"))
 
 
     @commands.command()
-    async def MonRole(self, ctx, Details = "court") :
+    async def monrole(self, ctx, details="court") :
         """Affiche les informations du rôle du joueur
-        L'option Details permet d'avoir plus ou moins d'info
-        Valeurs possibles pour Details : court, long, role"""
+        L'option details permet d'avoir plus ou moins d'info
+        Valeurs possibles pour details : court, long, role"""
         nom_user = ctx.author.display_name
         try :
             u = Joueurs.query.filter_by(nom = nom_user).one()
@@ -49,7 +49,7 @@ class Informations(commands.Cog):
             await ctx.send(tools.code_bloc(f"Le joueur {nom_user} n'a pas été trouvé\n{traceback.format_exc()}"))
         else :
             user_role = u.role
-            if Details == "role" :
+            if details == "role" :
                 await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role}"))
             else :
                 try :
@@ -62,13 +62,13 @@ class Informations(commands.Cog):
                     user_side = r.camp
                     user_descript = r.description_longue
                     user_short = r.description_courte
-                    if Details == "long" and user_begin_time != None:
+                    if details == "long" and user_begin_time != None:
                         await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action est entre : {user_begin_time} et {user_end_time}\nTon role consiste en :\n {user_descript}"))
-                    elif Details == "court" and user_begin_time != None:
+                    elif details == "court" and user_begin_time != None:
                         await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action est entre : {user_begin_time} et {user_end_time}\nTon role consiste en :\n {user_short}"))
-                    elif Details == "long" and user_begin_time == None:
+                    elif details == "long" and user_begin_time == None:
                         await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action n'a pas d'heure\nTon role consiste en :\n {user_descript}"))
-                    elif Details == "court" and user_begin_time == None:
+                    elif details == "court" and user_begin_time == None:
                         await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action n'a pas d'heure\nTon role consiste en :\n {user_short}"))
                     else :
                         await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role}\nEt utilise les bons arguments (voir !help MonRole pour plus de détails)"))

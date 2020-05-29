@@ -143,11 +143,12 @@ class Actions(db.Model):
 
 
 class BaseActionsRoles(db.Model):
-    _id = db.Column(db.Integer(), primary_key=True)
+    id = db.Column(db.Integer(), primary_key=True)
     role = db.Column(db.String(32), nullable=False)
     action = db.Column(db.String(32), nullable=False)
 
-    def __init__(self, role, action):
+    def __init__(self, id, role, action):
+        self.id = id
         self.role = role
         self.action = action
 
