@@ -1,14 +1,16 @@
-from discord.ext import commands
-import tools
-from bdd_connect import db, Actions, BaseActions
 import datetime
-from datetime import time
 
-from sqlalchemy.orm.attributes import flag_modified     # Permet de "signaler" les entrées modifiées, à commit en base
+from discord.ext import commands
+from sqlalchemy.sql.expression import and_, or_, not_
+
+from bdd_connect import db, Actions, BaseActions
+import tools
+
+
+from blocs.bdd_tools import flag_modified     # Permet de "signaler" les entrées modifiées (pour les commit en base)
 
 async def get_actions(quoi, trigger, heure=None):
-    """
-    Renvoie la liste des actions déclenchées par trigger, dans le cas ou c'est temporel, les actions possibles à heure_debut (objet de type time)
+    """Renvoie la liste des actions déclenchées par trigger, dans le cas ou c'est temporel, les actions possibles à heure_debut (objet de type time)
     """
     
     if trigger == "temporel":
@@ -16,30 +18,38 @@ async def get_actions(quoi, trigger, heure=None):
             raise ValueError("Merci de préciser une heure......\n Connard.")
             
         if quoi == "open":
-            criteres = {"trigger_debut": trigger, "heure_debut": heure}
-        else:
-            criteres = {"trigger_fin": trigger, "heure_fin": heure}
+            criteres = and_(Actions.trigger_debut == trigger, Actions.heure_debut == heure,
+                            Actions.charges != 0)    # charges peut être None, donc pas > 0
+        elif quoi == "close":
+            criteres = and_(Actions.trigger_fin == trigger, Actions.heure_fin == heure, 
+                            Actions._decision != None)
+        elif quoi == "remind":
+            criteres = and_(Actions.trigger_fin == trigger, Actions.heure_fin == heure, 
+                            Actions._decision == "rien")
+
     else:
         if quoi == "open":
-            criteres = {"trigger_debut": trigger}
-        else:
-            criteres = {"trigger_fin": trigger}
+            criteres = and_(Actions.trigger_debut == trigger, 
+                            Actions.charges != 0)
+        elif quoi == "close":
+            criteres = and_(Actions.trigger_fin == trigger, Actions._decision != None)
+        elif quoi == "remind":
+            criteres = and_(Actions.trigger_fin == trigger, Actions._decision == "rien")
+            
+            
+    actions = Actions.query.filter(criteres).all()
 
-
-    all_actions = BaseActions.query.filter_by(**criteres).all()
-
-    if not all_actions:
+    if not actions:
         return []
     else:
-        actions = [action.action for action in all_actions]
-        act_dispo = Actions.query.filter(Actions.action.in_(actions)).filter_by(cooldown=0).all()
-        act_decrement = Actions.query.filter(Actions.action.in_(actions)).filter(Actions.cooldown > 0).all()
+        
+        if quoi == "open":
+            act_decrement = [action for action in actions if action.cooldown > 0]
+            if act_decrement:
+                for act in act_decrement:
+                    act.cooldown -= 1
+                    flag_modified(act, "cooldown")
 
-        if act_decrement:
-            for act in act_decrement:
-                act.cooldown -= 1
-                flag_modified(act, "cooldown")
+                db.session.commit()
 
-            db.session.commit()
-
-        return(act_dispo)
+        return([action for action in actions if action.cooldown == 0])

@@ -20,12 +20,13 @@ class Joueurs(db.Model):
 
     _vote_village = db.Column(db.String(200), nullable=True)
     _vote_maire = db.Column(db.String(200), nullable=True)
+    _vote_loups = db.Column(db.String(200), nullable=True)
     _action_role = db.Column(db.Text(), nullable=True)
 
     def __repr__(self):
         return f"<Joueurs ({self.discord_id}/{self.nom})>"
 
-    def __init__(self, discord_id, _chan_id, nom, chambre, statut, role, camp, votant_village, votant_loups, role_actif=None, _vote_village=None, _vote_maire=None, _action_role=None):
+    def __init__(self, discord_id, _chan_id, nom, chambre, statut, role, camp, votant_village, votant_loups, role_actif=None, _vote_village=None, _vote_maire=None, _vote_loups=None, _action_role=None):
         self.discord_id = discord_id
         self._chan_id = _chan_id
         # self.inscrit = inscrit
@@ -43,6 +44,7 @@ class Joueurs(db.Model):
 
         self._vote_village = _vote_village
         self._vote_maire = _vote_village
+        self._vote_loups = _vote_loups
         self._action_role = _vote_village
 
 
@@ -79,8 +81,8 @@ class Roles(db.Model) :
 class BaseActions(db.Model):
     action = db.Column(db.String(32), primary_key=True)
     
-    trigger_debut = db.Column(db.String(32), nullable=False)
-    trigger_fin = db.Column(db.String(32), nullable=False)
+    trigger_debut = db.Column(db.String(32), nullable=True)
+    trigger_fin = db.Column(db.String(32), nullable=True)
     instant = db.Column(db.Boolean(), nullable=True)
 
     heure_debut = db.Column(db.Time(), nullable=True)
@@ -98,7 +100,7 @@ class BaseActions(db.Model):
     
     changement_cible = db.Column(db.Boolean(), nullable=True)
 
-    def __init__(self, action, trigger_debut, trigger_fin, instant=None, heure_debut=None, heure_fin=None, base_cooldown=0, base_charges=None, refill=None, lieu=None, interaction_notaire=None, interaction_gardien=None, mage=None, changement_cible=None):
+    def __init__(self, action, trigger_debut=None, trigger_fin=None, instant=None, heure_debut=None, heure_fin=None, base_cooldown=0, base_charges=None, refill=None, lieu=None, interaction_notaire=None, interaction_gardien=None, mage=None, changement_cible=None):
         self.action = action
         self.trigger_debut = trigger_debut
         self.trigger_fin = trigger_fin
@@ -117,29 +119,53 @@ class BaseActions(db.Model):
 
 
 class Actions(db.Model):
-    entry_num = db.Column(db.Integer(), primary_key=True)
+    _id = db.Column(db.Integer(), primary_key=True)
     player_id = db.Column(db.BigInteger(), nullable=False)
     action = db.Column(db.String(32), nullable=False)
+    
+    trigger_debut = db.Column(db.String(32), nullable=True)
+    trigger_fin = db.Column(db.String(32), nullable=True)
+    instant = db.Column(db.Boolean(), nullable=True)
 
-    cible_id = db.Column(db.BigInteger(), nullable=True)
-    cible2_id = db.Column(db.BigInteger(), nullable=True)
+    heure_debut = db.Column(db.Time(), nullable=True)
+    heure_fin = db.Column(db.Time(), nullable=True)
 
-    charges = db.Column(db.Integer(), nullable=True) #Nombrede charges RESTANTES sur l'action, infini si None
-    cooldown = db.Column(db.Integer(), nullable=False) #Cooldown restant à l'action, 0=utilisable, None=toujours utilisable
-
+    cooldown = db.Column(db.Integer(), nullable=False)
+    charges = db.Column(db.Integer(), nullable=True)
+    refill  = db.Column(db.String(32), nullable=True)
+    
+    lieu = db.Column(db.String(32), nullable=True)
+    interaction_notaire = db.Column(db.String(32), nullable=True)
+    interaction_gardien = db.Column(db.String(32), nullable=True)
+    mage = db.Column(db.String(100), nullable=True)
+    changement_cible = db.Column(db.Boolean(), nullable=True)
+    
+    # _cible_id = db.Column(db.BigInteger(), nullable=True)
+    # _cible2_id = db.Column(db.BigInteger(), nullable=True)
+    _decision = db.Column(db.String(200), nullable=True)
+    
     #treated = db.Column(db.Boolean(), nullable=False)
 
-    def __init__(self, player_id, action, cible_id, cible2_id, charges, cooldown):
+    def __init__(self, player_id, action, trigger_debut=None, trigger_fin=None, instant=None, heure_debut=None, heure_fin=None, cooldown=0, charges=None, refill=None, lieu=None, interaction_notaire=None, interaction_gardien=None, mage=None, changement_cible=None, _decision=None):
         self.player_id = player_id
-        self.action = action #Nom de l'action en rapport avec la table BaseActions
-
-        self.cible_id = cible_id
-        self.cible2_id = cible2_id
-
-        self.charges = charges      #Nombre de charges restantes (mettre à Null si toujours dispo)
-        self.cooldown = cooldown    #Cooldown restant pour l'action (Null si pas de cooldown)
-
-        #self.treated = treated
+        self.action = action                # Nom de l'action en rapport avec la table BaseActions
+        self.trigger_debut = trigger_debut
+        self.trigger_fin = trigger_fin
+        self.instant = instant
+        self.heure_debut = heure_debut
+        self.heure_fin = heure_fin
+        self.cooldown = cooldown            # Cooldown restant pour l'action (0 = action disponible)
+        self.charges = charges              # Nombre de charges restantes (mettre à Null si toujours dispo)
+        self.refill = refill
+        self.lieu = lieu
+        self.interaction_notaire = interaction_notaire
+        self.interaction_gardien = interaction_gardien
+        self.mage = mage
+        self.changement_cible = changement_cible    
+        # self._cible_id = _cible_id
+        # self._cible2_id = _cible2_id
+        self._decision = _decision
+        # self.treated = treated
 
 
 class BaseActionsRoles(db.Model):

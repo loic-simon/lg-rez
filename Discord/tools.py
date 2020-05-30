@@ -1,5 +1,6 @@
 from functools import wraps
 import asyncio
+import datetime
 
 import discord.utils
 import discord.ext.commands
@@ -128,6 +129,25 @@ async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, pr
         await message.clear_reactions()
         
     return ret
+
+
+# Renvoie l'emoji horloge correspondant à l'heure demandée (str "XXh" our "XXh30", actuelle si non précisée)
+
+def montre(heure=None):
+    if heure and isinstance(heure, str):
+        heure, minute = heure.split("h")
+        heure = int(heure) % 12
+        minute = int(minute) % 60 if minute else 0
+    else:
+        tps = datetime.datetime.now().time()
+        heure = tps.hour
+        minute = tps.minute
+        
+    if 15 < minute < 45:        # Demi heure
+        L = ["🕧", "🕜", "🕝", "🕞", "🕟", "🕠", "🕡", "🕢", "🕣", "🕤", "🕥", "🕦"]
+    else:                       # Heure pile
+        L = ["🕛", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚"]
+    return L[heure] if minute < 45 else L[(heure + 1) % 12]
 
 
 # Teste si le message contient un mot de la liste trigWords, les mots de trigWords doivent etre en minuscule
