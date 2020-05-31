@@ -31,10 +31,10 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
     table = Tables[p["table"]]
     r += f"<h2>Table : {table.__name__}</h2>"
 
-    cols = get_cols(table)
-    primary_col = get_primary_col(table)
-    SQL_type = get_SQL_types(table, detail=True)
-    SQL_nullable = {col:val if type(SQL_type[col]).__name__ != "Boolean" else True for (col, val) in get_SQL_nullable(table).items()}
+    cols = bdd_tools.get_cols(table)
+    primary_col = bdd_tools.get_primary_col(table)
+    SQL_type = bdd_tools.get_SQL_types(table, detail=True)
+    SQL_nullable = {col:val if type(SQL_type[col]).__name__ != "Boolean" else True for (col, val) in bdd_tools.get_SQL_nullable(table).items()}
 
     def HTMLform_type(SQL_type):
         SQL_type_name = type(SQL_type).__name__
@@ -78,9 +78,9 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
         return (f"""<input type="submit" name="editem" value="Édit">"""
                 f"""<input type="submit" name="delitem" value="Suppr">""")
 
-    corps = [[f"""<input type=\"{HTMLform_type(SQL_type[col])}" name=\"{col}" {HTMLform_value(SQL_type[col], val)} {"readonly" if col == primary_col else ""} {"" if SQL_nullable[col] else "required"}>""" for (col, val) in d.items()] + [boutons(d[primary_col])] for d in LE]
+    corps = [[f"""<input type=\"{HTMLform_type(SQL_type[col])}" name=\"{col}" {HTMLform_value(SQL_type[col], val)} {"readonly" if col == primary_col or col.startswith("_") else ""} {"" if SQL_nullable[col] else "required"}>""" for (col, val) in d.items()] + [boutons(d[primary_col])] for d in LE]
 
-    nouv = [f"""<input type=\"{HTMLform_type(SQL_type[col])}" name=\"{col}" {HTMLform_value(SQL_type[col], None)} {"" if SQL_nullable[col] else "required"}>""" for col in cols] + ["""<input type="submit" name="additem" value="Créer">"""]
+    nouv = [f"""<input type=\"{HTMLform_type(SQL_type[col])}" name=\"{col}" {HTMLform_value(SQL_type[col], None)} {"disabled" if col.startswith("_") else ""} {"" if SQL_nullable[col] else "required"}>""" for col in cols] + ["""<input type="submit" name="additem" value="Créer">"""]
 
     def actual_sort(col, asc):
         return """disabled style="background-color:yellow;" """ if col == sort_col and asc == sort_asc else ""
@@ -108,11 +108,11 @@ def additem(d, p):
     table = Tables[p["table"]]
     r += f"Table : {table.__name__}\n\n"
     
-    cols = get_cols(table)
-    SQL_type = get_SQL_types(table)
-    SQL_nullable = get_SQL_nullable(table)
+    cols = [col for col in bdd_tools.get_cols(table) if not col.startswith("_")]
+    SQL_type = bdd_tools.get_SQL_types(table)
+    SQL_nullable = bdd_tools.get_SQL_nullable(table)
 
-    args = {col:transtype(p[col] if col in p else False, col, SQL_type[col], SQL_nullable[col]) for col in cols}
+    args = {col:bdd_tools.transtype(p[col] if col in p else False, col, SQL_type[col], SQL_nullable[col]) for col in cols}
 
     user = table(**args)
     db.session.add(user)
@@ -149,19 +149,18 @@ def editem(d, p):
     id = {p["primary_col"]:p[p["primary_col"]]}
     r += f"Table : {table.__name__}, ID : {id}<br/><ul>"
     
-    cols = get_cols(table)
-    SQL_type = get_SQL_types(table)
-    SQL_nullable = get_SQL_nullable(table)
+    cols = [col for col in bdd_tools.get_cols(table) if not col.startswith("_")]
+    SQL_type = bdd_tools.get_SQL_types(table)
+    SQL_nullable = bdd_tools.get_SQL_nullable(table)
 
-    args = {col:transtype(p[col] if col in p else False, col, SQL_type[col], SQL_nullable[col]) for col in cols}
+    args = {col:bdd_tools.transtype(p[col] if col in p else False, col, SQL_type[col], SQL_nullable[col]) for col in cols}
 
     try:
         user = table.query.filter_by(**id).one()
         for col in cols:
             if (old := getattr(user, col)) != (new := args[col]):
                 r += f"<li>{col} : {old} &rarr; {new}</li>"
-                setattr(user, col, new)
-                flag_modified(user, col)
+                bdd_tools.modif(user, col, new)
         r += "</ul>"
         db.session.commit()
         r += "Modification effectuée.<br/><br/>"

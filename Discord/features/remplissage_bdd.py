@@ -66,8 +66,7 @@ class RemplissageBDD(commands.Cog):
                     if id in existants:
                         for col in cols:
                             if getattr(existants[id], col) != args[col]:
-                                setattr(existants[id], col, args[col])
-                                bdd_tools.flag_modified(existants[id], col)
+                                bdd_tools.modif(existants[id], col, args[col])
                     else:
                         db.session.add(table(**args))
                     

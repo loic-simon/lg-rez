@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 import tools
 import bdd_connect
 
-from features import annexe, IA, inscription, informations, sync, open_close, remplissage_bdd
+from features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -82,6 +82,7 @@ bot.add_cog(annexe.Annexe(bot))
 bot.add_cog(informations.Informations(bot))
 bot.add_cog(sync.Sync(bot))
 bot.add_cog(open_close.OpenClose(bot))
+bot.add_cog(voter_agir.VoterAgir(bot))
 bot.add_cog(remplissage_bdd.RemplissageBDD(bot))
 
 

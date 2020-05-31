@@ -48,8 +48,8 @@ def emoji(arg, nom):        # Renvoie l'emoji :nom:. arg peut être de type Cont
 # Renvoie le channel privé d'un utilisateur.
 
 def private_chan(member):
-    chan_id = Tables["Joueurs"].query.filter_by(discord_id=member.id).one()._chan_id
-    return get(member.guild.channels, id=int(chan_id))
+    chan_id = Tables["Joueurs"].query.get(member.id)._chan_id
+    return member.guild.get_channel(chan_id)
 
 
 # DÉCORATEUR : supprime le message et exécute la commande dans la conv privée si elle a été appellée ailleurs
@@ -131,9 +131,11 @@ async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, pr
     return ret
 
 
-# Renvoie l'emoji horloge correspondant à l'heure demandée (str "XXh" our "XXh30", actuelle si non précisée)
+# Utilitaires d'emojis
 
 def montre(heure=None):
+    """Renvoie l'emoji horloge correspondant à l'heure demandée (str "XXh" our "XXh30", actuelle si non précisée)"""
+    
     if heure and isinstance(heure, str):
         heure, minute = heure.split("h")
         heure = int(heure) % 12
@@ -150,6 +152,13 @@ def montre(heure=None):
     return L[heure] if minute < 45 else L[(heure + 1) % 12]
 
 
+def emoji_chiffre(chiffre :int):
+    if 0 <= chiffre <= 10:
+        return ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"][chiffre]
+    else:
+        raise ValueError("L'argument de emoji_chiffre doit être un entier entre 0 et 9")
+
+
 # Teste si le message contient un mot de la liste trigWords, les mots de trigWords doivent etre en minuscule
 
 def checkTrig(m,trigWords):
@@ -161,17 +170,16 @@ def checkRole(member,nom : str):
     return role in member.roles
 
 #Permet de boucler question -> réponse tant que la réponse vérifie pas les critères nécessaires dans chan
-async def boucleMessage(bot, chan, inMessage, conditionSortie, trigCheck = lambda m : m.channel==chan, repMessage="none"):
+async def boucleMessage(bot, chan, inMessage, conditionSortie, trigCheck=lambda m:m.channel == chan and m.author != bot.user, repMessage=None):
     """
     Permet de lancer une boucle question/réponse tant que la réponse ne vérifie pas conditionSortie
     chan est le channel dans lequel lancer la boucle
     trigCheck est la condition de détection du message dans le bot.wait_for
     inMessage est le premier message envoyé pour demander une réponse
-    repMessage permet de définir un message de boucle différent du message d'accueil (identique si défini sur "none" ou non renseigné)
+    repMessage permet de définir un message de boucle différent du message d'accueil (identique si None)
     """
 
-
-    if repMessage=="none":
+    if repMessage is None:
         repMessage = inMessage
     await chan.send(inMessage)
     rep = await bot.wait_for('message', check=trigCheck)

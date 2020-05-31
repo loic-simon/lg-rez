@@ -18,15 +18,15 @@ class Joueurs(db.Model):
     votant_loups = db.Column(db.Boolean(), nullable=False)
     role_actif = db.Column(db.Boolean(), nullable=True)
 
-    _vote_village = db.Column(db.String(200), nullable=True)
+    _vote_condamne = db.Column(db.String(200), nullable=True)
     _vote_maire = db.Column(db.String(200), nullable=True)
     _vote_loups = db.Column(db.String(200), nullable=True)
-    _action_role = db.Column(db.Text(), nullable=True)
+    # _action_role = db.Column(db.Text(), nullable=True)
 
     def __repr__(self):
         return f"<Joueurs ({self.discord_id}/{self.nom})>"
 
-    def __init__(self, discord_id, _chan_id, nom, chambre, statut, role, camp, votant_village, votant_loups, role_actif=None, _vote_village=None, _vote_maire=None, _vote_loups=None, _action_role=None):
+    def __init__(self, discord_id, _chan_id, nom, chambre, statut, role, camp, votant_village, votant_loups, role_actif=None, _vote_condamne=None, _vote_maire=None, _vote_loups=None):
         self.discord_id = discord_id
         self._chan_id = _chan_id
         # self.inscrit = inscrit
@@ -42,10 +42,10 @@ class Joueurs(db.Model):
         self.votant_loups = votant_loups
         self.role_actif = role_actif
 
-        self._vote_village = _vote_village
-        self._vote_maire = _vote_village
+        self._vote_condamne = _vote_condamne
+        self._vote_maire = _vote_maire
         self._vote_loups = _vote_loups
-        self._action_role = _vote_village
+        # self._action_role = _action_role
 
 
 class Roles(db.Model) :

@@ -2,6 +2,10 @@ import datetime
 from sqlalchemy.orm.attributes import flag_modified     # Permet de "signaler" les entrées modifiées, à commit en base
 
 
+def modif(item, col, value):
+    setattr(item, col, value)
+    flag_modified(item, col)
+
 def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input brut (BDD, POST, GET...) selon le type de sa colonne
     try:
         if value in (None, '', 'None', 'none', 'Null', 'null', 'not set', 'non défini'):

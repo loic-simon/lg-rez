@@ -5,9 +5,8 @@ from sqlalchemy.sql.expression import and_, or_, not_
 
 from bdd_connect import db, Actions, BaseActions
 import tools
+from blocs import bdd_tools
 
-
-from blocs.bdd_tools import flag_modified     # Permet de "signaler" les entrées modifiées (pour les commit en base)
 
 async def get_actions(quoi, trigger, heure=None):
     """Renvoie la liste des actions déclenchées par trigger, dans le cas ou c'est temporel, les actions possibles à heure_debut (objet de type time)
@@ -29,8 +28,7 @@ async def get_actions(quoi, trigger, heure=None):
 
     else:
         if quoi == "open":
-            criteres = and_(Actions.trigger_debut == trigger, 
-                            Actions.charges != 0)
+            criteres = and_(Actions.trigger_debut == trigger, Actions.charges != 0)
         elif quoi == "close":
             criteres = and_(Actions.trigger_fin == trigger, Actions._decision != None)
         elif quoi == "remind":
@@ -47,8 +45,7 @@ async def get_actions(quoi, trigger, heure=None):
             act_decrement = [action for action in actions if action.cooldown > 0]
             if act_decrement:
                 for act in act_decrement:
-                    act.cooldown -= 1
-                    flag_modified(act, "cooldown")
+                    bdd_tools.modif(act, "cooldown", act.cooldown - 1)
 
                 db.session.commit()
 

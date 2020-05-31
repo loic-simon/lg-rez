@@ -12,12 +12,11 @@ from dotenv import load_dotenv
 import sqlalchemy.ext
 from sqlalchemy.exc import *                            # Exceptions générales SQLAlchemy
 from sqlalchemy.orm.exc import *                        # Exceptions requêtes SQLAlchemy
-from sqlalchemy.orm.attributes import flag_modified     # Permet de "signaler" les entrées modifiées, à commit en base
 
 import Discord.blocs.chatfuel as chatfuel       # Envoi de blocs à Chatfuel (maison)
 import Discord.blocs.gsheets as gsheets         # Connection à Google Sheets (maison)
 import Discord.blocs.webhook as webhook
-from Discord.blocs.bdd_tools import *           # En théorie faut pas faire ça, mais là ça m'arrange
+from Discord.blocs import bdd_tools             # Outils BDD
 from __init__ import db, Tables      # Récupération BDD
 Joueurs = Tables["Joueurs"]
 
@@ -94,9 +93,9 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
             ### GÉNÉRALITÉS
 
-            cols = [col for col in get_cols(Joueurs) if not col.startswith('_')]    # On élimine les colonnes locales
-            cols_SQL_types = get_SQL_types(Joueurs)
-            cols_SQL_nullable = get_SQL_nullable(Joueurs)
+            cols = [col for col in bdd_tools.get_cols(Joueurs) if not col.startswith('_')]    # On élimine les colonnes locales
+            cols_SQL_types = bdd_tools.get_SQL_types(Joueurs)
+            cols_SQL_nullable = bdd_tools.get_SQL_nullable(Joueurs)
 
 
             ### RÉCUPÉRATION INFOS GSHEET
@@ -130,7 +129,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                 id_cell = L[TDB_index["discord_id"]]
                 if id_cell.isdigit():        # Si la cellule contient bien un ID (que des chiffres, et pas vide)
                     id = int(id_cell)
-                    user_TDB = {col:transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
+                    user_TDB = {col:bdd_tools.transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
                         # Dictionnaire correspondant à l'utilisateur
                     users_TDB.append(user_TDB)
                     ids_TDB.append(id)
@@ -169,8 +168,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                         if verbose:
                             r += f"\n---- Colonne différant : {col} (TDB : {user_TDB[col]}, Joueurs : {getattr(user_cache, col)})"
 
-                        setattr(user_cache, col, user_TDB[col])     # On modifie le cache (= BDD Joueurs)
-                        flag_modified(user_cache, col)              # On indique à SQLAlchemy la modification
+                        bdd_tools.modif(user_cache, col, user_TDB[col])     # On modifie le cache (= BDD Joueurs)
                         Modifs.append( (id, col, user_TDB[col]) )   # On ajoute les modifs
                         if id not in Modified_ids:
                             Modified_ids.append(id)
