@@ -74,12 +74,18 @@ def private(cmd):
 # Demande une réaction dans un choix (vrai/faux par défaut)
 
 async def yes_no(bot, message):
-    """Ajoute les reacts ✅ et ❎, et renvoie True ou False en fonction de l'emoji cliqué OU de la réponse textuelle détectée."""
+    """Ajoute les reacts ✅ et ❎ à message et renvoie True ou False en fonction de l'emoji cliqué OU de la réponse textuelle détectée."""
     yes_words = ["oui", "o", "yes", "y", "1", "true"]
     yes_no_words = yes_words + ["non", "n", "no", "n", "0", "false"]
     return await wait_for_react_clic(
         bot, message, emojis={"✅":True, "❎":False}, process_text=True, 
         text_filter=lambda s:s.lower() in yes_no_words, post_converter=lambda s:s.lower() in yes_words)
+
+async def choice(bot, message, N):
+    """Ajoute les reacts 1️⃣, 2️⃣, 3️⃣... [N] à message et renvoie le numéro cliqué OU détecté par réponse textuelle. (N <= 10)"""
+    return await wait_for_react_clic(
+        bot, message, emojis={emoji_chiffre(i):i for i in range(1, N+1)}, process_text=True, 
+        text_filter=lambda s:s.isdigit() and 1 <= int(s) <= N, post_converter=int)
 
 
 async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, process_text=False, 

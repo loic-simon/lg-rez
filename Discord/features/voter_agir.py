@@ -48,8 +48,8 @@ class VoterAgir(commands.Cog):
             await ctx.send(f"Contre qui veux-tu voter ? (vote actuel : {joueur._vote_condamne})")
             message = await self.bot.wait_for('message', check=trigCheck)
             nom_cible = message.content
-        while not (cible := Joueur.query.filter_by(nom=nom_cible).one_or_none()):    # Tant que nom_cible n'est pas le nom d'un joueur
-            await ctx.send(f"Cible {tools.quote(nom_cible)} non trouvée : contre qui veux-tu voter ?")
+        while not (cible := Joueurs.query.filter_by(nom=nom_cible).one_or_none()):    # Tant que nom_cible n'est pas le nom d'un joueur
+            await ctx.send(f"Cible {tools.code(nom_cible)} non trouvée : contre qui veux-tu voter ?")
             message = await self.bot.wait_for('message', check=trigCheck)
             nom_cible = message.content
             
@@ -60,7 +60,7 @@ class VoterAgir(commands.Cog):
             sheet = gsheets.connect(VOTECOND_SHEET_ID).sheet1                   # Écriture dans sheet Données brutes
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur._vote_condamne], value_input_option="USER_ENTERED")
             
-        await ctx.send(f"Votre contre {tools.quote(cible.nom)} bien pris en compte.")
+        await ctx.send(f"Votre contre {tools.code(cible.nom)} bien pris en compte.")
 
 
     @commands.command()
@@ -86,8 +86,8 @@ class VoterAgir(commands.Cog):
             await ctx.send(f"Pour qui veux-tu voter ? (vote actuel : {joueur._vote_maire})")
             message = await self.bot.wait_for('message', check=trigCheck)
             nom_cible = message.content
-        while not (cible := Joueur.query.filter_by(nom=nom_cible).one_or_none()):     # Tant que nom_cible n'est pas le nom d'un joueur
-            await ctx.send(f"Cible {tools.quote(nom_cible)} non trouvée : pour qui veux-tu voter ?")
+        while not (cible := Joueurs.query.filter_by(nom=nom_cible).one_or_none()):     # Tant que nom_cible n'est pas le nom d'un joueur
+            await ctx.send(f"Cible {tools.code(nom_cible)} non trouvée : pour qui veux-tu voter ?")
             message = await self.bot.wait_for('message', check=trigCheck)
             nom_cible = message.content
             
@@ -98,7 +98,7 @@ class VoterAgir(commands.Cog):
             sheet = gsheets.connect(VOTEMAIRE_SHEET_ID).sheet1                   # Écriture dans sheet Données brutes
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur._vote_maire], value_input_option="USER_ENTERED")
             
-        await ctx.send(f"Votre pour {tools.quote(cible.nom)} bien pris en compte.")
+        await ctx.send(f"Votre pour {tools.code(cible.nom)} bien pris en compte.")
         
 
     @commands.command()
@@ -124,8 +124,8 @@ class VoterAgir(commands.Cog):
             await ctx.send(f"Qui veux-tu manger ? (vote actuel : {joueur._vote_loups})")
             message = await self.bot.wait_for('message', check=trigCheck)
             nom_cible = message.content
-        while not (cible := Joueur.query.filter_by(nom=nom_cible).one_or_none()):     # Tant que nom_cible n'est pas le nom d'un joueur
-            await ctx.send(f"Cible {tools.quote(nom_cible)} non trouvée : qui veux-tu manger ?")
+        while not (cible := Joueurs.query.filter_by(nom=nom_cible).one_or_none()):     # Tant que nom_cible n'est pas le nom d'un joueur
+            await ctx.send(f"Cible {tools.code(nom_cible)} non trouvée : qui veux-tu manger ?")
             message = await self.bot.wait_for('message', check=trigCheck)
             nom_cible = message.content
             
@@ -136,7 +136,7 @@ class VoterAgir(commands.Cog):
             sheet = gsheets.connect(VOTELOUPS_SHEET_ID).sheet1                   # Écriture dans sheet Données brutes
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.camp, joueur._vote_loups], value_input_option="USER_ENTERED")
             
-        await ctx.send(f"Votre contre {tools.quote(cible.nom)} bien pris en compte.")
+        await ctx.send(f"Votre contre {tools.code(cible.nom)} bien pris en compte.")
         
 
     @commands.command()
@@ -159,10 +159,8 @@ class VoterAgir(commands.Cog):
             for i in range(N):
                 txt += f" {tools.emoji_chiffre(i+1)} - {actions[i].action}\n"
             message = await ctx.send(txt + "\nPour laquelle veux-tu agir ?")
-            i = await tools.wait_for_react_clic(
-                self.bot, message, {tools.emoji_chiffre(i+1):i for i in range(N)}, process_text=True, 
-                text_filter=lambda s:s.isdigit() and 1 <= int(s) <= N, post_converter=lambda s:int(s) - 1)
-            action = actions[i]
+            i = await tools.choice(self.bot, message, N)
+            action = actions[i-1]
         else:
             action = actions[0]
 
