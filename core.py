@@ -17,8 +17,8 @@ import Discord.blocs.chatfuel as chatfuel       # Envoi de blocs à Chatfuel (ma
 import Discord.blocs.gsheets as gsheets         # Connection à Google Sheets (maison)
 import Discord.blocs.webhook as webhook
 from Discord.blocs import bdd_tools             # Outils BDD
-from __init__ import db, Tables      # Récupération BDD
-Joueurs = Tables["Joueurs"]
+from __init__ import db, Tables, Joueurs        # Récupération BDD
+
 
 # CONSTANTES
 
@@ -55,19 +55,8 @@ def infos_tb(quiet=False):
     else:
         return f"<br/><div> AN EXCEPTION HAS BEEN RAISED! <br/><pre>{html_escape(tb)}</pre></div>"
 
-def format_Chatfuel(d):         # Représentation des attributs dans Chatfuel
-    for k,v in d.items():
-        if v == True:
-            d[k] = 1
-        elif v == False:
-            d[k] = 0
-        elif v == None:
-            d[k] = "non défini"
-    return d
-
 def getjobs():                  # Récupère la liste des tâches planifiées sur l'API alwaysdata
     rep = requests.get('https://api.alwaysdata.com/v1/job/', auth=(ALWAYSDATA_API_KEY, ''))
-
     if rep:
         try:
             lst = rep.json()
@@ -75,7 +64,6 @@ def getjobs():                  # Récupère la liste des tâches planifiées su
             lst = []
     else:
         raise ValueError(f"Request Error (HTTP code {rep.status_code})")
-
     return lst
 
 
@@ -97,7 +85,6 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             cols_SQL_types = bdd_tools.get_SQL_types(Joueurs)
             cols_SQL_nullable = bdd_tools.get_SQL_nullable(Joueurs)
 
-
             ### RÉCUPÉRATION INFOS GSHEET
 
             if "sheet_id" in d:
@@ -117,7 +104,6 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             TDB_index = {col:head.index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
             TDB_tampon_index = {col:head.index(f"tampon_{col}") for col in cols if col != 'discord_id'}    # Idem pour la partie « tampon »
 
-
             # CONVERSION INFOS GSHEET EN UTILISATEURS
 
             users_TDB = []              # Liste des joueurs tels qu'actuellement dans le TDB
@@ -135,12 +121,10 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                     ids_TDB.append(id)
                     rows_TDB[id] = l
 
-
             ### RÉCUPÉRATION UTILISATEURS CACHE
 
             users_cache = Joueurs.query.all()     # Liste des joueurs tels qu'actuellement en cache
             ids_cache = [user_cache.discord_id for user_cache in users_cache]
-
 
             ### COMPARAISON
 
@@ -153,7 +137,6 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                     db.session.delete(user_cache)
                     if verbose:
                         r += f"\nJoueur dans le cache hors TDB : {user_cache}"
-
 
             for user_TDB in users_TDB:                              ## Différences
                 id = user_TDB["discord_id"]
@@ -173,7 +156,6 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                         if id not in Modified_ids:
                             Modified_ids.append(id)
 
-
             ### ENVOI WEBHOOK DISCORD
 
             if Modifs:
@@ -183,7 +165,6 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                 rep = webhook.send(message, "sync")
                 if not rep:
                     raise Exception(f"L'envoi du webhook Discord a échoué : {rep} {rep.text}")
-
 
             ### APPLICATION DES MODIFICATIONS SUR LE TDB
 
@@ -195,14 +176,10 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                 if verbose:
                     r += "\n\n" + "\n".join([str(m) for m in Modifs])
 
-
             ### APPLICATION DES MODIFICATIONS SUR LES BDD cache
 
             db.session.commit()     # Modification de Joueurs
-
-
-            ### FIN DE LA PROCÉDURE
-
+            
         else:
             raise ValueError("WRONG OR MISSING PASSWORD!")
 
@@ -212,7 +189,6 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             return f"{strhtml(r)}<br/><br/><pre>{traceback.format_exc()}</pre>"
         else:
             return (400, f"{type(e).__name__}({str(e)})")
-
     else:
         return r
 
@@ -245,48 +221,6 @@ def cron_call(d):
         return r
 
 
-### ENVOI MESSAGE À UN JOUEUR (beta)
-
-def choix_cible(d, p, url_root):
-    R = []          # Liste des blocs envoyés en réponse
-    attrs = None    # Attributs à modifier
-    try:
-        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
-
-            SM = difflib.SequenceMatcher()                      # Création du comparateur de chaînes
-            slug1 = unidecode.unidecode(p["cible"]).lower()     # Cible en minuscule et sans accents
-            SM.set_seq1(slug1)                                  # Première chaîne à comparer : cible demandée
-
-            vivants = Joueurs.query.filter(Joueurs.statut.in_(["vivant","MV"])).all()
-            scores = []
-
-            for joueur in vivants:
-                slug2 = unidecode.unidecode(joueur.nom).lower()
-                SM.set_seq2(slug2)                              # Pour chaque joueur, on compare la cible à son nom (en non accentué)
-                score = SM.ratio()                              # On calcule la ressemblance
-                if score == 1:                                  # Cas particulier : joueur demandé correspondant exactement à un en BDD
-                    break
-                scores.append((joueur.nom, joueur.discord_id, score))
-
-            if score == 1:      # Joueur demandé correspondant exactement à un en BDD
-                attrs = {"cible": joueur.discord_id}      # On définit directement la cible (et on envoie aucun bloc)
-
-            else:               # Si pas de joueur correspondant parfaitement
-                bests = [(nom, id) for (nom, id, score) in sorted(scores, key=lambda x:x[2], reverse=True)]  # Meilleurs noms, dans l'ordre
-                boutons = [chatfuel.Button("", nom, "", set_attributes={"cible": id}) for (nom, id) in bests[:5]]
-                R.append(chatfuel.Text("Joueurs trouvés :").addQuickReplies(boutons))
-
-        else:
-            raise ValueError("WRONG OR MISSING PASSWORD!")
-
-    except Exception as exc:
-        return chatfuel.ErrorReport(exc, message="Une erreur technique est survenue 😪\nMerci d'en informer les MJs ! Erreur :")
-
-    else:
-        return chatfuel.Response(R, set_attributes=attrs)
-
-
-
 ### OPTIONS DU PANNEAU D'ADMIN
 
 exec(open("./Discord/blocs/admin_options.py").read())       # Come si le code de admin_options était écrit ici (séparé pour plus de lisibilité)
@@ -297,7 +231,6 @@ exec(open("./Discord/blocs/admin_options.py").read())       # Come si le code de
 # Options d'administration automatiques (ajout,...) - pour tests/debug seulement !
 def manual(d):
     return admin(d, d)
-
 
 def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd notemment) ; p : idem pour les arguments POST (différentes options du panneau)
     r = ""
@@ -419,61 +352,6 @@ def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd 
                         POST args:{dict(p)}
                     </i>
                 </div>"""
-
-        else:
-            raise ValueError("WRONG OR MISSING PASSWORD!")
-
-    except Exception:
-        r += infos_tb()     # Affiche le "traceback" (infos d'erreur Python) en cas d'erreur (plutôt qu'un 501 Internal Server Error)
-
-    finally:
-        return r
-
-
-### FONCTIONS TEST
-
-def API_test(d, p):
-    """ Récupère et renvoie une information à Chatfuel """
-
-    try:
-
-        rep= chatfuel.Response([chatfuel.Text(f"d:{d}"),
-                                chatfuel.Text(f"p:{p}")
-                                ],
-                                #set_attributes={"a":1,"b":2}#,
-                                # redirect_to_blocks="Menu"
-                               )
-
-    except Exception as exc:
-        rep = chatfuel.ErrorReport(exc)
-
-    finally:
-        return rep
-
-
-def Hermes_test(d):
-    r = "<h1>Hermes test.</h1><hr/><br/>"
-    try:
-
-        if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
-
-            ### COMPORTEMENT OPTION
-
-            id = 2033317286706583
-            bloc = d["bloc"] if "bloc" in d else "Sync"
-
-            params = {"chatfuel_token" : CHATFUEL_TOKEN,
-                      "chatfuel_message_tag" : CHATFUEL_TAG,
-                      "chatfuel_block_name" : bloc}
-
-            for k,v in d.items():
-                if k[:4] == "sync":
-                    params[k] = v
-
-            r += f"Requête : <pre>{json.dumps(params, indent=4)}</pre>"
-
-            rep = requests.post(f"https://api.chatfuel.com/bots/{BOT_ID}/users/{id}/send", params=params)
-            r += f"<br /><br />Réponse : <pre>{rep.text}</pre>"
 
         else:
             raise ValueError("WRONG OR MISSING PASSWORD!")

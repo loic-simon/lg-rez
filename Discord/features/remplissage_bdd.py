@@ -12,9 +12,6 @@ from bdd_connect import db, Tables
 class RemplissageBDD(commands.Cog):
     """RemplissageBDD : Commandes pour remplir la base de données du bot à partir des GSheets"""
 
-    def __init__(self, bot):
-        self.bot = bot
-
 
     @commands.command()
     @commands.has_role("MJ")
@@ -22,7 +19,7 @@ class RemplissageBDD(commands.Cog):
         """Supprime la table. ATTENTION À SAUVEGARDER AVANT !"""
 
         if table in Tables:
-            if await tools.yes_no(self.bot, await ctx.send("Sûr ?")):                
+            if await tools.yes_no(ctx.bot, await ctx.send("Sûr ?")):                
                 Tables[table].__table__.drop(db.engine)
                 
                 await ctx.send(f"Table {tools.code(table)} supprimée.")

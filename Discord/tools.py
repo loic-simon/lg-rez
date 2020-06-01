@@ -73,6 +73,15 @@ def private(cmd):
     return new_cmd
 
 
+
+async def wait_for_message(bot, check):
+    message = await bot.wait_for('message', check=lambda m:check(m) or m.content.lower() == "stop")
+        # Quelque soit le check demandé, on réagit en cas de STOP
+    if message.content.lower() == "stop":
+        raise RuntimeError("Arrêt demandé")
+    else:
+        return message
+
 # Demande une réaction dans un choix (vrai/faux par défaut)
 
 async def yes_no(bot, message):
@@ -106,20 +115,26 @@ async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, pr
     for emoji in emojis:                    # On ajoute les emojis
         await message.add_reaction(emoji)
 
-    tasks = []      # Tâches qu'on va exécuter en parallèle
-
+    # 
     emojis_names = [emoji.name if hasattr(emoji, "name") else emoji for emoji in emojis]
-    def react_check(react):                 # Check REACT : bon message, pas un autre emoji, et pas react du bot
+    def react_check(react):                     # Check REACT : bon message, pas un autre emoji, et pas react du bot
         return (react.message_id == message.id) and (react.emoji.name in emojis_names) and (react.user_id != bot.user.id)
-    tasks.append(asyncio.create_task(bot.wait_for('raw_reaction_add', check=react_check), name="react"))
+    react = asyncio.create_task(bot.wait_for('raw_reaction_add', check=react_check), name="react")
 
     if process_text:
         def message_check(mess):                # Check MESSAGE : bon channel, pas du bot, et filtre (optionnel)
             return (mess.channel == message.channel) and (mess.author != bot.user) and text_filter(mess.content)
-        tasks.append(asyncio.create_task(bot.wait_for('message', check=message_check), name="mess"))
+    else:       # On process DANS TOUS LES CAS, mais juste pour détecter "stop" si process_text == False
+        def message_check(mess):                # Check MESSAGE : bon channel, pas du bot, et filtre (optionnel)
+            return False
+    mess = asyncio.create_task(wait_for_message(bot, check=message_check), name="mess")
 
-    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)      # On lance
-    done = list(done)[0]
+    try:
+        done, pending = await asyncio.wait([react, mess], return_when=asyncio.FIRST_COMPLETED)      # On lance
+        done = list(done)[0]
+    except RuntimeError as exc:
+        await message.clear_reactions()
+        raise exc from RuntimeError
 
     if done.get_name() == "react":
         ret = emojis[done.result().emoji.name]      # Si clic sur react, done.result = react

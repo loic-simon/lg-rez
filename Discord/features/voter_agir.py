@@ -21,10 +21,6 @@ ACTIONS_SHEET_ID = os.getenv("ACTIONS_SHEET_ID")
 class VoterAgir(commands.Cog):
     """VoterAgir : voter (aux votes) et agir (les actions) #yes"""
     
-    def __init__(self, bot):
-        self.bot = bot
-
-
     @commands.command()
     @tools.private
     async def vote(self, ctx, *, nom_cible=None):
@@ -42,15 +38,15 @@ class VoterAgir(commands.Cog):
 
         # Choix de la cible
         def trigCheck(m):
-            return (m.channel == ctx.channel and m.author != self.bot.user)
+            return (m.channel == ctx.channel and m.author != ctx.bot.user)
             
         if not nom_cible:                   # Si cible pas précisée à l'appel de la commande
             await ctx.send(f"Contre qui veux-tu voter ? (vote actuel : {joueur._vote_condamne})")
-            message = await self.bot.wait_for('message', check=trigCheck)
+            message = await tools.wait_for_message(ctx.bot, check=trigCheck)
             nom_cible = message.content
         while not (cible := Joueurs.query.filter_by(nom=nom_cible).one_or_none()):    # Tant que nom_cible n'est pas le nom d'un joueur
             await ctx.send(f"Cible {tools.code(nom_cible)} non trouvée : contre qui veux-tu voter ?")
-            message = await self.bot.wait_for('message', check=trigCheck)
+            message = await tools.wait_for_message(ctx.bot, check=trigCheck)
             nom_cible = message.content
             
         async with ctx.typing():
@@ -80,15 +76,15 @@ class VoterAgir(commands.Cog):
 
         # Choix de la cible
         def trigCheck(m):
-            return (m.channel == ctx.channel and m.author != self.bot.user)
+            return (m.channel == ctx.channel and m.author != ctx.bot.user)
             
         if not nom_cible:                   # Si cible pas précisée à l'appel de la commande
             await ctx.send(f"Pour qui veux-tu voter ? (vote actuel : {joueur._vote_maire})")
-            message = await self.bot.wait_for('message', check=trigCheck)
+            message = await tools.wait_for_message(ctx.bot, check=trigCheck)
             nom_cible = message.content
         while not (cible := Joueurs.query.filter_by(nom=nom_cible).one_or_none()):     # Tant que nom_cible n'est pas le nom d'un joueur
             await ctx.send(f"Cible {tools.code(nom_cible)} non trouvée : pour qui veux-tu voter ?")
-            message = await self.bot.wait_for('message', check=trigCheck)
+            message = await tools.wait_for_message(ctx.bot, check=trigCheck)
             nom_cible = message.content
             
         async with ctx.typing():
@@ -118,15 +114,15 @@ class VoterAgir(commands.Cog):
 
         # Choix de la cible
         def trigCheck(m):
-            return (m.channel == ctx.channel and m.author != self.bot.user)
+            return (m.channel == ctx.channel and m.author != ctx.bot.user)
             
         if not nom_cible:                   # Si cible pas précisée à l'appel de la commande
             await ctx.send(f"Qui veux-tu manger ? (vote actuel : {joueur._vote_loups})")
-            message = await self.bot.wait_for('message', check=trigCheck)
+            message = await tools.wait_for_message(ctx.bot, check=trigCheck)
             nom_cible = message.content
         while not (cible := Joueurs.query.filter_by(nom=nom_cible).one_or_none()):     # Tant que nom_cible n'est pas le nom d'un joueur
             await ctx.send(f"Cible {tools.code(nom_cible)} non trouvée : qui veux-tu manger ?")
-            message = await self.bot.wait_for('message', check=trigCheck)
+            message = await tools.wait_for_message(ctx.bot, check=trigCheck)
             nom_cible = message.content
             
         async with ctx.typing():
@@ -148,7 +144,7 @@ class VoterAgir(commands.Cog):
 
         # Détermine la/les actions en cours pour le joueur
         def trigCheck(m):
-            return (m.channel == ctx.channel and m.author != self.bot.user)
+            return (m.channel == ctx.channel and m.author != ctx.bot.user)
             
         actions = Actions.query.filter(Actions.player_id == joueur.discord_id, Actions._decision != None).all()
         if not actions:
@@ -159,7 +155,7 @@ class VoterAgir(commands.Cog):
             for i in range(N):
                 txt += f" {tools.emoji_chiffre(i+1)} - {actions[i].action}\n"
             message = await ctx.send(txt + "\nPour laquelle veux-tu agir ?")
-            i = await tools.choice(self.bot, message, N)
+            i = await tools.choice(ctx.bot, message, N)
             action = actions[i-1]
         else:
             action = actions[0]
@@ -167,7 +163,7 @@ class VoterAgir(commands.Cog):
         # Choix de la décision : très simple pour l'instant, car pas de résolution auto
         if not decision:                   # Si décision pas précisée à l'appel de la commande
             await ctx.send(f"Que veux-tu faire pour l'action {action.action} ? (action actuelle : {action._decision})")
-            message = await self.bot.wait_for('message', check=trigCheck)
+            message = await tools.wait_for_message(ctx.bot, check=trigCheck)
             decision = message.content
             
         # Avertissement si action a conséquence instantanée (barbier...)
@@ -175,7 +171,7 @@ class VoterAgir(commands.Cog):
             message = await ctx.send("Attention : cette action a une conséquence instantanée ! "
                                      "Si tu valides, tu ne pourras pas revenir en arrière.\n"
                                      "Ça part ?")
-            if not await tools.yes_no(self.bot, message):
+            if not await tools.yes_no(ctx.bot, message):
                 await ctx.send("Mission aborted.")
                 return
                 

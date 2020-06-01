@@ -27,7 +27,7 @@ async def main(bot, member):
 
     def checkChan(m): #Check que le message soit envoyé par l'utilisateur et dans son channel perso
         return m.channel == chan and m.author == member and not m.content.startswith(bot.command_prefix)
-    vraiNom = await bot.wait_for('message', check=checkChan)
+    vraiNom = await tools.wait_for_message(bot, check=checkChan)
 
     await chan.edit(name=f"conv-bot-{vraiNom.content}")       # Renommage conv
     if not tools.role(member,"MJ") in member.roles:
