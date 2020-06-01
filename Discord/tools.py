@@ -112,44 +112,45 @@ async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, pr
     if not isinstance(emojis, dict):        # Si emoji est une liste, on en fait un dictionnaire
         emojis = {emoji:emoji for emoji in emojis}
 
-    for emoji in emojis:                    # On ajoute les emojis
-        await message.add_reaction(emoji)
+    try:    # Si une erreur dans ce bloc, on supprime les emojis du bot (sinon c'est moche)
+        for emoji in emojis:                    # On ajoute les emojis
+            await message.add_reaction(emoji)
 
-    # 
-    emojis_names = [emoji.name if hasattr(emoji, "name") else emoji for emoji in emojis]
-    def react_check(react):                     # Check REACT : bon message, pas un autre emoji, et pas react du bot
-        return (react.message_id == message.id) and (react.emoji.name in emojis_names) and (react.user_id != bot.user.id)
-    react = asyncio.create_task(bot.wait_for('raw_reaction_add', check=react_check), name="react")
+        emojis_names = [emoji.name if hasattr(emoji, "name") else emoji for emoji in emojis]
+        def react_check(react):                     # Check REACT : bon message, pas un autre emoji, et pas react du bot
+            return (react.message_id == message.id) and (react.emoji.name in emojis_names) and (react.user_id != bot.user.id)
+        react = asyncio.create_task(bot.wait_for('raw_reaction_add', check=react_check), name="react")
 
-    if process_text:
-        def message_check(mess):                # Check MESSAGE : bon channel, pas du bot, et filtre (optionnel)
-            return (mess.channel == message.channel) and (mess.author != bot.user) and text_filter(mess.content)
-    else:       # On process DANS TOUS LES CAS, mais juste pour détecter "stop" si process_text == False
-        def message_check(mess):                # Check MESSAGE : bon channel, pas du bot, et filtre (optionnel)
-            return False
-    mess = asyncio.create_task(wait_for_message(bot, check=message_check), name="mess")
+        if process_text:
+            def message_check(mess):                # Check MESSAGE : bon channel, pas du bot, et filtre (optionnel)
+                return (mess.channel == message.channel) and (mess.author != bot.user) and text_filter(mess.content)
+        else:       # On process DANS TOUS LES CAS, mais juste pour détecter "stop" si process_text == False
+            def message_check(mess):                # Check MESSAGE : bon channel, pas du bot, et filtre (optionnel)
+                return False
+        mess = asyncio.create_task(wait_for_message(bot, check=message_check), name="mess")
 
-    try:
         done, pending = await asyncio.wait([react, mess], return_when=asyncio.FIRST_COMPLETED)      # On lance
-        done = list(done)[0]
-    except RuntimeError as exc:
-        await message.clear_reactions()
-        raise exc from RuntimeError
+        # Le bot attend ici qu'une des deux tâches aboutissent
+        done = list(done)[0]        # done = tâche réussie
 
-    if done.get_name() == "react":
-        ret = emojis[done.result().emoji.name]      # Si clic sur react, done.result = react
+        if done.get_name() == "react":
+            ret = emojis[done.result().emoji.name]      # Si clic sur react, done.result = react
 
-        for emoji in emojis:
-            await message.remove_reaction(emoji, bot.user)         # On finit par supprimer les emojis mis par le bot
+            for emoji in emojis:
+                await message.remove_reaction(emoji, bot.user)         # On finit par supprimer les emojis mis par le bot
 
-    else:
-        mess = done.result().content                # Si envoi de message, done.result = message
-        if post_converter:
-            ret = post_converter(mess)
-        else:
-            ret = mess
+        else:   # Réponse par message / STOP
+            mess = done.result().content                # Si envoi de message, done.result = message
+            if post_converter:
+                ret = post_converter(mess)
+            else:
+                ret = mess
 
         await message.clear_reactions()
+        
+    except Exception as exc:
+        await message.clear_reactions()
+        raise exc from Exception
 
     return ret
 
