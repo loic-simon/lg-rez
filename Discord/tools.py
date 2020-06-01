@@ -6,7 +6,9 @@ import discord.utils
 import discord.ext.commands
 
 from bdd_connect import db, Tables
-
+from blocs import bdd_tools
+import difflib
+import unidecode
 
 # Récupération rapide
 
@@ -62,7 +64,7 @@ def private(cmd):
         if not ctx.channel.name.startswith("conv-bot-"):        # Si pas déjà dans une conv bot :
         # if not member.has_role("MJ") and not ctx.channel.name.beginswith("conv-bot-"):
             await ctx.message.delete()                          # On supprime le message,
-            ctx.channel = private_chan(ctx, ctx.author)         # On remplace le chan dans le contexte d'appel par le chan privé,
+            ctx.channel = private_chan(ctx.author)         # On remplace le chan dans le contexte d'appel par le chan privé,
             await ctx.send(f"{quote(ctx.message.content)}\n"    # On envoie un warning dans le chan privé,
                            f"{ctx.author.mention} :warning: Cette commande est interdite en dehors de ta conv privée ! :warning:\n"
                            f"J'ai supprimé ton message, et j'exécute la commande ici :")
@@ -78,62 +80,62 @@ async def yes_no(bot, message):
     yes_words = ["oui", "o", "yes", "y", "1", "true"]
     yes_no_words = yes_words + ["non", "n", "no", "n", "0", "false"]
     return await wait_for_react_clic(
-        bot, message, emojis={"✅":True, "❎":False}, process_text=True, 
+        bot, message, emojis={"✅":True, "❎":False}, process_text=True,
         text_filter=lambda s:s.lower() in yes_no_words, post_converter=lambda s:s.lower() in yes_words)
 
 async def choice(bot, message, N):
     """Ajoute les reacts 1️⃣, 2️⃣, 3️⃣... [N] à message et renvoie le numéro cliqué OU détecté par réponse textuelle. (N <= 10)"""
     return await wait_for_react_clic(
-        bot, message, emojis={emoji_chiffre(i):i for i in range(1, N+1)}, process_text=True, 
+        bot, message, emojis={emoji_chiffre(i):i for i in range(1, N+1)}, process_text=True,
         text_filter=lambda s:s.isdigit() and 1 <= int(s) <= N, post_converter=int)
 
 
-async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, process_text=False, 
+async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, process_text=False,
                               text_filter=lambda s:True, post_converter=None):
     """Ajoute les reacts dans emojis à message, attend que quelqu'un appuie sur une, puis renvoie :
         - soit le nom de l'emoji si emoji est une liste ;
         - soit la valeur associée si emoji est un dictionnaire.
-        
+
     Si process_text=True, détecte aussi la réponse par message et retourne ledit message (défaut False).
     De plus, si text_filter (fonction str -> bool) est défini, ne réagit qu'aux messages pour lesquels text_filter(message) = True.
     De plus, si post_converter (fonction str -> ?) est défini, le message détecté est passé dans cette fonction avant d'être renvoyé."""
-        
+
     if not isinstance(emojis, dict):        # Si emoji est une liste, on en fait un dictionnaire
         emojis = {emoji:emoji for emoji in emojis}
-        
+
     for emoji in emojis:                    # On ajoute les emojis
         await message.add_reaction(emoji)
 
     tasks = []      # Tâches qu'on va exécuter en parallèle
-        
+
     emojis_names = [emoji.name if hasattr(emoji, "name") else emoji for emoji in emojis]
     def react_check(react):                 # Check REACT : bon message, pas un autre emoji, et pas react du bot
-        return (react.message_id == message.id) and (react.emoji.name in emojis_names) and (react.user_id != bot.user.id)        
+        return (react.message_id == message.id) and (react.emoji.name in emojis_names) and (react.user_id != bot.user.id)
     tasks.append(asyncio.create_task(bot.wait_for('raw_reaction_add', check=react_check), name="react"))
-    
+
     if process_text:
         def message_check(mess):                # Check MESSAGE : bon channel, pas du bot, et filtre (optionnel)
             return (mess.channel == message.channel) and (mess.author != bot.user) and text_filter(mess.content)
         tasks.append(asyncio.create_task(bot.wait_for('message', check=message_check), name="mess"))
-        
+
     done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)      # On lance
     done = list(done)[0]
-        
+
     if done.get_name() == "react":
         ret = emojis[done.result().emoji.name]      # Si clic sur react, done.result = react
-        
+
         for emoji in emojis:
             await message.remove_reaction(emoji, bot.user)         # On finit par supprimer les emojis mis par le bot
-            
+
     else:
         mess = done.result().content                # Si envoi de message, done.result = message
         if post_converter:
-            ret = post_converter(mess)              
+            ret = post_converter(mess)
         else:
             ret = mess
-            
+
         await message.clear_reactions()
-        
+
     return ret
 
 
@@ -141,16 +143,16 @@ async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, pr
 
 def montre(heure=None):
     """Renvoie l'emoji horloge correspondant à l'heure demandée (str "XXh" our "XXh30", actuelle si non précisée)"""
-    
+
     if heure and isinstance(heure, str):
         heure, minute = heure.split("h")
         heure = int(heure) % 12
         minute = int(minute) % 60 if minute else 0
     else:
         tps = datetime.datetime.now().time()
-        heure = tps.hour
+        heure = tps.hour%12
         minute = tps.minute
-        
+
     if 15 < minute < 45:        # Demi heure
         L = ["🕧", "🕜", "🕝", "🕞", "🕟", "🕠", "🕡", "🕢", "🕣", "🕤", "🕥", "🕦"]
     else:                       # Heure pile
@@ -193,6 +195,42 @@ async def boucleMessage(bot, chan, inMessage, conditionSortie, trigCheck=lambda 
         await chan.send(repMessage)
         rep = await bot.wait_for('message', check=trigCheck)
     return rep
+
+#Recherche du plus proche résultat dans une table
+async def find_nearest(chaine, table, sensi=0.25, **kwargs):
+
+    SM = difflib.SequenceMatcher()                      # Création du comparateur de chaînes
+    slug1 = unidecode.unidecode(chaine).lower()     # Cible en minuscule et sans accents
+    SM.set_seq1(slug1)                                  # Première chaîne à comparer : cible demandée
+
+    if not "filtre" in kwargs or not kwargs["filtre"]:
+        query = table.query.all()
+    else:
+        query = table.query.filter(kwargs["filtre"]).all()
+
+
+    scores = []
+    if not "carac" in kwargs or not kwargs["carac"]:
+        carac = bdd_tools.get_primary_col(table)
+    else:
+        carac = kwargs["carac"]
+
+    for entry in query:
+        slug2 = unidecode.unidecode(getattr(entry, carac)).lower()
+
+        SM.set_seq2(slug2)                              # Pour chaque joueur, on compare la cible à son nom (en non accentué)
+        score = SM.ratio()                              # On calcule la ressemblance
+        if score == 1:                                  # Cas particulier : joueur demandé correspondant exactement à un en BDD
+            return [entry]
+        scores.append((entry, score))
+
+    # Si pas de joueur correspondant parfaitement
+    bests = [entry for (entry,score) in sorted(scores, key=lambda x:x[1], reverse=True) if score>sensi]  # Meilleurs noms, dans l'ordre
+    return bests
+
+
+
+
 
 # Log dans #logs
 
