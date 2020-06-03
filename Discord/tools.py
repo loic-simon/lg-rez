@@ -217,17 +217,25 @@ async def boucleMessage(bot, chan, inMessage, conditionSortie, trigCheck=lambda 
         rep = await bot.wait_for('message', check=trigCheck)
     return rep
 
-async def boucle_query_joueur(ctx, in_message, table=Tables["Joueurs"]):
+async def boucle_query_joueur(ctx, cible = None, message = None, table=Tables["Joueurs"]):
     """Demande "in_message", puis attend que le joueur entre un nom de joueur, et boucle 5 fois au max (avant de l'insulter)
     pour chercher le plus proche joueurs dans la table Joueurs
     """
 
-    await ctx.send(in_message)
+    if message:
+        await ctx.send(message)
+        
     trigCheck=lambda m:m.channel == ctx.channel and m.author != ctx.bot.user
 
     for i in range(5):
-        rep = await ctx.bot.wait_for('message', check=trigCheck)
-        nearest = await bdd_tools.find_nearest(rep.content, table, carac="nom")
+
+        if cible :
+            rep = cible
+        else:
+            rep = await wait_for_message(ctx.bot, check=trigCheck)
+            rep = rep.content
+
+        nearest = await bdd_tools.find_nearest(rep, table, carac="nom")
 
 
         if not nearest:
