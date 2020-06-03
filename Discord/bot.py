@@ -44,12 +44,10 @@ async def already_in_command(ctx):
 @bot.before_invoke      # Appelé seulement si les checks sont OK, donc pas déjà dans bot.in_command
 async def add_to_in_command(ctx):
     ctx.bot.in_command.append(ctx.author.id)
-    await ctx.send("yousk-avant")
 
 @bot.after_invoke
 async def remove_from_in_command(ctx):
     ctx.bot.in_command.remove(ctx.author.id)
-    await ctx.send("yousk-après")
 
 
 # Trigger au démarrage du bot
@@ -131,11 +129,16 @@ async def do(ctx, *, txt):
 
 @bot.command()
 @commands.has_role("MJ")
-@commands.max_concurrency(1, per=commands.BucketType.user)
 async def co(ctx):
     """lance un test d'inscription comme si on se connectait au serv pour la première fois"""
     await inscription.main(bot, ctx.author)
 
+@bot.command()
+@commands.has_role("MJ")
+async def dropbot(ctx):
+    """Vide les listes de SuperBot"""
+    bot.in_command = []
+    bot.in_stfu = []
 
 # Trigger si erreur dans une commande
 @bot.event
