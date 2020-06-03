@@ -40,6 +40,8 @@ class GestionIA(commands.Cog):
 async def main(message):
     if 'lange' in message.content.lower():
         rep = "LE LANGE !!!!!"
+    elif message.content.lower() == "crash":
+        bonsoir
     elif message.content.lower() == "stop":     # Si on a quitté une commande. Laisser tel quel.
         return
     else:

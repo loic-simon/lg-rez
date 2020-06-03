@@ -75,12 +75,17 @@ def private(cmd):
 
 
 async def wait_for_message(bot, check):
-    message = await bot.wait_for('message', check=lambda m:check(m) or m.content.lower() == "stop")
-        # Quelque soit le check demandé, on réagit en cas de STOP
-    if message.content.lower() == "stop":
+    def trigCheck(m):
+        return ((check(m)                                               # Quelque soit le check demandé
+                 and not m.content.startswith(bot.command_prefix))      # on ne trigger pas sur les commandes
+                or m.content.lower() in ["stop", "!stop"])              # et on trigger en cas de STOP
+
+    message = await bot.wait_for('message', check=trigCheck)
+    if message.content.lower() in ["stop", "!stop"]:
         raise RuntimeError("Arrêt demandé")
     else:
         return message
+
 
 # Demande une réaction dans un choix (vrai/faux par défaut)
 
@@ -193,7 +198,8 @@ def checkRole(member,nom : str):
     role = role(user, nom)
     return role in member.roles
 
-#Permet de boucler question -> réponse tant que la réponse vérifie pas les critères nécessaires dans chan
+
+# Permet de boucler question -> réponse tant que la réponse vérifie pas les critères nécessaires dans chan
 async def boucleMessage(bot, chan, inMessage, conditionSortie, trigCheck=lambda m:m.channel == chan and m.author != bot.user, repMessage=None):
     """
     Permet de lancer une boucle question/réponse tant que la réponse ne vérifie pas conditionSortie
@@ -212,7 +218,8 @@ async def boucleMessage(bot, chan, inMessage, conditionSortie, trigCheck=lambda 
         rep = await bot.wait_for('message', check=trigCheck)
     return rep
 
-#Recherche du plus proche résultat dans une table
+
+# Recherche du plus proche résultat dans une table
 async def find_nearest(chaine, table, sensi=0.25, **kwargs):
 
     SM = difflib.SequenceMatcher()                      # Création du comparateur de chaînes
