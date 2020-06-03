@@ -27,7 +27,8 @@ class SuperBot(commands.Bot):
     def __init__(self, **kwargs):
         commands.Bot.__init__(self, **kwargs)
         self.in_command = []       # Joueurs actuellement dans une commande
-        
+        self.in_stfu = []
+
 bot = SuperBot(command_prefix=COMMAND_PREFIX, description="Bonjour")
 
 @bot.check
@@ -43,10 +44,12 @@ async def already_in_command(ctx):
 @bot.before_invoke      # Appelé seulement si les checks sont OK, donc pas déjà dans bot.in_command
 async def add_to_in_command(ctx):
     ctx.bot.in_command.append(ctx.author.id)
+    await ctx.send("yousk-avant")
 
 @bot.after_invoke
 async def remove_from_in_command(ctx):
     ctx.bot.in_command.remove(ctx.author.id)
+    await ctx.send("yousk-après")
 
 
 # Trigger au démarrage du bot
@@ -81,10 +84,11 @@ async def on_message(message):
         ctx = await bot.get_context(message)
         await bot.invoke(ctx)                   # On trigger toutes les commandes
 
-        if (not message.content.startswith(COMMAND_PREFIX)      # Si pas une commande 
+        if (not message.content.startswith(COMMAND_PREFIX)      # Si pas une commande
             and message.channel.name.startswith("conv-bot")     # et dans un channel de conversation bot
-            and message.author.id not in bot.in_command):       # et pas déjà dans une commande (vote...)
-            
+            and message.author.id not in bot.in_command         # et pas déjà dans une commande (vote...)
+            and message.channel.id not in bot.in_stfu):         # et le channel est mas en stfu_mode
+
             await IA.main(message)
 
     except Exception:
@@ -102,6 +106,7 @@ bot.add_cog(annexe.Annexe(bot))                     # Tests divers et inutiles
 bot.add_cog(sync.Sync(bot))                         # Synchronisation TDB (appel par webhook)
 bot.add_cog(open_close.OpenClose(bot))              # Ouverture/fermeture votes/actions (appel par webhook)
 bot.add_cog(remplissage_bdd.RemplissageBDD(bot))    # Drop et remplissage table de données
+bot.add_cog(IA.GestionIA(bot))
 
 # Commandes joueurs
 bot.add_cog(informations.Informations(bot))         # Information du joueur
@@ -120,7 +125,7 @@ async def do(ctx, *, txt):
     exec(f"a.rep = {txt}", globals(), locals())
     if asyncio.iscoroutine(a.rep):
         a.rep = await a.rep
-        
+
     await ctx.send(f"Entrée : {tools.code(txt)}\nSortie :\n{a.rep}")
 
 
