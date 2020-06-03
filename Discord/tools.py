@@ -7,8 +7,7 @@ import discord.ext.commands
 
 from bdd_connect import db, Tables
 from blocs import bdd_tools
-import difflib
-import unidecode
+
 
 # Récupération rapide
 
@@ -151,8 +150,8 @@ async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, pr
             else:
                 ret = mess
 
-        await message.clear_reactions()
-        
+                await message.clear_reactions()
+
     except Exception as exc:
         await message.clear_reactions()
         raise exc from Exception
@@ -218,42 +217,43 @@ async def boucleMessage(bot, chan, inMessage, conditionSortie, trigCheck=lambda 
         rep = await bot.wait_for('message', check=trigCheck)
     return rep
 
+async def boucle_query_joueur(ctx, in_message, table=Tables["Joueurs"]):
+    """Demande "in_message", puis attend que le joueur entre un nom de joueur, et boucle 5 fois au max (avant de l'insulter)
+    pour chercher le plus proche joueurs dans la table Joueurs
+    """
 
-# Recherche du plus proche résultat dans une table
-async def find_nearest(chaine, table, sensi=0.25, **kwargs):
+    await ctx.send(in_message)
+    trigCheck=lambda m:m.channel == ctx.channel and m.author != ctx.bot.user
 
-    SM = difflib.SequenceMatcher()                      # Création du comparateur de chaînes
-    slug1 = unidecode.unidecode(chaine).lower()     # Cible en minuscule et sans accents
-    SM.set_seq1(slug1)                                  # Première chaîne à comparer : cible demandée
-
-    if not "filtre" in kwargs or not kwargs["filtre"]:
-        query = table.query.all()
-    else:
-        query = table.query.filter(kwargs["filtre"]).all()
-
-
-    scores = []
-    if not "carac" in kwargs or not kwargs["carac"]:
-        carac = bdd_tools.get_primary_col(table)
-    else:
-        carac = kwargs["carac"]
-
-    for entry in query:
-        slug2 = unidecode.unidecode(getattr(entry, carac)).lower()
-
-        SM.set_seq2(slug2)                              # Pour chaque joueur, on compare la cible à son nom (en non accentué)
-        score = SM.ratio()                              # On calcule la ressemblance
-        if score == 1:                                  # Cas particulier : joueur demandé correspondant exactement à un en BDD
-            return [entry]
-        scores.append((entry, score))
-
-    # Si pas de joueur correspondant parfaitement
-    bests = [entry for (entry,score) in sorted(scores, key=lambda x:x[1], reverse=True) if score>sensi]  # Meilleurs noms, dans l'ordre
-    return bests
+    for i in range(5):
+        rep = await ctx.bot.wait_for('message', check=trigCheck)
+        nearest = await bdd_tools.find_nearest(rep.content, table, carac="nom")
 
 
+        if not nearest:
+            await ctx.send("Aucune entrée trouvée, merci de réessayer")
+            continue
 
+        elif nearest[0][1] == 1: #Si le score le plus haut est égal à 1...
+            return nearest[0][0] #...renvoyer l'entrée correspondante
 
+        elif len(nearest) == 1:
+            m = await ctx.send(f"Je n'ai trouvé qu'une correspondance :upside_down: : {nearest[0][0].nom} \n Ça part ?")
+            if await yes_no(ctx.bot, m):
+                return nearest[0][0]
+            else:
+                await ctx.send("Bon d'accord, alors tu votes contre qui ?")
+
+        else:
+            str = "Les joueurs les plus proches de ton entrée sont les suivants : \n"
+            for i,j in enumerate(nearest[:10]):
+                str += f"{i+1}. {j[0].nom} \n"
+            m = await ctx.send(str + "Tu peux les choisir en réagissant à ce message, ou en répondant au clavier.")
+
+            n = await choice(ctx.bot, m, len(nearest)) - 1
+            return nearest[n][0]
+
+    await ctx.send("Et puis non, tiens ! \n https://giphy.com/gifs/fuck-you-middle-finger-ryan-stiles-x1kS7NRIcIigU")
 
 # Log dans #logs
 
