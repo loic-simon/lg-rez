@@ -7,6 +7,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
+import blocs
 import tools
 from bdd_connect import db, Tables
 from features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd
@@ -127,8 +128,16 @@ class Special(commands.Cog):
     @commands.command()
     @commands.has_role("MJ")
     async def doas(self, ctx, *, txt):
-        qui, quoi = txt.split('!', maxsplit=1)
-        qui = tools.find_nearest(qui.strip(), Tables["Joueurs"])
+        """Exécute une commande en tant qu'un autre joueur"""
+        qui, quoi = txt.split(" " + ctx.bot.command_prefix, maxsplit=1)      # !doas <@!id> !vote R ==> qui = "<@!id>", quoi = "vote R"
+        joueur = await tools.boucle_query_joueur(ctx, qui.strip() or None, Tables["Joueurs"])
+        
+        ctx.message.content = ctx.bot.command_prefix + quoi
+        ctx.message.author = ctx.guild.get_member(joueur.discord_id)
+        
+        ctx.send(f":robot: Exécution en tant que {joueur.nom}:")
+        ctx = await bot.get_context(ctx.message)
+        await ctx.bot.invoke(ctx)
 
     @commands.command()
     @tools.private

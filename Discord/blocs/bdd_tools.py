@@ -59,23 +59,29 @@ def get_SQL_nullable(table):               # Renvoie un dictionnaire {colonne: a
 
 
 # Recherche du plus proche résultat dans une table
-async def find_nearest(chaine, table, sensi=0.25, **kwargs):
+async def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None):
+    """Renvoie le/les éléments de <table> correspondant le mieux à <chaine> (selon la colonne <carac>, défaut : colonne primaire de la table), répondant à <filtre> (défaut : tous) sous forme de liste de tuples (element, score*) triés par score* décroissant, en se limitant aux scores* supérieurs à <sensi>. 
+    
+    Si <chaine> contient l'ID (numérique) d'un élément de <table>, celui-ci est directement renvoyé (quelques soient <filtre> et <carac>).
+    
+    *Score = ratio de difflib.SequenceMatcher, i.e. proportion de caractères communs aux deux chaînes"""
+
+    if id := ''.join([c for c in chaine if c.isdigit()]):   # Si la chaîne contient un nombre, on l'extrait
+        if user := table.query.get(int(id)):            # Si cet ID correspond à un utilisateur, on le récupère
+            return [(user, 1)]                          # On a trouvé l'utilisateur !
 
     SM = difflib.SequenceMatcher()                      # Création du comparateur de chaînes
-    slug1 = unidecode.unidecode(chaine).lower()     # Cible en minuscule et sans accents
+    slug1 = unidecode.unidecode(chaine).lower()         # Cible en minuscule et sans accents
     SM.set_seq1(slug1)                                  # Première chaîne à comparer : cible demandée
 
-    if not "filtre" in kwargs or not kwargs["filtre"]:
+    if not filtre:
         query = table.query.all()
     else:
-        query = table.query.filter(kwargs["filtre"]).all()
-
+        query = table.query.filter(filtre).all()
 
     scores = []
-    if not "carac" in kwargs or not kwargs["carac"]:
-        carac = bdd_tools.get_primary_col(table)
-    else:
-        carac = kwargs["carac"]
+    if not carac:
+        carac = get_primary_col(table)
 
     for entry in query:
         slug2 = unidecode.unidecode(getattr(entry, carac)).lower()
@@ -83,9 +89,9 @@ async def find_nearest(chaine, table, sensi=0.25, **kwargs):
         SM.set_seq2(slug2)                              # Pour chaque joueur, on compare la cible à son nom (en non accentué)
         score = SM.ratio()                              # On calcule la ressemblance
         if score == 1:                                  # Cas particulier : joueur demandé correspondant exactement à un en BDD
-            return [(entry,score)]
+            return [(entry, score)]
         scores.append((entry, score))
 
     # Si pas de joueur correspondant parfaitement
-    bests = [(entry,score) for (entry,score) in sorted(scores, key=lambda x:x[1], reverse=True) if score>sensi]  # Meilleurs noms, dans l'ordre
+    bests = [(entry, score) for (entry, score) in sorted(scores, key=lambda x:x[1], reverse=True) if score > sensi]  # Meilleurs noms, dans l'ordre
     return bests

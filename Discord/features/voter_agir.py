@@ -37,23 +37,16 @@ class VoterAgir(commands.Cog):
             return
 
         # Choix de la cible
-        def trigCheck(m):
-            return (m.channel == ctx.channel and m.author != ctx.bot.user)
-            
-        if not nom_cible:                   # Si cible pas précisée à l'appel de la commande
-            await ctx.send(f"Contre qui veux-tu voter ? (vote actuel : {joueur._vote_condamne})")
-            message = await tools.wait_for_message(ctx.bot, check=trigCheck)
-            nom_cible = message.content
-        while not (cible := Joueurs.query.filter_by(nom=nom_cible).one_or_none()):    # Tant que nom_cible n'est pas le nom d'un joueur
-            await ctx.send(f"Cible {tools.code(nom_cible)} non trouvée : contre qui veux-tu voter ?")
-            message = await tools.wait_for_message(ctx.bot, check=trigCheck)
-            nom_cible = message.content
+        cible = await tools.boucle_query_joueur(ctx, cible=nom_cible,
+                                                message=f"Contre qui veux-tu voter ? (vote actuel : {joueur._vote_condamne})")
             
         async with ctx.typing():
-            bdd_tools.modif(joueur, "_vote_condamne", cible.nom)       # Modification en base
+            # Modification en base
+            bdd_tools.modif(joueur, "_vote_condamne", cible.nom)       
             db.session.commit()
             
-            sheet = gsheets.connect(VOTECOND_SHEET_ID).sheet1                   # Écriture dans sheet Données brutes
+            # Écriture dans sheet Données brutes
+            sheet = gsheets.connect(VOTECOND_SHEET_ID).sheet1
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur._vote_condamne], value_input_option="USER_ENTERED")
             
         await ctx.send(f"Votre contre {tools.code(cible.nom)} bien pris en compte.")
@@ -75,23 +68,16 @@ class VoterAgir(commands.Cog):
             return
 
         # Choix de la cible
-        def trigCheck(m):
-            return (m.channel == ctx.channel and m.author != ctx.bot.user)
-            
-        if not nom_cible:                   # Si cible pas précisée à l'appel de la commande
-            await ctx.send(f"Pour qui veux-tu voter ? (vote actuel : {joueur._vote_maire})")
-            message = await tools.wait_for_message(ctx.bot, check=trigCheck)
-            nom_cible = message.content
-        while not (cible := Joueurs.query.filter_by(nom=nom_cible).one_or_none()):     # Tant que nom_cible n'est pas le nom d'un joueur
-            await ctx.send(f"Cible {tools.code(nom_cible)} non trouvée : pour qui veux-tu voter ?")
-            message = await tools.wait_for_message(ctx.bot, check=trigCheck)
-            nom_cible = message.content
+        cible = await tools.boucle_query_joueur(ctx, cible=nom_cible,
+                                                message=f"Pour qui veux-tu voter ? (vote actuel : {joueur._vote_maire})")
             
         async with ctx.typing():
-            bdd_tools.modif(joueur, "_vote_maire", cible.nom)       # Modification en base
+            # Modification en base
+            bdd_tools.modif(joueur, "_vote_maire", cible.nom)
             db.session.commit()
             
-            sheet = gsheets.connect(VOTEMAIRE_SHEET_ID).sheet1                   # Écriture dans sheet Données brutes
+            # Écriture dans sheet Données brutes
+            sheet = gsheets.connect(VOTEMAIRE_SHEET_ID).sheet1
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur._vote_maire], value_input_option="USER_ENTERED")
             
         await ctx.send(f"Votre pour {tools.code(cible.nom)} bien pris en compte.")
@@ -113,23 +99,16 @@ class VoterAgir(commands.Cog):
             return
 
         # Choix de la cible
-        def trigCheck(m):
-            return (m.channel == ctx.channel and m.author != ctx.bot.user)
-            
-        if not nom_cible:                   # Si cible pas précisée à l'appel de la commande
-            await ctx.send(f"Qui veux-tu manger ? (vote actuel : {joueur._vote_loups})")
-            message = await tools.wait_for_message(ctx.bot, check=trigCheck)
-            nom_cible = message.content
-        while not (cible := Joueurs.query.filter_by(nom=nom_cible).one_or_none()):     # Tant que nom_cible n'est pas le nom d'un joueur
-            await ctx.send(f"Cible {tools.code(nom_cible)} non trouvée : qui veux-tu manger ?")
-            message = await tools.wait_for_message(ctx.bot, check=trigCheck)
-            nom_cible = message.content
+        cible = await tools.boucle_query_joueur(ctx, cible=nom_cible,
+                                                message=f"Qui veux-tu manger ? (vote actuel : {joueur._vote_loups})")
             
         async with ctx.typing():
-            bdd_tools.modif(joueur, "_vote_loups", cible.nom)       # Modification en base
+            # Modification en base
+            bdd_tools.modif(joueur, "_vote_loups", cible.nom)
             db.session.commit()
             
-            sheet = gsheets.connect(VOTELOUPS_SHEET_ID).sheet1                   # Écriture dans sheet Données brutes
+            # Écriture dans sheet Données brutes
+            sheet = gsheets.connect(VOTELOUPS_SHEET_ID).sheet1
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.camp, joueur._vote_loups], value_input_option="USER_ENTERED")
             
         await ctx.send(f"Votre contre {tools.code(cible.nom)} bien pris en compte.")
@@ -176,15 +155,18 @@ class VoterAgir(commands.Cog):
                 return
                 
         async with ctx.typing():
-            bdd_tools.modif(action, "_decision", decision)       # Modification en base
+            # Modification en base
+            bdd_tools.modif(action, "_decision", decision)
             
-            sheet = gsheets.connect(ACTIONS_SHEET_ID).sheet1                   # Écriture dans sheet Données brutes
+            # Écriture dans sheet Données brutes
+            sheet = gsheets.connect(ACTIONS_SHEET_ID).sheet1
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.role, joueur.camp, 
                               "\n+\n".join([f"{action.action} : {action._decision}" for action in actions])],
                              value_input_option="USER_ENTERED")
                              
             await ctx.send(f"Action « {action._decision} » bien prise en compte pour {action.action}.")
             
+            # Conséquences si action instantanée
             if action.instant:
                 deleted = False
                 if action.charges:

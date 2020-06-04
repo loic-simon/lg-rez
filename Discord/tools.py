@@ -145,13 +145,9 @@ async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, pr
 
         else:   # Réponse par message / STOP
             mess = done.result().content                # Si envoi de message, done.result = message
-            if post_converter:
-                ret = post_converter(mess)
-            else:
-                ret = mess
-
-                await message.clear_reactions()
-
+            ret = post_converter(mess) if post_converter else mess
+            await message.clear_reactions()
+            
     except Exception as exc:
         await message.clear_reactions()
         raise exc from Exception
@@ -217,51 +213,49 @@ async def boucleMessage(bot, chan, inMessage, conditionSortie, trigCheck=lambda 
         rep = await bot.wait_for('message', check=trigCheck)
     return rep
 
-async def boucle_query_joueur(ctx, cible = None, message = None, table=Tables["Joueurs"]):
+async def boucle_query_joueur(ctx, cible=None, message=None, table=Tables["Joueurs"]):
     """Demande "in_message", puis attend que le joueur entre un nom de joueur, et boucle 5 fois au max (avant de l'insulter)
     pour chercher le plus proche joueurs dans la table Joueurs
     """
 
-    if message:
+    if message and not cible:
         await ctx.send(message)
         
-    trigCheck=lambda m:m.channel == ctx.channel and m.author != ctx.bot.user
+    trigCheck = lambda m:m.channel == ctx.channel and m.author != ctx.bot.user
 
     for i in range(5):
-
-        if cible :
+        if i == 0 and cible:            # Au premier tour, si on a donné une cible
             rep = cible
         else:
-            rep = await wait_for_message(ctx.bot, check=trigCheck)
-            rep = rep.content
+            mess = await wait_for_message(ctx.bot, check=trigCheck)
+            rep = mess.content
 
         nearest = await bdd_tools.find_nearest(rep, table, carac="nom")
 
-
         if not nearest:
             await ctx.send("Aucune entrée trouvée, merci de réessayer")
-            continue
 
-        elif nearest[0][1] == 1: #Si le score le plus haut est égal à 1...
-            return nearest[0][0] #...renvoyer l'entrée correspondante
+        elif nearest[0][1] == 1:        # Si le score le plus haut est égal à 1...
+            return nearest[0][0]        # ...renvoyer l'entrée correspondante
 
         elif len(nearest) == 1:
-            m = await ctx.send(f"Je n'ai trouvé qu'une correspondance :upside_down: : {nearest[0][0].nom} \n Ça part ?")
+            m = await ctx.send(f"Je n'ai trouvé qu'une correspondance : {nearest[0][0].nom}\nÇa part ?")
             if await yes_no(ctx.bot, m):
                 return nearest[0][0]
             else:
                 await ctx.send("Bon d'accord, alors tu votes contre qui ?")
 
         else:
-            str = "Les joueurs les plus proches de ton entrée sont les suivants : \n"
-            for i,j in enumerate(nearest[:10]):
-                str += f"{i+1}. {j[0].nom} \n"
-            m = await ctx.send(str + "Tu peux les choisir en réagissant à ce message, ou en répondant au clavier.")
-
-            n = await choice(ctx.bot, m, len(nearest)) - 1
-            return nearest[n][0]
+            s = "Les joueurs les plus proches de ton entrée sont les suivants : \n"
+            for i, j in enumerate(nearest[:10]):
+                s += f"{emoji_chiffre(i+1)}. {j[0].nom} \n"
+            m = await ctx.send(s + "Tu peux les choisir en réagissant à ce message, ou en répondant au clavier.")
+            n = await choice(ctx.bot, m, min(10, len(nearest)))
+            return nearest[n-1][0]
 
     await ctx.send("Et puis non, tiens ! \n https://giphy.com/gifs/fuck-you-middle-finger-ryan-stiles-x1kS7NRIcIigU")
+    raise RuntimeError("Le joueur est trop con, je peux rien faire")
+
 
 # Log dans #logs
 
