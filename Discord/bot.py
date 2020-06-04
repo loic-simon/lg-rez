@@ -87,7 +87,6 @@ async def on_message(message):
         await IA.main(message)
 
 
-
 # Trigger à chaque réaction ajoutée
 @bot.event
 async def on_raw_reaction_add(payload):
@@ -113,15 +112,6 @@ async def on_raw_reaction_add(payload):
         await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour la victime des loups :")}""")
         await bot.invoke(ctx)       # On trigger !vote
         
-
-
-# Trigger à chaque réaction ajoutée
-@bot.event
-async def on_reaction_add(reaction, user):
-    await reaction.message.send(f"{reaction.emoji}")
-
-
-
 
 # Commandes définies dans les fichiers annexes !
 #   (un cog par fichier dans features, sauf IA.py)
