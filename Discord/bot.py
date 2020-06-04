@@ -26,8 +26,8 @@ COMMAND_PREFIX = "!"
 class SuperBot(commands.Bot):
     def __init__(self, **kwargs):
         commands.Bot.__init__(self, **kwargs)
-        self.in_command = []       # Joueurs actuellement dans une commande
-        self.in_stfu = []
+        self.in_command = []        # IDs des joueurs dans une commande
+        self.in_stfu = []           # IDs des salons en mode STFU (IA off)
 
 bot = SuperBot(command_prefix=COMMAND_PREFIX, description="Bonjour")
 
@@ -85,7 +85,42 @@ async def on_message(message):
         and message.channel.id not in bot.in_stfu):         # et le channel est pas en stfu_mode
 
         await IA.main(message)
+
+
+
+# Trigger à chaque réaction ajoutée
+@bot.event
+async def on_raw_reaction_add(payload):
+    reactor = payload.member
+    if reactor == bot.user:          # Sécurité pour éviter les boucles infinies
+        return
+
+    if payload.emoji == tools.emoji(reactor, "volatron"):
+        await reactor.guild.get_channel(payload.channel_id).send(f"{reactor.mention}, GET VOLATRONED !!!")
         
+    elif payload.emoji == tools.emoji(reactor, "bucher"):
+        ctx = await tools.create_context(bot, payload.message_id, reactor, "!vote")
+        await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le condamné du jour :")}""")
+        await bot.invoke(ctx)       # On trigger !vote
+        
+    elif payload.emoji == tools.emoji(reactor, "maire"):
+        ctx = await tools.create_context(bot, payload.message_id, reactor, "!votemaire")
+        await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le nouveau maire :")}""")
+        await bot.invoke(ctx)       # On trigger !vote
+        
+    elif payload.emoji == tools.emoji(reactor, "lune"):
+        ctx = await tools.create_context(bot, payload.message_id, reactor, "!voteloups")
+        await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour la victime des loups :")}""")
+        await bot.invoke(ctx)       # On trigger !vote
+        
+
+
+# Trigger à chaque réaction ajoutée
+@bot.event
+async def on_reaction_add(reaction, user):
+    await reaction.message.send(f"{reaction.emoji}")
+
+
 
 
 # Commandes définies dans les fichiers annexes !

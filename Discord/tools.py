@@ -19,7 +19,7 @@ def channel(arg, nom):      # Renvoie le channel #nom. arg peut être de type Co
     elif hasattr(arg, "guild"):
         return get(arg.guild.channels, name=nom)
     else:
-        return TypeError("tools.channel : Impossible de remonter aux channels depuis l'argument trasmis")
+        raise TypeError("tools.channel : Impossible de remonter aux channels depuis l'argument trasmis")
 
 def role(arg, nom):         # Renvoie le rôle nom. arg peut être de type Context, Guild, User/Member, Channel
     if hasattr(arg, "banner"):     # méthode immonde pour détécter si c'est une Guild
@@ -27,7 +27,7 @@ def role(arg, nom):         # Renvoie le rôle nom. arg peut être de type Conte
     elif hasattr(arg, "guild"):
         return get(arg.guild.roles, name=nom)
     else:
-        return TypeError("tools.role : Impossible de remonter aux rôles depuis l'argument trasmis")
+        raise TypeError("tools.role : Impossible de remonter aux rôles depuis l'argument trasmis")
 
 def member(arg, nom):       # Renvoie le membre @member. arg peut être de type Context, Guild, User/Member, Channel
     if hasattr(arg, "banner"):     # méthode immonde pour détécter si c'est une Guild
@@ -35,7 +35,7 @@ def member(arg, nom):       # Renvoie le membre @member. arg peut être de type 
     elif hasattr(arg, "guild"):
         return get(arg.guild.members, display_name=nom)
     else:
-        return TypeError("tools.member : Impossible de remonter aux membres depuis l'argument trasmis")
+        raise TypeError("tools.member : Impossible de remonter aux membres depuis l'argument trasmis")
 
 def emoji(arg, nom):        # Renvoie l'emoji :nom:. arg peut être de type Context, Guild, User/Member, Channel
     if hasattr(arg, "banner"):     # méthode immonde pour détécter si c'est une Guild
@@ -43,7 +43,7 @@ def emoji(arg, nom):        # Renvoie l'emoji :nom:. arg peut être de type Cont
     elif hasattr(arg, "guild"):
         return get(arg.guild.emojis, name=nom)
     else:
-        return TypeError("tools.member : Impossible de remonter aux emojis depuis l'argument trasmis")
+        raise TypeError("tools.member : Impossible de remonter aux emojis depuis l'argument trasmis")
 
 
 # Renvoie le channel privé d'un utilisateur.
@@ -51,6 +51,17 @@ def emoji(arg, nom):        # Renvoie l'emoji :nom:. arg peut être de type Cont
 def private_chan(member):
     chan_id = Tables["Joueurs"].query.get(member.id)._chan_id
     return member.guild.get_channel(chan_id)
+
+
+# Crée un contexte à partir d'un message_id : simule que <user> a envoyé <content> dans son chan privé
+
+async def create_context(bot, message_id, user, content):
+    chan = private_chan(user)
+    message = (await chan.history(limit=1).flatten())[0]        # On a besoin de récupérer un message, ici le dernier de la conv privée
+    # message = await chan.fetch_message(message_id)      
+    message.author = user
+    message.content = content
+    return await bot.get_context(message)
 
 
 # DÉCORATEUR : supprime le message et exécute la commande dans la conv privée si elle a été appellée ailleurs
@@ -259,8 +270,32 @@ async def boucle_query_joueur(ctx, cible=None, message=None, table=Tables["Joueu
 
 # Log dans #logs
 
+def smooth_split(mess :str, N=2000, sep='\n'):
+    """Sépare <mess> en une liste de messages de moins de <N>=2000 mots (limitation Discord), en séparant aux <sep>=sauts de ligne si possible."""
+    
+    LM = []             # Liste des messages
+    psl = 0             # indice du Précédent Saut de Ligne
+    L = len(mess)
+    while psl + N < L:
+        if mess.count(sep, psl, psl+N+1):       # +1 parce que si sep est à la fin, on le dégage
+            i = psl + N - mess[psl:psl+N+1][::-1].find(sep)      # un peu sombre mais vrai, tkt frère
+            LM.append(mess[psl:i])
+            psl = i + 1     # on élimine le \n
+        else:
+            LM.append(mess[psl:psl + N])
+            psl += N
+            
+    if psl < L:
+        LM.append(mess[psl:])   # ce qui reste
+    return LM
+    
+
+
 async def log(arg, message):
-    await channel(arg, "logs").send(message)
+    """Envoie <message> dans le channel #logs. <arg> peut être de type Context, Guild, User/Member, Channel"""
+    logchan = channel(arg, "logs")
+    for mess in smooth_split(message):
+        await logchan.send(mess)
 
 
 # Formattage de texte dans Discord
