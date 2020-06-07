@@ -2,6 +2,7 @@ import os
 import asyncio
 import logging
 import traceback
+import datetime
 
 import discord
 from discord.ext import commands
@@ -58,10 +59,10 @@ async def on_ready():
     print(f"{bot.user} has connected to Discord!")
     guild = bot.get_guild(GUILD_ID)
     print(f"{bot.user} connecté au serveur « {guild.name} » (id : {guild.id})\n")
-    members = "\n - ".join([member.name for member in guild.members])
-    print(f"Guild Members:\n - {members}")
-    channels = "\n - ".join([channel.name for channel in guild.channels if isinstance(channel, discord.TextChannel)])
-    print(f"\nChannels:\n - {channels}\n")
+    print(f"Guild Members:\n - " + "\n - ".join([member.name for member in guild.members]))
+    print(f"\nChannels:\n - " + "\n - ".join([channel.name for channel in guild.text_channels]))
+    
+    await tools.log(guild, "Juste rebooted!")
 
 
 # Trigger à l'arrivée d'un membre sur le serveur, crée un channel à son nom
@@ -84,14 +85,14 @@ async def on_message(message):
         and message.author.id not in bot.in_command         # et pas déjà dans une commande (vote...)
         and message.channel.id not in bot.in_stfu):         # et le channel est pas en stfu_mode
 
-        await IA.main(message)
+        await IA.main(ctx)
 
 
 # Trigger à chaque réaction ajoutée
 @bot.event
 async def on_raw_reaction_add(payload):
     reactor = payload.member
-    if reactor == bot.user:          # Sécurité pour éviter les boucles infinies
+    if reactor == bot.user or reactor.id in bot.in_command:         # Boucles infinies + gens dans une commande
         return
 
     if payload.emoji == tools.emoji(reactor, "volatron"):
@@ -159,10 +160,40 @@ class Special(commands.Cog):
         
         ctx.message.content = ctx.bot.command_prefix + quoi
         ctx.message.author = ctx.guild.get_member(joueur.discord_id)
+        ctx = await bot.get_context(ctx.message)
         
         ctx.send(f":robot: Exécution en tant que {joueur.nom}:")
-        ctx = await bot.get_context(ctx.message)
         await ctx.bot.invoke(ctx)
+        
+        
+    @commands.command()
+    @commands.has_role("MJ")
+    async def doin(self, ctx, *, txt):
+        """Exécute une commande après x secondes"""
+        apres, quoi = txt.split(" ", maxsplit=1)      # !doin 15 !vote R ==> apres = "15", quoi = "!vote R"
+        
+        await asyncio.sleep(float(apres))
+        ctx.message.content = quoi
+        ctx = await bot.get_context(ctx.message)
+        
+        await remove_from_in_command(ctx)       # Bypass la limitation de 1 commande à la fois
+        await ctx.bot.invoke(ctx)
+        await add_to_in_command(ctx)
+        
+        
+    @commands.command(alisases=["autodestruct", "ad"])
+    @commands.has_role("MJ")
+    async def secret(self, ctx, *, quoi):
+        """Supprime le message puis exécute la commande"""
+        await ctx.message.delete()
+        
+        ctx.message.content = quoi
+        ctx = await bot.get_context(ctx.message)
+        
+        await remove_from_in_command(ctx)       # Bypass la limitation de 1 commande à la fois
+        await ctx.bot.invoke(ctx)
+        await add_to_in_command(ctx)
+
 
     @commands.command()
     @tools.private

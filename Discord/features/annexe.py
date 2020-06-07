@@ -1,11 +1,43 @@
+import random
+import traceback
+
 from discord.ext import commands
+
 import tools
 from bdd_connect import db, Joueurs
-import traceback
 
 
 class Annexe(commands.Cog):
     """Annexe : commandes annexes aux usages divers"""
+
+    @commands.command()
+    async def roll(self, ctx, *, arg):
+        dices = arg.replace(' ','').replace('-','+-').split('+')        # "1d6 + 5 - 2" -> ["1d6", "5", "-2"]
+        r = ""
+        s = 0
+        try:
+            for dice in dices:
+                if 'd' in dice:
+                    nb, faces = dice.split('d', maxsplit=1)
+                    for i in range(int(nb)):
+                        v = random.randrange(int(faces)) + 1 
+                        s += v
+                        r += f" + {v}₍{tools.sub_chiffre(int(faces), True)}₎"
+                else:
+                    v = int(dice)
+                    s += v
+                    r += f" {'-' if v < 0 else '+'} {abs(v)}"
+            r += f" = {tools.emoji_chiffre(s, True)}"
+        except Exception:
+            await ctx.send(tools.code("!role") + " : pattern non reconu"+traceback.format_exc())
+        else:
+            await ctx.send(r[3:])
+            
+
+    @commands.command(aliases=["cf", "pf"])
+    async def coinflip(self, ctx):
+        await ctx.send(random.choice(["Pile", "Face"]))
+
 
     @commands.command()
     @commands.has_role("MJ")

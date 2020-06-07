@@ -179,11 +179,35 @@ class BaseActionsRoles(db.Model):
         self.action = action
 
 
+class Triggers(db.Model):
+    """Table Triggers : mots et expressions déclenchant l'IA"""
+    id = db.Column(db.Integer(), primary_key=True)
+    trigger = db.Column(db.String(500), nullable=False)
+    reac_id = db.Column(db.Integer(), nullable=False)
+    
+    def __init__(self, *, id=None, trigger, reac_id):
+        self.id = id                # Si None : auto-incrément
+        self.trigger = trigger
+        self.reac_id = reac_id
+
+
+class Reactions(db.Model):
+    """Table Reactions : réactions de l'IA"""
+    id = db.Column(db.Integer(), primary_key=True)
+    reponse = db.Column(db.String(500), nullable=False)     # Réponse, dans le format personnalisé : "txt <||> txt <&&> <##>react"
+    
+    def __init__(self, *, id=None, reponse=None):
+        self.id = id                # Si None : auto-incrément
+        self.reponse = reponse
+
+
 Tables = {"Joueurs":Joueurs,
           "Roles":Roles,
           "BaseActions":BaseActions,
           "Actions":Actions,
           "BaseActionsRoles": BaseActionsRoles,
+          "Triggers": Triggers,
+          "Reactions": Reactions,
           }
 
 db.create_all()

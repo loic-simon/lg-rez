@@ -114,15 +114,17 @@ async def choice(bot, message, N):
         text_filter=lambda s:s.isdigit() and 1 <= int(s) <= N, post_converter=int)
 
 
-async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, process_text=False,
-                              text_filter=lambda s:True, post_converter=None):
+async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
+                              text_filter=lambda s:True, post_converter=None, trigger_all_reacts=False):
     """Ajoute les reacts dans emojis à message, attend que quelqu'un appuie sur une, puis renvoie :
         - soit le nom de l'emoji si emoji est une liste ;
         - soit la valeur associée si emoji est un dictionnaire.
 
-    Si process_text=True, détecte aussi la réponse par message et retourne ledit message (défaut False).
+    Si process_text == True, détecte aussi la réponse par message et retourne ledit message (défaut False).
     De plus, si text_filter (fonction str -> bool) est défini, ne réagit qu'aux messages pour lesquels text_filter(message) = True.
-    De plus, si post_converter (fonction str -> ?) est défini, le message détecté est passé dans cette fonction avant d'être renvoyé."""
+    De plus, si post_converter (fonction str -> ?) est défini, le message détecté est passé dans cette fonction avant d'être renvoyé.
+    
+    Si trigger_all_reacts == True, détecte l'ajout des toutes les réactions (et pas seulement celles dans emojis) et renvoie, si l'emoji directement si il n'est pas dans emojis (défaut False)."""
 
     if not isinstance(emojis, dict):        # Si emoji est une liste, on en fait un dictionnaire
         emojis = {emoji:emoji for emoji in emojis}
@@ -133,29 +135,39 @@ async def wait_for_react_clic(bot, message, emojis={"✅":True, "❎":False}, pr
 
         emojis_names = [emoji.name if hasattr(emoji, "name") else emoji for emoji in emojis]
         def react_check(react):                     # Check REACT : bon message, pas un autre emoji, et pas react du bot
-            return (react.message_id == message.id) and (react.emoji.name in emojis_names) and (react.user_id != bot.user.id)
-        react = asyncio.create_task(bot.wait_for('raw_reaction_add', check=react_check), name="react")
+            return (react.message_id == message.id
+                    and react.user_id != bot.user.id
+                    and (trigger_all_reacts or react.emoji.name in emojis_names))
+                    
+        react_task = asyncio.create_task(bot.wait_for('raw_reaction_add', check=react_check), name="react")
 
         if process_text:
-            def message_check(mess):                # Check MESSAGE : bon channel, pas du bot, et filtre (optionnel)
-                return (mess.channel == message.channel) and (mess.author != bot.user) and text_filter(mess.content)
-        else:       # On process DANS TOUS LES CAS, mais juste pour détecter "stop" si process_text == False
-            def message_check(mess):                # Check MESSAGE : bon channel, pas du bot, et filtre (optionnel)
+            def message_check(mess):        # Check MESSAGE : bon channel, pas du bot, et filtre
+                return (mess.channel == message.channel 
+                        and mess.author != bot.user
+                        and text_filter(mess.content))
+        else:
+            def message_check(mess):        # On process DANS TOUS LES CAS, mais juste pour détecter "stop" si process_text == False
                 return False
-        mess = asyncio.create_task(wait_for_message(bot, check=message_check), name="mess")
+                
+        mess_task = asyncio.create_task(wait_for_message(bot, check=message_check), name="mess")
 
-        done, pending = await asyncio.wait([react, mess], return_when=asyncio.FIRST_COMPLETED)      # On lance
+        done, pending = await asyncio.wait([react_task, mess_task], return_when=asyncio.FIRST_COMPLETED)      # On lance
         # Le bot attend ici qu'une des deux tâches aboutissent
-        done = list(done)[0]        # done = tâche réussie
+        done_task = list(done)[0]        # done = tâche réussie
 
-        if done.get_name() == "react":
-            ret = emojis[done.result().emoji.name]      # Si clic sur react, done.result = react
+        if done_task.get_name() == "react":
+            emoji = done_task.result().emoji
+            if trigger_all_reacts and emoji.name not in emojis_names:
+                ret = emoji
+            else:
+                ret = emojis[emoji.name]                            # Si clic sur react, done.result = react
 
             for emoji in emojis:
-                await message.remove_reaction(emoji, bot.user)         # On finit par supprimer les emojis mis par le bot
+                await message.remove_reaction(emoji, bot.user)      # On finit par supprimer les emojis mis par le bot
 
         else:   # Réponse par message / STOP
-            mess = done.result().content                # Si envoi de message, done.result = message
+            mess = done_task.result().content                # Si envoi de message, done.result = message
             ret = post_converter(mess) if post_converter else mess
             await message.clear_reactions()
             
@@ -187,11 +199,29 @@ def montre(heure=None):
     return L[heure] if minute < 45 else L[(heure + 1) % 12]
 
 
-def emoji_chiffre(chiffre :int):
+def emoji_chiffre(chiffre :int, multi=False):
     if 0 <= chiffre <= 10:
         return ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"][chiffre]
+    elif multi:
+        return ''.join([emoji_chiffre(int(c)) for c in str(chiffre)])
     else:
-        raise ValueError("L'argument de emoji_chiffre doit être un entier entre 0 et 9")
+        raise ValueError("L'argument de emoji_chiffre doit être un entier entre 0 et 10")
+
+def super_chiffre(chiffre :int, multi=False):
+    if 0 <= chiffre <= 9:
+        return ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"][chiffre]
+    elif multi:
+        return ''.join([super_chiffre(int(c)) for c in str(chiffre)])
+    else:
+        raise ValueError("L'argument de super_chiffre doit être un entier entre 0 et 9")
+
+def sub_chiffre(chiffre :int, multi=False):
+    if 0 <= chiffre <= 9:
+        return ["₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"][chiffre]
+    elif multi:
+        return ''.join([sub_chiffre(int(c)) for c in str(chiffre)])
+    else:
+        raise ValueError("L'argument de sub_chiffre doit être un entier entre 0 et 9")
 
 
 # Teste si le message contient un mot de la liste trigWords, les mots de trigWords doivent etre en minuscule

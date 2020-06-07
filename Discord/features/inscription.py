@@ -90,4 +90,6 @@ async def main(bot, member):
         await member.add_roles(tools.role(member, "Joueur en vie"))
         await chan.edit(topic="Ta conversation privée avec le bot, c'est ici que tout se passera !")
         
+        
+    # Conseiller d'ACTIVER TOUTES LES NOTIFS du chan (et mentions only pour le reste, en activant @everyone)
     await chan.send("Tu es maintenant inscrit, installe toi confortablement, la partie va bientôt commencer !")
