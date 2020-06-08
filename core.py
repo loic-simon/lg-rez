@@ -160,7 +160,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
             if Modifs:
                 dico = {id:{col:v for (idM, col, v) in Modifs if idM == id} for id in Modified_ids}
-                message = f"!sync{'_silent' if silent else ''} {json.dumps(dico)}"      # On transfère les infos sous forme de JSON (dictionnaire sérialisé)
+                message = f"!sync {silent} {json.dumps(dico)}"      # On transfère les infos sous forme de JSON (dictionnaire sérialisé)
 
                 rep = webhook.send(message, "sync")
                 if not rep:
@@ -179,7 +179,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             ### APPLICATION DES MODIFICATIONS SUR LES BDD cache
 
             db.session.commit()     # Modification de Joueurs
-            
+
         else:
             raise ValueError("WRONG OR MISSING PASSWORD!")
 
