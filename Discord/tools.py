@@ -300,7 +300,7 @@ async def boucle_query_joueur(ctx, cible=None, message=None, table=Tables["Joueu
 
 # Log dans #logs
 
-def smooth_split(mess :str, N=2000, sep='\n'):
+def smooth_split(mess :str, N=1990, sep='\n'):
     """Sépare <mess> en une liste de messages de moins de <N>=2000 mots (limitation Discord), en séparant aux <sep>=sauts de ligne si possible."""
     
     LM = []             # Liste des messages

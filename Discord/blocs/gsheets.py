@@ -32,7 +32,12 @@ def update(sheet, Modifs):
     cells_to_update = []
     for (l, c, v) in Modifs:
         cell = [cell for cell in cells if cell.col == c+1 and cell.row == l+1][0]    # on récup l'objet Cell correspondant aux coords à modifier
-        cell.value = "" if v is None else v     # cells : ([<L1C1>, <L1C2>, ..., <L1Ccm>, <L2C1>, <L2C2>, ..., <LlmCcm>]
+        if isinstance(v, int) and v > 10**14:
+            cell.value = str(v)
+        elif v is None:
+            cell.value = ""
+        else:
+            cell.value = v              # cells : ([<L1C1>, <L1C2>, ..., <L1Ccm>, <L2C1>, <L2C2>, ..., <LlmCcm>]
         cells_to_update.append(cell)
 
     sheet.update_cells(cells_to_update)

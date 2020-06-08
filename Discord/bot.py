@@ -3,6 +3,7 @@ import asyncio
 import logging
 import traceback
 import datetime
+import copy
 
 import discord
 from discord.ext import commands
@@ -203,9 +204,33 @@ class Special(commands.Cog):
             bot.in_command.remove(ctx.author.id)
         ctx.send("Te voilà libre, camarade !")
 
+
+    # bot.remove_command("help")
+    # 
+    # @commands.command()
+    # async def help(self, ctx, *, command=None):
+    #     try:
+    #         hc = commands.DefaultHelpCommand()
+    # 
+    #         return await hc.command_callback(ctx, command=command)
+    #     except Exception:
+    #         [await ctx.send(tools.code_bloc(m)) for m in tools.smooth_split(traceback.format_exc(), 1000)]
+            
 bot.add_cog(Special(bot))
-        
-        
+
+
+# Gestion de l'aide
+bot.remove_command("help")
+
+@bot.command()
+async def help(ctx, *, command=None):
+    try:
+        hc = commands.HelpCommand()
+        await hc.command_callback(ctx, command=command)
+    except:
+        await ctx.send(traceback.format_exc())
+
+
 # Gestion des erreurs
 
 @bot.event
