@@ -10,6 +10,7 @@ from bdd_connect import db, Triggers, Reactions
 MARK_OR = ' <||> '
 MARK_AND = ' <&&> '
 MARK_REACT = '<::>'
+MARK_CMD = '<!!>'
 
 # Commandes de STFU
 async def stfu_on(ctx):
@@ -33,11 +34,14 @@ async def build_sequence(ctx):
     reponse = ""
     fini = False
     while not fini:
-        message = await ctx.send("Réaction du bot : prochain message/média, ou réaction à ce message")
-        ret = await tools.wait_for_react_clic(ctx.bot, message, process_text=True, trigger_all_reacts=True)
-        if isinstance(ret, str):        # Texte / média
-            reponse += ret.strip()
-        else:                           # React
+        message = await ctx.send("Réaction du bot : prochain message/commande/média, ou réaction à ce message")
+        ret = await tools.wait_for_react_clic(ctx.bot, message, process_text=True, trigger_all_reacts=True, trigger_on_commands=True)
+        if isinstance(ret, str):
+            if ret.startswith(ctx.bot.command_prefix):      # Commande
+                reponse += MARK_CMD + ret.lstrip(ctx.bot.command_prefix).strip()
+            else:                                           # Texte / média
+                reponse += ret.strip()
+        else:                                               # React
             reponse += MARK_REACT + ret.name
             
         message = await ctx.send("▶ Puis / 🔀 Ou / ⏹ Fin ?")
@@ -124,7 +128,7 @@ class GestionIA(commands.Cog):
                 s = "Supprimer un trigger : \n"
                 for i, t in enumerate(trigs[:10]):
                     s += f"{tools.emoji_chiffre(i+1)}. {t.trigger} \n"
-                mess = await ctx.send(s + "Ou entrer un mot / une expression pour l'ajouter en trigger.\n⏹ pour finir.")
+                mess = await ctx.send(s + "Ou entrer un mot / une expression pour l'ajouter en trigger.\n⏹ pour finir")
                 r = await tools.wait_for_react_clic(ctx.bot, mess, emojis={(tools.emoji_chiffre(i) if i else "⏹"):str(i) for i in range(len(trigs)+1)}, process_text=True)
                 
                 if r == "0":
@@ -150,8 +154,8 @@ class GestionIA(commands.Cog):
             if (await tools.yes_no(ctx.bot, mess)):
                 reponse = await build_sequence(ctx)
             else:
-                r = f"Séquence actuelle : {tools.code(rep.reponse)}" if MT else ""    # ça fait longtemps, on le remet
-                r += f"\nMarqueur OU : {tools.code(MARK_OR)}, Marqueur ET : {tools.code(MARK_AND)}, Marqueur REACT : {tools.code(MARK_REACT)}"
+                r = f"Séquence actuelle : {tools.code(rep.reponse)}" if MT else ""    # Si ça fait longtemps, on le remet
+                r += f"\nMarqueur OU : {tools.code(MARK_OR)}, Marqueur ET : {tools.code(MARK_AND)}, Marqueur REACT : {tools.code(MARK_REACT)}, Marqueur CMD : {tools.code(MARK_CMD)}"
                 mess = await ctx.send(r + "\nNouvelle séquence :")
                 reponse = (await tools.wait_for_message(ctx.bot, lambda m:m.channel == ctx.channel and m.author != ctx.bot.user)).content
 
@@ -167,8 +171,9 @@ class GestionIA(commands.Cog):
         await ctx.send("Fini.")
         
 
+
 async def main(ctx):
-    trigs = await bdd_tools.find_nearest(ctx.message.content, Triggers, carac="trigger")
+    trigs = await bdd_tools.find_nearest(ctx.message.content, Triggers, carac="trigger", sensi=0.7)
     if not trigs:
         await ctx.send("Désolé, je n'ai pas compris 🤷‍♂️")
         return
@@ -185,6 +190,11 @@ async def main(ctx):
             react = rep.lstrip(MARK_REACT)
             emoji = tools.emoji(ctx, react) or react        # Si custom emoji : objet Emoji, sinon le codepoint de l'emoji direct
             await ctx.message.add_reaction(emoji)
+            
+        elif rep.startswith(MARK_CMD):                  # Commande
+            ctx.message.content = rep.replace(MARK_CMD, ctx.bot.command_prefix)
+            ctx = await ctx.bot.process_commands(ctx.message)
+            
         else:                                           # Texte / média
             await ctx.send(rep)
             

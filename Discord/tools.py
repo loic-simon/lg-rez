@@ -84,11 +84,15 @@ def private(cmd):
 
 
 
-async def wait_for_message(bot, check):
-    def trigCheck(m):
-        return ((check(m)                                               # Quelque soit le check demandé
-                 and not m.content.startswith(bot.command_prefix))      # on ne trigger pas sur les commandes
-                or m.content.lower() in ["stop", "!stop"])              # et on trigger en cas de STOP
+async def wait_for_message(bot, check, trigger_on_commands=False):
+    if trigger_on_commands:
+        def trigCheck(m):
+            return (check(m) or m.content.lower() in ["stop", "!stop"])         # et on trigger en cas de STOP
+    else:
+        def trigCheck(m):
+            return ((check(m) 
+                     and not m.content.startswith(bot.command_prefix))          # on ne trigger pas sur les commandes
+                    or m.content.lower() in ["stop", "!stop"])                  # et on trigger en cas de STOP
 
     message = await bot.wait_for('message', check=trigCheck)
     if message.content.lower() in ["stop", "!stop"]:
@@ -115,7 +119,7 @@ async def choice(bot, message, N):
 
 
 async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
-                              text_filter=lambda s:True, post_converter=None, trigger_all_reacts=False):
+                              text_filter=lambda s:True, post_converter=None, trigger_all_reacts=False, trigger_on_commands=False):
     """Ajoute les reacts dans emojis à message, attend que quelqu'un appuie sur une, puis renvoie :
         - soit le nom de l'emoji si emoji est une liste ;
         - soit la valeur associée si emoji est un dictionnaire.
@@ -124,7 +128,9 @@ async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
     De plus, si text_filter (fonction str -> bool) est défini, ne réagit qu'aux messages pour lesquels text_filter(message) = True.
     De plus, si post_converter (fonction str -> ?) est défini, le message détecté est passé dans cette fonction avant d'être renvoyé.
     
-    Si trigger_all_reacts == True, détecte l'ajout des toutes les réactions (et pas seulement celles dans emojis) et renvoie, si l'emoji directement si il n'est pas dans emojis (défaut False)."""
+    Si trigger_all_reacts == True, détecte l'ajout des toutes les réactions (et pas seulement celles dans emojis) et renvoie, si l'emoji directement si il n'est pas dans emojis (défaut False).
+    Enfin, trigger_on_commands est passé directement à wait_for_message.
+    """
 
     if not isinstance(emojis, dict):        # Si emoji est une liste, on en fait un dictionnaire
         emojis = {emoji:emoji for emoji in emojis}
@@ -150,7 +156,7 @@ async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
             def message_check(mess):        # On process DANS TOUS LES CAS, mais juste pour détecter "stop" si process_text == False
                 return False
                 
-        mess_task = asyncio.create_task(wait_for_message(bot, check=message_check), name="mess")
+        mess_task = asyncio.create_task(wait_for_message(bot, check=message_check, trigger_on_commands=True), name="mess")
 
         done, pending = await asyncio.wait([react_task, mess_task], return_when=asyncio.FIRST_COMPLETED)      # On lance
         # Le bot attend ici qu'une des deux tâches aboutissent
@@ -254,8 +260,9 @@ async def boucleMessage(bot, chan, inMessage, conditionSortie, trigCheck=lambda 
         rep = await bot.wait_for('message', check=trigCheck)
     return rep
 
+
 async def boucle_query_joueur(ctx, cible=None, message=None, table=Tables["Joueurs"]):
-    """Demande "in_message", puis attend que le joueur entre un nom de joueur, et boucle 5 fois au max (avant de l'insulter)
+    """Demande <message>, puis attend que le joueur entre un nom de joueur, et boucle 5 fois au max (avant de l'insulter)
     pour chercher le plus proche joueurs dans la table Joueurs
     """
 
@@ -300,16 +307,19 @@ async def boucle_query_joueur(ctx, cible=None, message=None, table=Tables["Joueu
 
 # Log dans #logs
 
-def smooth_split(mess :str, N=1990, sep='\n'):
-    """Sépare <mess> en une liste de messages de moins de <N>=2000 mots (limitation Discord), en séparant aux <sep>=sauts de ligne si possible."""
+def smooth_split(mess :str, N=1990, sep='\n', rep=''):
+    """Sépare <mess> en une liste de messages de moins de <N>=2000 mots (limitation Discord), en séparant aux <sep>=sauts de ligne si possible.
+    
+    Ajouter <rep> à la fin des messages tronqués de leur séparateur final.
+    """
     
     LM = []             # Liste des messages
     psl = 0             # indice du Précédent Saut de Ligne
     L = len(mess)
     while psl + N < L:
-        if mess.count(sep, psl, psl+N+1):       # +1 parce que si sep est à la fin, on le dégage
-            i = psl + N - mess[psl:psl+N+1][::-1].find(sep)      # un peu sombre mais vrai, tkt frère
-            LM.append(mess[psl:i])
+        if mess.count(sep, psl, psl+N+len(sep)):       # +len(sep) parce que si sep est à la fin, on le dégage
+            i = psl + N - mess[psl:psl+N+len(sep)][::-1].find(sep)      # un peu sombre mais vrai, tkt frère
+            LM.append(mess[psl:i] + rep)
             psl = i + 1     # on élimine le \n
         else:
             LM.append(mess[psl:psl + N])

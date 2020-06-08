@@ -39,7 +39,7 @@ class Annexe(commands.Cog):
         await ctx.send(random.choice(["Pile", "Face"]))
 
 
-    @commands.command()
+    @commands.command(enabled=False)
     @commands.has_role("MJ")
     async def test(self, ctx, *, arg):
         """Test : test !"""
@@ -62,7 +62,7 @@ class Annexe(commands.Cog):
         ))
         
         
-    @commands.command()
+    @commands.command(enabled=False)
     @commands.has_role("MJ")
     async def testreact(self, ctx, *reacts):
         message = await ctx.send(tools.code_bloc(f"REACT TO THAT!\nReacts: {' - '.join(reacts)}"))
@@ -70,7 +70,7 @@ class Annexe(commands.Cog):
         await ctx.send(tools.code_bloc(f"REACTED : {react}"))
 
 
-    @commands.command()
+    @commands.command(enabled=False)
     @commands.has_role("MJ")
     async def testbdd(self, ctx):
         """Test BDD"""
@@ -80,7 +80,7 @@ class Annexe(commands.Cog):
         message = await ctx.send(tools.code_bloc(f"Liste des joueurs :\n - {ret}"))
 
 
-    @commands.command()
+    @commands.command(enabled=False)
     @commands.has_role("MJ")
     async def rename(self, ctx, id: int, nom: str):
         """Renommer quelqu'un à partir de son ID"""
@@ -96,7 +96,7 @@ class Annexe(commands.Cog):
             await ctx.send(tools.code_bloc(f"Joueur {oldnom} renommé en {nom}."))
 
 
-    @commands.command()
+    @commands.command(enabled=False)
     @tools.private
     async def private_test(self, ctx, *, arg):
         """Test PRIVÉ"""

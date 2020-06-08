@@ -41,7 +41,7 @@ async def globally_block_dms(ctx):
 @bot.check
 async def already_in_command(ctx):
     return (ctx.author.id not in ctx.bot.in_command
-            or ctx.command.name == "stop")    # Cas particulier : !stop
+            or ctx.command.name in ["help", "stop"])    # Cas particulier : !stop
 
 @bot.before_invoke      # Appelé seulement si les checks sont OK, donc pas déjà dans bot.in_command
 async def add_to_in_command(ctx):
@@ -132,11 +132,20 @@ bot.add_cog(voter_agir.VoterAgir(bot))              # Voter ou agir
 
 # Commandes spéciales
 class Special(commands.Cog):
-    """Special : Commandes spéciales (méta-commandes, imitant ou impactant le déroulement des autres)"""
+    """Special - Commandes spéciales (méta-commandes, imitant ou impactant le déroulement des autres)"""
 
     @commands.command()
     @commands.has_role("MJ")
     async def do(self, ctx, *, txt):
+        """Exécute du code Python et affiche le résultat (COMMANDE MJ)
+        
+        <txt> doit être du code valide dans le contexte du fichier bot.py (utilisables notemment : bot, ctx, db, Tables...)
+        Si <txt> est une coroutine, elle sera awaited.
+        
+        Aussi connue sous le nom de « faille de sécurité », cette commande permet de faire environ tout ce qu'on veut sur le bot (y compris le crasher, importer des modules, exécuter des fichiers .py... même si c'est un peu compliqué) voire d'impacter le serveur sur lequel le bot tourne si on est motivé.
+        
+        À utiliser avec parcimonie donc, et QUE pour du développement/debug !
+        """
         class Answer():
             def __init__(self):
                 self.rep = ""
@@ -146,89 +155,153 @@ class Special(commands.Cog):
             a.rep = await a.rep
         await ctx.send(f"Entrée : {tools.code(txt)}\nSortie :\n{a.rep}")
 
+
     @commands.command()
     @commands.has_role("MJ")
-    async def co(self, ctx):
-        """lance un test d'inscription comme si on se connectait au serv pour la première fois"""
+    async def co(self, ctx, cible=None):
+        """Lance la procédure d'inscription comme si on se connectait au serveur pour la première fois (COMMANDE MJ)
+        
+        [cible] le joueur à inscrire, par défaut le lançeur de la commande.
+        Cette commande est principalement destinée aux tests de développement, mais peut être utile si un joueur chibre son inscription (nomamment en association avec !doas).
+        """
+        if id := ''.join([c for c in cible if c.isdigit()]):   # Si la chaîne contient un nombre, on l'extrait
+            if ctx.guild.get_member(int(id)):                   # Si cet ID correspond à un utilisateur, on le récupère
+                return [(user, 1)]                              # On a trouvé l'utilisateur !
         await inscription.main(bot, ctx.author)
         
+        
     @commands.command()
     @commands.has_role("MJ")
-    async def doas(self, ctx, *, txt):
-        """Exécute une commande en tant qu'un autre joueur"""
-        qui, quoi = txt.split(" " + ctx.bot.command_prefix, maxsplit=1)      # !doas <@!id> !vote R ==> qui = "<@!id>", quoi = "vote R"
+    async def doas(self, ctx, *, qui_quoi):
+        """Exécute une commande en tant qu'un autre joueur (COMMANDE MJ)
+        
+        <qui_quoi> doit être le nom de la cible (nom ou mention d'un joueur INSCRIT) suivi de la commande à exécuter (commençant par un !).
+        
+        Ex. !doas Vincent Croquette !vote Annie Colin
+        """
+        qui, quoi = qui_quoi.split(" " + bot.command_prefix, maxsplit=1)       # !doas <@!id> !vote R ==> qui = "<@!id>", quoi = "vote R"
         joueur = await tools.boucle_query_joueur(ctx, qui.strip() or None, Tables["Joueurs"])
         
-        ctx.message.content = ctx.bot.command_prefix + quoi
+        ctx.message.content = bot.command_prefix + quoi
         ctx.message.author = ctx.guild.get_member(joueur.discord_id)
-        ctx = await bot.get_context(ctx.message)
         
         ctx.send(f":robot: Exécution en tant que {joueur.nom}:")
-        await ctx.bot.invoke(ctx)
+        await ctx.bot.process_commands(ctx.message)
         
         
     @commands.command()
     @commands.has_role("MJ")
-    async def doin(self, ctx, *, txt):
-        """Exécute une commande après x secondes"""
-        apres, quoi = txt.split(" ", maxsplit=1)      # !doin 15 !vote R ==> apres = "15", quoi = "!vote R"
+    async def doin(self, ctx, *, apres_quoi):
+        """Exécute une commande après X secondes (COMMANDE MJ)
+        
+        <apres_quoi> doit être un entier ou un flottant (nombre de secondes à attendre) suivi de la commande à exécuter (commençant par un !)
+        
+        Pas sûr de l'utilité de cette commande, mais bon elle existe
+        """
+        apres, quoi = apres_quoi.split(" ", maxsplit=1)      # !doin 15 !vote R ==> apres = "15", quoi = "!vote R"
         
         await asyncio.sleep(float(apres))
         ctx.message.content = quoi
-        ctx = await bot.get_context(ctx.message)
         
         await remove_from_in_command(ctx)       # Bypass la limitation de 1 commande à la fois
-        await ctx.bot.invoke(ctx)
+        await ctx.bot.process_commands(ctx.message)
         await add_to_in_command(ctx)
         
         
-    @commands.command(alisases=["autodestruct", "ad"])
+    @commands.command(aliases=["autodestruct", "ad"])
     @commands.has_role("MJ")
     async def secret(self, ctx, *, quoi):
-        """Supprime le message puis exécute la commande"""
+        """Supprime le message puis exécute la commande (COMMANDE MJ)
+        
+        <quoi> commande à exécuter, commençant par un !
+        
+        Utile notemment pour faire des commandes dans un channel public, pour que la commande (moche) soit immédiatement supprimée.
+        """
         await ctx.message.delete()
         
         ctx.message.content = quoi
-        ctx = await bot.get_context(ctx.message)
         
         await remove_from_in_command(ctx)       # Bypass la limitation de 1 commande à la fois
-        await ctx.bot.invoke(ctx)
+        await ctx.bot.process_commands(ctx.message)
         await add_to_in_command(ctx)
 
 
     @commands.command()
     @tools.private
     async def stop(self, ctx):
-        """Débloque si faussement coincé dans une commande"""
+        """Peut débloquer des situations compliquées
+        
+        Ne pas utiliser cette commande sauf en cas de force majeure où plus rien ne marche, et sur demande d'un MJ (après c'est pas dit que ça marche mieux après l'avoir utilisé)
+        """
         if ctx.author.id in bot.in_command:
             bot.in_command.remove(ctx.author.id)
         ctx.send("Te voilà libre, camarade !")
 
 
-    # bot.remove_command("help")
-    # 
-    # @commands.command()
-    # async def help(self, ctx, *, command=None):
-    #     try:
-    #         hc = commands.DefaultHelpCommand()
-    # 
-    #         return await hc.command_callback(ctx, command=command)
-    #     except Exception:
-    #         [await ctx.send(tools.code_bloc(m)) for m in tools.smooth_split(traceback.format_exc(), 1000)]
+    # Gestion de l'aide    
+    bot.remove_command("help")
+    
+    @commands.command()
+    async def help(self, ctx, *, command=None):
+        """Affiche la liste des commandes utilisables et leur utilisation
+        
+        [command] : nom exact d'une commande à expliquer (ou un de ses alias)
+        Si [command] n'est pas précisé, liste l'ensemble des commandes accessibles à l'utilisateur.
+        """
+        # hc = commands.DefaultLaHelpCommand()
+        # setattr(hc, "context", ctx)
+        # await hc.command_callback(ctx, command=command)
+        
+        pref = bot.command_prefix
+        
+        cogs = bot.cogs                                                                     # Dictionnaire nom: cog
+        commandes = {cmd.name: cmd for cmd in bot.commands}                                 # Dictionnaire nom: commande
+        aliases = {alias: nom for nom, cmd in commandes.items() for alias in cmd.aliases}    # Dictionnaire alias: nom de la commande
+        
+        n_max = max([len(cmd) for cmd in commandes])
+        
+        if not command:
+            bot.in_command.remove(ctx.author.id)
+            async def runnable_commands(cog):       # obligé parce que can_run doit être await, donc c'est compliqué
+                L = []
+                for cmd in cog.get_commands():
+                    try:
+                        runnable = await cmd.can_run(ctx)
+                    except Exception:
+                        runnable = False
+                    if runnable:
+                        L.append(cmd)
+                return L
+                
+            r = f"""{bot.description}\n\n"""
+            r += "\n\n".join([f"{cog.description} : \n  - " + "\n  - ".join(
+                    [pref + cmd.name.ljust(n_max+2) + cmd.short_doc for cmd in runnables]           # pour chaque commande runnable
+                ) for cog in cogs.values() if (runnables := await runnable_commands(cog))])         # pour chaque cog contenant des runnables
+            r += f"\n\nUtilise <{pref}help command> pour plus d'information sur une commande."
+            bot.in_command.append(ctx.author.id)
             
+        else:
+            if command.startswith(pref):        # Si le joueur fait !help !command
+                command = command.lstrip(pref)
+                
+            if command in aliases:              # Si !help d'un alias
+                command = aliases[command]      # On remplace l'alias par sa commande
+                
+            if command in commandes:             # Si commande existante
+                cmd = commandes[command]
+                
+                r = f"{pref}{command} {cmd.signature} – {cmd.help}"
+                # r += f"\n\nUtilise <{pref}help> pour la liste des commandes ou <{pref}help command> pour plus d'information sur une commande."
+                if cmd_aliases := [alias for alias,cmd in aliases.items() if cmd == command]:       # Si la commande a des alias
+                    r += f"\n\nAlias : {pref}" + ", {pref}".join(cmd_aliases)
+                    
+            else:
+                r = f"Commande <{command}> non trouvée.\nUtilise <{pref}help> pour la liste des commandes."
+                
+        [await ctx.send(tools.code_bloc(m)) for m in tools.smooth_split(r, sep="\n\n")]
+        
+
 bot.add_cog(Special(bot))
-
-
-# Gestion de l'aide
-bot.remove_command("help")
-
-@bot.command()
-async def help(ctx, *, command=None):
-    try:
-        hc = commands.HelpCommand()
-        await hc.command_callback(ctx, command=command)
-    except:
-        await ctx.send(traceback.format_exc())
 
 
 # Gestion des erreurs
