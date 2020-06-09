@@ -14,7 +14,7 @@ class Informations(commands.Cog):
     @commands.command()
     async def roles(self, ctx, nom_camp="all") :
         """
-        !roles [camp] - Affiche la liste des rôles
+        Affiche la liste des rôles
 
         L'option nom_camp permet de lister les rôles d'un camp spécifique, elle est facultative
         Valeurs possibles pour nom_camp : all, None, Loups, Villageois, Solitaire, Nécros
@@ -45,7 +45,7 @@ class Informations(commands.Cog):
     @commands.command()
     async def monrole(self, ctx, details="court") :
         """
-        !monrole [details] - Affiche les informations du rôle du joueur
+        Affiche les informations du rôle du joueur
 
         L'option details permet d'avoir plus ou moins d'infos, elle est facultative
         Valeurs possibles pour details : None, court, long, role

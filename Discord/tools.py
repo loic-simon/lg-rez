@@ -58,7 +58,7 @@ def private_chan(member):
 async def create_context(bot, message_id, user, content):
     chan = private_chan(user)
     message = (await chan.history(limit=1).flatten())[0]        # On a besoin de récupérer un message, ici le dernier de la conv privée
-    # message = await chan.fetch_message(message_id)      
+    # message = await chan.fetch_message(message_id)
     message.author = user
     message.content = content
     return await bot.get_context(message)
@@ -90,7 +90,7 @@ async def wait_for_message(bot, check, trigger_on_commands=False):
             return (check(m) or m.content.lower() in ["stop", "!stop"])         # et on trigger en cas de STOP
     else:
         def trigCheck(m):
-            return ((check(m) 
+            return ((check(m)
                      and not m.content.startswith(bot.command_prefix))          # on ne trigger pas sur les commandes
                     or m.content.lower() in ["stop", "!stop"])                  # et on trigger en cas de STOP
 
@@ -127,7 +127,7 @@ async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
     Si process_text == True, détecte aussi la réponse par message et retourne ledit message (défaut False).
     De plus, si text_filter (fonction str -> bool) est défini, ne réagit qu'aux messages pour lesquels text_filter(message) = True.
     De plus, si post_converter (fonction str -> ?) est défini, le message détecté est passé dans cette fonction avant d'être renvoyé.
-    
+
     Si trigger_all_reacts == True, détecte l'ajout des toutes les réactions (et pas seulement celles dans emojis) et renvoie, si l'emoji directement si il n'est pas dans emojis (défaut False).
     Enfin, trigger_on_commands est passé directement à wait_for_message.
     """
@@ -144,18 +144,18 @@ async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
             return (react.message_id == message.id
                     and react.user_id != bot.user.id
                     and (trigger_all_reacts or react.emoji.name in emojis_names))
-                    
+
         react_task = asyncio.create_task(bot.wait_for('raw_reaction_add', check=react_check), name="react")
 
         if process_text:
             def message_check(mess):        # Check MESSAGE : bon channel, pas du bot, et filtre
-                return (mess.channel == message.channel 
+                return (mess.channel == message.channel
                         and mess.author != bot.user
                         and text_filter(mess.content))
         else:
             def message_check(mess):        # On process DANS TOUS LES CAS, mais juste pour détecter "stop" si process_text == False
                 return False
-                
+
         mess_task = asyncio.create_task(wait_for_message(bot, check=message_check, trigger_on_commands=True), name="mess")
 
         done, pending = await asyncio.wait([react_task, mess_task], return_when=asyncio.FIRST_COMPLETED)      # On lance
@@ -176,7 +176,7 @@ async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
             mess = done_task.result().content                # Si envoi de message, done.result = message
             ret = post_converter(mess) if post_converter else mess
             await message.clear_reactions()
-            
+
     except Exception as exc:
         await message.clear_reactions()
         raise exc from Exception
@@ -309,10 +309,10 @@ async def boucle_query_joueur(ctx, cible=None, message=None, table=Tables["Joueu
 
 def smooth_split(mess :str, N=1990, sep='\n', rep=''):
     """Sépare <mess> en une liste de messages de moins de <N>=2000 mots (limitation Discord), en séparant aux <sep>=sauts de ligne si possible.
-    
+
     Ajouter <rep> à la fin des messages tronqués de leur séparateur final.
     """
-    
+
     LM = []             # Liste des messages
     psl = 0             # indice du Précédent Saut de Ligne
     L = len(mess)
@@ -324,11 +324,11 @@ def smooth_split(mess :str, N=1990, sep='\n', rep=''):
         else:
             LM.append(mess[psl:psl + N])
             psl += N
-            
+
     if psl < L:
         LM.append(mess[psl:])   # ce qui reste
     return LM
-    
+
 
 
 async def log(arg, message):

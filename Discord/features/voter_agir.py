@@ -26,9 +26,11 @@ class VoterAgir(commands.Cog):
     @commands.command()
     @tools.private
     async def vote(self, ctx, *, nom_cible=None):
-        """!vote [cible] - Vote pour le condamné du jour
+        """
+        Vote pour le condamné du jour
 
-        [cible] est la cible de ton vote"""
+        [cible] est la cible de ton vote
+        """
 
         joueur = Joueurs.query.get(ctx.author.id)
 
@@ -59,9 +61,11 @@ class VoterAgir(commands.Cog):
     @commands.command()
     @tools.private
     async def votemaire(self, ctx, *, nom_cible=None):
-        """!votemaire [cible] - Vote pour le nouveau maire
+        """
+        Vote pour le nouveau maire
 
-        [cible] est la cible de ton vote"""
+        [cible] est la cible de ton vote
+        """
 
         joueur = Joueurs.query.get(ctx.author.id)
 
@@ -92,9 +96,11 @@ class VoterAgir(commands.Cog):
     @commands.command()
     @tools.private
     async def voteloups(self, ctx, *, nom_cible=None):
-        """!voteloups [cible] - Voter pour la victime de l'attaque des loups
+        """
+        Voter pour la victime de l'attaque des loups
 
-        [cible] est la cible de ton vote"""
+        [cible] est la cible de ton vote
+        """
 
         joueur = Joueurs.query.get(ctx.author.id)
 
@@ -125,10 +131,12 @@ class VoterAgir(commands.Cog):
     @commands.command()
     @tools.private
     async def action(self, ctx, *, decision=None):
-        """!action [decision] - Utiliser l'action de ton rôle / une des actions associées
+        """
+        Utiliser l'action de ton rôle / une des actions associées
 
         [decision] correspond à comment tu utiliseras ton action
-        Note: ce paramètre est facultatif, et il sera désactivé dans le cas où tu as plusieurs actions disponibles"""
+        Note: ce paramètre est facultatif, et il sera désactivé dans le cas où tu as plusieurs actions disponibles
+        """
 
         joueur = Joueurs.query.get(ctx.author.id)
 

@@ -18,10 +18,12 @@ class RemplissageBDD(commands.Cog):
     @commands.command()
     @commands.has_role("MJ")
     async def droptable(self, ctx, table):
-        """!droptable <table> - Supprime la table <table>.
+        """
+        Supprime la table <table>.
 
         ATTENTION À SAUVEGARDER AVANT !
-        CECI N'EST PAS UN EXERCICE, LA TABLE SERA SUPPRIMEE DEFINITIVEMENT!!"""
+        CECI N'EST PAS UN EXERCICE, LA TABLE SERA SUPPRIMEE DEFINITIVEMENT!!
+        """
 
         if table in Tables:
             if await tools.yes_no(ctx.bot, await ctx.send("Sûr ?")):
@@ -39,7 +41,9 @@ class RemplissageBDD(commands.Cog):
     @commands.command()
     @commands.has_role("MJ")
     async def fillroles(self, ctx):
-        """!fillroles - Remplit les table Roles, BaseActions et BaseActionsRoles depuis le GSheet ad hoc"""
+        """
+        Remplit les table Roles, BaseActions et BaseActionsRoles depuis le GSheet ad hoc
+        """
 
         load_dotenv()
         SHEET_ID = os.getenv("ROLES_SHEET_ID")

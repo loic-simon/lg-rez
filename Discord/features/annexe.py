@@ -13,14 +13,14 @@ class Annexe(commands.Cog):
     """
 
     @commands.command()
-    async def roll(self, ctx, *, arg):
+    async def roll(self, ctx, *, XdY):
         """
-        !roll <XdY> [Modifiers] Permet de lancer X dés à Y faces avec les modificateurs Modifiers
+        Permet de lancer X dés à Y faces avec les modificateurs Modifiers
         Ex. !roll 1d6 -> lance 1d6
             !roll 1d20 +3 -> lance 1d20, ajoute 3 au résultat
             !roll 1d20 +3 -5 -3 +6 -> lance 1d20, ajoute 3+5-3+6 = +1 au résultat
         """
-        dices = arg.replace(' ','').replace('-','+-').split('+')        # "1d6 + 5 - 2" -> ["1d6", "5", "-2"]
+        dices = XdY.replace(' ','').replace('-','+-').split('+')        # "1d6 + 5 - 2" -> ["1d6", "5", "-2"]
         r = ""
         s = 0
         try:
@@ -45,7 +45,7 @@ class Annexe(commands.Cog):
     @commands.command(aliases=["cf", "pf"])
     async def coinflip(self, ctx):
         """
-        !coinflip - Renvoie le résultat d'un tirage à Pile ou Face (aléatoire)
+        Renvoie le résultat d'un tirage à Pile ou Face (aléatoire)
 
         Alias : !cf, !pf
         """

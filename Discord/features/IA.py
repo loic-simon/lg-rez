@@ -63,7 +63,7 @@ class GestionIA(commands.Cog):
     @tools.private
     async def stfu(self, ctx, force=None): #stfu le channel de la personne mise en arguments
         """
-        !stfu [start/stop] - Gère les réponses automatiques du bot sur le channel courant
+        Gère les réponses automatiques du bot sur le channel courant
 
         Sans argument, la commande agit comme un toggle (allume les réactions si éteintes et vice-cersa).
         [start/stop] les active (resp. désactive) si start (resp. stop) est donné en argument de la commande.
@@ -85,7 +85,7 @@ class GestionIA(commands.Cog):
     @commands.has_role("MJ")
     async def addIA(self, ctx, *, triggers=None):
         """
-        !addIA [triggers] - Permet de faire réagir le bot au message "trigger"
+        Permet de faire réagir le bot au message "trigger"
 
         trigger peut être un mot, une phrase, ou plusieurs expressions séparées par des points-virgules ou sauts de lignes
         Dans le cas où plusieurs expressions sont spécifiées, toutes déclencheront l'action demandéenc
@@ -120,7 +120,7 @@ class GestionIA(commands.Cog):
     @commands.has_role("MJ")
     async def modifIA(self, ctx, *, trigger=None):
         """
-        !moifIA [trigger] - Permet de modifier la réponse automatique du bot au message trigger
+        Permet de modifier la réponse automatique du bot au message trigger
 
         Permet d'ajouter des triggers, des réponses au trigger susmentionné (successives ou aléatoires si plusieurs sont spécifiées, au choix)
         Permet également de supprimer ou modifier les triggers ou les réponses au trigger susmentionné

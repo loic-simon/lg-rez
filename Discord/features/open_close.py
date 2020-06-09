@@ -61,7 +61,7 @@ class OpenClose(commands.Cog):
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def open(self, ctx, qui, heure=None):
         """
-        !open <qui> [heure] - Lance un vote / des actions de rôle pour <qui>
+        Lance un vote / des actions de rôle pour <qui>
 
         <qui> prend les valeurs :
             -cond         Pour le vote du condamné
@@ -114,7 +114,7 @@ class OpenClose(commands.Cog):
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def close(self, ctx, qui, heure=None):
         """
-        !close <qui> [heure] - Lance un vote / des actions de rôle pour <qui>
+        Lance un vote / des actions de rôle pour <qui>
 
         <qui> prend les valeurs :
             -cond         Pour le vote du condamné
@@ -170,7 +170,7 @@ class OpenClose(commands.Cog):
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def remind(self, ctx, qui, heure=None):
         """
-        !remind <qui> [heure] - Rappelle un vote / des actions de rôle pour <qui> (message de rappel)
+        Rappelle un vote / des actions de rôle pour <qui> (message de rappel)
 
         <qui> prend les valeurs :
             -cond         Pour le vote du condamné
