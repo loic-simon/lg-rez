@@ -12,6 +12,12 @@ class Annexe(commands.Cog):
 
     @commands.command()
     async def roll(self, ctx, *, arg):
+        """
+        !roll <XdY> [Modifiers] Permet de lancer X dés à Y faces avec les modificateurs Modifiers
+        Ex. !roll 1d6 -> lance 1d6
+            !roll 1d20 +3 -> lance 1d20, ajoute 3 au résultat
+            !roll 1d20 +3 -5 -3 +6 -> lance 1d20, ajoute 3+5-3+6 = +1 au résultat
+        """
         dices = arg.replace(' ','').replace('-','+-').split('+')        # "1d6 + 5 - 2" -> ["1d6", "5", "-2"]
         r = ""
         s = 0
@@ -20,7 +26,7 @@ class Annexe(commands.Cog):
                 if 'd' in dice:
                     nb, faces = dice.split('d', maxsplit=1)
                     for i in range(int(nb)):
-                        v = random.randrange(int(faces)) + 1 
+                        v = random.randrange(int(faces)) + 1
                         s += v
                         r += f" + {v}₍{tools.sub_chiffre(int(faces), True)}₎"
                 else:
@@ -32,10 +38,15 @@ class Annexe(commands.Cog):
             await ctx.send(tools.code("!role") + " : pattern non reconu"+traceback.format_exc())
         else:
             await ctx.send(r[3:])
-            
+
 
     @commands.command(aliases=["cf", "pf"])
     async def coinflip(self, ctx):
+        """
+        !coinflip - Renvoie le résultat d'un tirage à Pile ou Face (aléatoire)
+
+        Alias : !cf, !pf
+        """
         await ctx.send(random.choice(["Pile", "Face"]))
 
 
@@ -60,8 +71,8 @@ class Annexe(commands.Cog):
             f"salon = {salon}\n"
             f"serveur = {serveur}"
         ))
-        
-        
+
+
     @commands.command(enabled=False)
     @commands.has_role("MJ")
     async def testreact(self, ctx, *reacts):

@@ -43,24 +43,31 @@ async def build_sequence(ctx):
                 reponse += ret.strip()
         else:                                               # React
             reponse += MARK_REACT + ret.name
-            
+
         message = await ctx.send("▶ Puis / 🔀 Ou / ⏹ Fin ?")
         ret = await tools.wait_for_react_clic(ctx.bot, message, emojis={"▶":MARK_AND, "🔀":MARK_OR, "⏹":False})
         if ret:
             reponse += ret
         else:
             fini = True
-            
+
     return reponse
 
 
 class GestionIA(commands.Cog):
     """Commandes relatives à l'IA (arrêter l'IA, les réactions du bot, etc)"""
-    
+
     @commands.command()
     @tools.private
     async def stfu(self, ctx, force=None): #stfu le channel de la personne mise en arguments
-        """Toggle l'IA sur le channel courant"""
+        """
+        !stfu [start/stop] - Gère les réponses automatiques du bot sur le channel courant
+
+        Sans argument, la commande agit comme un toggle (allume les réactions si éteintes et vice-cersa).
+        [start/stop] les active (resp. désactive) si start (resp. stop) est donné en argument de la commande.
+
+        DISCLAIMER : Les commandes restent reconnues
+        """
         if force == "start":
             await stfu_on(ctx)
         elif force == "stop":
@@ -70,58 +77,73 @@ class GestionIA(commands.Cog):
                 await stfu_on(ctx)
             else:
                 await stfu_off(ctx)
-                
-                
+
+
     @commands.command()
     @commands.has_role("MJ")
     async def addIA(self, ctx, *, triggers=None):
+        """
+        !addIA [triggers] - Permet de faire réagir le bot au message "trigger"
+
+        trigger peut être un mot, une phrase, ou plusieurs expressions séparées par des points-virgules ou sauts de lignes
+        Dans le cas où plusieurs expressions sont spécifiées, toutes déclencheront l'action demandéenc
+
+        Ne pas spécifier trigger réexpliquera le principe de la commande
+        """
+
         if not triggers:
             await ctx.send("Mots/expressions déclencheurs (non sensibles à la casse / accents), séparés par des points-virgules ou des sauts de ligne :")
             mess = await tools.wait_for_message(ctx.bot, check=lambda m:m.channel == ctx.channel and m.author != ctx.bot.user)
             triggers = mess.content
-            
+
         triggers = triggers.replace('\n', ';').split(';')
         triggers = [unidecode.unidecode(s).lower().strip() for s in triggers]
         await ctx.send(f"Triggers : `{'` – `'.join(triggers)}`")
 
         reponse = await build_sequence(ctx)
-        
+
         await ctx.send(f"Résumé de la séquence : {tools.code(reponse)}")
         async with ctx.typing():
             reac = Reactions(reponse=reponse)
             db.session.add(reac)
             db.session.flush()
-            
+
             trigs = [Triggers(trigger=trigger, reac_id=reac.id) for trigger in triggers]
             db.session.add_all(trigs)
             db.session.commit()
         await ctx.send(f"Ajouté en base.")
-        
-        
+
+
     @commands.command()
     @commands.has_role("MJ")
     async def modifIA(self, ctx, *, trigger=None):
+        """
+        !moifIA [trigger] - Permet de modifier la réponse automatique du bot au message trigger
+
+        Permet d'ajouter des triggers, des réponses au trigger susmentionné (successives ou aléatoires si plusieurs sont spécifiées, au choix)
+        Permet également de supprimer ou modifier les triggers ou les réponses au trigger susmentionné
+        """
         if not trigger:
             await ctx.send("Mot/expression déclencheur de la réaction à modifier :")
             mess = await tools.wait_for_message(ctx.bot, check=lambda m:m.channel == ctx.channel and m.author != ctx.bot.user)
             trigger = mess.content
-            
+
         trigs = await bdd_tools.find_nearest(trigger, Triggers, carac="trigger")
         if not trigs:
             await ctx.send("Rien trouvé.")
             return
-            
+
         trig = trigs[0][0]
         rep = Reactions.query.get(trig.reac_id)
         trigs = Triggers.query.filter_by(reac_id=trig.reac_id).all()
-        
+
         await ctx.send(f"Triggers : `{'` – `'.join([trig.trigger for trig in trigs])}`\n"
                        f"Séquence réponse : {tools.code(rep.reponse)}")
-                       
+
         message = await ctx.send("Modifier : ⏩ triggers / ⏺ Réponse / ⏸ Les deux / 🚮 Supprimer ?")
-        MT, MR = await tools.wait_for_react_clic(ctx.bot, message, emojis={"⏩":(True, False), "⏺":(False, True), 
+        MT, MR = await tools.wait_for_react_clic(ctx.bot, message, emojis={"⏩":(True, False), "⏺":(False, True),
                                                                            "⏸":(True, True), "🚮":(False, False)})
-                                                                           
+
         if MT:                      # Modification des triggers
             fini = False
             while not fini:
@@ -130,7 +152,7 @@ class GestionIA(commands.Cog):
                     s += f"{tools.emoji_chiffre(i+1)}. {t.trigger} \n"
                 mess = await ctx.send(s + "Ou entrer un mot / une expression pour l'ajouter en trigger.\n⏹ pour finir")
                 r = await tools.wait_for_react_clic(ctx.bot, mess, emojis={(tools.emoji_chiffre(i) if i else "⏹"):str(i) for i in range(len(trigs)+1)}, process_text=True)
-                
+
                 if r == "0":
                     fini = True
                 elif r.isdigit() and (n := int(r)) <= len(trigs):
@@ -142,13 +164,13 @@ class GestionIA(commands.Cog):
                     trigs.append(trig)
                     db.session.add(trig)
                     db.session.commit()
-                    
+
             if not trigs:        # on a tout supprimé !
                 await ctx.send("Tous les triggers supprimés, suppression de la réaction")
                 db.session.delete(rep)
                 db.session.commit()
                 return
-                
+
         if MR:                  # Modification de la réponse
             mess = await ctx.send("Réécrire complètement la séquence ? (si non, modification brute : plus compliqué !)")
             if (await tools.yes_no(ctx.bot, mess)):
@@ -160,16 +182,16 @@ class GestionIA(commands.Cog):
                 reponse = (await tools.wait_for_message(ctx.bot, lambda m:m.channel == ctx.channel and m.author != ctx.bot.user)).content
 
             bdd_tools.modif(rep, "reponse", reponse)
-            
+
         if not (MT or MR):      # Suppression
             db.session.delete(rep)
             for trig in trigs:
                 db.session.delete(trig)
-                
+
         db.session.commit()
-                
+
         await ctx.send("Fini.")
-        
+
 
 
 async def main(ctx):
@@ -177,24 +199,23 @@ async def main(ctx):
     if not trigs:
         await ctx.send("Désolé, je n'ai pas compris 🤷‍♂️")
         return
-        
+
     trig = trigs[0][0]
     seq = Reactions.query.get(trig.reac_id).reponse
-    
+
     etapes = seq.split(MARK_AND)
     for rep in etapes:
         if MARK_OR in rep:                              # Si plusieurs possiblités :
             rep = random.choice(rep.split(MARK_OR))         # Choix random
-            
+
         if rep.startswith(MARK_REACT):                  # Réaction
             react = rep.lstrip(MARK_REACT)
             emoji = tools.emoji(ctx, react) or react        # Si custom emoji : objet Emoji, sinon le codepoint de l'emoji direct
             await ctx.message.add_reaction(emoji)
-            
+
         elif rep.startswith(MARK_CMD):                  # Commande
             ctx.message.content = rep.replace(MARK_CMD, ctx.bot.command_prefix)
             ctx = await ctx.bot.process_commands(ctx.message)
-            
+
         else:                                           # Texte / média
             await ctx.send(rep)
-            

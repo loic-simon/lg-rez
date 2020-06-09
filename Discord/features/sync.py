@@ -25,7 +25,14 @@ class Sync(commands.Cog):
     @commands.command()
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def sync(self, ctx, silent, *, serial):
-        """Déserialise les infos JSON et log"""
+        """!sync <silent> <data> - Synchronise les données de tableau de bord vers les tables SQL
+
+        <silent> prend les valeurs "True" (les joueurs sont notifiés si leur statut est modifié) ou "False" (les joueurs ne sont pas notifiés)
+        <data> est un dictionnaire de dictionnaires contenant les données à modifier, de la forme {"discord_id":{"attribut_modifié":"valeur_attribut"}}
+
+        CETTE COMMANDE EST UTILISEE POUR LA SYNCHRONISATION UNIQUEMENT
+        ELLE N'EST PAS FAITE POUR ETRE UTILISEE A LA MAIN
+        """
 
         dic = json.loads(serial)
         message = self.changelog(ctx, dic)

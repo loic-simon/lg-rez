@@ -10,7 +10,9 @@ from blocs import gsheets, bdd_tools
 
 async def main(bot, member):
     ### Vérification si le joueur est déjà inscrit / en cours et création chan privé si nécessaire
-
+    """
+    Lance la routine d'inscription, fonction appelée par la commande !co
+    """
     if Joueurs.query.get(member.id):                                            # Joueur dans la bdd = déjà inscrit
         await tools.private_chan(member).send(f"Saloww ! {member.mention} tu es déjà inscrit, viens un peu ici enculé !")
         return
@@ -54,7 +56,7 @@ async def main(bot, member):
         ### Ajout à la BDD
 
         joueur = Joueurs(discord_id=member.id, _chan_id=chan.id, nom=member.display_name,
-                         chambre=chambre, statut="vivant", role="Non attribué", camp="Non attribué", 
+                         chambre=chambre, statut="vivant", role="Non attribué", camp="Non attribué",
                          votant_village=True, votant_loups=False, role_actif=True)
         db.session.add(joueur)
         db.session.commit()
@@ -89,7 +91,7 @@ async def main(bot, member):
 
         await member.add_roles(tools.role(member, "Joueur en vie"))
         await chan.edit(topic="Ta conversation privée avec le bot, c'est ici que tout se passera !")
-        
-        
+
+
     # Conseiller d'ACTIVER TOUTES LES NOTIFS du chan (et mentions only pour le reste, en activant @everyone)
     await chan.send("Tu es maintenant inscrit, installe toi confortablement, la partie va bientôt commencer !")
