@@ -7,7 +7,7 @@ from blocs import bdd_tools
 
 
 class Sync(commands.Cog):
-    """Sync : synchronisation"""
+    """Sync - synchronisation du GSheets vers les tables SQL et les joueurs"""
 
     def changelog(self, ctx, dic):
         message = ""

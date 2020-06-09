@@ -53,7 +53,7 @@ async def retrieve_users(quoi, qui, heure=None):
 
 
 class OpenClose(commands.Cog):
-    """OpenClose : lancement, rappel et fermetures de votes / actions"""
+    """OpenClose - lancement, rappel et fermetures des votes ou des actions"""
 
     @commands.command()
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
