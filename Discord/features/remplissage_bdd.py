@@ -10,7 +10,9 @@ from bdd_connect import db, Tables
 
 
 class RemplissageBDD(commands.Cog):
-    """RemplissageBDD - Commandes pour remplir la base de données du bot à partir des GSheets"""
+    """
+    RemplissageBDD - Commandes pour remplir la base de données du bot à partir des GSheets
+    """
 
 
     @commands.command()

@@ -8,7 +8,9 @@ from bdd_connect import db, Joueurs
 
 
 class Annexe(commands.Cog):
-    """Annexe - commandes annexes aux usages divers"""
+    """
+    Annexe - commandes annexes aux usages divers
+    """
 
     @commands.command()
     async def roll(self, ctx, *, arg):

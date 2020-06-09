@@ -55,7 +55,9 @@ async def build_sequence(ctx):
 
 
 class GestionIA(commands.Cog):
-    """GestionIA - Commandes relatives à l'IA et aux réponses automatiques du bot"""
+    """
+    GestionIA - Commandes relatives à l'IA et aux réponses automatiques du bot
+    """
 
     @commands.command()
     @tools.private

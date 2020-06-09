@@ -9,7 +9,8 @@ from blocs import bdd_tools
 
 
 async def get_actions(quoi, trigger, heure=None):
-    """Renvoie la liste des actions déclenchées par trigger, dans le cas ou c'est temporel, les actions possibles à heure (objet de type time)
+    """
+    Renvoie la liste des actions déclenchées par trigger, dans le cas ou c'est temporel, les actions possibles à heure (objet de type time)
     """
 
     if trigger == "temporel":

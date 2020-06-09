@@ -19,7 +19,9 @@ ACTIONS_SHEET_ID = os.getenv("ACTIONS_SHEET_ID")
 
 
 class VoterAgir(commands.Cog):
-    """VoterAgir - voter (aux votes) et agir (les actions) #yes"""
+    """
+    VoterAgir - voter (aux votes) et agir (les actions) #yes
+    """
 
     @commands.command()
     @tools.private
