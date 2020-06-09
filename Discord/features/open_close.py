@@ -169,15 +169,15 @@ class OpenClose(commands.Cog):
     @commands.command()
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def remind(self, ctx, qui, heure=None):
-    """
-    !remind <qui> [heure] - Rappelle un vote / des actions de rôle pour <qui> (message de rappel)
+        """
+        !remind <qui> [heure] - Rappelle un vote / des actions de rôle pour <qui> (message de rappel)
 
-    <qui> prend les valeurs :
-        -cond         Pour le vote du condamné
-        -maire        Pour le vote du maire
-        -loups        Pour le vote des loups
-        -action       Pour rappeler les actions commençant à [heure] (heure d'envoi du message si non spécifié)
-    """
+        <qui> prend les valeurs :
+            -cond         Pour le vote du condamné
+            -maire        Pour le vote du maire
+            -loups        Pour le vote des loups
+            -action       Pour rappeler les actions commençant à [heure] (heure d'envoi du message si non spécifié)
+        """
 
         users = await retrieve_users("remind", qui, heure)
 
