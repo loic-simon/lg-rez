@@ -1,5 +1,6 @@
 import random
 import unidecode
+import traceback
 
 from discord.ext import commands
 
@@ -62,13 +63,13 @@ class GestionIA(commands.Cog):
     @commands.command()
     @tools.private
     async def stfu(self, ctx, force=None): #stfu le channel de la personne mise en arguments
-        """
-        Gère les réponses automatiques du bot sur le channel courant
+        """Active/désactive la réponse automatique du bot sur les channels privés
 
-        Sans argument, la commande agit comme un toggle (allume les réactions si éteintes et vice-cersa).
-        [start/stop] les active (resp. désactive) si start (resp. stop) est donné en argument de la commande.
+        [force=start/stop] permet de forcer l'activation / la désactivation. 
+        Sans argument, la commande agit comme un toggle (allume les réactions si éteintes et vice-versa).
 
-        DISCLAIMER : Les commandes restent reconnues
+        N'agit que sur les messages classiques envoyés dans le channel : les commandes restent reconnues.
+        Si vous ne comprenez pas le nom de la commande, demandez à Google.
         """
         if force == "start":
             await stfu_on(ctx)
@@ -84,13 +85,10 @@ class GestionIA(commands.Cog):
     @commands.command()
     @commands.has_role("MJ")
     async def addIA(self, ctx, *, triggers=None):
-        """
-        Permet de faire réagir le bot au message "trigger"
+        """Ajouter au bot une règle d'IA : mots ou expressions déclenchant une réaction (COMMANDE MJ)
 
-        trigger peut être un mot, une phrase, ou plusieurs expressions séparées par des points-virgules ou sauts de lignes
-        Dans le cas où plusieurs expressions sont spécifiées, toutes déclencheront l'action demandéenc
-
-        Ne pas spécifier trigger réexpliquera le principe de la commande
+        [trigger] mot(s), phrase(s), ou expression(s) séparées par des points-virgules ou sauts de lignes
+        Dans le cas où plusieurs expressions sont spécifiées, toutes déclencheront l'action demandée.
         """
 
         if not triggers:
@@ -118,12 +116,47 @@ class GestionIA(commands.Cog):
 
     @commands.command()
     @commands.has_role("MJ")
-    async def modifIA(self, ctx, *, trigger=None):
-        """
-        Permet de modifier la réponse automatique du bot au message trigger
+    async def listIA(self, ctx, trigger=None, sensi=0.25):
+        """Liste les règles d'IA actuellement reconnues par le bot (COMMANDE MJ)
 
-        Permet d'ajouter des triggers, des réponses au trigger susmentionné (successives ou aléatoires si plusieurs sont spécifiées, au choix)
-        Permet également de supprimer ou modifier les triggers ou les réponses au trigger susmentionné
+        [trigger] (optionnel) mot/expression permettant de filter et trier les résultats. SI TRIGGER FAIT PLUS D'UN MOT, il doit être entouré par des guillemets !
+        Si trigger est précisé, les triggers sont détectés avec une sensibilité [sensi] (ratio des caractères correspondants, entre 0 et 1).
+        """
+        try:
+            if trigger:
+                trigs = await bdd_tools.find_nearest(trigger, Triggers, carac="trigger", sensi=sensi, solo_si_parfait=False)
+                if not trigs:
+                    await ctx.send(f"Rien trouvé, pas de chance (sensi = {sensi})")
+                    return
+                reacts_ids = list({trig[0].reac_id for trig in trigs})          # Pas de doublons (et reste ordonné)
+            else:
+                trigs = Triggers.query.order_by(Triggers.id).all()              # Trié par date de création (apeupré)
+                reacts_ids = list({trig.reac_id for trig in trigs})             # Pas de doublons (et reste ordonné)
+                
+            reacts = Reactions.query.filter(Reactions.id.in_(reacts_ids))
+            
+            if trigger:
+                L = ["- " + ' – '.join([f"({float(score):.2}) " + trig.trigger for (trig, score) in trigs if trig.reac_id == id]).ljust(50) 
+                    + f" ⇒ {Reactions.query.get(id).reponse}" for id in reacts_ids]
+            else:
+                L = ["- " + ' – '.join([trig.trigger for trig in trigs if trig.reac_id == id]).ljust(50)
+                    + f" ⇒ {Reactions.query.get(id).reponse}" for id in reacts_ids]
+                    
+            r = "\n".join(L) + "\n\nPour modifier une réaction, utiliser !modifIA <trigger>."
+            
+            [await ctx.send(tools.code_bloc(mess)) for mess in tools.smooth_split(r)]
+        except Exception:
+            await ctx.send(traceback.format_exc())
+
+
+    @commands.command()
+    @commands.has_role("MJ")
+    async def modifIA(self, ctx, *, trigger=None):
+        """Modifie/supprime une règle d'IA (COMMANDE MJ)
+
+        [trigger] mot/expression déclenchant la réaction à modifier/supprimer
+        
+        Permet d'ajouter et supprimer des triggers, de modifier la réaction du bot (construction d'une séquence de réponses successives ou aléatoires) ou de supprimer la réaction.
         """
         if not trigger:
             await ctx.send("Mot/expression déclencheur de la réaction à modifier :")

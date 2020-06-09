@@ -41,7 +41,7 @@ async def globally_block_dms(ctx):
 @bot.check
 async def already_in_command(ctx):
     return (ctx.author.id not in ctx.bot.in_command
-            or ctx.command.name in ["help", "stop"])    # Cas particulier : !stop
+            or ctx.command.name == "stop")    # Cas particulier : !stop
 
 @bot.before_invoke      # Appelé seulement si les checks sont OK, donc pas déjà dans bot.in_command
 async def add_to_in_command(ctx):
@@ -136,11 +136,11 @@ class Special(commands.Cog):
 
     @commands.command()
     @commands.has_role("MJ")
-    async def do(self, ctx, *, txt):
+    async def do(self, ctx, *, code):
         """Exécute du code Python et affiche le résultat (COMMANDE MJ)
         
-        <txt> doit être du code valide dans le contexte du fichier bot.py (utilisables notemment : bot, ctx, db, Tables...)
-        Si <txt> est une coroutine, elle sera awaited.
+        <code> doit être du code valide dans le contexte du fichier bot.py (utilisables notemment : bot, ctx, db, Tables...)
+        Si <code> est une coroutine, elle sera awaited (ne pas inclure "await" dans <code>).
         
         Aussi connue sous le nom de « faille de sécurité », cette commande permet de faire environ tout ce qu'on veut sur le bot (y compris le crasher, importer des modules, exécuter des fichiers .py... même si c'est un peu compliqué) voire d'impacter le serveur sur lequel le bot tourne si on est motivé.
         
@@ -150,7 +150,7 @@ class Special(commands.Cog):
             def __init__(self):
                 self.rep = ""
         a = Answer()
-        exec(f"a.rep = {txt}", globals(), locals())
+        exec(f"a.rep = {code}", globals(), locals())
         if asyncio.iscoroutine(a.rep):
             a.rep = await a.rep
         await ctx.send(f"Entrée : {tools.code(txt)}\nSortie :\n{a.rep}")
@@ -161,13 +161,20 @@ class Special(commands.Cog):
     async def co(self, ctx, cible=None):
         """Lance la procédure d'inscription comme si on se connectait au serveur pour la première fois (COMMANDE MJ)
         
-        [cible] le joueur à inscrire, par défaut le lançeur de la commande.
-        Cette commande est principalement destinée aux tests de développement, mais peut être utile si un joueur chibre son inscription (nomamment en association avec !doas).
+        [cible] la MENTION (@joueur) du joueur à inscrire, par défaut le lançeur de la commande.
+        Cette commande est principalement destinée aux tests de développement, mais peut être utile si un joueur chibre son inscription (à utiliser dans son channel, ou #bienvenue (avec !autodestruct) si même le début a chibré).
         """
-        if id := ''.join([c for c in cible if c.isdigit()]):   # Si la chaîne contient un nombre, on l'extrait
-            if ctx.guild.get_member(int(id)):                   # Si cet ID correspond à un utilisateur, on le récupère
-                return [(user, 1)]                              # On a trouvé l'utilisateur !
-        await inscription.main(bot, ctx.author)
+        if cible:
+            id = ''.join([c for c in cible if c.isdigit()])         # Si la chaîne contient un nombre, on l'extrait
+            if id and ctx.guild.get_member(int(id)):                # Si c'est un ID d'un membre du serveur
+                joueur = ctx.guild.get_member(int(id))
+            else:
+                await ctx.send("Cible introuvable.")
+                return
+        else:
+            joueur = ctx.author
+            
+        await inscription.main(bot, joueur)
         
         
     @commands.command()
@@ -290,14 +297,15 @@ class Special(commands.Cog):
             if command in commandes:             # Si commande existante
                 cmd = commandes[command]
                 
-                r = f"{pref}{command} {cmd.signature} – {cmd.help}"
+                r = f"{pref}{command} {cmd.signature} – {cmd.help}\n"
                 # r += f"\n\nUtilise <{pref}help> pour la liste des commandes ou <{pref}help command> pour plus d'information sur une commande."
                 if cmd_aliases := [alias for alias,cmd in aliases.items() if cmd == command]:       # Si la commande a des alias
                     r += f"\n\nAlias : {pref}" + ", {pref}".join(cmd_aliases)
                     
             else:
                 r = f"Commande <{command}> non trouvée.\nUtilise <{pref}help> pour la liste des commandes."
-                
+                     
+        r += "\nSi besoin, n'hésite pas à appeler un MJ en les mentionnant (@MJ)."
         [await ctx.send(tools.code_bloc(m)) for m in tools.smooth_split(r, sep="\n\n")]
         
 

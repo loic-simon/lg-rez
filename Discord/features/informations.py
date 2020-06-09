@@ -7,18 +7,15 @@ import traceback
 
 
 class Informations(commands.Cog):
-    """
-    Informations - Commandes disponibles pour être s'informer sur les rôles
-    """
+    """Informations - Commandes disponibles pour être s'informer sur les rôles"""
 
     @commands.command()
     async def roles(self, ctx, nom_camp="all") :
-        """
-        Affiche la liste des rôles
+        """Affiche la liste des rôles
 
         L'option nom_camp permet de lister les rôles d'un camp spécifique, elle est facultative
         Valeurs possibles pour nom_camp : all, None, Loups, Villageois, Solitaire, Nécros
-        """ #création de la BDD role dans models.py
+        """
         nom_camp = unidecode.unidecode(nom_camp.lower())
         if nom_camp == "all":
             tous = Roles.query.all()
@@ -44,8 +41,7 @@ class Informations(commands.Cog):
 
     @commands.command()
     async def monrole(self, ctx, details="court") :
-        """
-        Affiche les informations du rôle du joueur
+        """Affiche les informations du rôle du joueur
 
         L'option details permet d'avoir plus ou moins d'infos, elle est facultative
         Valeurs possibles pour details : None, court, long, role

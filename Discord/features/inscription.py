@@ -28,7 +28,7 @@ async def main(bot, member):
     await chan.send(f"Bienvenue {member.mention}, laisse moi t'aider à t'inscrire !\n Pour commencer, qui es-tu ?")
 
     def checkChan(m): #Check que le message soit envoyé par l'utilisateur et dans son channel perso
-        return m.channel == chan and m.author == member and not m.content.startswith(bot.command_prefix)
+        return m.channel == chan and m.author != bot.user
     vraiNom = await tools.wait_for_message(bot, check=checkChan)
 
     await chan.edit(name=f"conv-bot-{vraiNom.content}")       # Renommage conv
