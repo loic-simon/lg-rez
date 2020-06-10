@@ -7,19 +7,27 @@ Code : https://github.com/loic-simon/lg-rez
 Le bot tourne en permanence sur le serveur alwaysdata. Pour publier son code, il faut d'abord le transférer :
 	- Unix (après apt-get install sshpass):
 		sshpass -p '}fQ%9J37a' scp -ro User=lg-rez Discord/* ssh-lg-rez.alwaysdata.net:~/www/Discord
+		sshpass -p 'pas d'inspi' scp -ro User=lg-rez Discord/* 10.0.0.1:~/www/Discord (depuis la Rez uniquement)
 
 	- Windows :
 		scp -ro User=lg-rez Discord/* ssh-lg-rez.alwaysdata.net:~/www/Discord
 		}fQ%9J37a
-
+		
+		scp -ro User=lg-rez Discord/* 10.0.0.1:~/www/Discord (depuis la Rez uniquement)
+		pas d'inspi
+		
 
 Puis redémarrer le bot :
 	- Unix (après apt-get install sshpass):
 		sshpass -p '}fQ%9J37a' ssh -l lg-rez ssh-lg-rez.alwaysdata.net ./reboot_bot.sh
+		sshpass -p 'pas d'inspi' ssh -l lg-rez 10.0.0.1 ./reboot_bot.sh (depuis la Rez uniquement)
 
 	- Windows :
 		ssh -l lg-rez ssh-lg-rez.alwaysdata.net ./reboot_bot.sh
 		}fQ%9J37a
+		
+		ssh -l lg-rez 10.0.0.1 ./reboot_bot.sh (depuis la Rez uniquement)
+		pas d'inspi
 
 
 On peut bien sûr enchaîner le tout :

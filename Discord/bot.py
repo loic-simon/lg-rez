@@ -33,15 +33,16 @@ class SuperBot(commands.Bot):
 
 bot = SuperBot(command_prefix=COMMAND_PREFIX, description="Bonjour")
 
-@bot.check
-async def globally_block_dms(ctx):
-    return ctx.guild is not None
 
+class AlreadyInCommand(commands.CheckFailure):
+    pass
 
 @bot.check
 async def already_in_command(ctx):
-    return (ctx.author.id not in ctx.bot.in_command
-            or ctx.command.name == "stop")    # Cas particulier : !stop
+    if (ctx.author.id in ctx.bot.in_command and ctx.command.name != "stop"):    # Cas particulier : !stop
+        raise AlreadyInCommand()
+    else:
+        return True
 
 @bot.before_invoke      # Appelé seulement si les checks sont OK, donc pas déjà dans bot.in_command
 async def add_to_in_command(ctx):
@@ -76,6 +77,9 @@ async def on_member_join(member):
 @bot.event
 async def on_message(message):
     if message.author == bot.user:          # Sécurité pour éviter les boucles infinies
+        return
+    if not message.guild:
+        await message.channel.send("Je n'accepte pas les messages privés, désolé !")
         return
 
     ctx = await bot.get_context(message)
@@ -153,7 +157,7 @@ class Special(commands.Cog):
         exec(f"a.rep = {code}", globals(), locals())
         if asyncio.iscoroutine(a.rep):
             a.rep = await a.rep
-        await ctx.send(f"Entrée : {tools.code(txt)}\nSortie :\n{a.rep}")
+        await ctx.send(f"Entrée : {tools.code(code)}\nSortie :\n{a.rep}")
 
 
     @commands.command()
@@ -318,10 +322,44 @@ bot.add_cog(Special(bot))
 async def on_command_error(ctx, exc):
     db.session.rollback()       # Dans le doute, on vide la session SQL
     if isinstance(exc, commands.CommandInvokeError) and isinstance(exc.original, RuntimeError):     # STOP envoyé
-        await ctx.send(f"Mission aborted.")
+        await ctx.send("Mission aborted.")
+    
+    elif isinstance(exc, commands.CommandInvokeError):
+        await ctx.send(f"Oups ! Un problème est survenu à l'exécution de la commande  :grimacing:\n"
+                       f"{tools.role(ctx, 'MJ').mention} ALED – "
+                       f"{tools.ital(f'{type(exc.original).__name__}: {str(exc.original)}')}")
+    
+    elif isinstance(exc, commands.CommandNotFound):
+        await ctx.send(f"Hum, je ne connais pas cette commande  :thinking:\n"
+                       f"Utilise {tools.code('!help')} pour voir la liste des commandes.")
+    
+    elif isinstance(exc, commands.DisabledCommand):
+        await ctx.send(f"Cette commande est désactivée. Pas de chance !")
+    
+    elif isinstance(exc, commands.ConversionError) or isinstance(exc, commands.UserInputError):
+        await ctx.send(f"Hmm, ce n'est pas comme ça qu'on utilise cette commande ! Petit rappel :")
+        ctx.message.content = f"!help {ctx.command.name}"
+        ctx = await bot.get_context(ctx.message)
+        await ctx.reinvoke()
+    
+    elif isinstance(exc, commands.MissingRole) or isinstance(exc, commands.CheckAnyFailure):
+        await ctx.send("Hé ho toi, cette commande est réservée aux MJs !  :angry:")
+    
+    elif isinstance(exc, AlreadyInCommand) and ctx.command.name not in ["addIA", "modifIA"]:
+        await ctx.send(f"Impossible d'utiliser une commande pendant un processus ! (vote...)\n"
+                       f"Envoie {tools.code('stop')} pour arrêter le processus.")
+                       
+    elif isinstance(exc, commands.CheckFailure):        # Autre check non vérifié
+        await ctx.send(f"Tiens, il semblerait que cette commande ne puisse pas être exécutée ! {tools.role(ctx, 'MJ').mention} ?\n"
+                       f"({tools.ital(f'{type(exc).__name__}: {str(exc)}')})")
+                      
     else:
-        await ctx.send(f"<CommandError> {type(exc).__name__}: {str(exc)}")
+        await ctx.send(f"Oups ! Une erreur inattendue est survenue  :grimacing:\n"
+                       f"{tools.role(ctx, 'MJ').mention} ALED – "
+                       f"{tools.ital(f'{type(exc).__name__}: {str(exc)}')}")
 
+
+# Erreurs non gérées par le code précédent (hors du cadre d'une commande)
 @bot.event
 async def on_error(event, *args, **kwargs):
     db.session.rollback()       # Dans le doute, on vide la session SQL

@@ -1,5 +1,6 @@
 import random
 import traceback
+import datetime
 
 from discord.ext import commands
 
@@ -8,17 +9,17 @@ from bdd_connect import db, Joueurs
 
 
 class Annexe(commands.Cog):
-    """
-    Annexe - commandes annexes aux usages divers
-    """
+    """Annexe - commandes annexes aux usages divers"""
 
     @commands.command()
     async def roll(self, ctx, *, XdY):
-        """
-        Permet de lancer X dés à Y faces avec les modificateurs Modifiers
-        Ex. !roll 1d6 -> lance 1d6
-            !roll 1d20 +3 -> lance 1d20, ajoute 3 au résultat
-            !roll 1d20 +3 -5 -3 +6 -> lance 1d20, ajoute 3+5-3+6 = +1 au résultat
+        """Lance un ou plusieurs dés
+        
+        <XdY> dés à lancer + modifieurs, au format {XdY + XdY + ... + Z - Z ... } avec X le nombre de dés, Y le nombre de faces et Z les modifieurs (constants).
+        
+        Ex. !roll 1d6           -> lance un dé à 6 faces
+            !roll 1d20 +3       -> lance un dé à 20 faces, ajoute 3 au résultat
+            !roll 1d20 + 2d6 -8 -> lance un dé 20 plus deux dés 6, enlève 8 au résultat
         """
         dices = XdY.replace(' ','').replace('-','+-').split('+')        # "1d6 + 5 - 2" -> ["1d6", "5", "-2"]
         r = ""
@@ -44,12 +45,26 @@ class Annexe(commands.Cog):
 
     @commands.command(aliases=["cf", "pf"])
     async def coinflip(self, ctx):
-        """
-        Renvoie le résultat d'un tirage à Pile ou Face (aléatoire)
+        """Renvoie le résultat d'un tirage à Pile ou Face (aléatoire)
 
-        Alias : !cf, !pf
+        Pile je gagne, face tu perds.
         """
         await ctx.send(random.choice(["Pile", "Face"]))
+
+
+    @commands.command()
+    async def ping(self, ctx):
+        """Envoir un ping au bot
+
+        Pong
+        """
+        delta = datetime.datetime.utcnow() - ctx.message.created_at
+        await ctx.send(f"!pong ({delta.total_seconds():.2}s)")
+
+
+
+
+
 
 
     @commands.command(enabled=False)
