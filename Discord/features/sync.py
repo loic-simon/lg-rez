@@ -25,7 +25,7 @@ class Sync(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
     async def sync(self, ctx, silent, *, serial):
         """
         Synchronise les données de tableau de bord vers les tables SQL

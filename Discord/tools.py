@@ -1,6 +1,8 @@
 from functools import wraps
 import asyncio
 import datetime
+import unidecode
+import re
 
 import discord.utils
 import discord.ext.commands
@@ -51,6 +53,18 @@ def emoji(arg, nom):        # Renvoie l'emoji :nom:. arg peut être de type Cont
 def private_chan(member):
     chan_id = Tables["Joueurs"].query.get(member.id)._chan_id
     return member.guild.get_channel(chan_id)
+
+
+# Appel aux MJs
+
+def mention_MJ(arg):        # Renvoie @MJ si le joueur n'est pas un MJ. arg peut être de type Context ou User/Member
+    member = arg.author if hasattr(arg, "author") else arg
+    if member.top_role.name == "MJ":
+        return "@MJ"
+    else:
+        return role(arg, "MJ").mention
+        
+    
 
 
 # Crée un contexte à partir d'un message_id : simule que <user> a envoyé <content> dans son chan privé
@@ -313,6 +327,7 @@ def smooth_split(mess :str, N=1990, sep='\n', rep=''):
     Ajouter <rep> à la fin des messages tronqués de leur séparateur final.
     """
 
+    mess = str(mess)
     LM = []             # Liste des messages
     psl = 0             # indice du Précédent Saut de Ligne
     L = len(mess)
@@ -336,6 +351,13 @@ async def log(arg, message):
     logchan = channel(arg, "logs")
     for mess in smooth_split(message):
         await logchan.send(mess)
+
+
+# Remove accents
+
+def remove_accents(s):
+    p = re.compile("([À-ʲΆ-ת])")      # Abracadabrax, c'est moche mais ça marche (source : tkt frère)
+    return p.sub(lambda c:unidecode.unidecode(c.group()), s)
 
 
 # Formattage de texte dans Discord

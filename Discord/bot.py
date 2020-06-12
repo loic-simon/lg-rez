@@ -12,18 +12,19 @@ from dotenv import load_dotenv
 import blocs
 import tools
 from bdd_connect import db, Tables
-from features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd
+from features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches
 
 
 logging.basicConfig(level=logging.WARNING)
 
-# Récupération du token du bot et de l'ID du serveur
+
+### 1 - Récupération du token du bot et de l'ID du serveur
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 GUILD_ID = int(os.getenv("DISCORD_GUILD_ID"))
 
 
-# Création du bot
+### 2 - Création du bot
 COMMAND_PREFIX = "!"
 class SuperBot(commands.Bot):
     def __init__(self, **kwargs):
@@ -31,9 +32,12 @@ class SuperBot(commands.Bot):
         self.in_command = []        # IDs des joueurs dans une commande
         self.in_stfu = []           # IDs des salons en mode STFU (IA off)
 
-bot = SuperBot(command_prefix=COMMAND_PREFIX, description="Bonjour")
+bot = SuperBot(command_prefix=COMMAND_PREFIX,
+               description="LG-bot – Plateforme pour parties endiablées de Loup-Garou",
+)
 
 
+### 3 - Checks et système de blocage
 class AlreadyInCommand(commands.CheckFailure):
     pass
 
@@ -46,34 +50,48 @@ async def already_in_command(ctx):
 
 @bot.before_invoke      # Appelé seulement si les checks sont OK, donc pas déjà dans bot.in_command
 async def add_to_in_command(ctx):
-    if ctx.command.name != "stop":
+    if ctx.command.name != "stop" and not ctx.author.webhook_id:
         ctx.bot.in_command.append(ctx.author.id)
 
 @bot.after_invoke
 async def remove_from_in_command(ctx):
-    if ctx.command.name != "stop":
+    if ctx.command.name != "stop" and not ctx.author.webhook_id:
         ctx.bot.in_command.remove(ctx.author.id)
 
 
-# Trigger au démarrage du bot
+### 4 - Réactions aux différents évènements
+
+# Au démarrage du bot
 @bot.event
 async def on_ready():
-    print(f"{bot.user} has connected to Discord!")
     guild = bot.get_guild(GUILD_ID)
     print(f"{bot.user} connecté au serveur « {guild.name} » (id : {guild.id})\n")
-    print(f"Guild Members:\n - " + "\n - ".join([member.name for member in guild.members]))
-    print(f"\nChannels:\n - " + "\n - ".join([channel.name for channel in guild.text_channels]))
+    print(f"Guild Members: " + " - ".join([member.display_name for member in guild.members]))
+    print(f"\nChannels: " + " - ".join([channel.name for channel in guild.text_channels]))
     
     await tools.log(guild, "Juste rebooted!")
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="vos demandes (!help)"))
+    
+    # Tâches planifiées
+    now = datetime.datetime.now()
+    r = ""
+    
+    for tache in Tables["Taches"].query.all():
+        delta = (tache.timestamp - now).total_seconds()
+        bot.loop.call_later(delta, taches.execute, tache)  # Si delta < 0 (action manquée), l'exécute immédiatement, sinon attend jusqu'à tache.timestamp
+        r += f"Récupération de la tâche {tools.code(tache.timestamp)} > {tools.code(tache.commande)}\n"
+    
+    if r:
+        await tools.log(guild, r)
+    
 
-
-# Trigger à l'arrivée d'un membre sur le serveur, crée un channel à son nom
+# À l'arrivée d'un membre sur le serveur
 @bot.event
 async def on_member_join(member):
     await inscription.main(bot,member)
 
 
-# Trigger à chaque message
+# À chaque message
 @bot.event
 async def on_message(message):
     if message.author == bot.user:          # Sécurité pour éviter les boucles infinies
@@ -93,7 +111,7 @@ async def on_message(message):
         await IA.main(ctx)
 
 
-# Trigger à chaque réaction ajoutée
+# À chaque réaction ajoutée
 @bot.event
 async def on_raw_reaction_add(payload):
     reactor = payload.member
@@ -119,27 +137,27 @@ async def on_raw_reaction_add(payload):
         await bot.invoke(ctx)       # On trigger !vote
         
 
-# Commandes définies dans les fichiers annexes !
-#   (un cog par fichier dans features, sauf IA.py)
+### 5 - Commandes (définies dans les fichiers annexes, un cog par fichier dans features)
 
 # Commandes MJ / bot
-bot.add_cog(annexe.Annexe(bot))                     # Tests divers et inutiles
 bot.add_cog(sync.Sync(bot))                         # Synchronisation TDB (appel par webhook)
 bot.add_cog(open_close.OpenClose(bot))              # Ouverture/fermeture votes/actions (appel par webhook)
 bot.add_cog(remplissage_bdd.RemplissageBDD(bot))    # Drop et remplissage table de données
-bot.add_cog(IA.GestionIA(bot))
+bot.add_cog(IA.GestionIA(bot))                      # Ajout, liste, modification des règles d'IA
+bot.add_cog(taches.GestionTaches(bot))              # Tâches planifiées
 
 # Commandes joueurs
+bot.add_cog(annexe.Annexe(bot))                     # Ouils divers et plus ou moins inutiles
 bot.add_cog(informations.Informations(bot))         # Information du joueur
 bot.add_cog(voter_agir.VoterAgir(bot))              # Voter ou agir
 
 
-# Commandes spéciales
+### 6 - Commandes spéciales
 class Special(commands.Cog):
     """Special - Commandes spéciales (méta-commandes, imitant ou impactant le déroulement des autres)"""
 
     @commands.command()
-    @commands.has_role("MJ")
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def do(self, ctx, *, code):
         """Exécute du code Python et affiche le résultat (COMMANDE MJ)
         
@@ -161,7 +179,7 @@ class Special(commands.Cog):
 
 
     @commands.command()
-    @commands.has_role("MJ")
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def co(self, ctx, cible=None):
         """Lance la procédure d'inscription comme si on se connectait au serveur pour la première fois (COMMANDE MJ)
         
@@ -182,7 +200,7 @@ class Special(commands.Cog):
         
         
     @commands.command()
-    @commands.has_role("MJ")
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def doas(self, ctx, *, qui_quoi):
         """Exécute une commande en tant qu'un autre joueur (COMMANDE MJ)
         
@@ -200,27 +218,8 @@ class Special(commands.Cog):
         await ctx.bot.process_commands(ctx.message)
         
         
-    @commands.command()
-    @commands.has_role("MJ")
-    async def doin(self, ctx, *, apres_quoi):
-        """Exécute une commande après X secondes (COMMANDE MJ)
-        
-        <apres_quoi> doit être un entier ou un flottant (nombre de secondes à attendre) suivi de la commande à exécuter (commençant par un !)
-        
-        Pas sûr de l'utilité de cette commande, mais bon elle existe
-        """
-        apres, quoi = apres_quoi.split(" ", maxsplit=1)      # !doin 15 !vote R ==> apres = "15", quoi = "!vote R"
-        
-        await asyncio.sleep(float(apres))
-        ctx.message.content = quoi
-        
-        await remove_from_in_command(ctx)       # Bypass la limitation de 1 commande à la fois
-        await ctx.bot.process_commands(ctx.message)
-        await add_to_in_command(ctx)
-        
-        
     @commands.command(aliases=["autodestruct", "ad"])
-    @commands.has_role("MJ")
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def secret(self, ctx, *, quoi):
         """Supprime le message puis exécute la commande (COMMANDE MJ)
         
@@ -249,7 +248,7 @@ class Special(commands.Cog):
         ctx.send("Te voilà libre, camarade !")
 
 
-    # Gestion de l'aide    
+    ### 6 bis - Gestion de l'aide    
     bot.remove_command("help")
     
     @commands.command()
@@ -316,8 +315,7 @@ class Special(commands.Cog):
 bot.add_cog(Special(bot))
 
 
-# Gestion des erreurs
-
+### 7 - Gestion des erreurs
 @bot.event
 async def on_command_error(ctx, exc):
     db.session.rollback()       # Dans le doute, on vide la session SQL
@@ -326,7 +324,7 @@ async def on_command_error(ctx, exc):
     
     elif isinstance(exc, commands.CommandInvokeError):
         await ctx.send(f"Oups ! Un problème est survenu à l'exécution de la commande  :grimacing:\n"
-                       f"{tools.role(ctx, 'MJ').mention} ALED – "
+                       f"{tools.mention_MJ(ctx)} ALED – "
                        f"{tools.ital(f'{type(exc.original).__name__}: {str(exc.original)}')}")
     
     elif isinstance(exc, commands.CommandNotFound):
@@ -350,14 +348,13 @@ async def on_command_error(ctx, exc):
                        f"Envoie {tools.code('stop')} pour arrêter le processus.")
                        
     elif isinstance(exc, commands.CheckFailure):        # Autre check non vérifié
-        await ctx.send(f"Tiens, il semblerait que cette commande ne puisse pas être exécutée ! {tools.role(ctx, 'MJ').mention} ?\n"
+        await ctx.send(f"Tiens, il semblerait que cette commande ne puisse pas être exécutée ! {tools.mention_MJ(ctx)} ?\n"
                        f"({tools.ital(f'{type(exc).__name__}: {str(exc)}')})")
                       
     else:
         await ctx.send(f"Oups ! Une erreur inattendue est survenue  :grimacing:\n"
-                       f"{tools.role(ctx, 'MJ').mention} ALED – "
+                       f"{tools.mention_MJ(ctx)} ALED – "
                        f"{tools.ital(f'{type(exc).__name__}: {str(exc)}')}")
-
 
 # Erreurs non gérées par le code précédent (hors du cadre d'une commande)
 @bot.event
@@ -371,5 +368,12 @@ async def on_error(event, *args, **kwargs):
     raise        # On remonte l'exception à Python
 
 
-# Exécute le tout (bloquant, rien n'est exécuté après)
+### 8 - Exécute le tout (bloquant, rien n'est exécuté après)
 bot.run(TOKEN)
+# try:
+#     bot.loop.run_until_complete(bot.start(TOKEN))
+# except KeyboardInterrupt:
+#     bot.loop.run_until_complete(bot.logout())
+#     # cancel all tasks lingering
+# finally:
+#     bot.loop.close()

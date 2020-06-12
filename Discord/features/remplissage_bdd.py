@@ -16,7 +16,7 @@ class RemplissageBDD(commands.Cog):
 
 
     @commands.command()
-    @commands.has_role("MJ")
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def droptable(self, ctx, table):
         """
         Supprime la table <table>.
@@ -39,7 +39,7 @@ class RemplissageBDD(commands.Cog):
 
 
     @commands.command()
-    @commands.has_role("MJ")
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def fillroles(self, ctx):
         """
         Remplit les table Roles, BaseActions et BaseActionsRoles depuis le GSheet ad hoc

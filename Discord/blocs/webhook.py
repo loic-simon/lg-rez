@@ -13,7 +13,8 @@ def send(message :str, source="tp"):
     Appelle le webhook Discord de l'url <source> avec le message <message>.
     Raccourcis utilisables pour <source> :
         - "tp" ==> webhook Tâche planifiée (défini dans .env)
-        - "sync" ==> webhook Synchronisation TDB (défini dans .env)"""
+        - "sync" ==> webhook Synchronisation TDB (défini dans .env)
+    """
     
     if source == "tp":
         url = WEBHOOK_TP_URL

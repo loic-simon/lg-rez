@@ -1,8 +1,13 @@
 import datetime
-from sqlalchemy.orm.attributes import flag_modified     # Permet de "signaler" les entrées modifiées, à commit en base
+import re
 
 import difflib
 import unidecode
+from sqlalchemy.orm.attributes import flag_modified     # Permet de "signaler" les entrées modifiées, à commit en base
+
+def remove_accents(s):
+    p = re.compile("([À-ʲΆ-ת])")      # Abracadabrax, c'est moche mais ça marche
+    return p.sub(lambda c:unidecode.unidecode(c.group()), s)
 
 def modif(item, col, value):
     setattr(item, col, value)
@@ -26,9 +31,14 @@ def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input
                 return False
             else:
                 raise ValueError()
-        elif SQL_type == "Time":
-            h, m = value.split(':')
-            return datetime.time(int(h), int(m))
+        elif SQL_type == "Time":                # hh:mm
+            h, m, _ = value.split(':')
+            return datetime.time(hour=int(h), minute=int(m))
+        elif SQL_type == "DateTime":            # aaaa-mm-jjThh:mm
+            date, time = value.split('T')
+            aaaa, mm, jj = date.split('-')
+            h, m = time.split(':')
+            return datetime.datetime(year=int(aaaa), month=int(mm), day=int(jj), hour=int(h), minute=int(m))
         else:
             raise KeyError(f"unknown column type for column '{col}': '{SQL_type}'")
     except (ValueError, TypeError):
@@ -71,7 +81,7 @@ async def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_
             return [(user, 1)]                          # On a trouvé l'utilisateur !
 
     SM = difflib.SequenceMatcher()                      # Création du comparateur de chaînes
-    slug1 = unidecode.unidecode(chaine).lower()         # Cible en minuscule et sans accents
+    slug1 = remove_accents(chaine).lower()              # Cible en minuscule et sans accents
     SM.set_seq1(slug1)                                  # Première chaîne à comparer : cible demandée
 
     if not filtre:
@@ -84,7 +94,7 @@ async def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_
         carac = get_primary_col(table)
 
     for entry in query:
-        slug2 = unidecode.unidecode(getattr(entry, carac)).lower()
+        slug2 = remove_accents(getattr(entry, carac)).lower()
 
         SM.set_seq2(slug2)                              # Pour chaque joueur, on compare la cible à son nom (en non accentué)
         score = SM.ratio()                              # On calcule la ressemblance

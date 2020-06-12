@@ -58,7 +58,7 @@ class OpenClose(commands.Cog):
     """
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
     async def open(self, ctx, qui, heure=None):
         """
         Lance un vote / des actions de rôle pour <qui>
@@ -111,7 +111,7 @@ class OpenClose(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
     async def close(self, ctx, qui, heure=None):
         """
         Lance un vote / des actions de rôle pour <qui>
@@ -167,7 +167,7 @@ class OpenClose(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
     async def remind(self, ctx, qui, heure=None):
         """
         Rappelle un vote / des actions de rôle pour <qui> (message de rappel)

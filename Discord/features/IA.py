@@ -1,5 +1,4 @@
 import random
-import unidecode
 import traceback
 
 from discord.ext import commands
@@ -83,7 +82,7 @@ class GestionIA(commands.Cog):
 
 
     @commands.command()
-    @commands.has_role("MJ")
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def addIA(self, ctx, *, triggers=None):
         """Ajouter au bot une règle d'IA : mots ou expressions déclenchant une réaction (COMMANDE MJ)
 
@@ -97,7 +96,7 @@ class GestionIA(commands.Cog):
             triggers = mess.content
 
         triggers = triggers.replace('\n', ';').split(';')
-        triggers = [unidecode.unidecode(s).lower().strip() for s in triggers]
+        triggers = [tools.remove_accents(s).lower().strip() for s in triggers]
         await ctx.send(f"Triggers : `{'` – `'.join(triggers)}`")
 
         reponse = await build_sequence(ctx)
@@ -115,42 +114,46 @@ class GestionIA(commands.Cog):
 
 
     @commands.command()
-    @commands.has_role("MJ")
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def listIA(self, ctx, trigger=None, sensi=0.25):
         """Liste les règles d'IA actuellement reconnues par le bot (COMMANDE MJ)
 
         [trigger] (optionnel) mot/expression permettant de filter et trier les résultats. SI TRIGGER FAIT PLUS D'UN MOT, il doit être entouré par des guillemets !
         Si trigger est précisé, les triggers sont détectés avec une sensibilité [sensi] (ratio des caractères correspondants, entre 0 et 1).
         """
-        try:
+        async with ctx.typing():
             if trigger:
                 trigs = await bdd_tools.find_nearest(trigger, Triggers, carac="trigger", sensi=sensi, solo_si_parfait=False)
                 if not trigs:
                     await ctx.send(f"Rien trouvé, pas de chance (sensi = {sensi})")
                     return
-                reacts_ids = list({trig[0].reac_id for trig in trigs})          # Pas de doublons (et reste ordonné)
+                reacts_ids = []
+                [reacts_ids.append(id) for trig in trigs if (id := trig[0].reac_id) not in reacts_ids]    # Pas de doublons
             else:
                 trigs = Triggers.query.order_by(Triggers.id).all()              # Trié par date de création (apeupré)
                 reacts_ids = list({trig.reac_id for trig in trigs})             # Pas de doublons (et reste ordonné)
                 
             reacts = Reactions.query.filter(Reactions.id.in_(reacts_ids))
             
+            def nettoy(s):
+                if len(s) > 90:
+                    s = s[:60] + " [...] " + s[-15:]
+                return s.replace('\r\n', '\\n').replace('\n', '\\n').replace('\r', '\\r')
+
             if trigger:
                 L = ["- " + ' – '.join([f"({float(score):.2}) " + trig.trigger for (trig, score) in trigs if trig.reac_id == id]).ljust(50) 
-                    + f" ⇒ {Reactions.query.get(id).reponse}" for id in reacts_ids]
+                    + f" ⇒ {nettoy(Reactions.query.get(id).reponse)}" for id in reacts_ids]
             else:
                 L = ["- " + ' – '.join([trig.trigger for trig in trigs if trig.reac_id == id]).ljust(50)
-                    + f" ⇒ {Reactions.query.get(id).reponse}" for id in reacts_ids]
+                    + f" ⇒ {nettoy(Reactions.query.get(id).reponse)}" for id in reacts_ids]
                     
             r = "\n".join(L) + "\n\nPour modifier une réaction, utiliser !modifIA <trigger>."
             
-            [await ctx.send(tools.code_bloc(mess)) for mess in tools.smooth_split(r)]
-        except Exception:
-            await ctx.send(traceback.format_exc())
+        [await ctx.send(tools.code_bloc(mess)) for mess in tools.smooth_split(r)]
 
 
     @commands.command()
-    @commands.has_role("MJ")
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def modifIA(self, ctx, *, trigger=None):
         """Modifie/supprime une règle d'IA (COMMANDE MJ)
 
@@ -230,9 +233,15 @@ class GestionIA(commands.Cog):
 
 
 async def main(ctx):
-    trigs = await bdd_tools.find_nearest(ctx.message.content, Triggers, carac="trigger", sensi=0.7)
+    c = ctx.message.content
+    trigs = await bdd_tools.find_nearest(c, Triggers, carac="trigger", sensi=0.7)
     if not trigs:
-        await ctx.send("Désolé, je n'ai pas compris 🤷‍♂️")
+        if c.lower().startswith(('dis ', 'dit ')) and len(c) > 4:
+            await ctx.send(c[4:])
+        if c.lower().startswith(('di', 'dy')) and len(c) > 2:
+            await ctx.send(c[2:])
+        else:    
+            await ctx.send("Désolé, je n'ai pas compris 🤷‍♂️")
         return
 
     trig = trigs[0][0]
@@ -253,4 +262,4 @@ async def main(ctx):
             ctx = await ctx.bot.process_commands(ctx.message)
 
         else:                                           # Texte / média
-            await ctx.send(rep)
+            await ctx.send(rep, tts=True)   # pardon

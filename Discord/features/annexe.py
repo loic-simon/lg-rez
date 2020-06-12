@@ -38,7 +38,7 @@ class Annexe(commands.Cog):
                     r += f" {'-' if v < 0 else '+'} {abs(v)}"
             r += f" = {tools.emoji_chiffre(s, True)}"
         except Exception:
-            await ctx.send(tools.code("!role") + " : pattern non reconu"+traceback.format_exc())
+            await ctx.send(f"Pattern non reconu. Utilisez {tools.code('!help roll')} pour plus d'informations.")
         else:
             await ctx.send(r[3:])
 
@@ -68,7 +68,7 @@ class Annexe(commands.Cog):
 
 
     @commands.command(enabled=False)
-    @commands.has_role("MJ")
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def test(self, ctx, *, arg):
         """Test : test !"""
 
@@ -91,7 +91,7 @@ class Annexe(commands.Cog):
 
 
     @commands.command(enabled=False)
-    @commands.has_role("MJ")
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def testreact(self, ctx, *reacts):
         message = await ctx.send(tools.code_bloc(f"REACT TO THAT!\nReacts: {' - '.join(reacts)}"))
         react = await tools.wait_for_react_clic(ctx.bot, message, ["🔴", "🟠", "🟢"])
@@ -99,7 +99,7 @@ class Annexe(commands.Cog):
 
 
     @commands.command(enabled=False)
-    @commands.has_role("MJ")
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def testbdd(self, ctx):
         """Test BDD"""
 
@@ -109,7 +109,7 @@ class Annexe(commands.Cog):
 
 
     @commands.command(enabled=False)
-    @commands.has_role("MJ")
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def rename(self, ctx, id: int, nom: str):
         """Renommer quelqu'un à partir de son ID"""
 

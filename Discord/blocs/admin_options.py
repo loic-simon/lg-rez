@@ -44,6 +44,7 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
                      "BigInteger": "number",
                      "Boolean": "checkbox",
                      "Time": "time",
+                     "DateTime": "datetime-local",
                      }
         try:
             return map_types[SQL_type_name]
@@ -51,17 +52,16 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
             raise KeyError(f"unknown column type: '{SQL_type_name}''")
 
     def HTMLform_value(SQL_type, value):
-        SQL_type_name = type(SQL_type).__name__
-        maxcar = int(str(SQL_type)[8:-1]) if SQL_type_name == 'String' else 0
-        map_values = {"String": f"""{f'value="{value}"' if value else ""} size=\"{min(0.4*maxcar, 60)}cm" """,
-                      "Text": f"""{f'value="{value}"' if value else ""} size="20cm" """,
-                      "Integer": f"""{f'value={value}' if value is not None else ""} style="width:1.5cm" """,
-                      "BigInteger": f"""{f'value={value}' if value is not None else ""} style="width:4cm" """,
-                      "Boolean": "checked" if str(value).lower() == "true" else "",
-                      "Time": f"value={value}" if value else "",
+        map_values = {"String": lambda v:f"""{f'value="{v}"' if v else ""} size=\"{min(0.4*int(str(SQL_type)[8:-1]), 60)}cm" """,
+                      "Text": lambda v:f"""{f'value="{v}"' if v else ""} size="20cm" """,
+                      "Integer": lambda v:f"""{f'value={v}' if v is not None else ""} style="width:1.5cm" """,
+                      "BigInteger": lambda v:f"""{f'value={v}' if v is not None else ""} style="width:4cm" """,
+                      "Boolean": lambda v:"checked" if v else "",
+                      "Time": lambda v:f'value="{v.strftime("%H:%M")}"' if v else "",
+                      "DateTime": lambda v:f'value="{v.strftime("%Y-%m-%dT%H:%M")}"' if v else "",
                       }
         try:
-            return map_values[SQL_type_name]
+            return map_values[type(SQL_type).__name__](value)
         except KeyError:
             raise KeyError(f"unknown column type: '{SQL_type_name}''")
 

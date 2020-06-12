@@ -119,7 +119,7 @@ class BaseActions(db.Model):
 
 
 class Actions(db.Model):
-    _id = db.Column(db.Integer(), primary_key=True)
+    id = db.Column(db.Integer(), primary_key=True)
     player_id = db.Column(db.BigInteger(), nullable=False)
     action = db.Column(db.String(32), nullable=False)
     
@@ -146,7 +146,8 @@ class Actions(db.Model):
     
     #treated = db.Column(db.Boolean(), nullable=False)
 
-    def __init__(self, player_id, action, trigger_debut=None, trigger_fin=None, instant=None, heure_debut=None, heure_fin=None, cooldown=0, charges=None, refill=None, lieu=None, interaction_notaire=None, interaction_gardien=None, mage=None, changement_cible=None, _decision=None):
+    def __init__(self, *, id=None, player_id, action, trigger_debut=None, trigger_fin=None, instant=None, heure_debut=None, heure_fin=None, cooldown=0, charges=None, refill=None, lieu=None, interaction_notaire=None, interaction_gardien=None, mage=None, changement_cible=None, _decision=None):
+        self.id = id
         self.player_id = player_id
         self.action = action                # Nom de l'action en rapport avec la table BaseActions
         self.trigger_debut = trigger_debut
@@ -179,6 +180,17 @@ class BaseActionsRoles(db.Model):
         self.action = action
 
 
+class Taches(db.Model):
+    id = db.Column(db.Integer(), primary_key=True)
+    timestamp = db.Column(db.DateTime(), nullable=False)
+    commande = db.Column(db.String(200), nullable=False)
+
+    def __init__(self, *, id=None, timestamp, commande):
+        self.id = id
+        self.timestamp = timestamp
+        self.commande = commande
+
+
 class Triggers(db.Model):
     """Table Triggers : mots et expressions déclenchant l'IA"""
     id = db.Column(db.Integer(), primary_key=True)
@@ -194,7 +206,7 @@ class Triggers(db.Model):
 class Reactions(db.Model):
     """Table Reactions : réactions de l'IA"""
     id = db.Column(db.Integer(), primary_key=True)
-    reponse = db.Column(db.String(500), nullable=False)     # Réponse, dans le format personnalisé : "txt <||> txt <&&> <##>react"
+    reponse = db.Column(db.String(2000), nullable=False)     # Réponse, dans le format personnalisé : "txt <||> txt <&&> <##>react"
     
     def __init__(self, *, id=None, reponse=None):
         self.id = id                # Si None : auto-incrément
@@ -208,6 +220,7 @@ Tables = {"Joueurs":Joueurs,
           "BaseActionsRoles": BaseActionsRoles,
           "Triggers": Triggers,
           "Reactions": Reactions,
+          "Taches": Taches,
           }
 
 db.create_all()
