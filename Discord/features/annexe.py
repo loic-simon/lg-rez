@@ -54,7 +54,7 @@ class Annexe(commands.Cog):
 
     @commands.command()
     async def ping(self, ctx):
-        """Envoir un ping au bot
+        """Envoie un ping au bot
 
         Pong
         """

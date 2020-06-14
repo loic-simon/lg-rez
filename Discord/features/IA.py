@@ -1,5 +1,4 @@
 import random
-import traceback
 
 from discord.ext import commands
 
@@ -7,17 +6,19 @@ import tools
 from blocs import bdd_tools
 from bdd_connect import db, Triggers, Reactions
 
+
+# Marqueurs de séparation du mini-langage des séquences-réactions
 MARK_OR = ' <||> '
-MARK_AND = ' <&&> '
+MARK_THEN = ' <&&> '
 MARK_REACT = '<::>'
 MARK_CMD = '<!!>'
+
 
 # Commandes de STFU
 async def stfu_on(ctx):
     if ctx.channel.id not in ctx.bot.in_stfu:
         await ctx.send("Okay, je me tais ! Tape !stfu quand tu voudras de nouveau de moi :cry:")
         ctx.bot.in_stfu.append(ctx.channel.id)
-        #await ctx.channel.edit(topic = "Ta conversation privée avec le bot, c'est ici que tout se passera ! (STFU ON)")
     else:
         await ctx.send("Arrête de t'acharner, tu m'as déja dit de me taire...")
 
@@ -25,11 +26,11 @@ async def stfu_off(ctx):
     if ctx.channel.id in ctx.bot.in_stfu:
         await ctx.send("Ahhh, ça fait plaisir de pouvoir reparler !")
         ctx.bot.in_stfu.remove(ctx.channel.id)
-        #await ctx.channel.edit(topic = "Ta conversation privée avec le bot, c'est ici que tout se passera !")
     else:
         await ctx.send("Ça mon p'tit pote, tu l'as déjà dit !")
 
 
+# Construction d'une séquence-réaction par l'utilisateur
 async def build_sequence(ctx):
     reponse = ""
     fini = False
@@ -38,34 +39,33 @@ async def build_sequence(ctx):
         ret = await tools.wait_for_react_clic(ctx.bot, message, process_text=True, trigger_all_reacts=True, trigger_on_commands=True)
         if isinstance(ret, str):
             if ret.startswith(ctx.bot.command_prefix):      # Commande
-                reponse += MARK_CMD + ret.lstrip(ctx.bot.command_prefix).strip()
+                reponse += MARK_CMD + ret.lstrip(ctx.bot.command_prefix)
             else:                                           # Texte / média
-                reponse += ret.strip()
+                reponse += ret
         else:                                               # React
             reponse += MARK_REACT + ret.name
 
         message = await ctx.send("▶ Puis / 🔀 Ou / ⏹ Fin ?")
-        ret = await tools.wait_for_react_clic(ctx.bot, message, emojis={"▶":MARK_AND, "🔀":MARK_OR, "⏹":False})
+        ret = await tools.wait_for_react_clic(ctx.bot, message, emojis={"▶":MARK_THEN, "🔀":MARK_OR, "⏹":False})
         if ret:
-            reponse += ret
+            reponse += ret          # On ajoute la marque OR ou THEN à la séquence
         else:
             fini = True
 
     return reponse
 
 
+
 class GestionIA(commands.Cog):
-    """
-    GestionIA - Commandes relatives à l'IA et aux réponses automatiques du bot
-    """
+    """GestionIA - Commandes relatives à l'IA (réponses automatiques du bot)"""
 
     @commands.command()
     @tools.private
     async def stfu(self, ctx, force=None): #stfu le channel de la personne mise en arguments
-        """Active/désactive la réponse automatique du bot sur les channels privés
+        """Active/désactive la réponse automatique du bot sur ton channel privé
 
         [force=start/stop] permet de forcer l'activation / la désactivation. 
-        Sans argument, la commande agit comme un toggle (allume les réactions si éteintes et vice-versa).
+        Sans argument, la commande agit comme un toggle (active les réactions si désactivées et vice-versa).
 
         N'agit que sur les messages classiques envoyés dans le channel : les commandes restent reconnues.
         Si vous ne comprenez pas le nom de la commande, demandez à Google.
@@ -84,12 +84,11 @@ class GestionIA(commands.Cog):
     @commands.command()
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def addIA(self, ctx, *, triggers=None):
-        """Ajouter au bot une règle d'IA : mots ou expressions déclenchant une réaction (COMMANDE MJ)
+        """Ajoute au bot une règle d'IA : mots ou expressions déclenchant une réaction (COMMANDE MJ)
 
         [trigger] mot(s), phrase(s), ou expression(s) séparées par des points-virgules ou sauts de lignes
         Dans le cas où plusieurs expressions sont spécifiées, toutes déclencheront l'action demandée.
         """
-
         if not triggers:
             await ctx.send("Mots/expressions déclencheurs (non sensibles à la casse / accents), séparés par des points-virgules ou des sauts de ligne :")
             mess = await tools.wait_for_message(ctx.bot, check=lambda m:m.channel == ctx.channel and m.author != ctx.bot.user)
@@ -105,52 +104,51 @@ class GestionIA(commands.Cog):
         async with ctx.typing():
             reac = Reactions(reponse=reponse)
             db.session.add(reac)
-            db.session.flush()
+            db.session.flush()          # On "fait comme si" on commitait l'ajout de reac, ce qui calcule read.id (autoincrément)
 
             trigs = [Triggers(trigger=trigger, reac_id=reac.id) for trigger in triggers]
             db.session.add_all(trigs)
             db.session.commit()
-        await ctx.send(f"Ajouté en base.")
-
+        await ctx.send(f"Règle ajoutée en base.")
+        
 
     @commands.command()
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
-    async def listIA(self, ctx, trigger=None, sensi=0.25):
+    async def listIA(self, ctx, trigger=None, sensi=0.5):
         """Liste les règles d'IA actuellement reconnues par le bot (COMMANDE MJ)
 
-        [trigger] (optionnel) mot/expression permettant de filter et trier les résultats. SI TRIGGER FAIT PLUS D'UN MOT, il doit être entouré par des guillemets !
+        [trigger] (optionnel) mot/expression permettant de filter et trier les résultats. SI TRIGGER FAIT PLUS D'UN MOT, IL DOIT ÊTRE ENTOURÉ PAR DES GUILLEMETS !
         Si trigger est précisé, les triggers sont détectés avec une sensibilité [sensi] (ratio des caractères correspondants, entre 0 et 1).
         """
         async with ctx.typing():
             if trigger:
-                trigs = await bdd_tools.find_nearest(trigger, Triggers, carac="trigger", sensi=sensi, solo_si_parfait=False)
+                trigs = await bdd_tools.find_nearest(trigger, table=Triggers, carac="trigger", sensi=sensi, solo_si_parfait=False)
                 if not trigs:
                     await ctx.send(f"Rien trouvé, pas de chance (sensi = {sensi})")
                     return
-                reacts_ids = []
-                [reacts_ids.append(id) for trig in trigs if (id := trig[0].reac_id) not in reacts_ids]    # Pas de doublons
             else:
-                trigs = Triggers.query.order_by(Triggers.id).all()              # Trié par date de création (apeupré)
-                reacts_ids = list({trig.reac_id for trig in trigs})             # Pas de doublons (et reste ordonné)
-                
-            reacts = Reactions.query.filter(Reactions.id.in_(reacts_ids))
-            
-            def nettoy(s):
-                if len(s) > 90:
-                    s = s[:60] + " [...] " + s[-15:]
-                return s.replace('\r\n', '\\n').replace('\n', '\\n').replace('\r', '\\r')
+                raw_trigs = Triggers.query.order_by(Triggers.id).all()          # Trié par date de création
+                trigs = list(zip(raw_trigs, [None]*len(raw_trigs)))             # Mise au format (trig, score)
 
-            if trigger:
-                L = ["- " + ' – '.join([f"({float(score):.2}) " + trig.trigger for (trig, score) in trigs if trig.reac_id == id]).ljust(50) 
-                    + f" ⇒ {nettoy(Reactions.query.get(id).reponse)}" for id in reacts_ids]
-            else:
-                L = ["- " + ' – '.join([trig.trigger for trig in trigs if trig.reac_id == id]).ljust(50)
-                    + f" ⇒ {nettoy(Reactions.query.get(id).reponse)}" for id in reacts_ids]
-                    
+            reacts_ids = []     # IDs des réactions associées à notre liste de triggers
+            [reacts_ids.append(id) for trig in trigs if (id := trig[0].reac_id) not in reacts_ids]    # Pas de doublons, et reste ordonné
+            
+            def nettoy(s):      # Abrège la réponse si trop longue et neutralise les sauts de ligne / rupture code_bloc, pour affichage
+                s = s.replace('\r\n', '\\n').replace('\n', '\\n').replace('\r', '\\r').replace("```", "'''")
+                if len(s) < 75:
+                    return s
+                else: 
+                    return s[:50] + " [...] " + s[-15:]
+
+            L = ["- " + " – ".join([(f"({float(score):.2}) " if score else "") + trig.trigger       # (score) trigger - (score) trigger ...
+                                    for (trig, score) in trigs if trig.reac_id == id]).ljust(50)        # pour chaque trigger
+                 + f" ⇒ {nettoy(Reactions.query.get(id).reponse)}"                                 # ⇒ réponse
+                 for id in reacts_ids]                                                                  # pour chaque réponse
+                 
             r = "\n".join(L) + "\n\nPour modifier une réaction, utiliser !modifIA <trigger>."
             
-        [await ctx.send(tools.code_bloc(mess)) for mess in tools.smooth_split(r)]
-
+        [await ctx.send(tools.code_bloc(mess)) for mess in tools.smooth_split(r)]       # On envoie, en séparant en blocs de 2000 caractères max
+        
 
     @commands.command()
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
@@ -215,7 +213,7 @@ class GestionIA(commands.Cog):
                 reponse = await build_sequence(ctx)
             else:
                 r = f"Séquence actuelle : {tools.code(rep.reponse)}" if MT else ""    # Si ça fait longtemps, on le remet
-                r += f"\nMarqueur OU : {tools.code(MARK_OR)}, Marqueur ET : {tools.code(MARK_AND)}, Marqueur REACT : {tools.code(MARK_REACT)}, Marqueur CMD : {tools.code(MARK_CMD)}"
+                r += f"\nMarqueur OU : {tools.code(MARK_OR)}, Marqueur ET : {tools.code(MARK_THEN)}, Marqueur REACT : {tools.code(MARK_REACT)}, Marqueur CMD : {tools.code(MARK_CMD)}"
                 mess = await ctx.send(r + "\nNouvelle séquence :")
                 reponse = (await tools.wait_for_message(ctx.bot, lambda m:m.channel == ctx.channel and m.author != ctx.bot.user)).content
 
@@ -232,34 +230,39 @@ class GestionIA(commands.Cog):
 
 
 
-async def main(ctx):
-    c = ctx.message.content
-    trigs = await bdd_tools.find_nearest(c, Triggers, carac="trigger", sensi=0.7)
-    if not trigs:
+# Exécute les règles d'IA en réaction à <message>
+async def process_IA(bot, message):
+    trigs = await bdd_tools.find_nearest(message.content, Triggers, carac="trigger", sensi=0.7)
+    
+    if trigs:       # Au moins un trigger trouvé à cette sensi
+        trig = trigs[0][0]                                  # Meilleur trigger (score max)
+        seq = Reactions.query.get(trig.reac_id).reponse     # Séquence-réponse associée
+
+        for rep in seq.split(MARK_THEN):                    # Pour chaque étape :
+            if MARK_OR in rep:                                  # Si plusieurs possiblités :
+                rep = random.choice(rep.split(MARK_OR))             # On en choisit une random
+
+            if rep.startswith(MARK_REACT):                      # Si réaction :
+                react = rep.lstrip(MARK_REACT)
+                emoji = tools.emoji(message, react) or react        # Si custom emoji : objet Emoji, sinon le codepoint de l'emoji direct
+                await message.add_reaction(emoji)                   # Ajout de la réaction
+
+            elif rep.startswith(MARK_CMD):                      # Si commande :
+                message.content = rep.replace(MARK_CMD, bot.command_prefix)
+                await bot.process_commands(message)                 # Exécution de la commande
+
+            else:                                               # Sinon, texte / média :
+                await message.channel.send(rep, tts=True)           # On envoie
+                
+    else:           # Aucun trigger trouvé à cette sensi
+        c = message.content
         if c.lower().startswith(('dis ', 'dit ')) and len(c) > 4:
-            await ctx.send(c[4:])
-        if c.lower().startswith(('di', 'dy')) and len(c) > 2:
-            await ctx.send(c[2:])
+            mess = c[4:]
+        elif c.lower().startswith(('di', 'dy')) and len(c) > 2:
+            mess = c[2:]
+        elif c.lower().startswith(('cri', 'cry', 'kri', 'kry')) and len(c) > 3:
+            mess = tools.bold(c[3:].upper())
         else:    
-            await ctx.send("Désolé, je n'ai pas compris 🤷‍♂️")
-        return
-
-    trig = trigs[0][0]
-    seq = Reactions.query.get(trig.reac_id).reponse
-
-    etapes = seq.split(MARK_AND)
-    for rep in etapes:
-        if MARK_OR in rep:                              # Si plusieurs possiblités :
-            rep = random.choice(rep.split(MARK_OR))         # Choix random
-
-        if rep.startswith(MARK_REACT):                  # Réaction
-            react = rep.lstrip(MARK_REACT)
-            emoji = tools.emoji(ctx, react) or react        # Si custom emoji : objet Emoji, sinon le codepoint de l'emoji direct
-            await ctx.message.add_reaction(emoji)
-
-        elif rep.startswith(MARK_CMD):                  # Commande
-            ctx.message.content = rep.replace(MARK_CMD, ctx.bot.command_prefix)
-            ctx = await ctx.bot.process_commands(ctx.message)
-
-        else:                                           # Texte / média
-            await ctx.send(rep, tts=True)   # pardon
+            mess = "Désolé, je n'ai pas compris 🤷‍♂️"
+            
+        await message.channel.send(mess, tts=True)              # On envoie le texte par défaut / le di.../cri...

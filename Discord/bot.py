@@ -31,6 +31,7 @@ class SuperBot(commands.Bot):
         commands.Bot.__init__(self, **kwargs)
         self.in_command = []        # IDs des joueurs dans une commande
         self.in_stfu = []           # IDs des salons en mode STFU (IA off)
+        self.tasks = {}             # Dictionnaire des tâches en attente (id: TimerHandle)
 
 bot = SuperBot(command_prefix=COMMAND_PREFIX,
                description="LG-bot – Plateforme pour parties endiablées de Loup-Garou",
@@ -50,12 +51,12 @@ async def already_in_command(ctx):
 
 @bot.before_invoke      # Appelé seulement si les checks sont OK, donc pas déjà dans bot.in_command
 async def add_to_in_command(ctx):
-    if ctx.command.name != "stop" and not ctx.author.webhook_id:
+    if ctx.command.name != "stop" and not ctx.message.webhook_id:
         ctx.bot.in_command.append(ctx.author.id)
 
 @bot.after_invoke
 async def remove_from_in_command(ctx):
-    if ctx.command.name != "stop" and not ctx.author.webhook_id:
+    if ctx.command.name != "stop" and not ctx.message.webhook_id:
         ctx.bot.in_command.remove(ctx.author.id)
 
 
@@ -78,8 +79,9 @@ async def on_ready():
     
     for tache in Tables["Taches"].query.all():
         delta = (tache.timestamp - now).total_seconds()
-        bot.loop.call_later(delta, taches.execute, tache)  # Si delta < 0 (action manquée), l'exécute immédiatement, sinon attend jusqu'à tache.timestamp
-        r += f"Récupération de la tâche {tools.code(tache.timestamp)} > {tools.code(tache.commande)}\n"
+        TH = bot.loop.call_later(delta, taches.execute, tache)  # Si delta < 0 (action manquée), l'exécute immédiatement, sinon attend jusqu'à tache.timestamp
+        bot.tasks[tache.id] = TH
+        r += f"Récupération de la tâche {tools.code(tache.timestamp.strftime('%d/%m/%Y %H:%M:%S'))} > {tools.code(tache.commande)}\n"
     
     if r:
         await tools.log(guild, r)
@@ -96,19 +98,18 @@ async def on_member_join(member):
 async def on_message(message):
     if message.author == bot.user:          # Sécurité pour éviter les boucles infinies
         return
-    if not message.guild:
+    if not message.guild:                   # Message privé
         await message.channel.send("Je n'accepte pas les messages privés, désolé !")
         return
 
-    ctx = await bot.get_context(message)
-    await bot.invoke(ctx)                   # On trigger toutes les commandes
+    await bot.process_commands(message)     # On trigger toutes les commandes
 
-    if (not message.content.startswith(COMMAND_PREFIX)      # Si pas une commande
+    if (not message.content.startswith(bot.command_prefix)  # Si pas une commande
         and message.channel.name.startswith("conv-bot")     # et dans un channel de conversation bot
         and message.author.id not in bot.in_command         # et pas déjà dans une commande (vote...)
-        and message.channel.id not in bot.in_stfu):         # et le channel est pas en stfu_mode
+        and message.channel.id not in bot.in_stfu):         # et le channel est pas en mode STFU
 
-        await IA.main(ctx)
+        await IA.process_IA(bot, message)                       # On trigger les règles d'IA
 
 
 # À chaque réaction ajoutée
@@ -258,12 +259,8 @@ class Special(commands.Cog):
         [command] : nom exact d'une commande à expliquer (ou un de ses alias)
         Si [command] n'est pas précisé, liste l'ensemble des commandes accessibles à l'utilisateur.
         """
-        # hc = commands.DefaultLaHelpCommand()
-        # setattr(hc, "context", ctx)
-        # await hc.command_callback(ctx, command=command)
         
         pref = bot.command_prefix
-        
         cogs = bot.cogs                                                                     # Dictionnaire nom: cog
         commandes = {cmd.name: cmd for cmd in bot.commands}                                 # Dictionnaire nom: commande
         aliases = {alias: nom for nom, cmd in commandes.items() for alias in cmd.aliases}    # Dictionnaire alias: nom de la commande
@@ -303,7 +300,7 @@ class Special(commands.Cog):
                 r = f"{pref}{command} {cmd.signature} – {cmd.help}\n"
                 # r += f"\n\nUtilise <{pref}help> pour la liste des commandes ou <{pref}help command> pour plus d'information sur une commande."
                 if cmd_aliases := [alias for alias,cmd in aliases.items() if cmd == command]:       # Si la commande a des alias
-                    r += f"\n\nAlias : {pref}" + ", {pref}".join(cmd_aliases)
+                    r += f"\nAlias : {pref}" + f", {pref}".join(cmd_aliases)
                     
             else:
                 r = f"Commande <{command}> non trouvée.\nUtilise <{pref}help> pour la liste des commandes."

@@ -26,12 +26,15 @@ class GestionTaches(commands.Cog):
         Affiche les commandes en attente d'exécution (dans la table tâche) et le timestamp d'exécution associé.
         """
 
-        taches = Taches.query.all()
-        LT = "\n".join([f"{tache.timestamp}  >  {tache.commande}" for tache in taches])
+        taches = Taches.query.order_by(Taches.timestamp).all()
+        LT = "\n".join([f"{str(tache.id).ljust(5)} {tache.timestamp.strftime('%d/%m/%Y %H:%M:%S')}    {tache.commande}" for tache in taches])
         
-        await ctx.send(tools.code_bloc(("Tâches en attente : \n\n" + LT) if LT else "Aucune tâche en attente."))
-        
-        
+        await ctx.send(tools.code_bloc(("Tâches en attente : \n\nID    Timestamp              Commande\n"
+                                        f"{'-'*80}\n{LT}\n\n"
+                                        "Utilisez !cancel <ID> pour annuler une tâche.") if LT else "Aucune tâche en attente."))
+
+                                        
+                                        
     @commands.command(aliases=["doat"])
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def planif(self, ctx, quand, *, commande):
@@ -81,15 +84,16 @@ class GestionTaches(commands.Cog):
         time = datetime.time(hour=hour, minute=minute, second=second)
         
         ts = datetime.datetime.combine(date, time)
-        message = await ctx.send(f"Planifier {tools.code(commande)} pour le {tools.code(str(ts))} ?")
+        message = await ctx.send(f"Planifier {tools.code(commande)} pour le {tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))} ?")
         
         if await tools.yes_no(ctx.bot, message):
             tache = Taches(timestamp=ts, commande=commande)
             
-            db.session.add(tache)                                                   # Enregistre la tâche en BDD
+            db.session.add(tache)                                                       # Enregistre la tâche en BDD
             db.session.commit()
             
-            ctx.bot.loop.call_later((ts - now).total_seconds(), execute, tache)     # Programme la tâche
+            TH = ctx.bot.loop.call_later((ts - now).total_seconds(), execute, tache)    # Programme la tâche
+            ctx.bot.tasks[tache.id] = TH
             await ctx.send("Fait.")
             
         else:
@@ -125,9 +129,33 @@ class GestionTaches(commands.Cog):
         ts = datetime.datetime.now() + datetime.timedelta(seconds=secondes)
         tache = Taches(timestamp=ts, commande=commande)
         
-        db.session.add(tache)                                   # Enregistre la tâche en BDD
+        db.session.add(tache)                                       # Enregistre la tâche en BDD
         db.session.commit()
         
-        ctx.bot.loop.call_later(secondes, execute, tache)       # Programme la tâche
+        TH = ctx.bot.loop.call_later(secondes, execute, tache)      # Programme la tâche
+        ctx.bot.tasks[tache.id] = TH
         
-        await ctx.send(f"Commande {tools.code(commande)} planifiée pour le {tools.code(str(ts))}")
+        await ctx.send(f"Commande {tools.code(commande)} planifiée pour le {tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))}")
+        
+        
+    @commands.command()
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    async def cancel(self, ctx, id):
+        """Annule une tâche planifiée (COMMANDE MJ)
+        
+        <id> ID de la tâche à annuler (accessible via !taches)
+        """
+        
+        id = int(id)
+        tache = Taches.query.get(id)
+        if tache:
+            message = await ctx.send(f"Annuler la tâche {tools.code(tache.timestamp.strftime('%d/%m/%Y %H:%M:%S'))} > {tools.code(tache.commande)} ?")
+            if await tools.yes_no(ctx.bot, message):
+                ctx.bot.tasks[id].cancel()
+                db.session.delete(tache)
+                db.session.commit()
+                await ctx.send("Tâche annulée.")
+            else:
+                await ctx.send("Mission aborted.")
+        else:
+            await ctx.send(f"Tâche {id} non trouvée.")
