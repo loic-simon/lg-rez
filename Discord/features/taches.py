@@ -105,7 +105,7 @@ class GestionTaches(commands.Cog):
     async def delay(self, ctx, duree, *, commande):
         """Exécute une commande après XhYmZs (COMMANDE MJ)
 
-        - <duree> : format [<X>h][<Y>m][<Z>s], avec <X> (heures) et <Y> (minutes) des entiers et <Z> (secondes) un entier ou un flottant. Chacune des trois composantes est optionnelle ;
+        - <duree> : format [<X>h][<Y>m][<Z>s], avec <X> (heures) et <Y> (minutes) des entiers et <Z> (secondes) un entier ou un flottant. Chacune des trois composantes est optionnelle, mais au moins une d'entre elle doit être présente ;
         - <commande> : commande à exécuter (commençant par un !). La commande sera exécutée PAR UN WEBHOOK et DANS LE CHAN #logs : toutes les commandes qui sont liées au joueur ou réservées au chan privé sont à proscrire (ou doivent a minima être précédées de !doas <cible>)
 
         Cette commande repose sur l'architecture en base de données, ce qui garantit l'exécution de la commande même si le bot plante entre temps.
@@ -116,16 +116,22 @@ class GestionTaches(commands.Cog):
         """
 
         secondes = 0
-        if "h" in duree.lower():
-            h, duree = duree.split("h")
-            secondes += 3600*int(h)
-        if "m" in duree.lower():
-            m, duree = duree.split("m")
-            secondes += 60*int(m)
-        if "s" in duree.lower():
-            s, duree = duree.split("s")
-            secondes += float(s)
-
+        try:
+            if "h" in duree.lower():
+                h, duree = duree.split("h")
+                secondes += 3600*int(h)
+            if "m" in duree.lower():
+                m, duree = duree.split("m")
+                secondes += 60*int(m)
+            if "s" in duree.lower():
+                s, duree = duree.split("s")
+                secondes += float(s)
+        except Exception as e:
+            raise commands.BadArgument("<duree>") from e
+            
+        if duree or not secondes:
+            raise commands.BadArgument("<duree>")
+            
         ts = datetime.datetime.now() + datetime.timedelta(seconds=secondes)
         tache = Taches(timestamp=ts, commande=commande)
         

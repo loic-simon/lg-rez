@@ -102,8 +102,9 @@ async def on_message(message):
         await message.channel.send("Je n'accepte pas les messages privés, désolé !")
         return
 
-    await bot.process_commands(message)     # On trigger toutes les commandes
-
+    await bot.invoke(await bot.get_context(message))        # On trigger toutes les commandes 
+    # (ne PAS remplacer par bot.process_commands(message), en théorie c'est la même chose mais ça détecte pas les webhooks...)
+    
     if (not message.content.startswith(bot.command_prefix)  # Si pas une commande
         and message.channel.name.startswith("conv-bot")     # et dans un channel de conversation bot
         and message.author.id not in bot.in_command         # et pas déjà dans une commande (vote...)
@@ -130,12 +131,12 @@ async def on_raw_reaction_add(payload):
     elif payload.emoji == tools.emoji(reactor, "maire"):
         ctx = await tools.create_context(bot, payload.message_id, reactor, "!votemaire")
         await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le nouveau maire :")}""")
-        await bot.invoke(ctx)       # On trigger !vote
+        await bot.invoke(ctx)       # On trigger !votemaire
         
     elif payload.emoji == tools.emoji(reactor, "lune"):
         ctx = await tools.create_context(bot, payload.message_id, reactor, "!voteloups")
         await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour la victime des loups :")}""")
-        await bot.invoke(ctx)       # On trigger !vote
+        await bot.invoke(ctx)       # On trigger !voteloups
         
 
 ### 5 - Commandes (définies dans les fichiers annexes, un cog par fichier dans features)

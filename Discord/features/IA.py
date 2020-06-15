@@ -62,7 +62,7 @@ class GestionIA(commands.Cog):
             await ctx.send("Okay, je me tais ! Tape !stfu quand tu voudras de nouveau de moi :cry:")
 
         elif force in [None, "stop"] and id in ctx.bot.in_stfu:
-            ctx.bot.in_stfu.append(id)
+            ctx.bot.in_stfu.remove(id)
             await ctx.send("Ahhh, ça fait plaisir de pouvoir reparler !")
             
         else:       # Quelque chose d'autre que start/stop précisé après !stfu : bot discret
