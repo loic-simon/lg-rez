@@ -332,7 +332,7 @@ async def on_command_error(ctx, exc):
         await ctx.send(f"Cette commande est désactivée. Pas de chance !")
     
     elif isinstance(exc, commands.ConversionError) or isinstance(exc, commands.UserInputError):
-        await ctx.send(f"Hmm, ce n'est pas comme ça qu'on utilise cette commande ! Petit rappel :")
+        await ctx.send(f"Hmm, ce n'est pas comme ça qu'on utilise cette commande ! Petit rappel : ({tools.code(f'{type(exc).__name__}: {exc}')})")
         ctx.message.content = f"!help {ctx.command.name}"
         ctx = await bot.get_context(ctx.message)
         await ctx.reinvoke()
