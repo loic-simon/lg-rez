@@ -73,72 +73,45 @@ class Annexe(commands.Cog):
         if val is None:
             val = Embed.Empty
             
+        elif key == "color":        # Conversion couleur en int
+            try:
+                val = eval(val.replace("#", "0x"))
+                if not isinstance(val, int):
+                    raise ValueError()
+            except Exception:
+                await ctx.send("Couleur invalide")
+                return
+                
         emb = self.current_embed
         
         # !do ctx.send(embed=discord.Embed(title="Mort de Clément Neytard", color=0xff0000).set_footer(text="- Votes contre Clément Neytard : Robert, Roberta, Roberto, Cestsuperlong, Jailaflemme, Yaunelimiteenplus, Elle Estpas SiGrande, Jojo, Ouistiti, Nombril Velu, Mais Pourquoi, Corbeau \n- Votes contre Laetitia Furno : Quelqu'un").set_image(url="https://imgup.nl/images/2020/06/06/chart.png").set_author(name="Bûcher du jour",icon_url=tools.emoji(ctx,"bucher").url))
-
-        
+                
+        d = {"footer": ("set_footer", "text"),              # d[key] = (<met>, <attr>)
+             "footer_icon": ("set_footer", "icon_url"),
+             "image": ("set_image", "url"),
+             "thumb": ("set_thumbnail", "url"),
+             "author_url": ("set_author", "url"),
+             "author_icon": ("set_author", "icon_url"),
+            }
+            
+            
         if not emb:
             if key == "create" and val:
                 emb = Embed(title=val)
             else:
-                await ctx.send(f"Pas d'embed en préparation. {tools.code('!embed create <titre>')} pour en crée un.")
+                await ctx.send(f"Pas d'embed en préparation. {tools.code('!embed create <titre>')} pour en créer un.")
                 return
 
-        elif key == "title":
-            # The title of the embed. This can be set during initialisation.
-            emb.title = val
-
-        elif key == "desc":
-            # The description of the embed. This can be set during initialisation.
-            emb.description = val
-
-        elif key == "url":
-            # The URL of the embed. This can be set during initialisation.
-            emb.url = val
-
-        elif key == "color":
-            # The colour code of the embed. Aliased to color as well. This can be set during initialisation.
-            try:
-                col = eval(val.replace("#", "0x"))
-                if isinstance(col, int):
-                    emb.color = col or Embed.Empty
-                else:
-                    await ctx.send("Couleur invalide")
-                    return
-            except Exception:
-                await ctx.send("Couleur invalide")
-                return
-
-        elif key == "footer":
-            # Sets the footer for the embed content.
-            emb.set_footer(text=val)
+        elif key in ["title", "description", "url", "color"]:      # Attributs modifiables directement
+            setattr(emb, key, val)
             
-        elif key == "footer_icon":
-            # Sets the footer for the embed content.
-            emb.set_footer(icon_url=val)
-            
-        elif key == "image":
-            # Sets the image for the embed content.
-            emb.set_image(url=val)
-            
-        elif key == "image":
-            # Sets the thumbnail for the embed content.
-            emb.set_thumbnail(url=val)
+        elif key in d:                                      # Attributs à modifier en appelant une méthode
+            getattr(emb, d[key][0])(**{d[key][1]: val})         # emb.<met>(<attr>=val) 
 
-        elif key == "author":
-            # Sets the author for the embed content.
+        elif key == "author":                               # Cas particulier
             emb.set_author(name=val) if val else emb.remove_author()
 
-        elif key == "author_url":
-            # Sets the author for the embed content.
-            emb.set_author(url=val)
-
-        elif key == "author_icon":
-            # Sets the author for the embed content.
-            emb.set_author(icon_url=val)
-
-        elif key == "field":
+        elif key == "field":                                # Cas encore plus particulier
             i_max = len(emb.fields)         # N fields ==> i_max = N+1
             try:
                 i, skey, val = val.split(" ", maxsplit=2)
@@ -147,30 +120,31 @@ class Annexe(commands.Cog):
                     await ctx.send("Numéro de field invalide")
                     return
                 if skey not in ["name", "value", "delete"]:
-                    await ctx.send("Syntaxe invalide")
-                    return
+                    raise ValueError()
             except Exception:
                 await ctx.send("Syntaxe invalide")
                 return
                 
             if i == imax:
-                # Adds a field to the embed object.
                 if skey == "name":
-                    emb.add_field(name=val or Embed.Empty)
+                    emb.add_field(name=val or Embed.Empty, value="Valeur")
                 elif skey == "value":
-                    emb.add_field(value=val or Embed.Empty)
+                    emb.add_field(value=val or Embed.Empty, name="Nom")
                 # emb.add_field(*, name, value, inline=True)
 
             else:
-                # Modifies a field to the embed object.
-                if skey == "name":
-                    emb.set_field_at(i, name=val or Embed.Empty)
-                elif skey == "value":
-                    emb.set_field_at(i, value=val or Embed.Empty)
+                if skey in ["name", "value"]:
+                    emb.set_field_at(i, **{skey:val or Embed.Empty})
                 else:
                     emb.remove_field(i)
                 # emb.set_field_at(i, *, name, value, inline=True)    
-
+                
+        elif key == "delete":
+            await ctx.send(f"Supprimé. {tools.code('!embed create <titre>')} pour en créer un.")
+            
+        elif key == "create":
+            await ctx.send(f"Déjà un embed en cours de création. Utiliser {tools.code('!embed delete')} pour le supprimer.")
+            
         else:
             await ctx.send(f"Option {key} incorrecte : utiliser {tools.code('!help embed')} pour en savoir plus.")
             return

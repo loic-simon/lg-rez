@@ -1,4 +1,5 @@
 import random
+import datetime     # Pour pouvoir être utilisé dans les {} des réactions du bot
 
 from discord.ext import commands
 
@@ -12,6 +13,7 @@ MARK_OR = ' <||> '
 MARK_THEN = ' <&&> '
 MARK_REACT = '<::>'
 MARK_CMD = '<!!>'
+MARKS = [MARK_OR, MARK_THEN, MARK_REACT, MARK_CMD]
 
 
 
@@ -70,6 +72,19 @@ class GestionIA(commands.Cog):
                 ctx.bot.in_stfu.remove(id)
             else:
                 ctx.bot.in_stfu.append(id)
+
+
+    @commands.command(aliases=["r"])
+    async def react(self, ctx, *, trigger):
+        """Force le bot à réagir à un message
+        
+        <trigger> message auquel le bot doit réagir
+        
+        Permet de faire appel à l'IA du bot même sur les chans publics, ou en mode STFU, etc
+        """
+        message = ctx.message
+        message.content = trigger
+        await process_IA(ctx.bot, message)
 
 
     @commands.command()
@@ -162,10 +177,11 @@ class GestionIA(commands.Cog):
 
         trig = trigs[0][0]
         rep = Reactions.query.get(trig.reac_id)
+        displ_seq = rep.reponse if rep.reponse.startswith('`') else tools.code(rep.reponse)     # Pour affichage
         trigs = Triggers.query.filter_by(reac_id=trig.reac_id).all()
 
         await ctx.send(f"Triggers : `{'` – `'.join([trig.trigger for trig in trigs])}`\n"
-                       f"Séquence réponse : {tools.code(rep.reponse)}")
+                       f"Séquence réponse : {displ_seq}")
 
         message = await ctx.send("Modifier : ⏩ triggers / ⏺ Réponse / ⏸ Les deux / 🚮 Supprimer ?")
         MT, MR = await tools.wait_for_react_clic(ctx.bot, message, emojis={"⏩":(True, False), "⏺":(False, True),
@@ -199,15 +215,14 @@ class GestionIA(commands.Cog):
                 return
 
         if MR:                  # Modification de la réponse
-            mess = await ctx.send("Réécrire complètement la séquence ? (si non, modification brute : plus compliqué !)")
-            if (await tools.yes_no(ctx.bot, mess)):
-                reponse = await build_sequence(ctx)
-            else:
-                r = f"Séquence actuelle : {tools.code(rep.reponse)}" if MT else ""    # Si ça fait longtemps, on le remet
-                r += f"\nMarqueur OU : {tools.code(MARK_OR)}, Marqueur ET : {tools.code(MARK_THEN)}, Marqueur REACT : {tools.code(MARK_REACT)}, Marqueur CMD : {tools.code(MARK_CMD)}"
-                mess = await ctx.send(r + "\nNouvelle séquence :")
-                reponse = (await tools.wait_for_message(ctx.bot, lambda m:m.channel == ctx.channel and m.author != ctx.bot.user)).content
+            r = ""
+            if MT:      # Si ça fait longtemps, on remet la séquence
+                r += f"Séquence actuelle : {displ_seq}"
+                
+            if any([mark in rep.reponse for mark in MARKS]):                    # Séquence compliquée
+                r += f"\nLa séquence-réponse peut être refaite manuellement ou modifiée rapidement en envoyant directment la séquence ci-dessus modifiée (avec les marqueurs : OU = {tools.code(MARK_OR)}, ET = {tools.code(MARK_THEN)}, REACT = {tools.code(MARK_REACT)}, CMD = {tools.code(MARK_CMD)})"
 
+            reponse = await build_sequence(ctx)
             bdd_tools.modif(rep, "reponse", reponse)
 
         if not (MT or MR):      # Suppression
@@ -219,6 +234,40 @@ class GestionIA(commands.Cog):
 
         await ctx.send("Fini.")
 
+
+
+# Replace chaque bloc entouré par des {} dans rep par leur évaluation Python si aucune erreur n'est levée, sinon laisse l'expression telle quelle
+def format(rep, debug=False):
+    if "{" in rep:              # Si contient des expressions
+        evrep = ""                  # Réponse évaluée
+        expr = ""                   # Expression à évaluer
+        noc = 0                     # Nombre de { non appariés
+        for c in rep:
+            if c == "{":
+                if noc:             # Expression en cours :
+                    expr += c           # on garde le {
+                noc += 1
+            elif c == "}":
+                noc -= 1
+                if noc:             # idem
+                    expr += c
+                else:               # Fin d'une expression
+                    try:                                    # On essaie d'évaluer la chaîne
+                        evrep += str(eval(expr))                # eval("expr") = expr
+                    except Exception as e:
+                        evrep += "{" + expr + "}"           # Si erreur, on laisse {expr} non évaluée
+                        if debug:
+                            evrep += tools.code(f"->!!! {e} !!!")
+                    expr = ""
+            elif noc:               # Expression en cours
+                expr += c
+            else:                   # Pas d'expression en cours
+                evrep += c
+        if noc:     # Si expression jamais finie (nombre impair de {)
+            evrep += "{" + expr
+        return evrep
+    else:
+        return rep
 
 
 # Exécute les règles d'IA en réaction à <message>
@@ -243,17 +292,27 @@ async def process_IA(bot, message):
                 await bot.process_commands(message)                 # Exécution de la commande
 
             else:                                               # Sinon, texte / média :
-                await message.channel.send(rep, tts=True)           # On envoie
+                # rep = format(rep)                                   # On remplace tous les "{expr}" par str(expr)
+                rep = format(rep, debug=message.author.top_role.name == "MJ")
+                await message.channel.send(rep)                     # On envoie
                 
     else:           # Aucun trigger trouvé à cette sensi
         c = message.content
-        if c.lower().startswith(('dis ', 'dit ')) and len(c) > 4:
-            mess = c[4:]
-        elif c.lower().startswith(('di', 'dy')) and len(c) > 2:
-            mess = c[2:]
-        elif c.lower().startswith(('cri', 'cry', 'kri', 'kry')) and len(c) > 3:
-            mess = tools.bold(c[3:].upper())
-        else:    
+        diprefs = ["di", "dy", "dis ", "dit ", "dis-", "dit-"]
+        criprefs = ["cri", "cry", "kri", "kry"]
+        pos_prefs = {c.lower().find(pref):pref for pref in diprefs + criprefs 
+                    if pref in c.lower() and len(c) > len(pref)}
+
+        if pos_prefs:                                       # Si on a trouvé au moins un préfixe
+            i = min(pos_prefs)
+            pref = pos_prefs[i]
+            if pref in criprefs:
+                mess = tools.bold(c[i+len(pref):].upper())
+            else:
+                mess = c[i+len(pref):]
+            await message.channel.send(mess, tts=True)          # On envoie le di.../cri... en mode TTS
+                
+        else:                                               # Sinon
             mess = "Désolé, je n'ai pas compris 🤷‍♂️"
+            await message.channel.send(mess)                    # On envoie le texte par défaut
             
-        await message.channel.send(mess, tts=True)              # On envoie le texte par défaut / le di.../cri...

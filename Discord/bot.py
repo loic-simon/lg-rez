@@ -216,7 +216,7 @@ class Special(commands.Cog):
         ctx.message.content = bot.command_prefix + quoi
         ctx.message.author = ctx.guild.get_member(joueur.discord_id)
         
-        ctx.send(f":robot: Exécution en tant que {joueur.nom}:")
+        await ctx.send(f":robot: Exécution en tant que {joueur.nom} :")
         await ctx.bot.process_commands(ctx.message)
         
         
@@ -236,8 +236,8 @@ class Special(commands.Cog):
         await remove_from_in_command(ctx)       # Bypass la limitation de 1 commande à la fois
         await ctx.bot.process_commands(ctx.message)
         await add_to_in_command(ctx)
-
-
+        
+        
     @commands.command()
     @tools.private
     async def stop(self, ctx):
@@ -264,7 +264,7 @@ class Special(commands.Cog):
         pref = bot.command_prefix
         cogs = bot.cogs                                                                     # Dictionnaire nom: cog
         commandes = {cmd.name: cmd for cmd in bot.commands}                                 # Dictionnaire nom: commande
-        aliases = {alias: nom for nom, cmd in commandes.items() for alias in cmd.aliases}    # Dictionnaire alias: nom de la commande
+        aliases = {alias: nom for nom, cmd in commandes.items() for alias in cmd.aliases}   # Dictionnaire alias: nom de la commande
         
         n_max = max([len(cmd) for cmd in commandes])
         
