@@ -109,7 +109,7 @@ async def on_message(message):
         and message.channel.name.startswith("conv-bot")     # et dans un channel de conversation bot
         and message.author.id not in bot.in_command         # et pas déjà dans une commande (vote...)
         and message.channel.id not in bot.in_stfu):         # et le channel est pas en mode STFU
-
+        
         await IA.process_IA(bot, message)                       # On trigger les règles d'IA
 
 

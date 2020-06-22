@@ -4,6 +4,7 @@ import datetime
 import unidecode
 import re
 
+import discord
 import discord.utils
 import discord.ext.commands
 
@@ -15,37 +16,41 @@ from blocs import bdd_tools
 
 get = discord.utils.get
 
+def find_by_mention_or_name(collec, val, pattern=None):         # Utilitaire pour la suite
+    if not val:
+        return None
+    elif pattern and (match := re.search(pattern, val)):
+        return get(collec, id=int(match.group(1)))
+    else:
+        return get(collec, name=val)
+
 def channel(arg, nom):      # Renvoie le channel #nom. arg peut être de type Context, Guild, User/Member, Channel
-    if hasattr(arg, "banner"):      # méthode immonde pour détécter si c'est une Guild
-        return get(arg.channels, name=nom)
-    elif hasattr(arg, "guild"):
-        return get(arg.guild.channels, name=nom)
-    else:
+    try:
+        channels = arg.channels if isinstance(arg, discord.Guild) else arg.guild.channels
+    except AttributeError:
         raise TypeError("tools.channel : Impossible de remonter aux channels depuis l'argument trasmis")
+    return find_by_mention_or_name(channels, nom, pattern="<#([0-9]{18})>")
 
-def role(arg, nom):         # Renvoie le rôle nom. arg peut être de type Context, Guild, User/Member, Channel
-    if hasattr(arg, "banner"):     # méthode immonde pour détécter si c'est une Guild
-        return get(arg.roles, name=nom)
-    elif hasattr(arg, "guild"):
-        return get(arg.guild.roles, name=nom)
-    else:
+def role(arg, nom):         # Renvoie le rôle @&nom. arg peut être de type Context, Guild, User/Member, Channel
+    try:
+        roles = arg.roles if isinstance(arg, discord.Guild) else arg.guild.roles
+    except AttributeError:
         raise TypeError("tools.role : Impossible de remonter aux rôles depuis l'argument trasmis")
-
+    return find_by_mention_or_name(roles, nom, pattern="<@&([0-9]{18})>")
+        
 def member(arg, nom):       # Renvoie le membre @member. arg peut être de type Context, Guild, User/Member, Channel
-    if hasattr(arg, "banner"):     # méthode immonde pour détécter si c'est une Guild
-        return get(arg.members, display_name=nom)
-    elif hasattr(arg, "guild"):
-        return get(arg.guild.members, display_name=nom)
-    else:
+    try:
+        members = arg.members if isinstance(arg, discord.Guild) else arg.guild.members
+    except AttributeError:
         raise TypeError("tools.member : Impossible de remonter aux membres depuis l'argument trasmis")
+    return find_by_mention_or_name(members, nom, pattern="<@!([0-9]{18})>")
 
 def emoji(arg, nom):        # Renvoie l'emoji :nom:. arg peut être de type Context, Guild, User/Member, Channel
-    if hasattr(arg, "banner"):     # méthode immonde pour détécter si c'est une Guild
-        return get(arg.emojis, name=nom)
-    elif hasattr(arg, "guild"):
-        return get(arg.guild.emojis, name=nom)
-    else:
-        raise TypeError("tools.member : Impossible de remonter aux emojis depuis l'argument trasmis")
+    try:
+        emojis = arg.emojis if isinstance(arg, discord.Guild) else arg.guild.emojis
+    except AttributeError:
+        raise TypeError("tools.emoji : Impossible de remonter aux emojis depuis l'argument trasmis")
+    return find_by_mention_or_name(emojis, nom, pattern="<:.*:([0-9]{18})>")
 
 
 # Renvoie le channel privé d'un utilisateur.

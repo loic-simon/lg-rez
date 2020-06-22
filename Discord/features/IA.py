@@ -80,11 +80,13 @@ class GestionIA(commands.Cog):
         
         <trigger> message auquel le bot doit réagir
         
-        Permet de faire appel à l'IA du bot même sur les chans publics, ou en mode STFU, etc
+        Permet de faire appel à l'IA du bot même sur les chans publics, ou en mode STFU, etc.
+        Si utilisée par un MJ, active aussi le mode débug des évaluations Python (messages d'erreur).
         """
-        message = ctx.message
-        message.content = trigger
-        await process_IA(ctx.bot, message)
+        oc = ctx.message.content
+        ctx.message.content = trigger
+        await process_IA(ctx.bot, ctx.message, debug=(ctx.author.top_role.name == "MJ"))
+        ctx.message.content = oc        # On rétablit le message original pour ne pas qu'il trigger l'IA 2 fois, le cas échéant
 
 
     @commands.command()
@@ -237,7 +239,7 @@ class GestionIA(commands.Cog):
 
 
 # Replace chaque bloc entouré par des {} dans rep par leur évaluation Python si aucune erreur n'est levée, sinon laisse l'expression telle quelle
-def format(rep, debug=False):
+def eval_accols(rep, debug=False):
     if "{" in rep:              # Si contient des expressions
         evrep = ""                  # Réponse évaluée
         expr = ""                   # Expression à évaluer
@@ -271,7 +273,7 @@ def format(rep, debug=False):
 
 
 # Exécute les règles d'IA en réaction à <message>
-async def process_IA(bot, message):
+async def process_IA(bot, message, debug=False):
     trigs = await bdd_tools.find_nearest(message.content, Triggers, carac="trigger", sensi=0.7)
     
     if trigs:       # Au moins un trigger trouvé à cette sensi
@@ -293,7 +295,8 @@ async def process_IA(bot, message):
 
             else:                                               # Sinon, texte / média :
                 # rep = format(rep)                                   # On remplace tous les "{expr}" par str(expr)
-                rep = format(rep, debug=message.author.top_role.name == "MJ")
+                # debug = (message.author.top_role.name == "MJ")
+                rep = eval_accols(rep, debug=debug)
                 await message.channel.send(rep)                     # On envoie
                 
     else:           # Aucun trigger trouvé à cette sensi

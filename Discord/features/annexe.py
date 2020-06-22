@@ -12,8 +12,6 @@ from bdd_connect import db, Joueurs
 class Annexe(commands.Cog):
     """Annexe - commandes annexes aux usages divers"""
     
-    current_embed = None
-
     @commands.command()
     async def roll(self, ctx, *, XdY):
         """Lance un ou plusieurs dés
@@ -65,15 +63,94 @@ class Annexe(commands.Cog):
         await ctx.send(f"!pong ({delta.total_seconds():.2}s)")
 
 
+    current_embed = None
+    current_helper_embed = None
+
     @commands.command()
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def embed(self, ctx, key=None, *, val=None):
-        """J'adore les docstrings"""
+        """Prépare un embed (message riche) et l'envoie (COMMANDE MJ)
+        
+        [key] sous-commande (voir ci-dessous). Si omis, prévisualise le brouillon d'embed actuellement en préparation ;
+        [val] valeur associée. Pour les sous-commandes de construction d'élement, supprime ledit élément si omis.
+        
+        - Sous-commandes générales :
+            !embed create <titre>           Créer un nouveau brouillon d'embed (un seul brouillon en parallèle, pour tous les utilisateurs)
+            !embed delete                   Supprimer le brouillon d'embed
+            !embed preview                  Voir l'embed sans les rappels de commande
+            !embed post [#channel]          Envoyer l'embed sur #channel (chan courant si omis)
+            
+        - Sous-commandes de construction d'éléments :
+            - Éléments généraux :
+                !embed title [titre]
+                !embed description [texte]
+                !embed url [url*]
+                !embed color [#ffffff]      (barre de gauche, code hexadécimal)
+                
+            - Auteur :
+                !embed author [nom]
+                !embed author_url [url*]
+                !embed author_icon [url**]
+                
+            - Talon :
+                !embed footer [texte]
+                !embed footer_icon [url**]
+                
+            - Images :
+                !embed image [url**]        (grande image)
+                !embed thumb [url**]        (en haut à droite)
+                
+            - Champs : syntaxe spéciale
+                !embed field <i> <skey> [val]
+                    <i>             Numéro du champ (commençant à 0). Si premier champ non existant, le crée.
+                    <skey> = 
+                        name        Nom du champ
+                        value       Valeur du champ
+                        delete      Supprime le champ
+                        
+                Les champs sont (pour l'instant) forcément de type inline (côte à côte).
+                
+        * Les URL doivent commencer par http(s):// pour être reconnues comme telles.
+        ** Ces URL doivent correspondre à une image.
+        """
         
         if val is None:
             val = Embed.Empty
             
-        elif key == "color":        # Conversion couleur en int
+        emb = self.current_embed                # Récupération de l'embed (stocké dans le cog)
+        
+        direct = [                              # Attributs modifiables directement : emb.attr = value
+            "title",
+            "description",
+            "url",
+        ]
+        method = {                              # Attributs à modifier en appelant une méthode : emb.set_<attr>(value)
+            "footer": ("footer", "text"),                           # method[key] = (<attr>, <value>)
+            "footer_icon": ("footer", "icon_url"),
+            "image": ("image", "url"),
+            "thumb": ("thumbnail", "url"),
+            "author_url": ("author", "url"),
+            "author_icon": ("author", "icon_url"),
+        }
+        
+        if not emb:                             # Pas d'embed en cours
+            if key == "create" and val:
+                emb = Embed(title=val)
+            else:
+                await ctx.send(f"Pas d'embed en préparation. {tools.code('!embed create <titre>')} pour en créer un.")
+                return
+
+        elif key in direct:                     # Attributs modifiables directement                           
+            setattr(emb, key, val)
+            
+        elif key in method:                     # Attributs à modifier en appelant une méthode
+            prop, attr = method[key]
+            getattr(emb, f"set_{prop}")(**{attr: val})          # emb.set_<prop>(<attr>=val) 
+
+        elif key == "author":                   # Cas particulier
+            emb.set_author(name=val) if val else emb.remove_author()
+            
+        elif key == "color":                    # Autre cas particulier : conversion couleur en int
             try:
                 val = eval(val.replace("#", "0x"))
                 if not isinstance(val, int):
@@ -81,38 +158,9 @@ class Annexe(commands.Cog):
             except Exception:
                 await ctx.send("Couleur invalide")
                 return
-                
-        emb = self.current_embed
-        
-        # !do ctx.send(embed=discord.Embed(title="Mort de Clément Neytard", color=0xff0000).set_footer(text="- Votes contre Clément Neytard : Robert, Roberta, Roberto, Cestsuperlong, Jailaflemme, Yaunelimiteenplus, Elle Estpas SiGrande, Jojo, Ouistiti, Nombril Velu, Mais Pourquoi, Corbeau \n- Votes contre Laetitia Furno : Quelqu'un").set_image(url="https://imgup.nl/images/2020/06/06/chart.png").set_author(name="Bûcher du jour",icon_url=tools.emoji(ctx,"bucher").url))
-                
-        d = {"footer": ("set_footer", "text"),              # d[key] = (<met>, <attr>)
-             "footer_icon": ("set_footer", "icon_url"),
-             "image": ("set_image", "url"),
-             "thumb": ("set_thumbnail", "url"),
-             "author_url": ("set_author", "url"),
-             "author_icon": ("set_author", "icon_url"),
-            }
-            
-            
-        if not emb:
-            if key == "create" and val:
-                emb = Embed(title=val)
-            else:
-                await ctx.send(f"Pas d'embed en préparation. {tools.code('!embed create <titre>')} pour en créer un.")
-                return
 
-        elif key in ["title", "description", "url", "color"]:      # Attributs modifiables directement
-            setattr(emb, key, val)
-            
-        elif key in d:                                      # Attributs à modifier en appelant une méthode
-            getattr(emb, d[key][0])(**{d[key][1]: val})         # emb.<met>(<attr>=val) 
-
-        elif key == "author":                               # Cas particulier
-            emb.set_author(name=val) if val else emb.remove_author()
-
-        elif key == "field":                                # Cas encore plus particulier
-            i_max = len(emb.fields)         # N fields ==> i_max = N+1
+        elif key == "field":                    # Cas encore plus particulier
+            i_max = len(emb.fields)                 # N fields ==> i_max = N+1
             try:
                 i, skey, val = val.split(" ", maxsplit=2)
                 i = int(i)
@@ -125,48 +173,68 @@ class Annexe(commands.Cog):
                 await ctx.send("Syntaxe invalide")
                 return
                 
-            if i == imax:
+            if i == i_max:
                 if skey == "name":
-                    emb.add_field(name=val or Embed.Empty, value="Valeur")
+                    emb.add_field(name=val, value=f"!embed field {i} value <valeur>")
                 elif skey == "value":
-                    emb.add_field(value=val or Embed.Empty, name="Nom")
+                    emb.add_field(name=f"!embed field {i} name <nom>", value=val)
                 # emb.add_field(*, name, value, inline=True)
 
             else:
-                if skey in ["name", "value"]:
-                    emb.set_field_at(i, **{skey:val or Embed.Empty})
+                if skey == "name":
+                    emb.set_field_at(i, name=val, value=emb.fields[i].name)
+                elif skey == "value":
+                    emb.set_field_at(i, name=emb.fields[i].name, value=val)
                 else:
                     emb.remove_field(i)
                 # emb.set_field_at(i, *, name, value, inline=True)    
                 
         elif key == "delete":
+            self.current_embed = None
             await ctx.send(f"Supprimé. {tools.code('!embed create <titre>')} pour en créer un.")
+            return
             
         elif key == "create":
             await ctx.send(f"Déjà un embed en cours de création. Utiliser {tools.code('!embed delete')} pour le supprimer.")
+
+        elif key == "preview":
+            await ctx.send("Prévisuatisation :", embed=emb)
+            await ctx.send(f"Utiliser {tools.code('!embed post #channel')} pour publier l'embed.")
+            return
             
-        else:
+        elif key == "post":
+            if not val:     # channel non précisé
+                await ctx.send(embed=emb)
+            elif chan := tools.channel(ctx, val):
+                await chan.send(embed=emb)
+                await ctx.send("Et pouf !")
+            else:
+                await ctx.send(f"Channel inconnu. Réessaye en le mentionnant ({tools.code('#channel')})")
+            return
+            
+        elif key is not None:
             await ctx.send(f"Option {key} incorrecte : utiliser {tools.code('!help embed')} pour en savoir plus.")
             return
 
-        # insert_field_at(index, *, name, value, inline=True)
-        # Inserts a field before a specified index to the embed.
-        
-        # clear_fields()
-        # Removes all fields from this embed.
 
-        # if val == "preview":
+        h_emb = emb.copy()
+        if not emb.title:
+            h_emb.title = "!embed title <titre>"
+        if not emb.description:
+            h_emb.description = "!embed description <description>"
+        if not emb.footer:
+            h_emb.set_footer(text="!embed footer <footer>")
+        if not emb.author:
+            h_emb.set_author(name="!embed author <auteur>")
+            
+        i_max = len(emb.fields)                 # N fields ==> i_max = N+1
+        h_emb.add_field(name=f"!embed field {i_max} name <nom>", value=f"!embed field {i_max} value <nom>")
         
-        await ctx.send("Embed en préparation", embed=emb)
-        await ctx.send(f"Utiliser {tools.code('!embed preview')} pour prévisualiser l'embed.")        
-        
-        
-        
-        
+        await ctx.send("Embed en préparation :", embed=h_emb)
+        await ctx.send(f"Utiliser {tools.code('!embed preview')} pour prévisualiser l'embed.\n"
+                       f"Autres options : {tools.code('!embed color <#xxxxxx> / url <url> / image <url> / thumb <url> / author_url <url> / footer_icon <url>')}")        
+                       
         self.current_embed = emb
-        
-
-
 
 
     @commands.command(enabled=False)
