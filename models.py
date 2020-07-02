@@ -218,9 +218,9 @@ Tables = {"Joueurs":Joueurs,
           "BaseActions":BaseActions,
           "Actions":Actions,
           "BaseActionsRoles": BaseActionsRoles,
+          "Taches": Taches,
           "Triggers": Triggers,
           "Reactions": Reactions,
-          "Taches": Taches,
           }
 
 db.create_all()

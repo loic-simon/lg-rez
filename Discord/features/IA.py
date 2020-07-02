@@ -1,5 +1,4 @@
 import random
-import datetime     # Pour pouvoir être utilisé dans les {} des réactions du bot
 
 from discord.ext import commands
 
@@ -238,40 +237,6 @@ class GestionIA(commands.Cog):
 
 
 
-# Replace chaque bloc entouré par des {} dans rep par leur évaluation Python si aucune erreur n'est levée, sinon laisse l'expression telle quelle
-def eval_accols(rep, debug=False):
-    if "{" in rep:              # Si contient des expressions
-        evrep = ""                  # Réponse évaluée
-        expr = ""                   # Expression à évaluer
-        noc = 0                     # Nombre de { non appariés
-        for c in rep:
-            if c == "{":
-                if noc:             # Expression en cours :
-                    expr += c           # on garde le {
-                noc += 1
-            elif c == "}":
-                noc -= 1
-                if noc:             # idem
-                    expr += c
-                else:               # Fin d'une expression
-                    try:                                    # On essaie d'évaluer la chaîne
-                        evrep += str(eval(expr))                # eval("expr") = expr
-                    except Exception as e:
-                        evrep += "{" + expr + "}"           # Si erreur, on laisse {expr} non évaluée
-                        if debug:
-                            evrep += tools.code(f"->!!! {e} !!!")
-                    expr = ""
-            elif noc:               # Expression en cours
-                expr += c
-            else:                   # Pas d'expression en cours
-                evrep += c
-        if noc:     # Si expression jamais finie (nombre impair de {)
-            evrep += "{" + expr
-        return evrep
-    else:
-        return rep
-
-
 # Exécute les règles d'IA en réaction à <message>
 async def process_IA(bot, message, debug=False):
     trigs = await bdd_tools.find_nearest(message.content, Triggers, carac="trigger", sensi=0.7)
@@ -296,7 +261,7 @@ async def process_IA(bot, message, debug=False):
             else:                                               # Sinon, texte / média :
                 # rep = format(rep)                                   # On remplace tous les "{expr}" par str(expr)
                 # debug = (message.author.top_role.name == "MJ")
-                rep = eval_accols(rep, debug=debug)
+                rep = tools.eval_accols(rep, locals=locals(), debug=debug)  # on passe bot et message
                 await message.channel.send(rep)                     # On envoie
                 
     else:           # Aucun trigger trouvé à cette sensi
@@ -304,7 +269,7 @@ async def process_IA(bot, message, debug=False):
         diprefs = ["di", "dy", "dis ", "dit ", "dis-", "dit-"]
         criprefs = ["cri", "cry", "kri", "kry"]
         pos_prefs = {c.lower().find(pref):pref for pref in diprefs + criprefs 
-                    if pref in c.lower() and len(c) > len(pref)}
+                    if pref in c[:-1].lower()}                      # On extrait les cas où le préfixe est à la fin du message
 
         if pos_prefs:                                       # Si on a trouvé au moins un préfixe
             i = min(pos_prefs)

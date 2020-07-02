@@ -8,7 +8,8 @@ import discord
 import discord.utils
 import discord.ext.commands
 
-from bdd_connect import db, Tables
+from bdd_connect import db, Tables, Joueurs, Roles, BaseActions, Actions, BaseActionsRoles, Taches, Triggers, Reactions
+# on importe toutes les tables, plus simple pour eval_accols
 from blocs import bdd_tools
 
 
@@ -350,7 +351,6 @@ def smooth_split(mess :str, N=1990, sep='\n', rep=''):
     return LM
 
 
-
 async def log(arg, message):
     """Envoie <message> dans le channel #logs. <arg> peut être de type Context, Guild, User/Member, Channel"""
     logchan = channel(arg, "logs")
@@ -363,6 +363,42 @@ async def log(arg, message):
 def remove_accents(s):
     p = re.compile("([À-ʲΆ-ת])")      # Abracadabrax, c'est moche mais ça marche (source : tkt frère)
     return p.sub(lambda c:unidecode.unidecode(c.group()), s)
+
+
+# Replace chaque bloc entouré par des {} par leur évaluation Python si aucune erreur n'est levée, sinon laisse l'expression telle quelle
+# Penser à passer les globals() et locals() si besoin. Généralement, il faut passer locals() qui contient ctx, etc... mais pas globals() si on veut bénéficier de tous les modules importés dans tools.py
+
+def eval_accols(rep, globals=None, locals=None, debug=False):
+    if "{" in rep:              # Si contient des expressions
+        evrep = ""                  # Réponse évaluée
+        expr = ""                   # Expression à évaluer
+        noc = 0                     # Nombre de { non appariés
+        for c in rep:
+            if c == "{":
+                if noc:             # Expression en cours :
+                    expr += c           # on garde le {
+                noc += 1
+            elif c == "}":
+                noc -= 1
+                if noc:             # idem
+                    expr += c
+                else:               # Fin d'une expression
+                    try:                                            # On essaie d'évaluer la chaîne
+                        evrep += str(eval(expr, globals, locals))       # eval("expr") = expr
+                    except Exception as e:
+                        evrep += "{" + expr + "}"                   # Si erreur, on laisse {expr} non évaluée
+                        if debug:
+                            evrep += tools.code(f"->!!! {e} !!!")
+                    expr = ""
+            elif noc:               # Expression en cours
+                expr += c
+            else:                   # Pas d'expression en cours
+                evrep += c
+        if noc:     # Si expression jamais finie (nombre impair de {)
+            evrep += "{" + expr
+        return evrep
+    else:
+        return rep
 
 
 # Formattage de texte dans Discord

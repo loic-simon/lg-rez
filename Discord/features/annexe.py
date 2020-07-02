@@ -66,6 +66,59 @@ class Annexe(commands.Cog):
     current_embed = None
     current_helper_embed = None
 
+
+    @commands.command(aliases=["tell"])
+    async def send(self, ctx, cible, *, message):
+        """Envoie un message à tous ou certaints joueurs (COMMANDE MJ)
+
+        <cible> peut être :
+            all                 Tous les joueurs inscrits, vivants et morts
+            vivants             Les joueurs en vie
+            morts               Les joueurs morts
+            <crit>=<filtre>     Les joueurs répondant au critère Joueurs.<crit> == <filtre> :
+                                    <crit> peut être nom, chambre, statut, role, camp...
+                                    L'ensemble doit être entouré de guillements si <filtre> contient un espace.
+                                    
+        <message> peut contenir un ou plusieurs bouts de code Python à évaluer, entourés d'accolades.
+        Le joueur à qui le message sera envoyé est accessible sous le nom "joueur".
+        Les différentes tables de données sont accessibles sous leur propre nom (Joueurs, Roles...)
+        Il est impossible d'appeller des coroutines (await) dans le code à évaluer.
+        
+        Ex. !send all Bonsoir à tous c'est Fanta
+            !send "role=Servante Dévouée" Ça va vous ? Vous êtes bien {joueur.role} ?
+        """
+        if cible == "all":
+            joueurs = Joueurs.query.all()
+        elif cible == "vivants":
+            joueurs = Joueurs.query.filter_by(statut="vivant").all()
+        elif cible == "morts":
+            joueurs = Joueurs.query.filter_by(statut="mort").all()
+        elif "=" in cible:
+            crit, filtre = cible.split("=", maxsplit=1)
+            if hasattr(Joueurs, crit):
+                joueurs = Joueurs.query.filter(getattr(Joueurs, crit) == filtre).all()
+            else:
+                await ctx.send(f"Critère \"{crit}\" incorrect. !help {ctx.invoked_with} pour plus d'infos.")
+                return
+        else:
+            await ctx.send(f"Cible \"{cible}\" non reconnue. !help {ctx.invoked_with} pour plus d'infos.")
+            return
+            
+        if not joueurs:
+            await ctx.send(f"Aucun joueur trouvé.")
+            return
+            
+        await ctx.send(f"{len(joueurs)} trouvé(s), envoi...")
+        for joueur in joueurs:
+            evaluated_message = tools.eval_accols(message, locals=locals())
+            await ctx.guild.get_channel(joueur._chan_id).send(evaluated_message)
+            
+        await ctx.send(f"Fini.")
+
+
+    current_embed = None
+    current_helper_embed = None
+
     @commands.command()
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def embed(self, ctx, key=None, *, val=None):
@@ -152,9 +205,7 @@ class Annexe(commands.Cog):
             
         elif key == "color":                    # Autre cas particulier : conversion couleur en int
             try:
-                val = eval(val.replace("#", "0x"))
-                if not isinstance(val, int):
-                    raise ValueError()
+                emb.color = eval(val.replace("#", "0x")) if val else Embed.Empty
             except Exception:
                 await ctx.send("Couleur invalide")
                 return

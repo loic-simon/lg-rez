@@ -6,31 +6,45 @@ Code : https://github.com/loic-simon/lg-rez
 
 Le bot tourne en permanence sur la passerelle de la Rez. Les bases de données et le panneau d'admin sont sur alwaysdata.
 Pour publier son code, il faut d'abord le transférer :
-	- Unix (après apt-get install sshpass):
-		sshpass -p 'pas d'inspi' scp -ro User=lg-rez Discord/* 10.0.0.1:~/www/Discord (depuis la Rez uniquement)
-		sshpass -p '}fQ%9J37a' scp -ro User=lg-rez * ssh-lg-rez.alwaysdata.net:~/www
+	Depuis la Rez uniquement (réseau local) :
+		sshpass -p 'pas d'inspi' rsync -ri Discord/* lg-rez@10.0.0.1:~/www/Discord
+		
+	OU (après avoir ajouté sa clé publique SSH dans /home/lg-rez/.ssh/authorized_keys) :
+		rsync -ri Discord/* lg-rez@82.226.127.88:~/www/Discord
+		
+	Pour Alwaysdata (maintenant INTERDIT !) :
+		sshpass -p '}fQ%9J37a' rsync -ri * lg-rez@ssh-lg-rez.alwaysdata.net:~/www
 
-	- Windows :
-		scp -ro User=lg-rez Discord/* 10.0.0.1:~/www/Discord (depuis la Rez uniquement)
-		pas d'inspi
-		
-		scp -ro User=lg-rez * ssh-lg-rez.alwaysdata.net:~/www
-		}fQ%9J37a
-		
 
 Puis redémarrer le bot (depuis la Rez) :
-	- Unix (après apt-get install sshpass):
-		sshpass -p 'pas d'inspi' ssh -l lg-rez 10.0.0.1 ./reboot_bot.sh (depuis la Rez uniquement)
+	Depuis la Rez uniquement (réseau local) :
+		sshpass -p 'pas d'inspi' ssh lg-rez@10.0.0.1 ./reboot_bot.sh
+		
+	OU (après avoir ajouté sa clé publique SSH  dans /home/lg-rez/.ssh/authorized_keys) :
+		ssh lg-rez@82.226.127.88 ./reboot_bot.sh
+		
+	Pour Alwaysdata (maintenant INTERDIT !) :
+		sshpass -p '}fQ%9J37a' ssh lg-rez@ssh-lg-rez.alwaysdata.net ./reboot_bot.sh 
 
-	- Windows :
-		ssh -l lg-rez 10.0.0.1 ./reboot_bot.sh (depuis la Rez uniquement)
-		pas d'inspi
 		
 Pour redémarrer le panneau d'admin, utiliser le bouton ad hoc.
 
 
-On peut bien sûr enchaîner le tout (depuis la Rez uniquement) :
-	sshpass -p 'pas d'inspi' scp -ro User=lg-rez Discord/* 10.0.0.1:~/www/Discord && sshpass -p 'pas d'inspi' ssh -l lg-rez 10.0.0.1 ./reboot_bot.sh
+Petit script UNIX qui fait le taf pour enchaîner le tout :
+
+#!/bin/bash
+
+cd <racine des fichiers>
+echo 'Transfert des fichiers...'
+
+# scp -r Discord/* lg-rez@82.226.127.88:~/www/Discord
+rsync -r -t -i Discord/* lg-rez@82.226.127.88:~/www/Discord
+echo 'Fichiers transférés, reboot...'
+
+ssh lg-rez@82.226.127.88 ./reboot_bot.sh
+echo 'Rebooted!'
+
+
 
 
 Idée d'organisation des salons :
