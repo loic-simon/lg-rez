@@ -90,6 +90,7 @@ async def on_ready():
 # À l'arrivée d'un membre sur le serveur
 @bot.event
 async def on_member_join(member):
+    await tools.log(f"Arrivée de {member.name}#{member.discriminator} sur le serveur")
     await inscription.main(bot, member)
 
 

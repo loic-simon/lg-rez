@@ -65,7 +65,7 @@ def private_chan(member):
 
 def mention_MJ(arg):        # Renvoie @MJ si le joueur n'est pas un MJ. arg peut être de type Context ou User/Member
     member = arg.author if hasattr(arg, "author") else arg
-    if member.top_role.name == "MJ":
+    if hasattr(member, "top_role") and member.top_role.name == "MJ":    # Si webhook, pas de top_role
         return "@MJ"
     else:
         return role(arg, "MJ").mention

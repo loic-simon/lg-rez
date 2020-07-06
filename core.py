@@ -190,7 +190,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
         else:
             return (400, f"{type(e).__name__}({str(e)})")
     else:
-        return r
+        return f"<pre>{r}</pre>"
 
 
 ### APPEL D'UNE TÂCHE PLANIFIÉE

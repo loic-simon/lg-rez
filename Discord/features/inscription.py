@@ -126,6 +126,9 @@ async def main(bot, member):
 
     await tools.sleep(chan, 5)
     await chan.send("Voilà, c'est tout bon ! Installe toi bien confortablement, la partie commence le 32 plopembre.")
+    
+    # Log
+    await tools.log(member, f"Inscription de {member.name}#{member.discriminator} réussie\n - Nom : {nom}\n - Chambre : {chambre}\n - Channel créé : {chan.mention}")
 
 
     # Retrait du mode STFU
