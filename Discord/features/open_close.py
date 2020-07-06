@@ -10,8 +10,8 @@ import tools
 
 
 async def retrieve_users(quoi, qui, heure=None):
-    """Renvoie les joueurs concernés par la tâche !quoi qui <heure>
-        Ex : !open cond -> joueurs avec droit de vote, !close action 17h -> joueurs dont l'action se termine à 17h"""
+    # Renvoie les joueurs concernés par la tâche !quoi qui <heure>
+    # Ex : !open cond -> joueurs avec droit de vote, !close action 17h -> joueurs dont l'action se termine à 17h
 
     criteres = {
         "cond": {
@@ -53,21 +53,21 @@ async def retrieve_users(quoi, qui, heure=None):
 
 
 class OpenClose(commands.Cog):
-    """
-    OpenClose - lancement, rappel et fermetures des votes ou des actions
-    """
+    """OpenClose - lancement, rappel et fermetures des votes ou des actions"""
 
     @commands.command()
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
     async def open(self, ctx, qui, heure=None):
-        """
-        Lance un vote / des actions de rôle pour <qui>
+        """Lance un vote / des actions de rôle (COMMANDE BOT / MJ)
 
         <qui> prend les valeurs :
-            -cond         Pour le vote du condamné
-            -maire        Pour le vote du maire
-            -loups        Pour le vote des loups
-            -action       Pour lancer les actions commençant à [heure] (heure d'envoi du message si non spécifié)
+            cond        Pour le vote du condamné
+            maire       Pour le vote du maire
+            loups       Pour le vote des loups
+            action      Pour les actions commençant à [heure] (heure d'envoi du message si non spécifié)
+            
+        Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
+        Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi (penser à envoyer / planifier la fermeture, par exemple)
         """
 
         users = await retrieve_users("open", qui, heure)        # Liste de joueurs ou dictionnaire joueur : action
@@ -113,14 +113,16 @@ class OpenClose(commands.Cog):
     @commands.command()
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
     async def close(self, ctx, qui, heure=None):
-        """
-        Lance un vote / des actions de rôle pour <qui>
+        """Ferme un vote / des actions de rôle (COMMANDE BOT / MJ)
 
         <qui> prend les valeurs :
-            -cond         Pour le vote du condamné
-            -maire        Pour le vote du maire
-            -loups        Pour le vote des loups
-            -action       Pour fermer les actions commençant à [heure] (heure d'envoi du message si non spécifié)
+            cond        Pour le vote du condamné
+            maire       Pour le vote du maire
+            loups       Pour le vote des loups
+            action      Pour les actions se terminant à [heure] (heure d'envoi du message si non spécifié)
+            
+        Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
+        Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi !
         """
 
         users = await retrieve_users("close", qui, heure)
@@ -169,14 +171,18 @@ class OpenClose(commands.Cog):
     @commands.command()
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
     async def remind(self, ctx, qui, heure=None):
-        """
-        Rappelle un vote / des actions de rôle pour <qui> (message de rappel)
+        """Envoi un rappel de vote / actions de rôle (COMMANDE BOT / MJ)
 
         <qui> prend les valeurs :
-            -cond         Pour le vote du condamné
-            -maire        Pour le vote du maire
-            -loups        Pour le vote des loups
-            -action       Pour rappeler les actions commençant à [heure] (heure d'envoi du message si non spécifié)
+            cond        Pour le vote du condamné
+            maire       Pour le vote du maire
+            loups       Pour le vote des loups
+            action      Pour les actions se terminant à [heure] (heure d'envoi du message + 1 si non spécifié)
+            
+        Le bot n'envoie un message qu'aux joueurs n'ayant pas encore voté / agi.
+        
+        Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
+        Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi !
         """
 
         users = await retrieve_users("remind", qui, heure)

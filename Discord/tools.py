@@ -38,7 +38,7 @@ def role(arg, nom):         # Renvoie le rôle @&nom. arg peut être de type Con
     except AttributeError:
         raise TypeError("tools.role : Impossible de remonter aux rôles depuis l'argument trasmis")
     return find_by_mention_or_name(roles, nom, pattern="<@&([0-9]{18})>")
-        
+
 def member(arg, nom):       # Renvoie le membre @member. arg peut être de type Context, Guild, User/Member, Channel
     try:
         members = arg.members if isinstance(arg, discord.Guild) else arg.guild.members
@@ -69,8 +69,8 @@ def mention_MJ(arg):        # Renvoie @MJ si le joueur n'est pas un MJ. arg peut
         return "@MJ"
     else:
         return role(arg, "MJ").mention
-        
-    
+
+
 
 
 # Crée un contexte à partir d'un message_id : simule que <user> a envoyé <content> dans son chan privé
@@ -88,7 +88,6 @@ async def create_context(bot, message_id, user, content):
 # (utilisable que dans un Cog, de toute façon tout devra être cogé à terme)
 
 def private(cmd):
-
     @wraps(cmd)
     async def new_cmd(self, ctx, *args, **kwargs):              # Cette commande est renvoyée à la place de cmd
         if not ctx.channel.name.startswith("conv-bot-"):        # Si pas déjà dans une conv bot :
@@ -102,6 +101,11 @@ def private(cmd):
 
     return new_cmd
 
+
+# Attend x secondes en affichant l'indicateur typing... sur le chat
+async def sleep(chan, x):
+    async with chan.typing():
+        await asyncio.sleep(x)
 
 
 async def wait_for_message(bot, check, trigger_on_commands=False):
@@ -288,7 +292,7 @@ async def boucle_query_joueur(ctx, cible=None, message=None, table=Tables["Joueu
 
     if message and not cible:
         await ctx.send(message)
-        
+
     trigCheck = lambda m:m.channel == ctx.channel and m.author != ctx.bot.user
 
     for i in range(5):

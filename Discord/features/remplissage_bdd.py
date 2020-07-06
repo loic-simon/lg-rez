@@ -10,19 +10,20 @@ from bdd_connect import db, Tables
 
 
 class RemplissageBDD(commands.Cog):
-    """
-    RemplissageBDD - Commandes pour remplir la base de données du bot à partir des GSheets
-    """
+    """ RemplissageBDD - Commandes pour remplir la base de données du bot à partir des GSheets"""
 
 
     @commands.command()
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def droptable(self, ctx, table):
-        """
-        Supprime la table <table>.
+        """Supprime sans ménagement une table de données (COMMANDE MJ)
+        
+        <table> table à supprimer (doit exister)
 
         ATTENTION À SAUVEGARDER AVANT !
-        CECI N'EST PAS UN EXERCICE, LA TABLE SERA SUPPRIMEE DEFINITIVEMENT!!
+        CECI N'EST PAS UN EXERCICE, LA TABLE SERA SUPPRIMÉE DÉFINITIVEMENT !!!
+        
+        Cette commande ne devrait certainement pas exister, mais bon...
         """
 
         if table in Tables:
@@ -41,8 +42,11 @@ class RemplissageBDD(commands.Cog):
     @commands.command()
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def fillroles(self, ctx):
-        """
-        Remplit les table Roles, BaseActions et BaseActionsRoles depuis le GSheet ad hoc
+        """Remplit les table des rôles / actions depuis le GSheet ad hoc (COMMANDE MJ)
+        
+        Remplit les tables Roles, BaseActions et BaseActionsRoles avec les informations du Google Sheets "Rôles et actions" (https://docs.google.com/spreadsheets/d/1Mfs22B_HtqSejaN0lX_Q555JW4KTYW5Pj-D-1ywoEIg)
+        
+        Utile à chaque début de saison / changement dans les rôles/actions. Écrase toutes les entrées déjà en base, mais ne supprime pas celles obsolètes.
         """
 
         load_dotenv()

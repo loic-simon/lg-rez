@@ -19,19 +19,19 @@ ACTIONS_SHEET_ID = os.getenv("ACTIONS_SHEET_ID")
 
 
 class VoterAgir(commands.Cog):
-    """
-    VoterAgir - voter (aux votes) et agir (les actions) #yes
-    """
+    """VoterAgir - Commandes de vote et d'action de rôle"""
 
     @commands.command()
     @tools.private
-    async def vote(self, ctx, *, nom_cible=None):
-        """
-        Vote pour le condamné du jour
+    async def vote(self, ctx, *, cible=None):
+        """Vote pour le condamné du jour
 
-        [cible] est la cible de ton vote
+        [cible] joueur contre qui tu veux diriger ton vote.
+        
+        Cette commande n'est utilisable que lorsqu'un vote pour le condamné est en cours, pour les joueurs ayant le droit de voter.
+        Le bot t'enverra un message à l'ouverture de chaque vote.
+        La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
         """
-
         joueur = Joueurs.query.get(ctx.author.id)
 
         # Vérification vote en cours
@@ -43,7 +43,7 @@ class VoterAgir(commands.Cog):
             return
 
         # Choix de la cible
-        cible = await tools.boucle_query_joueur(ctx, cible=nom_cible,
+        cible = await tools.boucle_query_joueur(ctx, cible=cible,
                                                 message=f"Contre qui veux-tu voter ? (vote actuel : {joueur._vote_condamne})")
 
         async with ctx.typing():
@@ -60,13 +60,15 @@ class VoterAgir(commands.Cog):
 
     @commands.command()
     @tools.private
-    async def votemaire(self, ctx, *, nom_cible=None):
-        """
-        Vote pour le nouveau maire
+    async def votemaire(self, ctx, *, cible=None):
+        """Vote pour le nouveau maire
 
-        [cible] est la cible de ton vote
+        [cible] joueur pour lequel tu souhaites voter.
+        
+        Cette commande n'est utilisable que lorsqu'une élection pour le maire est en cours, pour les joueurs ayant le droit de voter.
+        Le bot t'enverra un message à l'ouverture de chaque vote.
+        La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
         """
-
         joueur = Joueurs.query.get(ctx.author.id)
 
         # Vérification vote en cours
@@ -78,7 +80,7 @@ class VoterAgir(commands.Cog):
             return
 
         # Choix de la cible
-        cible = await tools.boucle_query_joueur(ctx, cible=nom_cible,
+        cible = await tools.boucle_query_joueur(ctx, cible=cible,
                                                 message=f"Pour qui veux-tu voter ? (vote actuel : {joueur._vote_maire})")
 
         async with ctx.typing():
@@ -95,11 +97,14 @@ class VoterAgir(commands.Cog):
 
     @commands.command()
     @tools.private
-    async def voteloups(self, ctx, *, nom_cible=None):
-        """
-        Voter pour la victime de l'attaque des loups
+    async def voteloups(self, ctx, *, cible=None):
+        """Vote pour la victime de l'attaque des loups
 
-        [cible] est la cible de ton vote
+        [cible] joueur que tu souhaites éliminer.
+        
+        Cette commande n'est utilisable que lorsqu'une vote pour la victime du soir est en cours, pour les joueurs concernés.
+        Le bot t'enverra un message à l'ouverture de chaque vote.
+        La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
         """
 
         joueur = Joueurs.query.get(ctx.author.id)
@@ -113,7 +118,7 @@ class VoterAgir(commands.Cog):
             return
 
         # Choix de la cible
-        cible = await tools.boucle_query_joueur(ctx, cible=nom_cible,
+        cible = await tools.boucle_query_joueur(ctx, cible=cible,
                                                 message=f"Qui veux-tu manger ? (vote actuel : {joueur._vote_loups})")
 
         async with ctx.typing():
@@ -131,11 +136,15 @@ class VoterAgir(commands.Cog):
     @commands.command()
     @tools.private
     async def action(self, ctx, *, decision=None):
-        """
-        Utiliser l'action de ton rôle / une des actions associées
+        """Utilise l'action de ton rôle / une des actions associées
 
-        [decision] correspond à comment tu utiliseras ton action
-        Note: ce paramètre est facultatif, et il sera désactivé dans le cas où tu as plusieurs actions disponibles
+        [decision] ce que tu souhaites faire.
+        Dans le cas où tu as plusieurs actions disponibles, ce paramètre n'est pas pris en compte pour éviter toute ambiguïté.
+        
+        Cette commande n'est utilisable que si tu as au moins une action ouverte. Action = pouvoir associé à ton rôle, mais aussi pouvoirs ponctuels (Lame Vorpale, Chat d'argent...)
+        Le bot t'enverra un message à l'ouverture de chaque action.
+        
+        La commande peut être utilisée autant que voulu pour changer d'action tant que la fenêtre d'action est en cours, SAUF pour certaines actions (dites "instantanées") ayant une conséquence immédiate (Barbier, Licorne...). Le bot mettra dans ce cas un message d'avertissement.
         """
 
         joueur = Joueurs.query.get(ctx.author.id)

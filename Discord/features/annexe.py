@@ -10,7 +10,7 @@ from bdd_connect import db, Joueurs
 
 
 class Annexe(commands.Cog):
-    """Annexe - commandes annexes aux usages divers"""
+    """Annexe - Commandes annexes aux usages divers"""
     
     @commands.command()
     async def roll(self, ctx, *, XdY):
@@ -68,8 +68,9 @@ class Annexe(commands.Cog):
 
 
     @commands.command(aliases=["tell"])
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def send(self, ctx, cible, *, message):
-        """Envoie un message à tous ou certaints joueurs (COMMANDE MJ)
+        """Envoie un message à tous ou certains joueurs (COMMANDE MJ)
 
         <cible> peut être :
             all                 Tous les joueurs inscrits, vivants et morts

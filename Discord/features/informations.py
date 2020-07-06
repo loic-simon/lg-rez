@@ -7,7 +7,7 @@ import traceback
 
 
 class Informations(commands.Cog):
-    """Informations - Commandes disponibles pour être s'informer sur les rôles"""
+    """Informations - Commandes disponibles pour s'informer sur les rôles"""
 
     @commands.command()
     async def roles(self, ctx, nom_camp="all") :
