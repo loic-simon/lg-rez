@@ -21,4 +21,3 @@ if __name__ == '__main__':
 
 if not subprocess.run(["pgrep", "-f", "bot.py"], stdout=subprocess.PIPE).stdout:    # Si bot.py pas en cours d'exécution
     subprocess.Popen(["env/bin/python3", "Discord/bot.py"])
-    

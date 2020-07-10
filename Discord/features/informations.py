@@ -47,20 +47,20 @@ class Informations(commands.Cog):
         Valeurs possibles pour details : None, court, long, role
         """
         nom_user = ctx.author.display_name
-        try :
+        try:
             u = Joueurs.query.filter_by(nom = nom_user).one()
-        except :
+        except:
             await ctx.send(tools.code_bloc(f"Le joueur {nom_user} n'a pas été trouvé\n{traceback.format_exc()}"))
-        else :
+        else:
             user_role = u.role
             if details == "role" :
                 await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role}"))
-            else :
-                try :
+            else:
+                try:
                     r = Roles.query.filter_by(role = user_role).one()
-                except :
+                except:
                     await ctx.send(tools.code_bloc(f"Votre rôle : {user_role} n'existe pas\n{traceback.format_exc()}"))
-                else :
+                else:
                     user_begin_time = r.horaire_debut
                     user_end_time = r.horaire_fin
                     user_side = r.camp
@@ -74,5 +74,5 @@ class Informations(commands.Cog):
                         await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action n'a pas d'heure\nTon role consiste en :\n {user_descript}"))
                     elif details == "court" and user_begin_time == None:
                         await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action n'a pas d'heure\nTon role consiste en :\n {user_short}"))
-                    else :
+                    else:
                         await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role}\nEt utilise les bons arguments (voir !help MonRole pour plus de détails)"))

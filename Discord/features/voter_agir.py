@@ -17,7 +17,6 @@ VOTELOUPS_SHEET_ID = os.getenv("VOTELOUPS_SHEET_ID")
 ACTIONS_SHEET_ID = os.getenv("ACTIONS_SHEET_ID")
 
 
-
 class VoterAgir(commands.Cog):
     """VoterAgir - Commandes de vote et d'action de rôle"""
 
@@ -27,7 +26,7 @@ class VoterAgir(commands.Cog):
         """Vote pour le condamné du jour
 
         [cible] joueur contre qui tu veux diriger ton vote.
-        
+
         Cette commande n'est utilisable que lorsqu'un vote pour le condamné est en cours, pour les joueurs ayant le droit de voter.
         Le bot t'enverra un message à l'ouverture de chaque vote.
         La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
@@ -64,7 +63,7 @@ class VoterAgir(commands.Cog):
         """Vote pour le nouveau maire
 
         [cible] joueur pour lequel tu souhaites voter.
-        
+
         Cette commande n'est utilisable que lorsqu'une élection pour le maire est en cours, pour les joueurs ayant le droit de voter.
         Le bot t'enverra un message à l'ouverture de chaque vote.
         La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
@@ -101,7 +100,7 @@ class VoterAgir(commands.Cog):
         """Vote pour la victime de l'attaque des loups
 
         [cible] joueur que tu souhaites éliminer.
-        
+
         Cette commande n'est utilisable que lorsqu'une vote pour la victime du soir est en cours, pour les joueurs concernés.
         Le bot t'enverra un message à l'ouverture de chaque vote.
         La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
@@ -140,10 +139,10 @@ class VoterAgir(commands.Cog):
 
         [decision] ce que tu souhaites faire.
         Dans le cas où tu as plusieurs actions disponibles, ce paramètre n'est pas pris en compte pour éviter toute ambiguïté.
-        
+
         Cette commande n'est utilisable que si tu as au moins une action ouverte. Action = pouvoir associé à ton rôle, mais aussi pouvoirs ponctuels (Lame Vorpale, Chat d'argent...)
         Le bot t'enverra un message à l'ouverture de chaque action.
-        
+
         La commande peut être utilisée autant que voulu pour changer d'action tant que la fenêtre d'action est en cours, SAUF pour certaines actions (dites "instantanées") ayant une conséquence immédiate (Barbier, Licorne...). Le bot mettra dans ce cas un message d'avertissement.
         """
 
@@ -194,7 +193,7 @@ class VoterAgir(commands.Cog):
                              value_input_option="USER_ENTERED")
 
         await ctx.send(f"Action « {action._decision} » bien prise en compte pour {action.action}.")
-        
+
         # Conséquences si action instantanée
         if action.instant:
             async with ctx.typing():

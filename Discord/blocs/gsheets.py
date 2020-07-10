@@ -17,12 +17,12 @@ def connect(key="1jsruJoeQ4LSbh8RlRGmiyDNGsoWZewqDKPd12M9jj20"):
     workbook = client.open_by_key(key)
 
     return workbook
-    
-    
+
+
 def update(sheet, Modifs):
     """Met à jour la feuille sheet avec les modifications indiquées dans Modifs.
     Modifs doit être une liste de tuples (ligne, colonne, valeur)."""
-    
+
     lm = max([l for (l, c, v) in Modifs])       # ligne max de la zone à modifier
     cm = max([c for (l, c, v) in Modifs])       # colonne max de la zone à modifier
 

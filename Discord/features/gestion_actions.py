@@ -43,16 +43,16 @@ async def open_action(ctx, action, chan):
         db.session.commit()
         if action.trigger_debut == "temporel":      # Programmation action du lendemain
             ts = tools.next_occurence(action.heure_debut)
-            taches.add_task(ctx.bot, ts, f"!open {action.id}")            
+            taches.add_task(ctx.bot, ts, f"!open {action.id}")
         return
-        
+
     elif action.charges == 0:               # Plus de charges, mais action maintenue en base car refill / ...
         return
 
     elif action.trigger_fin == "auto":      # Action "automatiques" (passives : notaire...) : lance la procédure de clôture / résolution
         await close_action(ctx, action, chan)
         return
-        
+
     else:                                   # Vraie action à lancer
         heure_fin = None
         if action.trigger_fin == "temporel":
@@ -62,18 +62,18 @@ async def open_action(ctx, action, chan):
             delta = action.heure_fin
             ts = datetime.datetime.now() + datetime.timedelta(hours=delta.hour, minutes=delta.minute, seconds=delta.second)
             heure_fin = ts.time()
-            
+
         bdd_tools.modif(action, "_decision", "rien")
         message = await chan.send(
             f"""{tools.montre()}  Tu peux maintenant utiliser ton action {action.action} !  {tools.emoji(ctx, "foudra")} \n"""
             + (f"""Tu as jusqu'à {heure_fin} pour le faire. \n""" if heure_fin else "")
             + tools.ital(f"""Tape {tools.code('!action <phrase>')} ou utilise la réaction pour voter."""))
         await message.add_reaction(tools.emoji(ctx, "foudra"))
-        
+
         if action.trigger_fin in ["temporel", "delta"]:        # Programmation remind / close
             taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=10), f"!remind {action.id}")
             taches.add_task(ctx.bot, ts, f"!close {action.id}")
-            
+
     db.session.commit()
 
 
@@ -94,5 +94,5 @@ async def close_action(ctx, action, chan):
         if action.trigger_debut == "temporel":      # Programmation action du lendemain
             ts = tools.next_occurence(action.heure_debut)
             taches.add_task(ctx.bot, ts, f"!open {action.id}")
-            
+
     db.session.commit()

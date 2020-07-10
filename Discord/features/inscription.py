@@ -33,15 +33,15 @@ async def main(bot, member):
     await tools.sleep(chan, 5)    # tools.sleep(x) = attend x secondes avec l'indicateur typing...'
 
     await chan.send(f"""Avant toute chose, finalisons ton inscription !\nD'abord, un point règles nécessaire :\n\n{tools.quote_bloc("En t'inscrivant au Loup-Garou de la Rez, tu garantis vouloir participer à cette édition et t'engages à respecter les règles du jeu. Si tu venais à entraver le bon déroulement de la partie pour une raison ou une autre, les MJ s'autorisent à te mute ou t'expulser du Discord sans préavis.")}""")
-    
+
     await tools.sleep(chan, 5)    # tools.sleep(x) = attend x secondes avec l'indicateur typing...'
-    
+
     message = await chan.send(f"""C'est bon pour toi ?\n{tools.ital("(Le bot te demandera souvent confirmation, en t'affichant deux réactions comme ceci. Clique sur ✅ si ça te va, sur ❎ sinon. Tu peux aussi répondre (oui, non, ...) par écrit.)")}""")
     if not await tools.yes_no(bot, message):
         await chan.send(f"Pas de soucis. Si tu changes d'avis ou que c'est un missclick, appelle un MJ aled ({tools.code('@MJ')}).")
         return
-        
-        
+
+
     await chan.send(f"Parfait. Je vais d'abord avoir besoin de ton (vrai) prénom, celui par lequel on t'appelle au quotidien. Attention, tout troll sera foudracanonné {tools.emoji(chan, 'foudra')}")
 
     def checkChan(m): #Check que le message soit envoyé par l'utilisateur et dans son channel perso
@@ -80,7 +80,7 @@ async def main(bot, member):
     await chan.send(f"{nom}, en chambre {chambre}... Je t'inscris en base !")
 
     async with chan.typing():     # Envoi indicateur d'écriture pour informer le joueur que le bot fait des trucs
-        ### Ajout à la BDD
+        # Ajout à la BDD
 
         joueur = Joueurs(discord_id=member.id, _chan_id=chan.id, nom=member.display_name,
                          chambre=chambre, statut="vivant", role="Non attribué", camp="Non attribué",
@@ -88,8 +88,7 @@ async def main(bot, member):
         db.session.add(joueur)
         db.session.commit()
 
-
-        ### Ajout au TDB
+        # Ajout au TDB
 
         cols = [col for col in bdd_tools.get_cols(Joueurs) if not col.startswith('_')]    # On élimine les colonnes locales
 
@@ -102,8 +101,8 @@ async def main(bot, member):
         NL = len(values)
 
         head = values[2]            # Ligne d'en-têtes (noms des colonnes) = 3e ligne du TDB
-        TDB_index = {col:head.index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
-        TDB_tampon_index = {col:head.index(f"tampon_{col}") for col in cols if col != 'discord_id'}    # Idem pour la partie « tampon »
+        TDB_index = {col: head.index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
+        TDB_tampon_index = {col: head.index(f"tampon_{col}") for col in cols if col != 'discord_id'}    # Idem pour la partie « tampon »
 
         plv = 3        # Première ligne vide (si tableau vide, 4e ligne ==> l=3)
         for l in range(NL):
@@ -114,7 +113,7 @@ async def main(bot, member):
         gsheets.update(sheet, Modifs)
 
 
-        ### Grant accès aux channels joueurs et information
+        # Grant accès aux channels joueurs et information
 
         await member.add_roles(tools.role(member, "Joueur en vie"))
         await chan.edit(topic="Ta conversation privée avec le bot, c'est ici que tout se passera !")
@@ -126,7 +125,7 @@ async def main(bot, member):
 
     await tools.sleep(chan, 5)
     await chan.send("Voilà, c'est tout bon ! Installe toi bien confortablement, la partie commence le 32 plopembre.")
-    
+
     # Log
     await tools.log(member, f"Inscription de {member.name}#{member.discriminator} réussie\n - Nom : {nom}\n - Chambre : {chambre}\n - Channel créé : {chan.mention}")
 

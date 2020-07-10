@@ -101,8 +101,8 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                 r += f"<{NL}L/{NC}C>\n"
 
             head = values[2]            # Ligne d'en-têtes (noms des colonnes) = 3e ligne du TDB
-            TDB_index = {col:head.index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
-            TDB_tampon_index = {col:head.index(f"tampon_{col}") for col in cols if col != 'discord_id'}    # Idem pour la partie « tampon »
+            TDB_index = {col: head.index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
+            TDB_tampon_index = {col: head.index(f"tampon_{col}") for col in cols if col != 'discord_id'}    # Idem pour la partie « tampon »
 
             # CONVERSION INFOS GSHEET EN UTILISATEURS
 
@@ -115,7 +115,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                 id_cell = L[TDB_index["discord_id"]]
                 if id_cell.isdigit():        # Si la cellule contient bien un ID (que des chiffres, et pas vide)
                     id = int(id_cell)
-                    user_TDB = {col:bdd_tools.transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
+                    user_TDB = {col: bdd_tools.transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
                         # Dictionnaire correspondant à l'utilisateur
                     users_TDB.append(user_TDB)
                     ids_TDB.append(id)
@@ -159,7 +159,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
             ### ENVOI WEBHOOK DISCORD
 
             if Modifs:
-                dico = {id:{col:v for (idM, col, v) in Modifs if idM == id} for id in Modified_ids}
+                dico = {id: {col: v for (idM, col, v) in Modifs if idM == id} for id in Modified_ids}
                 message = f"!sync {silent} {json.dumps(dico)}"      # On transfère les infos sous forme de JSON (dictionnaire sérialisé)
 
                 rep = webhook.send(message, "sync")

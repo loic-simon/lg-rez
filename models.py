@@ -50,10 +50,10 @@ class Joueurs(db.Model):
 
 class Roles(db.Model) :
     slug = db.Column(db.String(32), primary_key=True)
-    
+
     prefixe = db.Column(db.String(8), nullable=False)
     nom = db.Column(db.String(32), nullable=False)
-    
+
     camp = db.Column(db.String(32), nullable=False)                       # loups, solitaire, nécro, village...
 
     description_courte = db.Column(db.String(140), nullable=False)
@@ -80,7 +80,7 @@ class Roles(db.Model) :
 
 class BaseActions(db.Model):
     action = db.Column(db.String(32), primary_key=True)
-    
+
     trigger_debut = db.Column(db.String(32), nullable=True)
     trigger_fin = db.Column(db.String(32), nullable=True)
     instant = db.Column(db.Boolean(), nullable=True)
@@ -91,13 +91,13 @@ class BaseActions(db.Model):
     base_cooldown = db.Column(db.Integer(), nullable=False)
     base_charges = db.Column(db.Integer(), nullable=True)
     refill  = db.Column(db.String(32), nullable=True)
-    
+
     # role_actif  = db.Column(db.Boolean(), nullable=False) # Définit si l'action est active(peut être utilisé par le joueur, même sous certaines conditions) ou passif (auto, AUCUNE influence du joueur)
     lieu = db.Column(db.String(32), nullable=True) #Distance/Physique/Lieu/Contact/Conditionnel/None/Public
     interaction_notaire = db.Column(db.String(32), nullable=True)         # Oui, Non, Conditionnel, Potion, Rapport; None si récursif
     interaction_gardien = db.Column(db.String(32), nullable=True)         # Oui, Non, Conditionnel, Taverne, Feu, MaisonClose, Précis, Cimetière, Loups, None si recursif
     mage = db.Column(db.String(100), nullable=True)                       #Oui, Non, changement de cible, etc
-    
+
     changement_cible = db.Column(db.Boolean(), nullable=True)
 
     def __init__(self, action, trigger_debut=None, trigger_fin=None, instant=None, heure_debut=None, heure_fin=None, base_cooldown=0, base_charges=None, refill=None, lieu=None, interaction_notaire=None, interaction_gardien=None, mage=None, changement_cible=None):
@@ -122,7 +122,7 @@ class Actions(db.Model):
     id = db.Column(db.Integer(), primary_key=True)
     player_id = db.Column(db.BigInteger(), nullable=False)
     action = db.Column(db.String(32), nullable=False)
-    
+
     trigger_debut = db.Column(db.String(32), nullable=True)
     trigger_fin = db.Column(db.String(32), nullable=True)
     instant = db.Column(db.Boolean(), nullable=True)
@@ -133,17 +133,17 @@ class Actions(db.Model):
     cooldown = db.Column(db.Integer(), nullable=False)
     charges = db.Column(db.Integer(), nullable=True)
     refill  = db.Column(db.String(32), nullable=True)
-    
+
     lieu = db.Column(db.String(32), nullable=True)
     interaction_notaire = db.Column(db.String(32), nullable=True)
     interaction_gardien = db.Column(db.String(32), nullable=True)
     mage = db.Column(db.String(100), nullable=True)
     changement_cible = db.Column(db.Boolean(), nullable=True)
-    
+
     # _cible_id = db.Column(db.BigInteger(), nullable=True)
     # _cible2_id = db.Column(db.BigInteger(), nullable=True)
     _decision = db.Column(db.String(200), nullable=True)
-    
+
     #treated = db.Column(db.Boolean(), nullable=False)
 
     def __init__(self, *, id=None, player_id, action, trigger_debut=None, trigger_fin=None, instant=None, heure_debut=None, heure_fin=None, cooldown=0, charges=None, refill=None, lieu=None, interaction_notaire=None, interaction_gardien=None, mage=None, changement_cible=None, _decision=None):
@@ -162,7 +162,7 @@ class Actions(db.Model):
         self.interaction_notaire = interaction_notaire
         self.interaction_gardien = interaction_gardien
         self.mage = mage
-        self.changement_cible = changement_cible    
+        self.changement_cible = changement_cible
         # self._cible_id = _cible_id
         # self._cible2_id = _cible2_id
         self._decision = _decision
@@ -196,7 +196,7 @@ class Triggers(db.Model):
     id = db.Column(db.Integer(), primary_key=True)
     trigger = db.Column(db.String(500), nullable=False)
     reac_id = db.Column(db.Integer(), nullable=False)
-    
+
     def __init__(self, *, id=None, trigger, reac_id):
         self.id = id                # Si None : auto-incrément
         self.trigger = trigger
@@ -207,7 +207,7 @@ class Reactions(db.Model):
     """Table Reactions : réactions de l'IA"""
     id = db.Column(db.Integer(), primary_key=True)
     reponse = db.Column(db.String(2000), nullable=False)     # Réponse, dans le format personnalisé : "txt <||> txt <&&> <##>react"
-    
+
     def __init__(self, *, id=None, reponse=None):
         self.id = id                # Si None : auto-incrément
         self.reponse = reponse

@@ -14,15 +14,15 @@ class RemplissageBDD(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
     async def droptable(self, ctx, table):
         """Supprime sans ménagement une table de données (COMMANDE MJ)
-        
+
         <table> table à supprimer (doit exister)
 
         ATTENTION À SAUVEGARDER AVANT !
         CECI N'EST PAS UN EXERCICE, LA TABLE SERA SUPPRIMÉE DÉFINITIVEMENT !!!
-        
+
         Cette commande ne devrait certainement pas exister, mais bon...
         """
 
@@ -40,12 +40,12 @@ class RemplissageBDD(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
     async def fillroles(self, ctx):
         """Remplit les table des rôles / actions depuis le GSheet ad hoc (COMMANDE MJ)
-        
+
         Remplit les tables Roles, BaseActions et BaseActionsRoles avec les informations du Google Sheets "Rôles et actions" (https://docs.google.com/spreadsheets/d/1Mfs22B_HtqSejaN0lX_Q555JW4KTYW5Pj-D-1ywoEIg)
-        
+
         Utile à chaque début de saison / changement dans les rôles/actions. Écrase toutes les entrées déjà en base, mais ne supprime pas celles obsolètes.
         """
 
@@ -66,12 +66,12 @@ class RemplissageBDD(commands.Cog):
                 SQL_nullable = bdd_tools.get_SQL_nullable(table)
                 primary_col = bdd_tools.get_primary_col(table)
 
-                cols_index = {col:values[0].index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
+                cols_index = {col: values[0].index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
 
                 existants = {getattr(item, primary_col):item for item in table.query.all()}
 
                 for L in values[1:]:
-                    args = {col:bdd_tools.transtype(L[cols_index[col]], col, SQL_types[col], SQL_nullable[col]) for col in cols}
+                    args = {col: bdd_tools.transtype(L[cols_index[col]], col, SQL_types[col], SQL_nullable[col]) for col in cols}
                     id = args[primary_col]
                     if id in existants:
                         for col in cols:

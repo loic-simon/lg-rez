@@ -7,11 +7,13 @@ from sqlalchemy.orm.attributes import flag_modified     # Permet de "signaler" l
 
 def remove_accents(s):
     p = re.compile("([À-ʲΆ-ת])")      # Abracadabrax, c'est moche mais ça marche
-    return p.sub(lambda c:unidecode.unidecode(c.group()), s)
+    return p.sub(lambda c: unidecode.unidecode(c.group()), s)
+
 
 def modif(item, col, value):
     setattr(item, col, value)
     flag_modified(item, col)
+
 
 def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input brut (BDD, POST, GET...) selon le type de sa colonne
     try:
@@ -52,31 +54,32 @@ def get_cols(table):                    # Renvoie la liste des colonnes de la ta
     raw_cols = table.__table__.columns
     return [col.key for col in raw_cols]
 
+
 def get_primary_col(table):             # Renvoie la colonne étant une clé primaire de la table
     raw_cols = table.__table__.columns
     return [col.key for col in raw_cols if col.primary_key][0]
 
+
 def get_SQL_types(table, detail=False):  # Renvoie un dictionnaire {colonne: type SQL} pour la table
     raw_cols = table.__table__.columns
     if detail:                              # detail = True ==> types "VARCHAR(N)", "INTEGER"...
-        return {col.key:col.type for col in raw_cols}
+        return {col.key: col.type for col in raw_cols}
     else:                                   # detail = False ==> types "String", "Integer"...
-        return {col.key:type(col.type).__name__ for col in raw_cols}
+        return {col.key: type(col.type).__name__ for col in raw_cols}
+
 
 def get_SQL_nullable(table):               # Renvoie un dictionnaire {colonne: accepte les NULL ? (bool)} pour la table
     raw_cols = table.__table__.columns
-    return {col.key:col.nullable for col in raw_cols}
-
-
+    return {col.key: col.nullable for col in raw_cols}
 
 
 # Recherche du plus proche résultat dans une table
 async def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_si_parfait=True):
-    """Renvoie le/les éléments de <table> correspondant le mieux à <chaine> (selon la colonne <carac>, défaut : colonne primaire de la table), répondant à <filtre> (défaut : tous) sous forme de liste de tuples (element, score*) triés par score* décroissant, en se limitant aux scores* supérieurs à <sensi>. 
-    
+    """Renvoie le/les éléments de <table> correspondant le mieux à <chaine> (selon la colonne <carac>, défaut : colonne primaire de la table), répondant à <filtre> (défaut : tous) sous forme de liste de tuples (element, score*) triés par score* décroissant, en se limitant aux scores* supérieurs à <sensi>.
+
     Si <chaine> contient l'ID (numérique) d'un élément de <table>, celui-ci est directement renvoyé (quelques soient <filtre> et <carac>).
     Si <solo_si_parfait> (défaut), renvoie uniquement le premier élément de score 1 trouvé s'il existe (ignore les autres éléments, même si >= sensi)
-    
+
     *Score = ratio de difflib.SequenceMatcher, i.e. proportion de caractères communs aux deux chaînes"""
 
     if id := ''.join([c for c in chaine if c.isdigit()]):   # Si la chaîne contient un nombre, on l'extrait
@@ -106,5 +109,5 @@ async def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_
         scores.append((entry, score))
 
     # Si pas de joueur correspondant parfaitement
-    bests = [(entry, score) for (entry, score) in sorted(scores, key=lambda x:x[1], reverse=True) if score >= sensi]  # Meilleurs noms, dans l'ordre
+    bests = [(entry, score) for (entry, score) in sorted(scores, key=lambda x: x[1], reverse=True) if score >= sensi]  # Meilleurs noms, dans l'ordre
     return bests

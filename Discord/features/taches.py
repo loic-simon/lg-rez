@@ -11,15 +11,15 @@ def execute(tache):         # Exécute la tâche <tache> (objet BDD Taches) : ap
     webhook.send(tache.commande, source="tp")
     db.session.delete(tache)
     db.session.commit()
-    
-    
+
+
 def add_task(bot, timestamp, commande):     # Ajoute une tâche sur le bot + en base (fonction pour usage ici et dans d'autres features)
     now = datetime.datetime.now()
     tache = Taches(timestamp=timestamp, commande=commande)
-    
+
     db.session.add(tache)                                                           # Enregistre la tâche en BDD
     db.session.commit()
-    
+
     TH = bot.loop.call_later((timestamp - now).total_seconds(), execute, tache)     # Programme la tâche (appellera execute(tache) à timestamp)
     bot.tasks[tache.id] = TH        # TaskHandler, pour pouvoir cancel
 
@@ -28,7 +28,7 @@ class GestionTaches(commands.Cog):
     """GestionTaches - planification et exécution de tâches"""
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
     async def taches(self, ctx):
         """Liste les tâches en attente (COMMANDE MJ)
 
@@ -37,22 +37,22 @@ class GestionTaches(commands.Cog):
 
         taches = Taches.query.order_by(Taches.timestamp).all()
         LT = "\n".join([f"{str(tache.id).ljust(5)} {tache.timestamp.strftime('%d/%m/%Y %H:%M:%S')}    {tache.commande}" for tache in taches])
-        
+
         mess = ("Tâches en attente : \n\nID    Timestamp              Commande\n"
                 f"{'-'*80}\n{LT}\n\n"
                 "Utilisez !cancel <ID> pour annuler une tâche.") if LT else "Aucune tâche en attente."
-                
+
         await tools.send_code_blocs(ctx, mess)
-        
-        
+
+
     @commands.command(aliases=["doat"])
-    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
     async def planif(self, ctx, quand, *, commande):
         """Planifie une tâche au moment voulu (COMMANDE MJ)
-        
-        - <quand> : format [<J>/<M>[/<AAAA>]-]<H>:<M>[:<S>], avec <J> (jours), <M> (mois), <AAAA> (année sur 4 chiffres), <H> (heures) et <M> (minutes) des entiers et <S> (secondes) un entier ou un flottant, optionnel (défaut : 0). 
+
+        - <quand> : format [<J>/<M>[/<AAAA>]-]<H>:<M>[:<S>], avec <J> (jours), <M> (mois), <AAAA> (année sur 4 chiffres), <H> (heures) et <M> (minutes) des entiers et <S> (secondes) un entier ou un flottant, optionnel (défaut : 0).
         La date est optionnelle (défaut : date du jour). Si elle est précisée, elle doit être séparée de l'heure par un tiret et l'année peut être omise (défaut : année actuelle) ;
-        
+
         - <commande> : commande à exécuter (commençant par un !). La commande sera exécutée PAR UN WEBHOOK et DANS LE CHAN #logs : toutes les commandes qui sont liées au joueur ou réservées au chan privé sont à proscrire (ou doivent a minima être précédées de !doas <cible>)
 
         Cette commande repose sur l'architecture en base de données, ce qui garantit l'exécution de la commande même si le bot plante entre temps.
@@ -63,7 +63,7 @@ class GestionTaches(commands.Cog):
               - !planif 13/06-10:00 !open maire
               - !planif 18:00 !close maire
         """
-        
+
         now = datetime.datetime.now()
 
         if "/" in quand:            # Date précisée
@@ -81,7 +81,7 @@ class GestionTaches(commands.Cog):
         else:
             date = now.date()
             time = quand
-            
+
         H, MS = time.split(":", maxsplit=1)
         hour = int(H)
         if ":" in MS:               # Secondes précisées
@@ -92,20 +92,20 @@ class GestionTaches(commands.Cog):
             minute = int(MS)
             second = 0
         time = datetime.time(hour=hour, minute=minute, second=second)
-        
+
         ts = datetime.datetime.combine(date, time)
         message = await ctx.send(f"Planifier {tools.code(commande)} pour le {tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))} ?")
-        
+
         if await tools.yes_no(ctx.bot, message):
             add_task(ctx.bot, ts, commande)
             await ctx.send("Fait.")
-            
+
         else:
             await ctx.send("Mission aborted.")
 
 
     @commands.command(aliases=["retard", "doin"])
-    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
     async def delay(self, ctx, duree, *, commande):
         """Exécute une commande après XhYmZs (COMMANDE MJ)
 
@@ -132,21 +132,21 @@ class GestionTaches(commands.Cog):
                 secondes += float(s)
         except Exception as e:
             raise commands.BadArgument("<duree>") from e
-            
+
         if duree or not secondes:
             raise commands.BadArgument("<duree>")
-            
+
         ts = datetime.datetime.now() + datetime.timedelta(seconds=secondes)
         add_task(ctx.bot, ts, commande)
-        
+
         await ctx.send(f"Commande {tools.code(commande)} planifiée pour le {tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))}")
-        
-        
+
+
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
     async def cancel(self, ctx, *ids):
         """Annule une ou plusieurs tâche(s) planifiée(s) (COMMANDE MJ)
-        
+
         [ids...] IDs des tâches à annuler, séparées par des espaces.
         Utiliser !taches pour voir la liste des IDs.
         """
@@ -158,10 +158,10 @@ class GestionTaches(commands.Cog):
                     ctx.bot.tasks[tache.id].cancel()
                     db.session.delete(tache)
                     del ctx.bot.tasks[tache.id]
-                    
+
                 db.session.commit()
                 await ctx.send("Tâche(s) annulée(s).")
             else:
-                await ctx.send("Mission aborted.")            
+                await ctx.send("Mission aborted.")
         else:
             await ctx.send(f"Aucune tâche trouvée.")

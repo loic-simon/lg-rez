@@ -39,7 +39,7 @@ def holder_sync_TDB():
         raise InvalidUsage(r[1], status_code=r[0])
     else:
         return r
-        
+
 @app.route('/cron_call', methods=['GET'])
 def holder_cron_call():
     r = cron_call(request.args)
@@ -47,4 +47,3 @@ def holder_cron_call():
         raise InvalidUsage(r[1], status_code=r[0])
     else:
         return r
-        

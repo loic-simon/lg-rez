@@ -4,7 +4,7 @@
 ### UTILITAIRES
 
 def html_table(LL, first_row=None, second_row=None, last_row=None, repeat_header=False, very_last_row=None, row_start="", row_end=""):
-    r = "<table style='border:1px solid black; border-collapse: collapse;'>"
+    r = "<table style='border: 1px solid black; border-collapse: collapse;'>"
     if second_row:
         LL.insert(0, [f"<i>{e}</i>" for e in second_row])
     if first_row:
@@ -16,8 +16,8 @@ def html_table(LL, first_row=None, second_row=None, last_row=None, repeat_header
     if very_last_row:
         LL.append(very_last_row)
     for L in LL:
-        r += f"<tr>{row_start}<td style='border:1px solid black; padding:2pt;'><nobr>"
-        r += "</nobr></td><td style='border:1px solid black; padding:2pt;'><nobr>".join([str(l) for l in L])
+        r += f"<tr>{row_start}<td style='border: 1px solid black; padding: 2pt;'><nobr>"
+        r += "</nobr></td><td style='border: 1px solid black; padding: 2pt;'><nobr>".join([str(li) for li in L])
         r += f"</nobr></td>{row_end}</tr>"
     r += "</table>"
     return r
@@ -34,7 +34,7 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
     cols = bdd_tools.get_cols(table)
     primary_col = bdd_tools.get_primary_col(table)
     SQL_type = bdd_tools.get_SQL_types(table, detail=True)
-    SQL_nullable = {col:val if type(SQL_type[col]).__name__ != "Boolean" else True for (col, val) in bdd_tools.get_SQL_nullable(table).items()}
+    SQL_nullable = {col: val if type(SQL_type[col]).__name__ != "Boolean" else True for (col, val) in bdd_tools.get_SQL_nullable(table).items()}
 
     def HTMLform_type(SQL_type):
         SQL_type_name = type(SQL_type).__name__
@@ -52,13 +52,13 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
             raise KeyError(f"unknown column type: '{SQL_type_name}''")
 
     def HTMLform_value(SQL_type, value):
-        map_values = {"String": lambda v:f"""{f'value="{v}"' if v else ""} size=\"{min(0.4*int(str(SQL_type)[8:-1]), 60)}cm" """,
-                      "Text": lambda v:f"""{f'value="{v}"' if v else ""} size="20cm" """,
-                      "Integer": lambda v:f"""{f'value={v}' if v is not None else ""} style="width:1.5cm" """,
-                      "BigInteger": lambda v:f"""{f'value={v}' if v is not None else ""} style="width:4cm" """,
-                      "Boolean": lambda v:"checked" if v else "",
-                      "Time": lambda v:f'value="{v.strftime("%H:%M")}"' if v else "",
-                      "DateTime": lambda v:f'value="{v.strftime("%Y-%m-%dT%H:%M")}"' if v else "",
+        map_values = {"String": lambda v: f"""{f'value="{v}"' if v else ""} size=\"{min(0.4*int(str(SQL_type)[8:-1]), 60)}cm" """,
+                      "Text": lambda v: f"""{f'value="{v}"' if v else ""} size="20cm" """,
+                      "Integer": lambda v: f"""{f'value={v}' if v is not None else ""} style="width: 1.5cm" """,
+                      "BigInteger": lambda v: f"""{f'value={v}' if v is not None else ""} style="width: 4cm" """,
+                      "Boolean": lambda v: "checked" if v else "",
+                      "Time": lambda v: f'value="{v.strftime("%H:%M")}"' if v else "",
+                      "DateTime": lambda v: f'value="{v.strftime("%Y-%m-%dT%H:%M")}"' if v else "",
                       }
         try:
             return map_values[type(SQL_type).__name__](value)
@@ -72,7 +72,7 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
             LE = table.query.order_by(getattr(table, sort_col).desc()).all()
     else:
         LE = table.query.all()
-    LE = [{col:getattr(e, col) for col in cols} for e in LE]
+    LE = [{col: getattr(e, col) for col in cols} for e in LE]
 
     def boutons(value):
         return (f"""<input type="submit" name="editem" value="Édit">"""
@@ -83,20 +83,20 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
     nouv = [f"""<input type=\"{HTMLform_type(SQL_type[col])}" name=\"{col}" {HTMLform_value(SQL_type[col], None)} {"disabled" if col.startswith("_") else ""} {"" if SQL_nullable[col] else "required"}>""" for col in cols] + ["""<input type="submit" name="additem" value="Créer">"""]
 
     def actual_sort(col, asc):
-        return """disabled style="background-color:yellow;" """ if col == sort_col and asc == sort_asc else ""
+        return """disabled style="background-color: yellow;" """ if col == sort_col and asc == sort_asc else ""
     first_row = [(f"""{col}<br/><input type=submit name="viewtable-sort:{col}:asc" value="&and;" {actual_sort(col, True)}>"""
                   f"""<input type=submit name="viewtable-sort:{col}:desc" value="&or;" {actual_sort(col, False)}>""") for col in cols] + ["""Action <input type=submit name="viewtable" value="&times;">"""]
 
     r += html_table(corps,
                     # first_row = cols + ["Action"],
-                    first_row = first_row,
-                    second_row = [f"""{SQL_type[col]}{"" if SQL_nullable[col] else "*"}""" for col in cols] + [""],
-                    repeat_header = True,
-                    very_last_row = nouv,
-                    row_start = (f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">"""
+                    first_row=first_row,
+                    second_row=[f"""{SQL_type[col]}{"" if SQL_nullable[col] else "*"}""" for col in cols] + [""],
+                    repeat_header=True,
+                    very_last_row=nouv,
+                    row_start=(f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">"""
                                  f"""<input type="hidden" name="table" value=\"{table.__name__}">"""
                                  f"""<input type="hidden" name="primary_col" value=\"{primary_col}">"""),
-                    row_end = "</form>")
+                    row_end="</form>")
     r += "<br />"
 
     return r
@@ -107,12 +107,12 @@ def additem(d, p):
 
     table = Tables[p["table"]]
     r += f"Table : {table.__name__}\n\n"
-    
+
     cols = [col for col in bdd_tools.get_cols(table) if not col.startswith("_")]
     SQL_type = bdd_tools.get_SQL_types(table)
     SQL_nullable = bdd_tools.get_SQL_nullable(table)
 
-    args = {col:bdd_tools.transtype(p[col] if col in p else False, col, SQL_type[col], SQL_nullable[col]) for col in cols}
+    args = {col: bdd_tools.transtype(p[col] if col in p else False, col, SQL_type[col], SQL_nullable[col]) for col in cols}
 
     user = table(**args)
     db.session.add(user)
@@ -126,7 +126,7 @@ def delitem(d, p):
     r = "<h2>Suppression d'élément</h2>"
 
     table = Tables[p["table"]]
-    id = {p["primary_col"]:p[p["primary_col"]]}
+    id = {p["primary_col"]: p[p["primary_col"]]}
     r += f"Table : {table.__name__}, ID : {id}<br/><br/>"
 
     try:
@@ -146,14 +146,14 @@ def editem(d, p):
     r = "<h2>Modification d'élément</h2>"
 
     table = Tables[p["table"]]
-    id = {p["primary_col"]:p[p["primary_col"]]}
+    id = {p["primary_col"]: p[p["primary_col"]]}
     r += f"Table : {table.__name__}, ID : {id}<br/><ul>"
-    
+
     cols = [col for col in bdd_tools.get_cols(table) if not col.startswith("_")]
     SQL_type = bdd_tools.get_SQL_types(table)
     SQL_nullable = bdd_tools.get_SQL_nullable(table)
 
-    args = {col:bdd_tools.transtype(p[col] if col in p else False, col, SQL_type[col], SQL_nullable[col]) for col in cols}
+    args = {col: bdd_tools.transtype(p[col] if col in p else False, col, SQL_type[col], SQL_nullable[col]) for col in cols}
 
     try:
         user = table.query.filter_by(**id).one()
@@ -178,14 +178,14 @@ def viewcron(d, p):
     r = "<h2>Tâches planifiées alwaysdata</h2>"
 
     lst = getjobs()     # Récupération de la liste des tâches
-    lst.sort(key=lambda x:x["id"])
+    lst.sort(key=lambda x: x["id"])
 
     keys = list(lst[0].keys())
 
     def boutons(id, is_disabled):
         return (f"""<input type="hidden" name="id" value=\"{id}"><input type="submit" name="delcron" value="Suppr">"""
                 f"""<input type="hidden" name="id" value="{id}">{'' if is_disabled else '<input type="hidden" name="disable">'}<input type="submit" name="disablecron" value=" {'Activer' if is_disabled else 'Désactiver'}">""")
-                
+
     corps = [[dic[k] for k in keys] + [boutons(dic["id"], dic["is_disabled"])] for dic in lst]
 
     fieldProperties = {"id": None,
@@ -218,11 +218,11 @@ def viewcron(d, p):
     nouv = [champ(k, fieldProperties[k]) for k in keys] + ["""<input type="submit" name="addcron" value="Créer">"""]
 
     r += html_table(corps,
-                    first_row = keys + ["Action"],
-                    repeat_header = True,
-                    very_last_row = nouv,
-                    row_start = f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">""",
-                    row_end = "</form>")
+                    first_row=keys + ["Action"],
+                    repeat_header=True,
+                    very_last_row=nouv,
+                    row_start=f"""<form action="admin?pwd={GLOBAL_PASSWORD}" method="post">""",
+                    row_end="</form>")
 
     return r
 
@@ -281,7 +281,7 @@ def disablecron(d, p, id=False):
 
     rep = requests.patch(f'https://api.alwaysdata.com/v1/job/{id}/',
                          auth=(ALWAYSDATA_API_KEY, ''),
-                         json={"id":id, "is_disabled":disable})
+                         json={"id": id, "is_disabled": disable})
 
     if rep:
         r += f"<pre>{rep.text}</pre>"

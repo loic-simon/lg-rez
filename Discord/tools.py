@@ -25,12 +25,14 @@ def find_by_mention_or_name(collec, val, pattern=None):         # Utilitaire pou
     else:
         return get(collec, name=val)
 
+
 def channel(arg, nom):      # Renvoie le channel #nom. arg peut être de type Context, Guild, User/Member, Channel
     try:
         channels = arg.channels if isinstance(arg, discord.Guild) else arg.guild.channels
     except AttributeError:
         raise TypeError("tools.channel : Impossible de remonter aux channels depuis l'argument trasmis")
     return find_by_mention_or_name(channels, nom, pattern="<#([0-9]{18})>")
+
 
 def role(arg, nom):         # Renvoie le rôle @&nom. arg peut être de type Context, Guild, User/Member, Channel
     try:
@@ -39,12 +41,14 @@ def role(arg, nom):         # Renvoie le rôle @&nom. arg peut être de type Con
         raise TypeError("tools.role : Impossible de remonter aux rôles depuis l'argument trasmis")
     return find_by_mention_or_name(roles, nom, pattern="<@&([0-9]{18})>")
 
+
 def member(arg, nom):       # Renvoie le membre @member. arg peut être de type Context, Guild, User/Member, Channel
     try:
         members = arg.members if isinstance(arg, discord.Guild) else arg.guild.members
     except AttributeError:
         raise TypeError("tools.member : Impossible de remonter aux membres depuis l'argument trasmis")
     return find_by_mention_or_name(members, nom, pattern="<@!([0-9]{18})>")
+
 
 def emoji(arg, nom):        # Renvoie l'emoji :nom:. arg peut être de type Context, Guild, User/Member, Channel
     try:
@@ -69,8 +73,6 @@ def mention_MJ(arg):        # Renvoie @MJ si le joueur n'est pas un MJ. arg peut
         return "@MJ"
     else:
         return role(arg, "MJ").mention
-
-
 
 
 # Crée un contexte à partir d'un message_id : simule que <user> a envoyé <content> dans son chan privé
@@ -132,18 +134,18 @@ async def yes_no(bot, message):
     yes_words = ["oui", "o", "yes", "y", "1", "true"]
     yes_no_words = yes_words + ["non", "n", "no", "n", "0", "false"]
     return await wait_for_react_clic(
-        bot, message, emojis={"✅":True, "❎":False}, process_text=True,
-        text_filter=lambda s:s.lower() in yes_no_words, post_converter=lambda s:s.lower() in yes_words)
+        bot, message, emojis={"✅": True, "❎": False}, process_text=True,
+        text_filter=lambda s: s.lower() in yes_no_words, post_converter=lambda s: s.lower() in yes_words)
 
 async def choice(bot, message, N):
     """Ajoute les reacts 1️⃣, 2️⃣, 3️⃣... [N] à message et renvoie le numéro cliqué OU détecté par réponse textuelle. (N <= 10)"""
     return await wait_for_react_clic(
-        bot, message, emojis={emoji_chiffre(i):i for i in range(1, N+1)}, process_text=True,
-        text_filter=lambda s:s.isdigit() and 1 <= int(s) <= N, post_converter=int)
+        bot, message, emojis={emoji_chiffre(i): i for i in range(1, N+1)}, process_text=True,
+        text_filter=lambda s: s.isdigit() and 1 <= int(s) <= N, post_converter=int)
 
 
 async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
-                              text_filter=lambda s:True, post_converter=None, trigger_all_reacts=False, trigger_on_commands=False):
+                              text_filter=lambda s: True, post_converter=None, trigger_all_reacts=False, trigger_on_commands=False):
     """Ajoute les reacts dans emojis à message, attend que quelqu'un appuie sur une, puis renvoie :
         - soit le nom de l'emoji si emoji est une liste ;
         - soit la valeur associée si emoji est un dictionnaire.
@@ -157,7 +159,7 @@ async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
     """
 
     if not isinstance(emojis, dict):        # Si emoji est une liste, on en fait un dictionnaire
-        emojis = {emoji:emoji for emoji in emojis}
+        emojis = {emoji: emoji for emoji in emojis}
 
     try:    # Si une erreur dans ce bloc, on supprime les emojis du bot (sinon c'est moche)
         for emoji in emojis:                    # On ajoute les emojis
@@ -219,7 +221,7 @@ def montre(heure=None):
         minute = int(minute) % 60 if minute else 0
     else:
         tps = datetime.datetime.now().time()
-        heure = tps.hour%12
+        heure = tps.hour % 12
         minute = tps.minute
 
     if 15 < minute < 45:        # Demi heure
@@ -229,7 +231,7 @@ def montre(heure=None):
     return L[heure] if minute < 45 else L[(heure + 1) % 12]
 
 
-def emoji_chiffre(chiffre :int, multi=False):
+def emoji_chiffre(chiffre: int, multi=False):
     if 0 <= chiffre <= 10:
         return ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"][chiffre]
     elif multi:
@@ -237,7 +239,7 @@ def emoji_chiffre(chiffre :int, multi=False):
     else:
         raise ValueError("L'argument de emoji_chiffre doit être un entier entre 0 et 10")
 
-def super_chiffre(chiffre :int, multi=False):
+def super_chiffre(chiffre: int, multi=False):
     if 0 <= chiffre <= 9:
         return ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"][chiffre]
     elif multi:
@@ -245,7 +247,7 @@ def super_chiffre(chiffre :int, multi=False):
     else:
         raise ValueError("L'argument de super_chiffre doit être un entier entre 0 et 9")
 
-def sub_chiffre(chiffre :int, multi=False):
+def sub_chiffre(chiffre: int, multi=False):
     if 0 <= chiffre <= 9:
         return ["₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"][chiffre]
     elif multi:
@@ -258,14 +260,14 @@ def sub_chiffre(chiffre :int, multi=False):
 
 def next_occurence(tps):
     pause = datetime.time(hour=19)
-    
+
     now = datetime.datetime.now()
     jour = now.date()
     if tps <= now.time():       # Si plus tôt dans la journée que l'heure actuelle
         jour += datetime.timedelta(days=1)       # on réfléchit comme si on était demain très tôt
-        
+
     wd = jour.weekday()         # Jour de la semaine, Lu = 0 ... Di = 6
-    
+
     if tps < pause:
         if wd <= 4:                 # Avant 19h du lundi au vendredi : OK
             pass
@@ -276,10 +278,10 @@ def next_occurence(tps):
             pass
         else:                       # Après 19h et on est vendredi/samedi
             jour += datetime.timedelta(days=(6-wd))
-            
+
     return datetime.datetime.combine(jour, tps)         # passage de date et time à datetime
-    
-    
+
+
 # Convertit HHh[MM] en objet Time
 
 def heure_to_time(heure):
@@ -288,7 +290,7 @@ def heure_to_time(heure):
         return datetime.time(int(hh), int(mm) if mm else 0)
     except ValueError as exc:
         raise ValueError(f"Valeur \"{heure}\" non convertible en temps") from exc
-        
+
 
 # Teste si le message contient un mot de la liste trigWords, les mots de trigWords doivent etre en minuscule
 
@@ -302,7 +304,7 @@ def checkRole(member,nom : str):
 
 
 # Permet de boucler question -> réponse tant que la réponse vérifie pas les critères nécessaires dans chan
-async def boucleMessage(bot, chan, inMessage, conditionSortie, trigCheck=lambda m:m.channel == chan and m.author != bot.user, repMessage=None):
+async def boucleMessage(bot, chan, inMessage, conditionSortie, trigCheck=lambda m: m.channel == chan and m.author != bot.user, repMessage=None):
     """
     Permet de lancer une boucle question/réponse tant que la réponse ne vérifie pas conditionSortie
     chan est le channel dans lequel lancer la boucle
@@ -329,7 +331,7 @@ async def boucle_query_joueur(ctx, cible=None, message=None, table=Tables["Joueu
     if message and not cible:
         await ctx.send(message)
 
-    trigCheck = lambda m:m.channel == ctx.channel and m.author != ctx.bot.user
+    trigCheck = lambda m: m.channel == ctx.channel and m.author != ctx.bot.user
 
     for i in range(5):
         if i == 0 and cible:            # Au premier tour, si on a donné une cible
@@ -365,7 +367,6 @@ async def boucle_query_joueur(ctx, cible=None, message=None, table=Tables["Joueu
     raise RuntimeError("Le joueur est trop con, je peux rien faire")
 
 
-
 # Sépare <mess> en une liste de messages de moins de <N>=2000 mots (limitation Discord), en séparant aux <sep>=sauts de ligne si possible.
 # Ajoute <rep> à la fin des messages tronqués de leur séparateur final.
 def smooth_split(mess :str, N=1990, sep='\n', rep=''):
@@ -376,11 +377,11 @@ def smooth_split(mess :str, N=1990, sep='\n', rep=''):
     L = len(mess)
     while psl + N < L:
         if mess.count(sep, psl, psl+N+len(sep)):       # +len(sep) parce que si sep est à la fin, on le dégage
-            i = psl + N - mess[psl:psl+N+len(sep)][::-1].find(sep)      # un peu sombre mais vrai, tkt frère
-            LM.append(mess[psl:i] + rep)
+            i = psl + N - mess[psl: psl+N+len(sep)][::-1].find(sep)      # un peu sombre mais vrai, tkt frère
+            LM.append(mess[psl: i] + rep)
             psl = i + 1     # on élimine le \n
         else:
-            LM.append(mess[psl:psl + N])
+            LM.append(mess[psl: psl + N])
             psl += N
 
     if psl < L:
@@ -390,7 +391,6 @@ def smooth_split(mess :str, N=1990, sep='\n', rep=''):
 # Envoie dans <messageable> (ctx / channel) mess
 async def send_code_blocs(messageable, mess, **kwargs):
     [await messageable.send(code_bloc(bloc)) for bloc in smooth_split(mess, **kwargs)]
-
 
 
 # Log dans #logs
@@ -407,7 +407,7 @@ async def log(arg, message, code=False):
 
 def remove_accents(s):
     p = re.compile("([À-ʲΆ-ת])")      # Abracadabrax, c'est moche mais ça marche (source : tkt frère)
-    return p.sub(lambda c:unidecode.unidecode(c.group()), s)
+    return p.sub(lambda c: unidecode.unidecode(c.group()), s)
 
 
 # Replace chaque bloc entouré par des {} par leur évaluation Python si aucune erreur n'est levée, sinon laisse l'expression telle quelle
@@ -451,26 +451,34 @@ def eval_accols(rep, globals=None, locals=None, debug=False):
 def bold(s):
     return f"**{s}**"
 
+
 def ital(s):
     return f"*{s}*"
+
 
 def soul(s):
     return f"__{s}__"
 
+
 def strike(s):
     return f"~~{s}~~"
+
 
 def code(s):
     return f"`{s}`"
 
+
 def code_bloc(s, langage=""):
     return f"```{langage}\n{s}```"
+
 
 def quote(s):
     return f"> {s}"
 
+
 def quote_bloc(s):
     return f">>> {s}"
+
 
 def spoiler(s):
     return f"||{s}||"

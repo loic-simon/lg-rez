@@ -157,7 +157,7 @@ class Special(commands.Cog):
     """Special - Commandes spéciales (méta-commandes, imitant ou impactant le déroulement des autres)"""
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
     async def do(self, ctx, *, code):
         """Exécute du code Python et affiche le résultat (COMMANDE MJ)
 
@@ -179,7 +179,7 @@ class Special(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
     async def co(self, ctx, cible=None):
         """Lance la procédure d'inscription comme si on se connectait au serveur pour la première fois (COMMANDE MJ)
 
@@ -200,7 +200,7 @@ class Special(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
     async def doas(self, ctx, *, qui_quoi):
         """Exécute une commande en tant qu'un autre joueur (COMMANDE MJ)
 
@@ -219,7 +219,7 @@ class Special(commands.Cog):
 
 
     @commands.command(aliases=["autodestruct", "ad"])
-    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
+    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
     async def secret(self, ctx, *, quoi):
         """Supprime le message puis exécute la commande (COMMANDE MJ)
 
