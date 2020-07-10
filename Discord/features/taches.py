@@ -7,12 +7,21 @@ import tools
 from bdd_connect import db, Taches
 
 
-def execute(tache):
-    """Exécute la tâche <tache> (objet BDD Taches) : appel le webhook et supprime l'entrée en base"""
-    
+def execute(tache):         # Exécute la tâche <tache> (objet BDD Taches) : appelle le webhook et nettoie
     webhook.send(tache.commande, source="tp")
     db.session.delete(tache)
     db.session.commit()
+    
+    
+def add_task(bot, timestamp, commande):     # Ajoute une tâche sur le bot + en base (fonction pour usage ici et dans d'autres features)
+    now = datetime.datetime.now()
+    tache = Taches(timestamp=timestamp, commande=commande)
+    
+    db.session.add(tache)                                                           # Enregistre la tâche en BDD
+    db.session.commit()
+    
+    TH = bot.loop.call_later((timestamp - now).total_seconds(), execute, tache)     # Programme la tâche (appellera execute(tache) à timestamp)
+    bot.tasks[tache.id] = TH        # TaskHandler, pour pouvoir cancel
 
 
 class GestionTaches(commands.Cog):
@@ -29,12 +38,13 @@ class GestionTaches(commands.Cog):
         taches = Taches.query.order_by(Taches.timestamp).all()
         LT = "\n".join([f"{str(tache.id).ljust(5)} {tache.timestamp.strftime('%d/%m/%Y %H:%M:%S')}    {tache.commande}" for tache in taches])
         
-        await ctx.send(tools.code_bloc(("Tâches en attente : \n\nID    Timestamp              Commande\n"
-                                        f"{'-'*80}\n{LT}\n\n"
-                                        "Utilisez !cancel <ID> pour annuler une tâche.") if LT else "Aucune tâche en attente."))
-
-                                        
-                                        
+        mess = ("Tâches en attente : \n\nID    Timestamp              Commande\n"
+                f"{'-'*80}\n{LT}\n\n"
+                "Utilisez !cancel <ID> pour annuler une tâche.") if LT else "Aucune tâche en attente."
+                
+        await tools.send_code_blocs(ctx, mess)
+        
+        
     @commands.command(aliases=["doat"])
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
     async def planif(self, ctx, quand, *, commande):
@@ -87,13 +97,7 @@ class GestionTaches(commands.Cog):
         message = await ctx.send(f"Planifier {tools.code(commande)} pour le {tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))} ?")
         
         if await tools.yes_no(ctx.bot, message):
-            tache = Taches(timestamp=ts, commande=commande)
-            
-            db.session.add(tache)                                                       # Enregistre la tâche en BDD
-            db.session.commit()
-            
-            TH = ctx.bot.loop.call_later((ts - now).total_seconds(), execute, tache)    # Programme la tâche
-            ctx.bot.tasks[tache.id] = TH
+            add_task(ctx.bot, ts, commande)
             await ctx.send("Fait.")
             
         else:
@@ -133,13 +137,7 @@ class GestionTaches(commands.Cog):
             raise commands.BadArgument("<duree>")
             
         ts = datetime.datetime.now() + datetime.timedelta(seconds=secondes)
-        tache = Taches(timestamp=ts, commande=commande)
-        
-        db.session.add(tache)                                       # Enregistre la tâche en BDD
-        db.session.commit()
-        
-        TH = ctx.bot.loop.call_later(secondes, execute, tache)      # Programme la tâche
-        ctx.bot.tasks[tache.id] = TH
+        add_task(ctx.bot, ts, commande)
         
         await ctx.send(f"Commande {tools.code(commande)} planifiée pour le {tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))}")
         

@@ -305,7 +305,7 @@ class Special(commands.Cog):
                 r = f"Commande <{command}> non trouvée.\nUtilise <{pref}help> pour la liste des commandes."
 
         r += "\nSi besoin, n'hésite pas à appeler un MJ en les mentionnant (@MJ)."
-        [await ctx.send(tools.code_bloc(m)) for m in tools.smooth_split(r, sep="\n\n")]
+        await tools.send_code_blocs(ctx, r, sep="\n\n")     # On envoie, en séparant en blocs de 2000 caractères max
 
 
 bot.add_cog(Special(bot))

@@ -254,6 +254,42 @@ def sub_chiffre(chiffre :int, multi=False):
         raise ValueError("L'argument de sub_chiffre doit être un entier entre 0 et 9")
 
 
+# Renvoie le datetime correspondant au prochain moment ou tps arrive DANS LES HORAIRES DU JEU : du dimanche 19:00:00 au vendredi 18:59:59.
+
+def next_occurence(tps):
+    pause = datetime.time(hour=19)
+    
+    now = datetime.datetime.now()
+    jour = now.date()
+    if tps <= now.time():       # Si plus tôt dans la journée que l'heure actuelle
+        jour += datetime.timedelta(days=1)       # on réfléchit comme si on était demain très tôt
+        
+    wd = jour.weekday()         # Jour de la semaine, Lu = 0 ... Di = 6
+    
+    if tps < pause:
+        if wd <= 4:                 # Avant 19h du lundi au vendredi : OK
+            pass
+        else:                       # Avant 19h mais on est samedi/dimanche
+            jour += datetime.timedelta(days=(7-wd))
+    else:
+        if wd <= 3 or wd == 6:      # Après 19h du dimanche au jeudi : OK
+            pass
+        else:                       # Après 19h et on est vendredi/samedi
+            jour += datetime.timedelta(days=(6-wd))
+            
+    return datetime.datetime.combine(jour, tps)         # passage de date et time à datetime
+    
+    
+# Convertit HHh[MM] en objet Time
+
+def heure_to_time(heure):
+    try:
+        hh, mm = heure.split("h")
+        return datetime.time(int(hh), int(mm) if mm else 0)
+    except ValueError as exc:
+        raise ValueError(f"Valeur \"{heure}\" non convertible en temps") from exc
+        
+
 # Teste si le message contient un mot de la liste trigWords, les mots de trigWords doivent etre en minuscule
 
 def checkTrig(m,trigWords):
@@ -329,13 +365,10 @@ async def boucle_query_joueur(ctx, cible=None, message=None, table=Tables["Joueu
     raise RuntimeError("Le joueur est trop con, je peux rien faire")
 
 
-# Log dans #logs
 
+# Sépare <mess> en une liste de messages de moins de <N>=2000 mots (limitation Discord), en séparant aux <sep>=sauts de ligne si possible.
+# Ajoute <rep> à la fin des messages tronqués de leur séparateur final.
 def smooth_split(mess :str, N=1990, sep='\n', rep=''):
-    """Sépare <mess> en une liste de messages de moins de <N>=2000 mots (limitation Discord), en séparant aux <sep>=sauts de ligne si possible.
-
-    Ajouter <rep> à la fin des messages tronqués de leur séparateur final.
-    """
 
     mess = str(mess)
     LM = []             # Liste des messages
@@ -354,12 +387,20 @@ def smooth_split(mess :str, N=1990, sep='\n', rep=''):
         LM.append(mess[psl:])   # ce qui reste
     return LM
 
+# Envoie dans <messageable> (ctx / channel) mess
+async def send_code_blocs(messageable, mess, **kwargs):
+    [await messageable.send(code_bloc(bloc)) for bloc in smooth_split(mess, **kwargs)]
 
-async def log(arg, message):
+
+
+# Log dans #logs
+async def log(arg, message, code=False):
     """Envoie <message> dans le channel #logs. <arg> peut être de type Context, Guild, User/Member, Channel"""
     logchan = channel(arg, "logs")
-    for mess in smooth_split(message):
-        await logchan.send(mess)
+    if code:
+        await send_code_blocs(logchan, message)
+    else:
+        [await logchan.send(bloc) for bloc in smooth_split(mess)]
 
 
 # Remove accents

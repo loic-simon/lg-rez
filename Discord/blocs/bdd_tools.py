@@ -32,7 +32,10 @@ def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input
             else:
                 raise ValueError()
         elif SQL_type == "Time":                # hh:mm
-            h, m, _ = value.split(':')
+            try:
+                h, m, _ = value.split(':')
+            except ValueError:
+                h, m = value.split(':')
             return datetime.time(hour=int(h), minute=int(m))
         elif SQL_type == "DateTime":            # aaaa-mm-jjThh:mm
             date, time = value.split('T')

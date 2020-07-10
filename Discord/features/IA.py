@@ -154,7 +154,7 @@ class GestionIA(commands.Cog):
                  
             r = "\n".join(L) + "\n\nPour modifier une réaction, utiliser !modifIA <trigger>."
             
-        [await ctx.send(tools.code_bloc(mess)) for mess in tools.smooth_split(r)]       # On envoie, en séparant en blocs de 2000 caractères max
+        await tools.send_code_blocs(ctx, r)       # On envoie, en séparant en blocs de 2000 caractères max
         
 
     @commands.command()

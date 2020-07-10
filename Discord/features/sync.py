@@ -99,7 +99,7 @@ class Sync(commands.Cog):
 
             db.session.commit()
 
-            await tools.log(ctx, tools.code_bloc(changelog))
+            await tools.log(ctx, changelog, code=True)
         
         except Exception:
-            await tools.log(ctx, tools.code_bloc(traceback.format_exc()))
+            await tools.log(ctx, traceback.format_exc(), code=True)
