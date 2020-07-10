@@ -144,22 +144,24 @@ class GestionTaches(commands.Cog):
         
     @commands.command()
     @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_role("MJ"))
-    async def cancel(self, ctx, id):
-        """Annule une tâche planifiée (COMMANDE MJ)
+    async def cancel(self, ctx, *ids):
+        """Annule une ou plusieurs tâche(s) planifiée(s) (COMMANDE MJ)
         
-        <id> ID de la tâche à annuler (accessible via !taches)
+        [ids...] IDs des tâches à annuler, séparées par des espaces.
+        Utiliser !taches pour voir la liste des IDs.
         """
-        
-        id = int(id)
-        tache = Taches.query.get(id)
-        if tache:
-            message = await ctx.send(f"Annuler la tâche {tools.code(tache.timestamp.strftime('%d/%m/%Y %H:%M:%S'))} > {tools.code(tache.commande)} ?")
+        taches = [tache for id in ids if id.isdigit() and (tache := Taches.query.get(int(id)))]
+        if taches:
+            message = await ctx.send("Annuler les tâches :\n" + "\n".join([f" - {tools.code(tache.timestamp.strftime('%d/%m/%Y %H:%M:%S'))} > {tools.code(tache.commande)}" for tache in taches]))
             if await tools.yes_no(ctx.bot, message):
-                ctx.bot.tasks[id].cancel()
-                db.session.delete(tache)
+                for tache in taches:
+                    ctx.bot.tasks[tache.id].cancel()
+                    db.session.delete(tache)
+                    del ctx.bot.tasks[tache.id]
+                    
                 db.session.commit()
-                await ctx.send("Tâche annulée.")
+                await ctx.send("Tâche(s) annulée(s).")
             else:
-                await ctx.send("Mission aborted.")
+                await ctx.send("Mission aborted.")            
         else:
-            await ctx.send(f"Tâche {id} non trouvée.")
+            await ctx.send(f"Aucune tâche trouvée.")

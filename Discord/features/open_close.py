@@ -3,7 +3,7 @@ import datetime
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
-from bdd_connect import db, Joueurs, Actions
+from bdd_connect import db, Joueurs, Actions, BaseActions, BaseActionsRoles
 from features import gestion_actions, taches
 from blocs import bdd_tools
 import tools
@@ -15,17 +15,20 @@ async def retrieve_users(quoi, qui, heure=None):
 
     criteres = {
         "cond": {
-            "open": Joueurs.votant_village == True,     # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
+            "open": and_(Joueurs.votant_village == True,        # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
+                         Joueurs._vote_condamne == None),
             "close": Joueurs._vote_condamne != None,
             "remind": Joueurs._vote_condamne == "non défini",
             },
         "maire": {
-            "open": Joueurs.votant_village == True,
+            "open": and_(Joueurs.votant_village == True,        # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
+                         Joueurs._vote_condamne == None),
             "close": Joueurs._vote_maire != None,
             "remind": Joueurs._vote_maire == "non défini",
             },
         "loups": {
-            "open": Joueurs.votant_loups == True,
+            "open": and_(Joueurs.votant_loups == True,          # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
+                         Joueurs._vote_loups == None),
             "close": Joueurs._vote_loups != None,
             "remind": Joueurs._vote_loups == "non défini",
             },
@@ -34,6 +37,7 @@ async def retrieve_users(quoi, qui, heure=None):
     if qui in criteres:
         critere = criteres[qui][quoi]
         return Joueurs.query.filter(critere).all()      # Liste des joueurs répondant aux critères
+        
     elif qui == "action":
         if heure and isinstance(heure, str):            # Si l'heure est précisée, on convertit str "HHhMM" -> datetime.time
             tps = tools.heure_to_time(heure)
@@ -45,8 +49,16 @@ async def retrieve_users(quoi, qui, heure=None):
 
         actions = await gestion_actions.get_actions(quoi, "temporel", tps)
         return {Joueurs.query.get(action.player_id):action for action in actions}
-    elif qui.isdigit() and (action := Actions.query.get(int(qui))):
-        return {Joueurs.query.get(action.player_id):action}
+        
+    elif qui.isdigit() and (action := Actions.query.get(int(qui))):     # Appel direct action par son numéro
+        if ((quoi == "open" and not action._decision)       # Sécurité : ne pas lancer une action déjà lancer, 
+            or (quoi == "close" and action._decision)       #   ni fermer une déjà fermée
+            or (quoi == "remind" and action._decision == "rien")):
+            
+            return {Joueurs.query.get(action.player_id):action}
+        else:
+            return {}
+            
     else:
         raise ValueError(f"""Argument <qui> == \"{qui}" invalide""")
 
@@ -75,8 +87,10 @@ class OpenClose(commands.Cog):
         [heure_chain] permet de chaîner des votes : lance le vote immédiatement et programme sa fermeture à [heure], en appellant !close de sorte à programmer une nouvelle ouverture le lendemain à [heure_chain], et ainsi de suite
         Format HHh ou HHhMM.
         
+        Une sécurité empêche de lancer un vote ou une action déjà en cours.
+        
         Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
-        Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi (penser à envoyer / planifier la fermeture des votes, par exemple)
+        Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi (penser à envoyer / planifier la fermeture des votes, par exemple).
         
         Ex. !open maire             lance un vote condamné maintenant
             !open cond 19h          lance un vote condamné maintenant et programme sa fermeture à 19h00 (ex. Juge Bègue)
@@ -151,8 +165,10 @@ class OpenClose(commands.Cog):
         [heure_chain] permet de chaîner des votes : ferme le vote immédiatement et programme une prochaine ouverture à [heure], en appellant !open de sorte à programmer une nouvelle fermeture le lendemain à [heure_chain], et ainsi de suite.
         Format HHh ou HHhMM.
         
+        Une sécurité empêche de fermer un vote ou une action qui n'est pas en cours.
+        
         Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
-        Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi (penser à envoyer / planifier la fermeture des votes, par exemple)
+        Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi (penser à envoyer / planifier la fermeture des votes, par exemple).
         
         Ex. !close maire            ferme le vote condamné maintenant
             !close cond 10h         ferme le vote condamné maintenant et programme une prochaine ouverture à 10h00
@@ -163,7 +179,7 @@ class OpenClose(commands.Cog):
 
         users = await retrieve_users("close", qui, heure)
 
-        str_users = str(users).replace(', ', ',\n ')
+        str_users = "\n - ".join([user.nom for user in users])
         await ctx.send(tools.code_bloc(f"Utilisateur(s) répondant aux critères ({len(users)}) : \n{str_users}"))
 
         for user in users:
@@ -215,10 +231,10 @@ class OpenClose(commands.Cog):
         [heure] ne sert que dans le cas où <qui> == "action" (il est alors obligatoire), contrairement à !open et !close.
         Format HHh ou HHhMM.
         
-        Le bot n'envoie un message qu'aux joueurs n'ayant pas encore voté / agi.
+        Le bot n'envoie un message qu'aux joueurs n'ayant pas encore voté / agi, si le vote ou l'action est bien en cours.
         
         Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
-        Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi !
+        Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi !.
         
         Ex. !remind maire           rappelle le vote condamné maintenant
             !remind action 22h      rappelle toutes les actions se terminant à 22h00
@@ -227,19 +243,79 @@ class OpenClose(commands.Cog):
 
         users = await retrieve_users("remind", qui, heure)
 
-        str_users = str(users).replace(', ', ',\n ')
+        str_users = "\n - ".join([user.nom for user in users])
         await ctx.send(tools.code_bloc(f"Utilisateur(s) répondant aux critères ({len(users)}) : \n{str_users}"))
 
         for user in users:
             chan = ctx.guild.get_channel(user._chan_id)
             if qui == "cond":
-                await chan.send(f"""⏰ Plus que 10 minutes pour voter pour le condamné du jour ! 😱 \n""")
+                await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes pour voter pour le condamné du jour ! 😱 \n""")
 
             elif qui == "maire":
-                await chan.send(f"""⏰ Plus que 10 minutes pour élire le nouveau maire ! 😱 \n""")
+                await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes pour élire le nouveau maire ! 😱 \n""")
 
             elif qui == "loups":
-                await chan.send(f"""⏰ Plus que 10 minutes voter pour la victime du soir ! 😱 \n""")
+                await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes voter pour la victime du soir ! 😱 \n""")
 
             else:       # Action
-                await chan.send(f"""⏰ Plus que 10 minutes pour utiliser ton action {action.action} ! 😱 \n""")
+                action = users[user]
+                await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes pour utiliser ton action {action.action} ! 😱 \n""")
+
+
+
+    @commands.command()
+    @commands.check_any(commands.check(lambda ctx:ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
+    async def cparti(self, ctx):
+        """Lance le jeu (COMMANDE MJ)
+        
+        Crée (et programme) les actions associées aux rôles de tous les joueurs
+        Programme les votes condamnés quotidiens (avec chaînage) 10h-18h
+        Programme un vote maire 10h-18h
+        
+        À utiliser le jour du lancement après 10h (lance les premières actions le soir et les votes le lendemain)
+        """
+        
+        message = await ctx.send("C'est parti ?")
+        if await tools.yes_no(ctx.bot, message):
+            async with ctx.typing():
+                joueurs = Joueurs.query.all()
+                r = "C'est parti !\n"
+                
+                ### Ajout de toutes les actions en base
+                r += "\nChargement des actions :\n"
+                actions = []
+                cols = [col for col in bdd_tools.get_cols(BaseActions) if not col.startswith("base")]
+                
+                for joueur in joueurs:
+                    base_actions_roles = BaseActionsRoles.query.filter_by(role=joueur.role).all()
+                    base_actions = [BaseActions.query.get(bar.action) for bar in base_actions_roles]
+                    actions.extend([Actions(player_id=joueur.discord_id, **{col: getattr(ba, col) for col in cols},
+                                            cooldown=0, charges=ba.base_charges) for ba in base_actions])
+                                            
+                for action in actions:
+                    db.session.add(action)  # add_all marche pas, problème d'ids étou étou
+                db.session.commit()
+                for action in actions:      # Après le commit pour que action.id existe
+                    r += f" - {action.id} ({joueur.nom} > {action.action})\n"
+                    
+                ### Programmation des actions temporelles
+                r += "\nProgrammation des tâches :\n"
+                for action in actions:
+                    if action.trigger_debut == "temporel":
+                        taches.add_task(ctx.bot, tools.next_occurence(action.heure_debut), f"!open {action.id}")
+                        r += f" - !open {action.id}"
+                        
+                ### Programmation votes condamnés chainés
+                r += "\nProgrammation des votes :\n"
+                taches.add_task(ctx.bot, tools.next_occurence(datetime.time(hour=10)), "!open cond 18h 10h")
+                r += " - !open cond 18h 10h\n"
+                
+                ### Programmation premier vote maire
+                taches.add_task(ctx.bot, tools.next_occurence(datetime.time(hour=10)), "!open maire 17h")
+                r += " - !open maire 17h\n"
+                
+                await tools.log(ctx, r, code=True)
+                
+            await ctx.send("C'est tout bon ! (normalement) (détails dans #logs)")
+        else:
+            await ctx.send("Mission aborted.")

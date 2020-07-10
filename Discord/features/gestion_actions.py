@@ -18,60 +18,63 @@ async def get_actions(quoi, trigger, heure=None):
 
         if quoi == "open":
             criteres = and_(Actions.trigger_debut == trigger, Actions.heure_debut == heure,
-                            Actions.charges != 0)    # charges peut être None, donc pas > 0
+                            Action._decision == None)       # Obhects spéciaux SQLAlchemy : LAISSER le == !
         elif quoi == "close":
             criteres = and_(Actions.trigger_fin == trigger, Actions.heure_fin == heure,
-                            Actions._decision != None)
+                            Actions._decision != None)      # Obhects spéciaux SQLAlchemy : LAISSER le == !
         elif quoi == "remind":
             criteres = and_(Actions.trigger_fin == trigger, Actions.heure_fin == heure,
                             Actions._decision == "rien")
-
     else:
         if quoi == "open":
-            criteres = and_(Actions.trigger_debut == trigger, Actions.charges != 0)
+            criteres = and_(Actions.trigger_debut == trigger, Actions._decision == None)
         elif quoi == "close":
             criteres = and_(Actions.trigger_fin == trigger, Actions._decision != None)
         elif quoi == "remind":
             criteres = and_(Actions.trigger_fin == trigger, Actions._decision == "rien")
 
-    actions = Actions.query.filter(criteres).all()
+    return Actions.query.filter(criteres).all()
 
-    if not actions:
-        return []
-    else:
-
-        if quoi == "open":
-            act_decrement = [action for action in actions if action.cooldown > 0]
-            if act_decrement:
-                for act in act_decrement:
-                    bdd_tools.modif(act, "cooldown", act.cooldown - 1)
-
-                db.session.commit()
-
-        return([action for action in actions if action.cooldown == 0])
 
 
 async def open_action(ctx, action, chan):
-    if action.trigger_fin != "auto":
+    if action.cooldown > 0:                 # Action en cooldown
+        bdd_tools.modif(act, "cooldown", act.cooldown - 1)
+        db.session.commit()
+        if action.trigger_debut == "temporel":      # Programmation action du lendemain
+            ts = tools.next_occurence(action.heure_debut)
+            taches.add_task(ctx.bot, ts, f"!open {action.id}")            
+        return
         
-        if action.trigger_fin == "delta":       # Si delta, on calcule la vraie heure de fin (pas modifié en base)
+    elif action.charges == 0:               # Plus de charges, mais action maintenue en base car refill / ...
+        return
+
+    elif action.trigger_fin == "auto":      # Action "automatiques" (passives : notaire...) : lance la procédure de clôture / résolution
+        await close_action(ctx, action, chan)
+        return
+        
+    else:                                   # Vraie action à lancer
+        heure_fin = None
+        if action.trigger_fin == "temporel":
+            heure_fin = action.heure_fin
+            ts = tools.next_occurence(heure_fin)
+        if action.trigger_fin == "delta":           # Si delta, on calcule la vraie heure de fin (pas modifié en base)
             delta = action.heure_fin
-            action.heure_fin = datetime.datetime.now() + datetime.timedelta(hours=delta.hour, minutes=delta.minute, seconds=delta.second)
+            ts = datetime.datetime.now() + datetime.timedelta(hours=delta.hour, minutes=delta.minute, seconds=delta.second)
+            heure_fin = ts.time()
             
         bdd_tools.modif(action, "_decision", "rien")
         message = await chan.send(
             f"""{tools.montre()}  Tu peux maintenant utiliser ton action {action.action} !  {tools.emoji(ctx, "foudra")} \n"""
-            + (f"""Tu as jusqu'à {action.heure_fin} pour le faire. \n""" if action.trigger_fin in ["temporel", "delta"] else "")
+            + (f"""Tu as jusqu'à {heure_fin} pour le faire. \n""" if heure_fin else "")
             + tools.ital(f"""Tape {tools.code('!action <phrase>')} ou utilise la réaction pour voter."""))
         await message.add_reaction(tools.emoji(ctx, "foudra"))
         
         if action.trigger_fin in ["temporel", "delta"]:        # Programmation remind / close
-            ts = tools.next_occurence(action.heure_fin)
             taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=10), f"!remind {action.id}")
             taches.add_task(ctx.bot, ts, f"!close {action.id}")
             
-    else:       # Actions "automatiques" (passives : notaire...) : lance la procédure de clôture / résolution
-        await close_action(ctx, action, chan)
+    db.session.commit()
 
 
 async def close_action(ctx, action, chan):
@@ -91,3 +94,5 @@ async def close_action(ctx, action, chan):
         if action.trigger_debut == "temporel":      # Programmation action du lendemain
             ts = tools.next_occurence(action.heure_debut)
             taches.add_task(ctx.bot, ts, f"!open {action.id}")
+            
+    db.session.commit()

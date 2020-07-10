@@ -400,7 +400,7 @@ async def log(arg, message, code=False):
     if code:
         await send_code_blocs(logchan, message)
     else:
-        [await logchan.send(bloc) for bloc in smooth_split(mess)]
+        [await logchan.send(bloc) for bloc in smooth_split(message)]
 
 
 # Remove accents

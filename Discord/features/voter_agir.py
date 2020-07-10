@@ -193,10 +193,11 @@ class VoterAgir(commands.Cog):
                               "\n+\n".join([f"{action.action} : {action._decision}" for action in actions])],
                              value_input_option="USER_ENTERED")
 
-            await ctx.send(f"Action « {action._decision} » bien prise en compte pour {action.action}.")
-
-            # Conséquences si action instantanée
-            if action.instant:
+        await ctx.send(f"Action « {action._decision} » bien prise en compte pour {action.action}.")
+        
+        # Conséquences si action instantanée
+        if action.instant:
+            async with ctx.typing():
                 deleted = False
                 if action.charges:
                     bdd_tools.modif(action, "charges", action.charges - 1)
@@ -208,6 +209,6 @@ class VoterAgir(commands.Cog):
                 if not deleted:
                     bdd_tools.modif(action, "_decision", None)
 
-                await ctx.send(f"[Allo {tools.role(ctx, 'MJ').mention}, conséquance instantanée ici !]")
+            await ctx.send(f"[Allo {tools.role(ctx, 'MJ').mention}, conséquance instantanée ici !]")
 
-            db.session.commit()
+        db.session.commit()
