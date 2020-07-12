@@ -83,8 +83,8 @@ async def main(bot, member):
         # Ajout à la BDD
 
         joueur = Joueurs(discord_id=member.id, _chan_id=chan.id, nom=member.display_name,
-                         chambre=chambre, statut="vivant", role="Non attribué", camp="Non attribué",
-                         votant_village=True, votant_loups=False, role_actif=True)
+                         chambre=chambre, statut="vivant", role="nonattr", camp="Non attribué",
+                         votant_village=True, votant_loups=False, role_actif=False)
         db.session.add(joueur)
         db.session.commit()
 

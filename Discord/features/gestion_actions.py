@@ -36,7 +36,6 @@ async def get_actions(quoi, trigger, heure=None):
     return Actions.query.filter(criteres).all()
 
 
-
 async def open_action(ctx, action, chan):
     if action.cooldown > 0:                 # Action en cooldown
         bdd_tools.modif(act, "cooldown", act.cooldown - 1)
@@ -46,33 +45,39 @@ async def open_action(ctx, action, chan):
             taches.add_task(ctx.bot, ts, f"!open {action.id}")
         return
 
-    elif action.charges == 0:               # Plus de charges, mais action maintenue en base car refill / ...
+    if not Joueurs.get(action.player_id).role_actif:    # role_actif == False : on reprogramme la tâche au lendemain, tanpis
+        if action.trigger_debut == "temporel":
+            ts = tools.next_occurence(action.heure_debut)
+            taches.add_task(ctx.bot, ts, f"!open {action.id}")
         return
 
-    elif action.trigger_fin == "auto":      # Action "automatiques" (passives : notaire...) : lance la procédure de clôture / résolution
+    if action.charges == 0:                 # Plus de charges, mais action maintenue en base car refill / ...
+        return
+
+    if action.trigger_fin == "auto":        # Action "automatiques" (passives : notaire...) : lance la procédure de clôture / résolution
         await close_action(ctx, action, chan)
         return
 
-    else:                                   # Vraie action à lancer
-        heure_fin = None
-        if action.trigger_fin == "temporel":
-            heure_fin = action.heure_fin
-            ts = tools.next_occurence(heure_fin)
-        if action.trigger_fin == "delta":           # Si delta, on calcule la vraie heure de fin (pas modifié en base)
-            delta = action.heure_fin
-            ts = datetime.datetime.now() + datetime.timedelta(hours=delta.hour, minutes=delta.minute, seconds=delta.second)
-            heure_fin = ts.time()
+    # Tous tests préliminaires n'ont pas return ==> Vraie action à lancer
+    heure_fin = None
+    if action.trigger_fin == "temporel":
+        heure_fin = action.heure_fin
+        ts = tools.next_occurence(heure_fin)
+    if action.trigger_fin == "delta":           # Si delta, on calcule la vraie heure de fin (pas modifié en base)
+        delta = action.heure_fin
+        ts = datetime.datetime.now() + datetime.timedelta(hours=delta.hour, minutes=delta.minute, seconds=delta.second)
+        heure_fin = ts.time()
 
-        bdd_tools.modif(action, "_decision", "rien")
-        message = await chan.send(
-            f"""{tools.montre()}  Tu peux maintenant utiliser ton action {action.action} !  {tools.emoji(ctx, "foudra")} \n"""
-            + (f"""Tu as jusqu'à {heure_fin} pour le faire. \n""" if heure_fin else "")
-            + tools.ital(f"""Tape {tools.code('!action <phrase>')} ou utilise la réaction pour voter."""))
-        await message.add_reaction(tools.emoji(ctx, "foudra"))
+    bdd_tools.modif(action, "_decision", "rien")
+    message = await chan.send(
+        f"""{tools.montre()}  Tu peux maintenant utiliser ton action {action.action} !  {tools.emoji(ctx, "foudra")} \n"""
+        + (f"""Tu as jusqu'à {heure_fin} pour le faire. \n""" if heure_fin else "")
+        + tools.ital(f"""Tape {tools.code('!action <phrase>')} ou utilise la réaction pour voter."""))
+    await message.add_reaction(tools.emoji(ctx, "foudra"))
 
-        if action.trigger_fin in ["temporel", "delta"]:        # Programmation remind / close
-            taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=10), f"!remind {action.id}")
-            taches.add_task(ctx.bot, ts, f"!close {action.id}")
+    if action.trigger_fin in ["temporel", "delta"]:        # Programmation remind / close
+        taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=10), f"!remind {action.id}")
+        taches.add_task(ctx.bot, ts, f"!close {action.id}")
 
     db.session.commit()
 
@@ -88,10 +93,15 @@ async def close_action(ctx, action, chan):
             if action.charges == 0 and not action.refill:
                 db.session.delete(action)
                 deleted = True
+
     if not deleted:
         bdd_tools.modif(action, "_decision", None)
 
-        if action.trigger_debut == "temporel":      # Programmation action du lendemain
+        ba = BaseActions.query.get(action.action)       # Si l'action a un cooldown, on le met
+        if ba and ba.base_cooldown > 0:
+            bdd_tools.modif(action, "cooldown", ba.base_cooldown)
+
+        if action.trigger_debut == "temporel":          # Programmation action du lendemain
             ts = tools.next_occurence(action.heure_debut)
             taches.add_task(ctx.bot, ts, f"!open {action.id}")
 

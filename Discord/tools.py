@@ -9,7 +9,7 @@ import discord.utils
 import discord.ext.commands
 
 from bdd_connect import db, Tables, Joueurs, Roles, BaseActions, Actions, BaseActionsRoles, Taches, Triggers, Reactions
-# on importe toutes les tables, plus simple pour eval_accols
+# on importe toutes les tables, plus simple pour y accéder depuis des réactions etc (via eval_accols)
 from blocs import bdd_tools
 
 
@@ -294,11 +294,11 @@ def heure_to_time(heure):
 
 # Teste si le message contient un mot de la liste trigWords, les mots de trigWords doivent etre en minuscule
 
-def checkTrig(m,trigWords):
+def checkTrig(m, trigWords):
     return m.content in trigWords
 
 # Teste si user possède le role roles
-def checkRole(member,nom : str):
+def checkRole(member, nom: str):
     role = role(user, nom)
     return role in member.roles
 
@@ -370,7 +370,6 @@ async def boucle_query_joueur(ctx, cible=None, message=None, table=Tables["Joueu
 # Sépare <mess> en une liste de messages de moins de <N>=2000 mots (limitation Discord), en séparant aux <sep>=sauts de ligne si possible.
 # Ajoute <rep> à la fin des messages tronqués de leur séparateur final.
 def smooth_split(mess :str, N=1990, sep='\n', rep=''):
-
     mess = str(mess)
     LM = []             # Liste des messages
     psl = 0             # indice du Précédent Saut de Ligne
@@ -388,10 +387,13 @@ def smooth_split(mess :str, N=1990, sep='\n', rep=''):
         LM.append(mess[psl:])   # ce qui reste
     return LM
 
-# Envoie dans <messageable> (ctx / channel) mess
+# Envoie dans <messageable> (ctx / channel) mess sous forme de blocs de code
 async def send_code_blocs(messageable, mess, **kwargs):
     [await messageable.send(code_bloc(bloc)) for bloc in smooth_split(mess, **kwargs)]
 
+# Envoie dans <messageable> (ctx / channel) mess
+async def send_blocs(messageable, mess, **kwargs):
+    [await messageable.send(bloc) for bloc in smooth_split(mess, **kwargs)]
 
 # Log dans #logs
 async def log(arg, message, code=False):
@@ -403,8 +405,15 @@ async def log(arg, message, code=False):
         [await logchan.send(bloc) for bloc in smooth_split(message)]
 
 
-# Remove accents
+# Retourne le nom du slug role (None si non trouvé)
+def nom_role(role):
+    if role := Roles.query.get(role):
+        return role.nom
+    else:
+        return None
 
+
+# Remove accents
 def remove_accents(s):
     p = re.compile("([À-ʲΆ-ת])")      # Abracadabrax, c'est moche mais ça marche (source : tkt frère)
     return p.sub(lambda c: unidecode.unidecode(c.group()), s)

@@ -90,7 +90,7 @@ async def on_ready():
 # À l'arrivée d'un membre sur le serveur
 @bot.event
 async def on_member_join(member):
-    await tools.log(f"Arrivée de {member.name}#{member.discriminator} sur le serveur")
+    await tools.log(member, f"Arrivée de {member.name}#{member.discriminator} sur le serveur")
     await inscription.main(bot, member)
 
 
@@ -137,6 +137,11 @@ async def on_raw_reaction_add(payload):
     elif payload.emoji == tools.emoji(reactor, "lune"):
         ctx = await tools.create_context(bot, payload.message_id, reactor, "!voteloups")
         await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour la victime des loups :")}""")
+        await bot.invoke(ctx)       # On trigger !voteloups
+
+    elif payload.emoji == tools.emoji(reactor, "action"):
+        ctx = await tools.create_context(bot, payload.message_id, reactor, "!action")
+        await ctx.send(f"""{payload.emoji} > {tools.bold("Action :")}""")
         await bot.invoke(ctx)       # On trigger !voteloups
 
 

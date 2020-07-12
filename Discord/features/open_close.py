@@ -268,7 +268,7 @@ class OpenClose(commands.Cog):
     async def cparti(self, ctx):
         """Lance le jeu (COMMANDE MJ)
 
-        Crée (et programme) les actions associées aux rôles de tous les joueurs
+        Crée (et programme) les actions associées aux rôles de tous les joueurs     ==> EN FAIT NON, plus besoin vu que c'est fait à la synchro des rôles
         Programme les votes condamnés quotidiens (avec chaînage) 10h-18h
         Programme un vote maire 10h-18h
 
@@ -282,28 +282,29 @@ class OpenClose(commands.Cog):
                 r = "C'est parti !\n"
 
                 # Ajout de toutes les actions en base
-                r += "\nChargement des actions :\n"
-                actions = []
-                cols = [col for col in bdd_tools.get_cols(BaseActions) if not col.startswith("base")]
-
-                for joueur in joueurs:
-                    base_actions_roles = BaseActionsRoles.query.filter_by(role=joueur.role).all()
-                    base_actions = [BaseActions.query.get(bar.action) for bar in base_actions_roles]
-                    actions.extend([Actions(player_id=joueur.discord_id, **{col: getattr(ba, col) for col in cols},
-                                            cooldown=0, charges=ba.base_charges) for ba in base_actions])
-
-                for action in actions:
-                    db.session.add(action)  # add_all marche pas, problème d'ids étou étou
-                db.session.commit()
-                for action in actions:      # Après le commit pour que action.id existe
-                    r += f" - {action.id} ({joueur.nom} > {action.action})\n"
-
-                # Programmation des actions temporelles
-                r += "\nProgrammation des tâches :\n"
-                for action in actions:
-                    if action.trigger_debut == "temporel":
-                        taches.add_task(ctx.bot, tools.next_occurence(action.heure_debut), f"!open {action.id}")
-                        r += f" - !open {action.id}"
+                # r += "\nChargement des actions :\n"
+                # actions = []
+                # cols = [col for col in bdd_tools.get_cols(BaseActions) if not col.startswith("base")]
+                #
+                # for joueur in joueurs:
+                #     base_actions_roles = BaseActionsRoles.query.filter_by(role=joueur.role).all()
+                #     base_actions = [BaseActions.query.get(bar.action) for bar in base_actions_roles]
+                #     actions.extend([Actions(player_id=joueur.discord_id, **{col: getattr(ba, col) for col in cols},
+                #                             cooldown=0, charges=ba.base_charges) for ba in base_actions])
+                #
+                # for action in actions:
+                #     db.session.add(action)  # add_all marche pas, problème d'ids étou étou
+                # db.session.commit()
+                # for action in actions:      # Après le commit pour que action.id existe
+                #     r += f" - {action.id} ({joueur.nom} > {action.action})\n"
+                #
+                # # Programmation des actions temporelles
+                # r += "\nProgrammation des tâches :\n"
+                # for action in actions:
+                #     if action.trigger_debut == "temporel":
+                #         taches.add_task(ctx.bot, tools.next_occurence(action.heure_debut), f"!open {action.id}")
+                #         r += f" - !open {action.id}"
+                r += "\n\nBon plus besoin de lancer les actions, c'est fait à la synchro des rôles mais les !open n'ont aucun impact tant que tout le monde est en role_actif == False, DU COUP passer tout le monde en True genre MAINTENANT (et en silencieux !) si on veut vraiment lancer\n\n"
 
                 # Programmation votes condamnés chainés
                 r += "\nProgrammation des votes :\n"
