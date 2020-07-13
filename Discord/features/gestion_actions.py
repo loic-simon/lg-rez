@@ -3,7 +3,7 @@ import datetime
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
-from bdd_connect import db, Actions, BaseActions
+from bdd_connect import db, Actions, BaseActions, Joueurs
 import tools
 from blocs import bdd_tools
 from features import taches
@@ -38,23 +38,27 @@ async def get_actions(quoi, trigger, heure=None):
 
 async def open_action(ctx, action, chan):
     if action.cooldown > 0:                 # Action en cooldown
-        bdd_tools.modif(act, "cooldown", act.cooldown - 1)
+        bdd_tools.modif(action, "cooldown", action.cooldown - 1)
         db.session.commit()
+        await ctx.send(f"Action en cooldown, exit (reprogrammation si temporel).")
         if action.trigger_debut == "temporel":      # Programmation action du lendemain
             ts = tools.next_occurence(action.heure_debut)
-            taches.add_task(ctx.bot, ts, f"!open {action.id}")
+            taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
         return
 
-    if not Joueurs.get(action.player_id).role_actif:    # role_actif == False : on reprogramme la tâche au lendemain, tanpis
+    if not Joueurs.query.get(action.player_id).role_actif:    # role_actif == False : on reprogramme la tâche au lendemain, tanpis
+        await ctx.send(f"role_actif == False, exit (reprogrammation si temporel).")
         if action.trigger_debut == "temporel":
             ts = tools.next_occurence(action.heure_debut)
-            taches.add_task(ctx.bot, ts, f"!open {action.id}")
+            taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
         return
 
     if action.charges == 0:                 # Plus de charges, mais action maintenue en base car refill / ...
+        await ctx.send(f"Plus de charges, exit (reprogrammation si temporel).")
         return
 
     if action.trigger_fin == "auto":        # Action "automatiques" (passives : notaire...) : lance la procédure de clôture / résolution
+        await ctx.send(f"Action automatique, appel processus de clôture")
         await close_action(ctx, action, chan)
         return
 
@@ -70,14 +74,14 @@ async def open_action(ctx, action, chan):
 
     bdd_tools.modif(action, "_decision", "rien")
     message = await chan.send(
-        f"""{tools.montre()}  Tu peux maintenant utiliser ton action {action.action} !  {tools.emoji(ctx, "foudra")} \n"""
+        f"""{tools.montre()}  Tu peux maintenant utiliser ton action {tools.code(action.action)} !  {tools.emoji(ctx, "foudra")} \n"""
         + (f"""Tu as jusqu'à {heure_fin} pour le faire. \n""" if heure_fin else "")
-        + tools.ital(f"""Tape {tools.code('!action <phrase>')} ou utilise la réaction pour voter."""))
-    await message.add_reaction(tools.emoji(ctx, "foudra"))
+        + tools.ital(f"""Tape {tools.code('!action <phrase>')} ou utilise la réaction pour agir."""))
+    await message.add_reaction(tools.emoji(ctx, "action"))
 
     if action.trigger_fin in ["temporel", "delta"]:        # Programmation remind / close
-        taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=10), f"!remind {action.id}")
-        taches.add_task(ctx.bot, ts, f"!close {action.id}")
+        taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=10), f"!remind {action.id}", action=action.id)
+        taches.add_task(ctx.bot, ts, f"!close {action.id}", action=action.id)
 
     db.session.commit()
 
@@ -103,6 +107,23 @@ async def close_action(ctx, action, chan):
 
         if action.trigger_debut == "temporel":          # Programmation action du lendemain
             ts = tools.next_occurence(action.heure_debut)
-            taches.add_task(ctx.bot, ts, f"!open {action.id}")
+            taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
 
     db.session.commit()
+
+
+def add_action(ctx, action):
+    db.session.add(action)
+    db.session.commit()
+    # Ajout tâche ouverture
+    if action.trigger_debut == "temporel":
+        taches.add_task(ctx.bot, tools.next_occurence(action.heure_debut), f"!open {action.id}", action=action.id)
+
+
+def delete_action(ctx, action):
+    db.session.delete(action)
+    db.session.commit()
+    # Suppression tâches liées à l'action
+    taches = Taches.query.filter_by(action=action.id).all()
+    for tache in taches:
+        taches.cancel_task(ctx.bot, tache)

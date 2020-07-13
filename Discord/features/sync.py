@@ -5,6 +5,7 @@ from discord.ext import commands
 import tools
 from bdd_connect import db, Joueurs
 from blocs import bdd_tools
+from features import gestion_actions
 
 
 class Sync(commands.Cog):
@@ -75,8 +76,7 @@ class Sync(commands.Cog):
                         for bar in old_bars:
                             actions.extend(Actions.query.filter_by(action=bar.action, player_id=joueur.id).all())
                         for action in old_actions:
-                            db.session.delete(action)       # On supprime les anciennes actions de rôle
-                            # TO DO : Suppression tâches
+                            gestion_actions.delete_action(ctx, action)  # On supprime les anciennes actions de rôle (et les tâches si il y en a)
 
                         new_bars = BaseActionsRoles.query.filter_by(role=val).all()         # Actions associées au nouveau rôle
                         new_bas = [BaseActions.query.get(bar.action) for bar in new_bars]   # Nouvelles BaseActions
@@ -85,12 +85,7 @@ class Sync(commands.Cog):
                                                cooldown=0, charges=ba.base_charges) for ba in new_bas]
 
                         for action in new_actions:
-                            db.session.add(action)          # On ajoute les nouvelles actions de rôle
-                        db.session.flush()          # On "fait comme si" on commitait, ce qui calcule action.id (autoincrément)
-                        # Ajout tâches
-                        for action in new_actions:
-                            if action.trigger_debut == "temporel":
-                                taches.add_task(ctx.bot, tools.next_occurence(action.heure_debut), f"!open {action.id}")
+                            gestion_actions.add_action(ctx, action)     # Ajout et création des tâches si trigger temporel
 
                         role = tools.nom_role(val)
                         if not role:        # role <val> pas en base : Error!
@@ -116,9 +111,9 @@ class Sync(commands.Cog):
 
                     elif col == "role_actif" and not silent:
                         if val:                                 # role_actif = True
-                            notif += f":arrow_forward: Tu peux maintenant utiliser ton pouvoir de {joueur.role} !\n"
+                            notif += f":arrow_forward: Tu peux maintenant utiliser tes pouvoirs !\n"
                         else:                                   # role_actif = False
-                            notif += f":arrow_forward: Tu ne peux maintenant plus utiliser ton pouvoir de {joueur.role}.\n"
+                            notif += f":arrow_forward: Tu ne peux maintenant plus utiliser aucun pouvoir.\n"
 
                     bdd_tools.modif(joueur, col, val)           # Dans tous les cas, on modifie en base (après, pour pouvoir accéder aux vieux attribus plus haut)
 

@@ -4,7 +4,7 @@ from discord.ext import commands
 
 from blocs import webhook
 import tools
-from bdd_connect import db, Taches
+from bdd_connect import db, Taches, Actions, Joueurs
 
 
 def execute(tache):         # Exécute la tâche <tache> (objet BDD Taches) : appelle le webhook et nettoie
@@ -13,15 +13,22 @@ def execute(tache):         # Exécute la tâche <tache> (objet BDD Taches) : ap
     db.session.commit()
 
 
-def add_task(bot, timestamp, commande):     # Ajoute une tâche sur le bot + en base (fonction pour usage ici et dans d'autres features)
+def add_task(bot, timestamp, commande, action=None):        # Ajoute une tâche sur le bot + en base (fonction pour usage ici et dans d'autres features)
     now = datetime.datetime.now()
-    tache = Taches(timestamp=timestamp, commande=commande)
+    tache = Taches(timestamp=timestamp, commande=commande, action=action)
 
     db.session.add(tache)                                                           # Enregistre la tâche en BDD
     db.session.commit()
 
     TH = bot.loop.call_later((timestamp - now).total_seconds(), execute, tache)     # Programme la tâche (appellera execute(tache) à timestamp)
     bot.tasks[tache.id] = TH        # TaskHandler, pour pouvoir cancel
+
+
+def cancel_task(bot, tache):        # Supprime (annule) une tâche (fonction pour usage ici et dans d'autres features)
+    bot.tasks[tache.id].cancel()        # Annulation (objet TaskHandler)
+    db.session.delete(tache)            # Suppression en base
+    db.session.commit()
+    del ctx.bot.tasks[tache.id]         # Suppression TaskHandler
 
 
 class GestionTaches(commands.Cog):
@@ -32,14 +39,20 @@ class GestionTaches(commands.Cog):
     async def taches(self, ctx):
         """Liste les tâches en attente (COMMANDE MJ)
 
-        Affiche les commandes en attente d'exécution (dans la table tâche) et le timestamp d'exécution associé.
+        Affiche les commandes en attente d'exécution (dans la table Taches) et le timestamp d'exécution associé.
+        Lorsque la tâche est liée à une action, affiche le nom de l'action et du joueur concerné.
         """
 
         taches = Taches.query.order_by(Taches.timestamp).all()
-        LT = "\n".join([f"{str(tache.id).ljust(5)} {tache.timestamp.strftime('%d/%m/%Y %H:%M:%S')}    {tache.commande}" for tache in taches])
+        LT = ""
+        for tache in taches:
+            LT += f"\n{str(tache.id).ljust(5)} {tache.timestamp.strftime('%d/%m/%Y %H:%M:%S')}    {tache.commande.ljust(25)} "
+            if tache.action and (action := Actions.query.get(tache.action)):
+                joueur = Joueurs.query.get(action.player_id)
+                LT += f"{action.action.ljust(20)} {joueur.nom}"
 
-        mess = ("Tâches en attente : \n\nID    Timestamp              Commande\n"
-                f"{'-'*80}\n{LT}\n\n"
+        mess = ("Tâches en attente : \n\nID    Timestamp              Commande                  Action               Joueur"
+                f"\n{'-'*105}{LT}\n\n"
                 "Utilisez !cancel <ID> pour annuler une tâche.") if LT else "Aucune tâche en attente."
 
         await tools.send_code_blocs(ctx, mess)
@@ -97,7 +110,15 @@ class GestionTaches(commands.Cog):
         message = await ctx.send(f"Planifier {tools.code(commande)} pour le {tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))} ?")
 
         if await tools.yes_no(ctx.bot, message):
-            add_task(ctx.bot, ts, commande)
+            action_id = None            # ID de l'action associée à la tâche (utile pour propagation à la suppression de l'action)
+            try:
+                quoi, id = commande.split(" ")
+                if quoi in ["!open", "!close", "!remind"]:
+                    action_id = int(id)
+            except ValueError:
+                pass
+
+            add_task(ctx.bot, ts, commande, action=action_id)
             await ctx.send("Fait.")
 
         else:
@@ -137,7 +158,15 @@ class GestionTaches(commands.Cog):
             raise commands.BadArgument("<duree>")
 
         ts = datetime.datetime.now() + datetime.timedelta(seconds=secondes)
-        add_task(ctx.bot, ts, commande)
+        action_id = None            # ID de l'action associée à la tâche (utile pour propagation à la suppression de l'action)
+        try:
+            quoi, id = commande.split(" ")
+            if quoi in ["!open", "!close", "!remind"]:
+                action_id = int(id)
+        except ValueError:
+            pass
+
+        add_task(ctx.bot, ts, commande, action=action_id)
 
         await ctx.send(f"Commande {tools.code(commande)} planifiée pour le {tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))}")
 
@@ -155,11 +184,8 @@ class GestionTaches(commands.Cog):
             message = await ctx.send("Annuler les tâches :\n" + "\n".join([f" - {tools.code(tache.timestamp.strftime('%d/%m/%Y %H:%M:%S'))} > {tools.code(tache.commande)}" for tache in taches]))
             if await tools.yes_no(ctx.bot, message):
                 for tache in taches:
-                    ctx.bot.tasks[tache.id].cancel()
-                    db.session.delete(tache)
-                    del ctx.bot.tasks[tache.id]
+                    cancel_task(ctx.bot, tache)
 
-                db.session.commit()
                 await ctx.send("Tâche(s) annulée(s).")
             else:
                 await ctx.send("Mission aborted.")

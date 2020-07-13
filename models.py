@@ -184,11 +184,13 @@ class Taches(db.Model):
     id = db.Column(db.Integer(), primary_key=True)
     timestamp = db.Column(db.DateTime(), nullable=False)
     commande = db.Column(db.String(200), nullable=False)
+    action = db.Column(db.Integer(), nullable=True)
 
-    def __init__(self, *, id=None, timestamp, commande):
+    def __init__(self, *, id=None, timestamp, commande, action=False):
         self.id = id
         self.timestamp = timestamp
         self.commande = commande
+        self.action = action
 
 
 class Triggers(db.Model):

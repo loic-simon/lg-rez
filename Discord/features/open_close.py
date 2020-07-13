@@ -201,7 +201,7 @@ class OpenClose(commands.Cog):
 
             else:       # Action
                 action = users[user]
-                await chan.send(f"""{tools.montre()}  Fin de la possiblité d'utiliser ton action {action.action} ! \n"""
+                await chan.send(f"""{tools.montre()}  Fin de la possiblité d'utiliser ton action {tools.code(action.action)} ! \n"""
                                 f"""Action définitive : {action._decision}""")
                 await gestion_actions.close_action(ctx, action, chan)
 
@@ -249,17 +249,21 @@ class OpenClose(commands.Cog):
         for user in users:
             chan = ctx.guild.get_channel(user._chan_id)
             if qui == "cond":
-                await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes pour voter pour le condamné du jour ! 😱 \n""")
+                message = await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes pour voter pour le condamné du jour ! 😱 \n""")
+                await message.add_reaction(tools.emoji(ctx, "bucher"))
 
             elif qui == "maire":
-                await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes pour élire le nouveau maire ! 😱 \n""")
+                message = await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes pour élire le nouveau maire ! 😱 \n""")
+                await message.add_reaction(tools.emoji(ctx, "maire"))
 
             elif qui == "loups":
-                await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes voter pour la victime du soir ! 😱 \n""")
+                message = await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes voter pour la victime du soir ! 😱 \n""")
+                await message.add_reaction(tools.emoji(ctx, "lune"))
 
             else:       # Action
                 action = users[user]
-                await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes pour utiliser ton action {action.action} ! 😱 \n""")
+                message = await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes pour utiliser ton action {tools.code(action.action)} ! 😱 \n""")
+                await message.add_reaction(tools.emoji(ctx, "action"))
 
 
 
