@@ -43,7 +43,7 @@ class VoterAgir(commands.Cog):
 
         # Choix de la cible
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
-                                                message=f"Contre qui veux-tu voter ? (vote actuel : {joueur._vote_condamne})")
+                                                message=f"Contre qui veux-tu voter ? (vote actuel : {tools.code(joueur._vote_condamne)})")
 
         async with ctx.typing():
             # Modification en base
@@ -80,7 +80,7 @@ class VoterAgir(commands.Cog):
 
         # Choix de la cible
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
-                                                message=f"Pour qui veux-tu voter ? (vote actuel : {joueur._vote_maire})")
+                                                message=f"Pour qui veux-tu voter ? (vote actuel : {tools.code(joueur._vote_maire)})")
 
         async with ctx.typing():
             # Modification en base
@@ -118,7 +118,7 @@ class VoterAgir(commands.Cog):
 
         # Choix de la cible
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
-                                                message=f"Qui veux-tu manger ? (vote actuel : {joueur._vote_loups})")
+                                                message=f"Qui veux-tu manger ? (vote actuel : {tools.code(joueur._vote_loups)})")
 
         async with ctx.typing():
             # Modification en base
@@ -160,7 +160,7 @@ class VoterAgir(commands.Cog):
             txt = "Tu as plusieurs actions actuellement en cours :\n"
             decision = None #Evite de lancer une décision en blind si le joueur a plusieurs actions
             for i in range(N):
-                txt += f" {tools.emoji_chiffre(i+1)} - {actions[i].action}\n"
+                txt += f" {tools.emoji_chiffre(i+1)} - {tools.code(actions[i].action)}\n"
             message = await ctx.send(txt + "\nPour laquelle veux-tu agir ?")
             i = await tools.choice(ctx.bot, message, N)
             action = actions[i-1]
@@ -169,7 +169,7 @@ class VoterAgir(commands.Cog):
 
         # Choix de la décision : très simple pour l'instant, car pas de résolution auto
         if not decision:                   # Si décision pas précisée à l'appel de la commande
-            await ctx.send(f"Que veux-tu faire pour l'action {action.action} ? (action actuelle : {action._decision})")
+            await ctx.send(f"Que veux-tu faire pour l'action {tools.code(action.action)} ? (action actuelle : {tools.code(action._decision)})")
             message = await tools.wait_for_message(ctx.bot, check=trigCheck)
             decision = message.content
 
@@ -192,7 +192,7 @@ class VoterAgir(commands.Cog):
                               "\n+\n".join([f"{action.action} : {action._decision}" for action in actions])],
                              value_input_option="USER_ENTERED")
 
-        await ctx.send(f"Action « {action._decision} » bien prise en compte pour {action.action}.")
+        await ctx.send(f"Action « {tools.code(action._decision)} » bien prise en compte pour {tools.code(action.action)}.")
 
         # Conséquences si action instantanée
         if action.instant:

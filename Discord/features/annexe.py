@@ -81,7 +81,7 @@ class Annexe(commands.Cog):
                                     L'ensemble doit être entouré de guillements si <filtre> contient un espace.
 
         <message> peut contenir un ou plusieurs bouts de code Python à évaluer, entourés d'accolades.
-        Le joueur à qui le message sera envoyé est accessible sous le nom "joueur".
+        Le joueur à qui le message sera envoyé est accessible sous le nom "joueur", le contexte (de !send !!!) sous le nom "ctx".
         Les différentes tables de données sont accessibles sous leur propre nom (Joueurs, Roles...)
         Il est impossible d'appeller des coroutines (await) dans le code à évaluer.
 

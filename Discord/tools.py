@@ -323,7 +323,7 @@ async def boucleMessage(bot, chan, inMessage, conditionSortie, trigCheck=lambda 
     return rep
 
 
-async def boucle_query_joueur(ctx, cible=None, message=None, table=Tables["Joueurs"]):
+async def boucle_query_joueur(ctx, cible=None, message=None, table=Joueurs):
     """Demande <message>, puis attend que le joueur entre un nom de joueur, et boucle 5 fois au max (avant de l'insulter)
     pour chercher le plus proche joueurs dans la table Joueurs
     """
@@ -340,7 +340,11 @@ async def boucle_query_joueur(ctx, cible=None, message=None, table=Tables["Joueu
             mess = await wait_for_message(ctx.bot, check=trigCheck)
             rep = mess.content
 
-        nearest = await bdd_tools.find_nearest(rep, table, carac="nom")
+        if id := ''.join([c for c in rep if c.isdigit()]):      # Si la chaîne contient un nombre, on l'extrait
+            if user := table.query.get(int(id)):                # Si cet ID correspond à un utilisateur, on le récupère
+                return user                                     # On a trouvé l'utilisateur !
+
+        nearest = await bdd_tools.find_nearest(rep, table, carac="nom")     # Sinon, recherche au plus proche
 
         if not nearest:
             await ctx.send("Aucune entrée trouvée, merci de réessayer")

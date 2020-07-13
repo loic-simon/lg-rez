@@ -3,7 +3,7 @@ import traceback
 
 from discord.ext import commands
 import tools
-from bdd_connect import db, Joueurs
+from bdd_connect import db, Joueurs, Actions, BaseActions, BaseActionsRoles, Taches
 from blocs import bdd_tools
 from features import gestion_actions
 
@@ -22,7 +22,7 @@ class Sync(commands.Cog):
         Cette commande va modifier toutes les colonnes de la BDD Joueurs nécessaires, et appliquer les modificatons dans Discord le cas échéant : renommage des utilisateurs, modification des rôles...
 
         CETTE COMMANDE EST UTILISÉE POUR LA SYNCHRONISATION UNIQUEMENT (APPEL WEBHOOK)
-        ELLE N'EST PAS CONÇUE POUR ETRE UTILISÉE À LA MAIN
+        ELLE N'EST PAS CONÇUE POUR ÊTRE UTILISÉE À LA MAIN
         """
         try:
             dic = json.loads(serial)                # Désérialisation JSON en dictionnaire Python
@@ -74,7 +74,7 @@ class Sync(commands.Cog):
                         old_bars = BaseActionsRoles.query.filter_by(role=joueur.role).all()
                         old_actions = []
                         for bar in old_bars:
-                            actions.extend(Actions.query.filter_by(action=bar.action, player_id=joueur.id).all())
+                            old_actions.extend(Actions.query.filter_by(action=bar.action, player_id=joueur.discord_id).all())
                         for action in old_actions:
                             gestion_actions.delete_action(ctx, action)  # On supprime les anciennes actions de rôle (et les tâches si il y en a)
 
@@ -92,7 +92,7 @@ class Sync(commands.Cog):
                             role = f"« {val} »"
                             await tools.log(ctx, f"{tools.mention_MJ(ctx)} ALED : rôle \"{val}\" attribué à {joueur.nom} inconnu en base !")
                         if not silent:
-                            notif += f":arrow_forward: Ton nouveau rôle, si tu l'acceptes : {tools.bold(val)} !\nQue ce soit pour un jour ou pour le reste de la partie, renseigne toi avec {tools.code(f'!roles {role}')} en texte libre.\n"
+                            notif += f":arrow_forward: Ton nouveau rôle, si tu l'acceptes : {tools.bold(role)} !\nQue ce soit pour un jour ou pour le reste de la partie, renseigne toi avec {tools.code(f'!roles {val}')} en texte libre.\n"
 
                     elif col == "camp" and not silent:          # Modification camp
                         notif += f":arrow_forward: Tu fais maintenant partie du camp « {tools.bold(val)} ».\n"

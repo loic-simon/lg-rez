@@ -4,7 +4,7 @@ from discord.ext import commands
 
 import tools
 from blocs import bdd_tools
-from bdd_connect import db, Triggers, Reactions
+from bdd_connect import db, Triggers, Reactions, Roles
 
 
 # Marqueurs de séparation du mini-langage des séquences-réactions
@@ -237,9 +237,23 @@ class GestionIA(commands.Cog):
 
 
 
-# Exécute les règles d'IA en réaction à <message>
-async def process_IA(bot, message, debug=False):
-    trigs = await bdd_tools.find_nearest(message.content, Triggers, carac="trigger", sensi=0.7)
+# Réaction si un nom de rôle est donné
+async def trigger_roles(message):
+    roles = await bdd_tools.find_nearest(message.content, Roles, carac="nom", sensi=0.7)
+
+    if roles:       # Au moins un trigger trouvé à cette sensi
+        role = roles[0][0]                                  # Meilleur trigger (score max)
+        await message.channel.send(tools.code_bloc(f"{role.prefixe}{role.nom} – {role.description_courte}\n\n{role.description_longue}"))                    # On envoie
+        return True
+
+    return False
+
+
+# Réaction à partir de la base Reactions
+async def trigger_reactions(message, chain=None, sensi=0.7, debug=False):
+    if not chain:                   # Si pas précisé,
+        chain = message.content         # contenu de message
+    trigs = await bdd_tools.find_nearest(chain, Triggers, carac="trigger", sensi=sensi)
 
     if trigs:       # Au moins un trigger trouvé à cette sensi
         trig = trigs[0][0]                                  # Meilleur trigger (score max)
@@ -259,27 +273,58 @@ async def process_IA(bot, message, debug=False):
                 await bot.process_commands(message)                 # Exécution de la commande
 
             else:                                               # Sinon, texte / média :
-                # rep = format(rep)                                   # On remplace tous les "{expr}" par str(expr)
-                # debug = (message.author.top_role.name == "MJ")
-                rep = tools.eval_accols(rep, locals=locals(), debug=debug)  # on passe bot et message
+                rep = tools.eval_accols(rep, locals=locals(), debug=debug)  # On remplace tous les "{expr}" par leur évaluation
+                # Passer locals permet d'accéder à bot, message... depuis eval_accols
                 await message.channel.send(rep)                     # On envoie
 
-    else:           # Aucun trigger trouvé à cette sensi
-        c = message.content
-        diprefs = ["di", "dy", "dis ", "dit ", "dis-", "dit-"]
-        criprefs = ["cri", "cry", "kri", "kry"]
-        pos_prefs = {c.lower().find(pref): pref for pref in diprefs + criprefs
-                    if pref in c[:-1].lower()}                      # On extrait les cas où le préfixe est à la fin du message
+        return True
 
-        if pos_prefs:                                       # Si on a trouvé au moins un préfixe
-            i = min(pos_prefs)
-            pref = pos_prefs[i]
-            if pref in criprefs:
-                mess = tools.bold(c[i+len(pref):].upper())
-            else:
-                mess = c[i+len(pref):]
-            await message.channel.send(mess, tts=True)          # On envoie le di.../cri... en mode TTS
+    return False
 
-        else:                                               # Sinon
-            mess = "Désolé, je n'ai pas compris 🤷‍♂️"
-            await message.channel.send(mess)                    # On envoie le texte par défaut
+
+async def trigger_sub_reactions(message, debug=False):
+    mots = message.content.split(" ")
+    if len(mots) > 1:       # Si le message fait plus d'un mot
+        for mot in sorted(mots, key=lambda m:-len(m)):      # On parcourt les mots du plus long au plus court
+            if len(mot) > 4:                                            # on élimine les mots de liaison
+                if await trigger_reactions(message, chain=mot, sensi=0.9, debug=debug):    # Si on trouve une sous-rect (à 0.9)
+                    return True
+
+    return False
+
+
+# Réaction aux messages en di... / cri...
+async def trigger_di(message):
+    c = message.content
+    diprefs = ["di", "dy", "dis ", "dit ", "dis-", "dit-"]
+    criprefs = ["cri", "cry", "kri", "kry"]
+    pos_prefs = {c.lower().find(pref): pref for pref in diprefs + criprefs
+                if pref in c[:-1].lower()}                      # On extrait les cas où le préfixe est à la fin du message
+
+    if pos_prefs:                                       # Si on a trouvé au moins un préfixe
+        i = min(pos_prefs)
+        pref = pos_prefs[i]
+        if pref in criprefs:
+            mess = tools.bold(c[i+len(pref):].upper())
+        else:
+            mess = c[i+len(pref):]
+        await message.channel.send(mess, tts=True)          # On envoie le di.../cri... en mode TTS
+        return True
+
+    return False
+
+
+# Réaction par défaut
+async def default(message):
+    mess = "Désolé, je n'ai pas compris 🤷‍♂️"
+    await message.channel.send(mess)                    # On envoie le texte par défaut
+
+
+# Exécute les règles d'IA en réaction à <message> (par ordre de priorité)
+async def process_IA(bot, message, debug=False):
+    (await trigger_roles(message)                               # Rôles
+        or await trigger_reactions(message, debug=debug)        # Table Reactions (IA proprement dite)
+        or await trigger_sub_reactions(message, debug=debug)    # IA sur les mots
+        or await trigger_di(message)                            # di... / cri...
+        or await default(message)                               # Réponse par défaut
+    )

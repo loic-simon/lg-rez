@@ -77,14 +77,9 @@ def get_SQL_nullable(table):               # Renvoie un dictionnaire {colonne: a
 async def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_si_parfait=True):
     """Renvoie le/les éléments de <table> correspondant le mieux à <chaine> (selon la colonne <carac>, défaut : colonne primaire de la table), répondant à <filtre> (défaut : tous) sous forme de liste de tuples (element, score*) triés par score* décroissant, en se limitant aux scores* supérieurs à <sensi>.
 
-    Si <chaine> contient l'ID (numérique) d'un élément de <table>, celui-ci est directement renvoyé (quelques soient <filtre> et <carac>).
     Si <solo_si_parfait> (défaut), renvoie uniquement le premier élément de score 1 trouvé s'il existe (ignore les autres éléments, même si >= sensi)
 
     *Score = ratio de difflib.SequenceMatcher, i.e. proportion de caractères communs aux deux chaînes"""
-
-    if id := ''.join([c for c in chaine if c.isdigit()]):   # Si la chaîne contient un nombre, on l'extrait
-        if user := table.query.get(int(id)):            # Si cet ID correspond à un utilisateur, on le récupère
-            return [(user, 1)]                          # On a trouvé l'utilisateur !
 
     SM = difflib.SequenceMatcher()                      # Création du comparateur de chaînes
     slug1 = remove_accents(chaine).lower()              # Cible en minuscule et sans accents
