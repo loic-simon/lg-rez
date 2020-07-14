@@ -81,11 +81,19 @@ class Annexe(commands.Cog):
                                     L'ensemble doit être entouré de guillements si <filtre> contient un espace.
 
         <message> peut contenir un ou plusieurs bouts de code Python à évaluer, entourés d'accolades.
-        Le joueur à qui le message sera envoyé est accessible sous le nom "joueur", le contexte (de !send !!!) sous le nom "ctx".
-        Les différentes tables de données sont accessibles sous leur propre nom (Joueurs, Roles...)
+        L'évaluation est faite séparément pour chaque joueur, ce qui permet de personnaliser le message grâce aux variables particulières dépendant du joueur :
+            joueur          objet BDD du joueur recevant le message  ==> joueur.nom, joueur.role...
+            member          objet discord.Member associé             ==> member.mention
+            chan            objet discord.TextChannel du chan privé du joueur
+
+        Attention :
+            ctx             objet discord.commands.Context de !send  ==> ctx.author = lanceur de la commande !!!
+
+        Les différentes tables de données sont accessibles sous leur nom (Joueurs, Roles...)
         Il est impossible d'appeller des coroutines (await) dans le code à évaluer.
 
         Ex. !send all Bonsoir à tous c'est Fanta
+            !send vivants Attention {member.mention}, derrière toi c'est affreux !
             !send "role=Servante Dévouée" Ça va vous ? Vous êtes bien {joueur.role} ?
         """
         if cible == "all":
@@ -111,8 +119,10 @@ class Annexe(commands.Cog):
 
         await ctx.send(f"{len(joueurs)} trouvé(s), envoi...")
         for joueur in joueurs:
+            member = ctx.guild.get_member(joueur.discord_id)
+            chan = ctx.guild.get_channel(joueur._chan_id)
             evaluated_message = tools.eval_accols(message, locals=locals())
-            await ctx.guild.get_channel(joueur._chan_id).send(evaluated_message)
+            await chan.send(evaluated_message)
 
         await ctx.send(f"Fini.")
 

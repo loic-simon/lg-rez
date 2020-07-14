@@ -37,10 +37,10 @@ Petit script UNIX qui fait le taf pour enchaîner le tout (à distance avec acc�
 cd <racine des fichiers>
 echo 'Transfert des fichiers...'
 
-rsync -r -t -i Discord/* lg-rez@82.226.127.88:~/www/Discord
+rsync -r -t -i * lg-rez@82.226.127.88:~/www/Discord
 echo 'Fichiers transférés, reboot...'
 
-ssh lg-rez@82.226.127.88 ./reboot_bot.sh
+ssh lg-rez@82.226.127.88 ./reboot_bot.sh $1
 echo 'Rebooted!'
 
 

@@ -60,6 +60,9 @@ class Sync(commands.Cog):
                             await joueur_Discord.remove_roles(tools.role(ctx, "Joueur en vie"))
                             if not silent:
                                 notif += f":arrow_forward: Tu es malheureusement décédé(e) :cry:\nÇa arrive même aux meilleurs, en espérant que ta mort ait été belle !\n"
+                            # Actions à la mort
+                            for action in Actions.query.filter_by(player_id=joueur.id, trigger_debut="mort"):
+                                await gestion_actions.open_action(ctx, action, chan)
 
                         elif val == "MV":                       # Statut = MV
                             await joueur_Discord.add_roles(tools.role(ctx, "Joueur en vie"))
@@ -92,7 +95,7 @@ class Sync(commands.Cog):
                             role = f"« {val} »"
                             await tools.log(ctx, f"{tools.mention_MJ(ctx)} ALED : rôle \"{val}\" attribué à {joueur.nom} inconnu en base !")
                         if not silent:
-                            notif += f":arrow_forward: Ton nouveau rôle, si tu l'acceptes : {tools.bold(role)} !\nQue ce soit pour un jour ou pour le reste de la partie, renseigne toi avec {tools.code(f'!roles {val}')} en texte libre.\n"
+                            notif += f":arrow_forward: Ton nouveau rôle, si tu l'acceptes : {tools.bold(role)} !\nQue ce soit pour un jour ou pour le reste de la partie, renseigne toi en tapant {tools.code(f'!roles {val}')}.\n"
 
                     elif col == "camp" and not silent:          # Modification camp
                         notif += f":arrow_forward: Tu fais maintenant partie du camp « {tools.bold(val)} ».\n"

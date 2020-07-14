@@ -282,6 +282,34 @@ def next_occurence(tps):
     return datetime.datetime.combine(jour, tps)         # passage de date et time à datetime
 
 
+# Renvoie le datetime correspondant au prochain vendredi 19h
+def debut_pause():
+    pause_time = datetime.time(hour=19)
+    pause_wday = 4          # Vendredi
+
+    now = datetime.datetime.now()
+    jour = now.date()
+    if pause_time <= now.time():        # Si plus tôt dans la journée que l'heure actuelle
+        jour += datetime.timedelta(days=1)       # on réfléchit comme si on était demain très tôt
+
+    pause_jour = jour + datetime.timedelta(days=(pause_wday - jour.weekday()) % 7)      # Jour décalé du nombre de jours avant vendredi
+    return datetime.datetime.combine(pause_jour, pause_time)         # passage de date et time à datetime
+
+
+# Renvoie le datetime correspondant au prochain dimanche 19h
+def fin_pause():
+    reprise_time = datetime.time(hour=19)
+    reprise_wday = 6        # Dimanche
+
+    now = datetime.datetime.now()
+    jour = now.date()
+    if reprise_time <= now.time():      # Si plus tôt dans la journée que l'heure actuelle
+        jour += datetime.timedelta(days=1)      # on réfléchit comme si on était demain très tôt
+
+    reprise_jour = jour + datetime.timedelta(days=(reprise_wday - jour.weekday()) % 7)      # Jour décalé du nombre de jours avant vendredi
+    return datetime.datetime.combine(reprise_jour, reprise_time)        # passage de date et time à datetime
+
+
 # Convertit HHh[MM] en objet Time
 
 def heure_to_time(heure):

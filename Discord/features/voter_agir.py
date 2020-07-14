@@ -45,6 +45,10 @@ class VoterAgir(commands.Cog):
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
                                                 message=f"Contre qui veux-tu voter ? (vote actuel : {tools.code(joueur._vote_condamne)})")
 
+        if joueur._vote_condamne is None:      # On revérifie, si ça a fermé entre temps !!
+            await ctx.send("Le vote pour le condamné du jour a fermé entre temps, pas de chance !")
+            return
+
         async with ctx.typing():
             # Modification en base
             bdd_tools.modif(joueur, "_vote_condamne", cible.nom)
@@ -81,6 +85,10 @@ class VoterAgir(commands.Cog):
         # Choix de la cible
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
                                                 message=f"Pour qui veux-tu voter ? (vote actuel : {tools.code(joueur._vote_maire)})")
+
+        if joueur._vote_maire is None:          # On revérifie, si ça a fermé entre temps !!
+            await ctx.send("Le vote pour le nouveau maire a fermé entre temps, pas de chance !")
+            return
 
         async with ctx.typing():
             # Modification en base
@@ -119,6 +127,10 @@ class VoterAgir(commands.Cog):
         # Choix de la cible
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
                                                 message=f"Qui veux-tu manger ? (vote actuel : {tools.code(joueur._vote_loups)})")
+
+        if joueur._vote_loups is None:          # On revérifie, si ça a fermé entre temps !!
+            await ctx.send("Le vote pour la victime des loups a fermé entre temps, pas de chance !")
+            return
 
         async with ctx.typing():
             # Modification en base
@@ -168,10 +180,14 @@ class VoterAgir(commands.Cog):
             action = actions[0]
 
         # Choix de la décision : très simple pour l'instant, car pas de résolution auto
-        if not decision:                   # Si décision pas précisée à l'appel de la commande
+        if not decision:                    # Si décision pas précisée à l'appel de la commande
             await ctx.send(f"Que veux-tu faire pour l'action {tools.code(action.action)} ? (action actuelle : {tools.code(action._decision)})")
             message = await tools.wait_for_message(ctx.bot, check=trigCheck)
             decision = message.content
+
+        if action._decision is None:        # On revérifie, si ça a fermé entre temps !!
+            await ctx.send("L'action a fermé entre temps, pas de chance !")
+            return
 
         # Avertissement si action a conséquence instantanée (barbier...)
         if action.instant:

@@ -135,7 +135,12 @@ class OpenClose(commands.Cog):
 
         db.session.commit()
 
-        if qui in ["cond", "maire", "loups"] and heure:             # Programme fermeture
+        # Actions déclenchées par ouverture
+        for action in Actions.query.filter_by(trigger_debut=f"open_{qui}"):
+            await gestion_actions.open_action(ctx, action)
+
+        # Programme fermeture
+        if qui in ["cond", "maire", "loups"] and heure:
             ts = tools.next_occurence(tools.heure_to_time(heure))
             taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=10), f"!remind {qui}")
             if heure_chain:
@@ -207,7 +212,12 @@ class OpenClose(commands.Cog):
 
         db.session.commit()
 
-        if qui in ["cond", "maire", "loups"] and heure:             # Programme prochaine ouverture
+        # Actions déclenchées par fermeture
+        for action in Actions.query.filter_by(trigger_debut=f"close_{qui}"):
+            await gestion_actions.open_action(ctx, action)
+
+        # Programme prochaine ouverture
+        if qui in ["cond", "maire", "loups"] and heure:
             ts = tools.next_occurence(tools.heure_to_time(heure))
             if heure_chain:
                 taches.add_task(ctx.bot, ts, f"!open {qui} {heure_chain} {heure}")      # Programmera fermeture
@@ -272,14 +282,15 @@ class OpenClose(commands.Cog):
     async def cparti(self, ctx):
         """Lance le jeu (COMMANDE MJ)
 
-        Crée (et programme) les actions associées aux rôles de tous les joueurs     ==> EN FAIT NON, plus besoin vu que c'est fait à la synchro des rôles
-        Programme les votes condamnés quotidiens (avec chaînage) 10h-18h
-        Programme un vote maire 10h-18h
+        - Crée (et programme) les actions associées aux rôles de tous les joueurs     ==> EN FAIT NON, plus besoin vu que c'est fait à la synchro des rôles
+        - Programme les votes condamnés quotidiens (avec chaînage) 10h-18h
+        - Programme un vote maire 10h-18h
+        - Programme les actions au lancement du jeu (choix de mentor...) et permanentes (forgeron)... à 19h
 
         À utiliser le jour du lancement après 10h (lance les premières actions le soir et les votes le lendemain)
         """
 
-        message = await ctx.send("C'est parti ?")
+        message = await ctx.send("C'est parti ?\nLes rôles ont bien été attribués et synchronisés ? (si non, le faire AVANT de valider)")
         if await tools.yes_no(ctx.bot, message):
             async with ctx.typing():
                 joueurs = Joueurs.query.all()
@@ -308,6 +319,7 @@ class OpenClose(commands.Cog):
                 #     if action.trigger_debut == "temporel":
                 #         taches.add_task(ctx.bot, tools.next_occurence(action.heure_debut), f"!open {action.id}")
                 #         r += f" - !open {action.id}"
+
                 r += "\n\nBon plus besoin de lancer les actions, c'est fait à la synchro des rôles mais les !open n'ont aucun impact tant que tout le monde est en role_actif == False, DU COUP passer tout le monde en True genre MAINTENANT (et en silencieux !) si on veut vraiment lancer\n\n"
 
                 # Programmation votes condamnés chainés
@@ -318,6 +330,13 @@ class OpenClose(commands.Cog):
                 # Programmation premier vote maire
                 taches.add_task(ctx.bot, tools.next_occurence(datetime.time(hour=10)), "!open maire 17h")
                 r += " - !open maire 17h\n"
+
+                # Programmation actions au lancement et actions permanentes
+                r += "\nProgrammation des actions start / perma :\n"
+                ts = tools.next_occurence(datetime.time(hour=19))
+                for action in Actions.query.filter_by(trigger_debut="start").all() + Actions.query.filter_by(trigger_debut="perma").all():
+                    r += f" - !open {action.id}\n"
+                    taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
 
                 await tools.log(ctx, r, code=True)
 

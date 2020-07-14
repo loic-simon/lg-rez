@@ -9,8 +9,8 @@ from blocs import bdd_tools
 from features import taches
 
 
+# Renvoie la liste des actions déclenchées par trigger, dans le cas ou c'est temporel, les actions possibles à heure (objet de type time)
 async def get_actions(quoi, trigger, heure=None):
-    # Renvoie la liste des actions déclenchées par trigger, dans le cas ou c'est temporel, les actions possibles à heure (objet de type time)
 
     if trigger == "temporel":
         if not heure:
@@ -36,7 +36,14 @@ async def get_actions(quoi, trigger, heure=None):
     return Actions.query.filter(criteres).all()
 
 
-async def open_action(ctx, action, chan):
+# Ouvre l'action <action> : vérification conditions, gestion tâches, information joueur dans <chan>.
+# <ctx> contexte où on log, i.e. contexte de !open, !sync...
+async def open_action(ctx, action, chan=None):
+    if not chan:        # chan non défini ==> chan perso du joueur
+        joueur = Joueurs.query.get(action.player_id)
+        chan = ctx.guild.get_channel(joueur._chan_id)
+
+    # Vérification cooldown
     if action.cooldown > 0:                 # Action en cooldown
         bdd_tools.modif(action, "cooldown", action.cooldown - 1)
         db.session.commit()
@@ -46,6 +53,7 @@ async def open_action(ctx, action, chan):
             taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
         return
 
+    # Vérification role_actif
     if not Joueurs.query.get(action.player_id).role_actif:    # role_actif == False : on reprogramme la tâche au lendemain, tanpis
         await ctx.send(f"role_actif == False, exit (reprogrammation si temporel).")
         if action.trigger_debut == "temporel":
@@ -53,40 +61,55 @@ async def open_action(ctx, action, chan):
             taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
         return
 
+    # Vérification charges
     if action.charges == 0:                 # Plus de charges, mais action maintenue en base car refill / ...
         await ctx.send(f"Plus de charges, exit (reprogrammation si temporel).")
         return
 
-    if action.trigger_fin == "auto":        # Action "automatiques" (passives : notaire...) : lance la procédure de clôture / résolution
+    # Action "automatiques" (passives : notaire...) : lance la procédure de clôture / résolution
+    if action.trigger_fin == "auto":
         await ctx.send(f"Action automatique, appel processus de clôture")
         await close_action(ctx, action, chan)
         return
 
     # Tous tests préliminaires n'ont pas return ==> Vraie action à lancer
+
+    # Calcul heure de fin (si applicable)
     heure_fin = None
     if action.trigger_fin == "temporel":
         heure_fin = action.heure_fin
         ts = tools.next_occurence(heure_fin)
-    if action.trigger_fin == "delta":           # Si delta, on calcule la vraie heure de fin (pas modifié en base)
+    elif action.trigger_fin == "delta":         # Si delta, on calcule la vraie heure de fin (pas modifié en base)
         delta = action.heure_fin
         ts = datetime.datetime.now() + datetime.timedelta(hours=delta.hour, minutes=delta.minute, seconds=delta.second)
         heure_fin = ts.time()
 
+    # Information du joueur
     bdd_tools.modif(action, "_decision", "rien")
     message = await chan.send(
-        f"""{tools.montre()}  Tu peux maintenant utiliser ton action {tools.code(action.action)} !  {tools.emoji(ctx, "foudra")} \n"""
+        f"""{tools.montre()}  Tu peux maintenant utiliser ton action {tools.code(action.action)} !  {tools.emoji(ctx, "action")} \n"""
         + (f"""Tu as jusqu'à {heure_fin} pour le faire. \n""" if heure_fin else "")
         + tools.ital(f"""Tape {tools.code('!action <phrase>')} ou utilise la réaction pour agir."""))
     await message.add_reaction(tools.emoji(ctx, "action"))
 
-    if action.trigger_fin in ["temporel", "delta"]:        # Programmation remind / close
+    # Programmation remind / close
+    if action.trigger_fin in ["temporel", "delta"]:
         taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=10), f"!remind {action.id}", action=action.id)
+        taches.add_task(ctx.bot, ts, f"!close {action.id}", action=action.id)
+    elif action.trigger_fin == "perma":       # Action permanente : fermer pour le WE
+        ts = tools.debut_pause()
         taches.add_task(ctx.bot, ts, f"!close {action.id}", action=action.id)
 
     db.session.commit()
 
 
-async def close_action(ctx, action, chan):
+# Ferme l'action <action>, la supprime si nécessaire, gère les tâches et informe le joueur dans <chan>
+# <ctx> contexte où on log, i.e. contexte de !open, !sync...
+async def close_action(ctx, action, chan=None):
+    if not chan:        # chan non défini ==> chan perso du joueur
+        joueur = Joueurs.query.get(action.player_id)
+        chan = ctx.guild.get_channel(joueur._chan_id)
+
     deleted = False
     if action._decision != "rien" and not action.instant:
         # Résolution de l'action (pour l'instant juste charge -= 1 et suppression le cas échéant)
@@ -94,6 +117,7 @@ async def close_action(ctx, action, chan):
             bdd_tools.modif(action, "charges", action.charges - 1)
             pcs = " pour cette semaine" if "weekends" in action.refill else ""
             await chan.send(f"Il te reste {action.charges} charge(s){pcs}.")
+
             if action.charges == 0 and not action.refill:
                 db.session.delete(action)
                 deleted = True
@@ -101,12 +125,17 @@ async def close_action(ctx, action, chan):
     if not deleted:
         bdd_tools.modif(action, "_decision", None)
 
-        ba = BaseActions.query.get(action.action)       # Si l'action a un cooldown, on le met
+        # Si l'action a un cooldown, on le met
+        ba = BaseActions.query.get(action.action)
         if ba and ba.base_cooldown > 0:
             bdd_tools.modif(action, "cooldown", ba.base_cooldown)
 
-        if action.trigger_debut == "temporel":          # Programmation action du lendemain
+        # Programmation prochaine ouverture
+        if action.trigger_debut == "temporel":
             ts = tools.next_occurence(action.heure_debut)
+            taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
+        elif action.trigger_debut == "perma":           # Action permanente : ouvrir après le WE
+            ts = tools.fin_pause()
             taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
 
     db.session.commit()

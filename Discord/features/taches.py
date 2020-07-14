@@ -72,9 +72,10 @@ class GestionTaches(commands.Cog):
         Si le bot est down à l'heure d'exécution prévue, la commande sera exécutée dès le bot de retour en ligne.
         Si la date est dans le passé, la commande est exécutée immédiatement.
 
-        Ex. : - !planif 13/06/2020-10:00 !open maire
+        Ex. : - !planif 18:00 !close maire
               - !planif 13/06-10:00 !open maire
-              - !planif 18:00 !close maire
+              - !planif 13/06/2020-10:00 !open maire
+              - !planif 23:25:12 !close maire
         """
 
         now = datetime.datetime.now()
