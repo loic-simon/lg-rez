@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 import blocs
 import tools
 from bdd_connect import db, Tables
-from features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches
+from features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -155,7 +155,7 @@ bot.add_cog(sync.Sync(bot))                         # Synchronisation TDB (appel
 bot.add_cog(taches.GestionTaches(bot))              # Tâches planifiées
 bot.add_cog(remplissage_bdd.RemplissageBDD(bot))    # Drop et remplissage table de données
 bot.add_cog(annexe.Annexe(bot))                     # Ouils divers et plus ou moins inutiles
-
+bot.add_cog(actions_publiques.ActionsPubliques(bot))
 
 ### 6 - Commandes spéciales
 class Special(commands.Cog):

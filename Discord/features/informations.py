@@ -6,7 +6,7 @@ from discord.ext import commands
 from bdd_connect import db, Joueurs, Roles, Actions, BaseActions
 from blocs import bdd_tools
 import tools
-
+from blocs import bdd_tools
 
 def emoji_camp(arg, camp):
     d = {"village": "village",
@@ -66,6 +66,7 @@ class Informations(commands.Cog):
 
 
     @commands.command()
+    @tools.private
     async def menu(self, ctx):
         """Affiche des informations et boutons sur les votes / actions en cours
 
@@ -103,6 +104,7 @@ class Informations(commands.Cog):
 
 
     @commands.command()
+    @tools.private
     async def infos(self, ctx):
         """Affiche tes informations de rôle / actions
 
@@ -129,8 +131,32 @@ class Informations(commands.Cog):
 
         await ctx.send(r + f"\n{tools.code('!menu')} pour voir les votes et actions en cours, {tools.code('@MJ')} en cas de problème")
 
+    @commands.command()
+    async def vivants(self, ctx):
+        """Affiche la liste des joueurs vivants"""
+
+        mess = "Les joueurs vivants sont : \n"
+        joueurs = [joueur.nom for joueur in Joueurs.query.filter(Joueurs.statut != "mort").order_by(Joueurs.nom)]
+        for joueur in joueurs:
+            mess += f" - {joueur} \n"
+        await tools.send_code_blocs(ctx, mess)
+
+
+    @commands.command()
+    async def morts(self, ctx):
+        """Affiche la liste des joueurs morts"""
+
+        mess = "Les morts sont :\n"
+        joueurs = [joueur.nom for joueur in Joueurs.query.filter_by(statut = "mort").order_by(Joueurs.nom)]
+        if not joueurs:
+            mess += "Toi (mais tu ne le sais pas encore)"
+        else:
+            for joueur in joueurs:
+                mess += f" - {joueur} \n"
+        await tools.send_code_blocs(ctx, mess)
 
     @commands.command(enabled=False)
+    @tools.private
     async def monrole(self, ctx, details="court") :
         """Affiche les informations du rôle du joueur
 

@@ -214,6 +214,16 @@ class Reactions(db.Model):
         self.id = id                # Si None : auto-incrément
         self.reponse = reponse
 
+class CandidHaro(db.Model):
+    """Table CandidHaro : candidatures et haros #Philippe CandidHaro"""
+    id = db.Column(db.Integer(), primary_key = True)
+    player_id = db.Column(db.BigInteger(), nullable=False)
+    type = db.Column(db.String(11), nullable=False)
+
+    def __init__(self, *, id=None, player_id, type):
+        self.id = id
+        self.player_id = player_id
+        self.type = type
 
 Tables = {"Joueurs":Joueurs,
           "Roles":Roles,
@@ -223,6 +233,7 @@ Tables = {"Joueurs":Joueurs,
           "Taches": Taches,
           "Triggers": Triggers,
           "Reactions": Reactions,
+          "CandidHaro":CandidHaro
           }
 
 db.create_all()
