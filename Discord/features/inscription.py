@@ -16,7 +16,8 @@ async def main(bot, member):
     elif chan := tools.get(member.guild.text_channels, topic=f"{member.id}"):   # Inscription en cours
         await chan.send(f"Tu as déjà un channel à ton nom, {member.mention}, par ici !")
     else:
-        chan = await member.guild.create_text_channel(f"conv-bot-{member.name}", category=tools.channel(member, "CONVERSATION BOT"), topic=str(member.id)) # Crée le channel "conv-bot-nom" avec le topic "member.id"
+        chan = await member.guild.create_text_channel(f"conv-bot-{member.name}",  topic=str(member.id)) # Crée le channel "conv-bot-nom" avec le topic "member.id"
+        await chan.edit(category=tools.channel(member, "CONVERSATION BOT")) #Met le channel au bon endroit (GROS CON DE BOT)
         await chan.set_permissions(member, read_messages=True, send_messages=True)
 
 
