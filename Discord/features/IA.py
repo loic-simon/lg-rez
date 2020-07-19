@@ -89,7 +89,7 @@ class GestionIA(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def addIA(self, ctx, *, triggers=None):
         """Ajoute au bot une règle d'IA : mots ou expressions déclenchant une réaction (COMMANDE MJ)
 
@@ -120,7 +120,7 @@ class GestionIA(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def listIA(self, ctx, trigger=None, sensi=0.5):
         """Liste les règles d'IA actuellement reconnues par le bot (COMMANDE MJ)
 
@@ -158,7 +158,7 @@ class GestionIA(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def modifIA(self, ctx, *, trigger=None):
         """Modifie/supprime une règle d'IA (COMMANDE MJ)
 
@@ -178,6 +178,8 @@ class GestionIA(commands.Cog):
 
         trig = trigs[0][0]
         rep = Reactions.query.get(trig.reac_id)
+        assert rep, f"!modifIA : réaction associée à {trig} introuvable"
+
         displ_seq = rep.reponse if rep.reponse.startswith('`') else tools.code(rep.reponse)     # Pour affichage
         trigs = Triggers.query.filter_by(reac_id=trig.reac_id).all()
 
@@ -257,7 +259,9 @@ async def trigger_reactions(message, chain=None, sensi=0.7, debug=False):
 
     if trigs:       # Au moins un trigger trouvé à cette sensi
         trig = trigs[0][0]                                  # Meilleur trigger (score max)
-        seq = Reactions.query.get(trig.reac_id).reponse     # Séquence-réponse associée
+        rep = Reactions.query.get(trig.reac_id)
+        assert rep, f"trigger_reactions : Réaction associée à {trig} introuvable"
+        seq = rep.reponse                                   # Séquence-réponse associée
 
         for rep in seq.split(MARK_THEN):                    # Pour chaque étape :
             if MARK_OR in rep:                                  # Si plusieurs possiblités :

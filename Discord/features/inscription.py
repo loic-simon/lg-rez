@@ -16,8 +16,11 @@ async def main(bot, member):
     elif chan := tools.get(member.guild.text_channels, topic=f"{member.id}"):   # Inscription en cours
         await chan.send(f"Tu as déjà un channel à ton nom, {member.mention}, par ici !")
     else:
-        chan = await member.guild.create_text_channel(f"conv-bot-{member.name}",  topic=str(member.id)) # Crée le channel "conv-bot-nom" avec le topic "member.id"
-        await chan.edit(category=tools.channel(member, "CONVERSATION BOT")) #Met le channel au bon endroit (GROS CON DE BOT)
+        chan = await member.guild.create_text_channel(f"conv-bot-{member.name}",  topic=str(member.id),
+                                                      category=tools.channel(member, "CONVERSATION BOT"))
+        # Crée le channel "conv-bot-nom" avec le topic "member.id" et au bon endroit
+
+        # await chan.edit(category=tools.channel(member, "CONVERSATION BOT")) #Met le channel au bon endroit (GROS CON DE BOT)
         await chan.set_permissions(member, read_messages=True, send_messages=True)
 
 
@@ -74,7 +77,7 @@ async def main(bot, member):
     if a_la_rez:
         def sortieNumRez(m):
             return len(m.content) < 200     # Longueur de chambre de rez maximale
-        chambre = (await tools.boucleMessage(bot, chan, "Alors, quelle est ta chambre ?", sortieNumRez, checkChan, repMessage="Désolé, ce n'est pas un numéro de chambre valide, réessaie...")).content
+        chambre = (await tools.boucle_message(bot, chan, "Alors, quelle est ta chambre ?", sortieNumRez, checkChan, repMessage="Désolé, ce n'est pas un numéro de chambre valide, réessaie...")).content
     else:
         chambre = "XXX (chambre MJ)"
 
@@ -95,6 +98,7 @@ async def main(bot, member):
 
         load_dotenv()
         SHEET_ID = os.getenv("TDB_SHEET_ID")
+        assert SHEET_ID, "inscription.main : TDB_SHEET_ID introuvable"
 
         workbook = gsheets.connect(SHEET_ID)    # Tableau de bord
         sheet = workbook.worksheet("Journée en cours")

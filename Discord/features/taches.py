@@ -28,14 +28,14 @@ def cancel_task(bot, tache):        # Supprime (annule) une tâche (fonction pou
     bot.tasks[tache.id].cancel()        # Annulation (objet TaskHandler)
     db.session.delete(tache)            # Suppression en base
     db.session.commit()
-    del ctx.bot.tasks[tache.id]         # Suppression TaskHandler
+    del bot.tasks[tache.id]             # Suppression TaskHandler
 
 
 class GestionTaches(commands.Cog):
-    """GestionTaches - planification et exécution de tâches"""
+    """GestionTaches - Commandes de planification, exécution, annulation de tâches"""
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def taches(self, ctx):
         """Liste les tâches en attente (COMMANDE MJ)
 
@@ -49,6 +49,7 @@ class GestionTaches(commands.Cog):
             LT += f"\n{str(tache.id).ljust(5)} {tache.timestamp.strftime('%d/%m/%Y %H:%M:%S')}    {tache.commande.ljust(25)} "
             if tache.action and (action := Actions.query.get(tache.action)):
                 joueur = Joueurs.query.get(action.player_id)
+                assert joueur, f"!taches : joueur d'ID {action.player_id} introuvable"
                 LT += f"{action.action.ljust(20)} {joueur.nom}"
 
         mess = ("Tâches en attente : \n\nID    Timestamp              Commande                  Action               Joueur"
@@ -59,7 +60,7 @@ class GestionTaches(commands.Cog):
 
 
     @commands.command(aliases=["doat"])
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def planif(self, ctx, quand, *, commande):
         """Planifie une tâche au moment voulu (COMMANDE MJ)
 
@@ -127,7 +128,7 @@ class GestionTaches(commands.Cog):
 
 
     @commands.command(aliases=["retard", "doin"])
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def delay(self, ctx, duree, *, commande):
         """Exécute une commande après XhYmZs (COMMANDE MJ)
 
@@ -173,7 +174,7 @@ class GestionTaches(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def cancel(self, ctx, *ids):
         """Annule une ou plusieurs tâche(s) planifiée(s) (COMMANDE MJ)
 

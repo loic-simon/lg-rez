@@ -6,67 +6,80 @@ import re
 
 import discord
 import discord.utils
-import discord.ext.commands
+from discord.ext import commands
 
 from bdd_connect import db, Tables, Joueurs, Roles, BaseActions, Actions, BaseActionsRoles, Taches, Triggers, Reactions, CandidHaro
 # on importe toutes les tables, plus simple pour y accéder depuis des réactions etc (via eval_accols)
 from blocs import bdd_tools
 
 
-# Récupération rapide
+### ---------------------------------------------------------------------------
+### Utilitaires de récupération d'objets Discord (détectent les mentions)
+### ---------------------------------------------------------------------------
 
 get = discord.utils.get
 
-def find_by_mention_or_name(collec, val, pattern=None):         # Utilitaire pour la suite
+def find_by_mention_or_name(collec, val, pattern=None, must_be_found=False, raiser=None):         # Utilitaire pour la suite
     if not val:
-        return None
+        item = None
     elif pattern and (match := re.search(pattern, val)):
-        return get(collec, id=int(match.group(1)))
+        item = get(collec, id=int(match.group(1)))
     else:
-        return get(collec, name=val)
+        item = get(collec, name=val)
+
+    if must_be_found:
+        assert item, f"{raiser or 'tools.find_by_mention_or_name'} : Élément {val} introuvable"
+
+    return item
 
 
-def channel(arg, nom):      # Renvoie le channel #nom. arg peut être de type Context, Guild, User/Member, Channel
+def channel(arg, nom, must_be_found=True):         # Renvoie le channel #nom. arg peut être de type Context, Guild, User/Member, Channel
     try:
         channels = arg.channels if isinstance(arg, discord.Guild) else arg.guild.channels
     except AttributeError:
         raise TypeError("tools.channel : Impossible de remonter aux channels depuis l'argument trasmis")
-    return find_by_mention_or_name(channels, nom, pattern="<#([0-9]{18})>")
+    return find_by_mention_or_name(channels, nom, pattern="<#([0-9]{18})>",
+                                   must_be_found=must_be_found, raiser="tools.channel")
 
 
-def role(arg, nom):         # Renvoie le rôle @&nom. arg peut être de type Context, Guild, User/Member, Channel
+def role(arg, nom, must_be_found=True):            # Renvoie le rôle @&nom. arg peut être de type Context, Guild, User/Member, Channel
     try:
         roles = arg.roles if isinstance(arg, discord.Guild) else arg.guild.roles
     except AttributeError:
         raise TypeError("tools.role : Impossible de remonter aux rôles depuis l'argument trasmis")
-    return find_by_mention_or_name(roles, nom, pattern="<@&([0-9]{18})>")
+    return find_by_mention_or_name(roles, nom, pattern="<@&([0-9]{18})>",
+                                   must_be_found=must_be_found, raiser="tools.role")
 
 
-def member(arg, nom):       # Renvoie le membre @member. arg peut être de type Context, Guild, User/Member, Channel
+def member(arg, nom, must_be_found=True):          # Renvoie le membre @member. arg peut être de type Context, Guild, User/Member, Channel
     try:
         members = arg.members if isinstance(arg, discord.Guild) else arg.guild.members
     except AttributeError:
         raise TypeError("tools.member : Impossible de remonter aux membres depuis l'argument trasmis")
-    return find_by_mention_or_name(members, nom, pattern="<@!([0-9]{18})>")
+    return find_by_mention_or_name(members, nom, pattern="<@!([0-9]{18})>",
+                                   must_be_found=must_be_found, raiser="tools.member")
 
 
-def emoji(arg, nom):        # Renvoie l'emoji :nom:. arg peut être de type Context, Guild, User/Member, Channel
+def emoji(arg, nom, must_be_found=True):           # Renvoie l'emoji :nom:. arg peut être de type Context, Guild, User/Member, Channel
     try:
         emojis = arg.emojis if isinstance(arg, discord.Guild) else arg.guild.emojis
     except AttributeError:
         raise TypeError("tools.emoji : Impossible de remonter aux emojis depuis l'argument trasmis")
-    return find_by_mention_or_name(emojis, nom, pattern="<:.*:([0-9]{18})>")
+    return find_by_mention_or_name(emojis, nom, pattern="<:.*:([0-9]{18})>",
+                                   must_be_found=must_be_found, raiser="tools.emoji")
 
 
-# Renvoie le channel privé d'un utilisateur.
-
-def private_chan(member):
-    chan_id = Tables["Joueurs"].query.get(member.id)._chan_id
-    return member.guild.get_channel(chan_id)
+# Renvoie le channel privé d'un utilisateur
+def private_chan(member, must_be_found=True):
+    joueur = Joueurs.query.get(member.id)
+    assert joueur, f"tools.private_chan : Joueur {member} introuvable"
+    chan = member.guild.get_channel(joueur._chan_id)
+    if must_be_found:
+        assert chan, f"tools.private_chan : Chan privé de {joueur} introuvable"
+    return chan
 
 
 # Appel aux MJs
-
 def mention_MJ(arg):        # Renvoie @MJ si le joueur n'est pas un MJ. arg peut être de type Context ou User/Member
     member = arg.author if hasattr(arg, "author") else arg
     if hasattr(member, "top_role") and member.top_role.name == "MJ":    # Si webhook, pas de top_role
@@ -75,75 +88,126 @@ def mention_MJ(arg):        # Renvoie @MJ si le joueur n'est pas un MJ. arg peut
         return role(arg, "MJ").mention
 
 
-# Crée un contexte à partir d'un message_id : simule que <user> a envoyé <content> dans son chan privé
 
-async def create_context(bot, message_id, user, content):
-    chan = private_chan(user)
-    message = (await chan.history(limit=1).flatten())[0]        # On a besoin de récupérer un message, ici le dernier de la conv privée
-    # message = await chan.fetch_message(message_id)
-    message.author = user
-    message.content = content
-    return await bot.get_context(message)
+### ---------------------------------------------------------------------------
+### Décorateurs pour les différentes commandes, en fonction de leur usage
+### ---------------------------------------------------------------------------
 
+# @tools.mjs_only : commande exécutables uniquement par un MJ ou un webhook
+mjs_only = commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
 
-# DÉCORATEUR : supprime le message et exécute la commande dans la conv privée si elle a été appellée ailleurs
-# (utilisable que dans un Cog, de toute façon tout devra être cogé à terme)
+# @tools.joueurs_only : commande exécutables uniquement par un joueur (inscrit en base), vivant ou mort
+joueurs_only = commands.has_any_role("Joueur en vie", "Joueur mort")
 
+# @tools.vivants_only : commande exécutables uniquement par un joueur vivant
+vivants_only = commands.has_role("Joueur en vie")
+
+# @tools.private : supprime le message et exécute la commande dans la conv privée si elle a été appellée ailleurs (utilisable que dans un Cog)
+# Utilisable en combinaison avec joueurs_only et vivants_only (pas avec les autres attention, vu que seuls les joueurs ont un channel privé)
 def private(cmd):
     @wraps(cmd)
     async def new_cmd(self, ctx, *args, **kwargs):              # Cette commande est renvoyée à la place de cmd
-        if not ctx.channel.name.startswith("conv-bot-"):        # Si pas déjà dans une conv bot :
-        # if not member.has_role("MJ") and not ctx.channel.name.beginswith("conv-bot-"):
-            await ctx.message.delete()                          # On supprime le message,
-            ctx.channel = private_chan(ctx.author)         # On remplace le chan dans le contexte d'appel par le chan privé,
-            await ctx.send(f"{quote(ctx.message.content)}\n"    # On envoie un warning dans le chan privé,
+        if not ctx.channel.name.startswith("conv-bot-"):            # Si pas déjà dans une conv bot :
+            await ctx.message.delete()                                  # On supprime le message,
+            ctx.channel = private_chan(ctx.author)                      # On remplace le chan dans le contexte d'appel par le chan privé,
+            await ctx.send(f"{quote(ctx.message.content)}\n"            # On envoie un warning dans le chan privé,
                            f"{ctx.author.mention} :warning: Cette commande est interdite en dehors de ta conv privée ! :warning:\n"
                            f"J'ai supprimé ton message, et j'exécute la commande ici :")
-        return await cmd(self, ctx, *args, **kwargs)            # Et on appelle cmd, avec le contexte modifié !
+        return await cmd(self, ctx, *args, **kwargs)                # Et on appelle cmd, avec le contexte modifié !
 
     return new_cmd
 
 
-# Attend x secondes en affichant l'indicateur typing... sur le chat
-async def sleep(chan, x):
-    async with chan.typing():
-        await asyncio.sleep(x)
 
+### ---------------------------------------------------------------------------
+### Commandes d'interaction avec les joueurs : input, boucles, confirmation...
+### ---------------------------------------------------------------------------
 
+# Commande générale, à utiliser à la place de bot.wait_for('message', ...)
 async def wait_for_message(bot, check, trigger_on_commands=False):
     if trigger_on_commands:
-        def trigCheck(m):
+        def trig_check(m):
             return (check(m) or m.content.lower() in ["stop", "!stop"])         # et on trigger en cas de STOP
     else:
-        def trigCheck(m):
+        def trig_check(m):
             return ((check(m)
                      and not m.content.startswith(bot.command_prefix))          # on ne trigger pas sur les commandes
                     or m.content.lower() in ["stop", "!stop"])                  # et on trigger en cas de STOP
 
-    message = await bot.wait_for('message', check=trigCheck)
+    message = await bot.wait_for('message', check=trig_check)
     if message.content.lower() in ["stop", "!stop"]:
         raise RuntimeError("Arrêt demandé")
     else:
         return message
 
 
-# Demande une réaction dans un choix (vrai/faux par défaut)
+# Permet de boucler question -> réponse tant que la réponse vérifie pas les critères nécessaires dans chan
+async def boucle_message(bot, chan, in_message, condition_sortie, trig_check=lambda m: m.channel == chan and m.author != bot.user, rep_message=None):
+    """Permet de lancer une boucle question/réponse tant que la réponse ne vérifie pas condition_sortie
 
-async def yes_no(bot, message):
-    """Ajoute les reacts ✅ et ❎ à message et renvoie True ou False en fonction de l'emoji cliqué OU de la réponse textuelle détectée."""
-    yes_words = ["oui", "o", "yes", "y", "1", "true"]
-    yes_no_words = yes_words + ["non", "n", "no", "n", "0", "false"]
-    return await wait_for_react_clic(
-        bot, message, emojis={"✅": True, "❎": False}, process_text=True,
-        text_filter=lambda s: s.lower() in yes_no_words, post_converter=lambda s: s.lower() in yes_words)
+    chan est le channel dans lequel lancer la boucle
+    trig_check est la condition de détection du message dans le bot.wait_for
+    in_message est le premier message envoyé pour demander une réponse
+    rep_message permet de définir un message de boucle différent du message d'accueil (identique si None)
+    """
+    if not rep_message:
+        rep_message = in_message
+    await chan.send(in_message)
+    rep = await wait_for_message(bot, check=trig_check)
+    while not condition_sortie(rep):
+        await chan.send(rep_message)
+        rep = await wait_for_message(bot, check=trig_check)
+    return rep
 
-async def choice(bot, message, N):
-    """Ajoute les reacts 1️⃣, 2️⃣, 3️⃣... [N] à message et renvoie le numéro cliqué OU détecté par réponse textuelle. (N <= 10)"""
-    return await wait_for_react_clic(
-        bot, message, emojis={emoji_chiffre(i): i for i in range(1, N+1)}, process_text=True,
-        text_filter=lambda s: s.isdigit() and 1 <= int(s) <= N, post_converter=int)
+
+async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
+    """Demande <message>, puis attend que le joueur entre un nom de joueur, et boucle 5 fois au max (avant de l'insulter)
+    pour chercher le plus proche joueurs dans la table Joueurs
+    """
+    if message and not cible:
+        await ctx.send(message)
+
+    trig_check = lambda m: m.channel == ctx.channel and m.author != ctx.bot.user
+
+    for i in range(5):
+        if i == 0 and cible:            # Au premier tour, si on a donné une cible
+            rep = cible
+        else:
+            mess = await wait_for_message(ctx.bot, check=trig_check)
+            rep = mess.content
+
+        if id := ''.join([c for c in rep if c.isdigit()]):      # Si la chaîne contient un nombre, on l'extrait
+            if joueur := Joueurs.query.get(int(id)):                # Si cet ID correspond à un utilisateur, on le récupère
+                return joueur                                       # On a trouvé l'utilisateur !
+
+        nearest = await bdd_tools.find_nearest(rep, Joueurs, carac="nom", sensi=sensi)     # Sinon, recherche au plus proche
+
+        if not nearest:
+            await ctx.send("Aucune entrée trouvée, merci de réessayer")
+
+        elif nearest[0][1] == 1:        # Si le score le plus haut est égal à 1...
+            return nearest[0][0]        # ...renvoyer l'entrée correspondante
+
+        elif len(nearest) == 1:
+            m = await ctx.send(f"Je n'ai trouvé qu'une correspondance : {nearest[0][0].nom}\nÇa part ?")
+            if await yes_no(ctx.bot, m):
+                return nearest[0][0]
+            else:
+                await ctx.send("Bon d'accord, alors tu votes contre qui ?")
+
+        else:
+            s = "Les joueurs les plus proches de ton entrée sont les suivants : \n"
+            for i, j in enumerate(nearest[:10]):
+                s += f"{emoji_chiffre(i+1)}. {j[0].nom} \n"
+            m = await ctx.send(s + "Tu peux les choisir en réagissant à ce message, ou en répondant au clavier.")
+            n = await choice(ctx.bot, m, min(10, len(nearest)))
+            return nearest[n-1][0]
+
+    await ctx.send("Et puis non, tiens ! \n https://giphy.com/gifs/fuck-you-middle-finger-ryan-stiles-x1kS7NRIcIigU")
+    raise RuntimeError("Le joueur est trop con, je peux rien faire")
 
 
+# Récupère un input par réaction
 async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
                               text_filter=lambda s: True, post_converter=None, trigger_all_reacts=False, trigger_on_commands=False):
     """Ajoute les reacts dans emojis à message, attend que quelqu'un appuie sur une, puis renvoie :
@@ -210,7 +274,34 @@ async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
     return ret
 
 
-# Utilitaires d'emojis
+# Surcouche de wait_for_react_clic pour demander une confirmation / question fermée simplement
+async def yes_no(bot, message):
+    """Ajoute les reacts ✅ et ❎ à message et renvoie True ou False en fonction de l'emoji cliqué OU de la réponse textuelle détectée."""
+    yes_words = ["oui", "o", "yes", "y", "1", "true"]
+    yes_no_words = yes_words + ["non", "n", "no", "n", "0", "false"]
+    return await wait_for_react_clic(
+        bot, message, emojis={"✅": True, "❎": False}, process_text=True,
+        text_filter=lambda s: s.lower() in yes_no_words, post_converter=lambda s: s.lower() in yes_words)
+
+
+# Surcouche de wait_for_react_clic pour demander de choisir dans une liste simplement
+async def choice(bot, message, N):
+    """Ajoute les reacts 1️⃣, 2️⃣, 3️⃣... [N] à message et renvoie le numéro cliqué OU détecté par réponse textuelle. (N <= 10)"""
+    return await wait_for_react_clic(
+        bot, message, emojis={emoji_chiffre(i): i for i in range(1, N+1)}, process_text=True,
+        text_filter=lambda s: s.isdigit() and 1 <= int(s) <= N, post_converter=int)
+
+
+# Attend x secondes en affichant l'indicateur typing... sur le chat
+async def sleep(chan, x):
+    async with chan.typing():
+        await asyncio.sleep(x)
+
+
+
+### ---------------------------------------------------------------------------
+### Utilitaires d'emojis
+### ---------------------------------------------------------------------------
 
 def montre(heure=None):
     """Renvoie l'emoji horloge correspondant à l'heure demandée (str "XXh" our "XXh30", actuelle si non précisée)"""
@@ -256,8 +347,21 @@ def sub_chiffre(chiffre: int, multi=False):
         raise ValueError("L'argument de sub_chiffre doit être un entier entre 0 et 9")
 
 
-# Renvoie le datetime correspondant au prochain moment ou tps arrive DANS LES HORAIRES DU JEU : du dimanche 19:00:00 au vendredi 18:59:59.
 
+### ---------------------------------------------------------------------------
+### Utilitaires de date / temps, notemment liées aux horaires de jeu
+### ---------------------------------------------------------------------------
+
+# Convertit HHh[MM] en objet Time
+def heure_to_time(heure):
+    try:
+        hh, mm = heure.split("h")
+        return datetime.time(int(hh), int(mm) if mm else 0)
+    except ValueError as exc:
+        raise ValueError(f"Valeur \"{heure}\" non convertible en temps") from exc
+
+
+# Renvoie le datetime correspondant au prochain moment ou tps arrive DANS LES HORAIRES DU JEU : du dimanche 19:00:00 au vendredi 18:59:59.
 def next_occurence(tps):
     pause = datetime.time(hour=19)
 
@@ -310,94 +414,10 @@ def fin_pause():
     return datetime.datetime.combine(reprise_jour, reprise_time)        # passage de date et time à datetime
 
 
-# Convertit HHh[MM] en objet Time
 
-def heure_to_time(heure):
-    try:
-        hh, mm = heure.split("h")
-        return datetime.time(int(hh), int(mm) if mm else 0)
-    except ValueError as exc:
-        raise ValueError(f"Valeur \"{heure}\" non convertible en temps") from exc
-
-
-# Teste si le message contient un mot de la liste trigWords, les mots de trigWords doivent etre en minuscule
-
-def checkTrig(m, trigWords):
-    return m.content in trigWords
-
-# Teste si user possède le role roles
-def checkRole(member, nom: str):
-    role = role(user, nom)
-    return role in member.roles
-
-
-# Permet de boucler question -> réponse tant que la réponse vérifie pas les critères nécessaires dans chan
-async def boucleMessage(bot, chan, inMessage, conditionSortie, trigCheck=lambda m: m.channel == chan and m.author != bot.user, repMessage=None):
-    """
-    Permet de lancer une boucle question/réponse tant que la réponse ne vérifie pas conditionSortie
-    chan est le channel dans lequel lancer la boucle
-    trigCheck est la condition de détection du message dans le bot.wait_for
-    inMessage est le premier message envoyé pour demander une réponse
-    repMessage permet de définir un message de boucle différent du message d'accueil (identique si None)
-    """
-
-    if repMessage is None:
-        repMessage = inMessage
-    await chan.send(inMessage)
-    rep = await bot.wait_for('message', check=trigCheck)
-    while not conditionSortie(rep):
-        await chan.send(repMessage)
-        rep = await bot.wait_for('message', check=trigCheck)
-    return rep
-
-
-async def boucle_query_joueur(ctx, cible=None, message=None, table=Joueurs):
-    """Demande <message>, puis attend que le joueur entre un nom de joueur, et boucle 5 fois au max (avant de l'insulter)
-    pour chercher le plus proche joueurs dans la table Joueurs
-    """
-
-    if message and not cible:
-        await ctx.send(message)
-
-    trigCheck = lambda m: m.channel == ctx.channel and m.author != ctx.bot.user
-
-    for i in range(5):
-        if i == 0 and cible:            # Au premier tour, si on a donné une cible
-            rep = cible
-        else:
-            mess = await wait_for_message(ctx.bot, check=trigCheck)
-            rep = mess.content
-
-        if id := ''.join([c for c in rep if c.isdigit()]):      # Si la chaîne contient un nombre, on l'extrait
-            if user := table.query.get(int(id)):                # Si cet ID correspond à un utilisateur, on le récupère
-                return user                                     # On a trouvé l'utilisateur !
-
-        nearest = await bdd_tools.find_nearest(rep, table, carac="nom")     # Sinon, recherche au plus proche
-
-        if not nearest:
-            await ctx.send("Aucune entrée trouvée, merci de réessayer")
-
-        elif nearest[0][1] == 1:        # Si le score le plus haut est égal à 1...
-            return nearest[0][0]        # ...renvoyer l'entrée correspondante
-
-        elif len(nearest) == 1:
-            m = await ctx.send(f"Je n'ai trouvé qu'une correspondance : {nearest[0][0].nom}\nÇa part ?")
-            if await yes_no(ctx.bot, m):
-                return nearest[0][0]
-            else:
-                await ctx.send("Bon d'accord, alors tu votes contre qui ?")
-
-        else:
-            s = "Les joueurs les plus proches de ton entrée sont les suivants : \n"
-            for i, j in enumerate(nearest[:10]):
-                s += f"{emoji_chiffre(i+1)}. {j[0].nom} \n"
-            m = await ctx.send(s + "Tu peux les choisir en réagissant à ce message, ou en répondant au clavier.")
-            n = await choice(ctx.bot, m, min(10, len(nearest)))
-            return nearest[n-1][0]
-
-    await ctx.send("Et puis non, tiens ! \n https://giphy.com/gifs/fuck-you-middle-finger-ryan-stiles-x1kS7NRIcIigU")
-    raise RuntimeError("Le joueur est trop con, je peux rien faire")
-
+### ---------------------------------------------------------------------------
+### Split et log
+### ---------------------------------------------------------------------------
 
 # Sépare <mess> en une liste de messages de moins de <N>=2000 mots (limitation Discord), en séparant aux <sep>=sauts de ligne si possible.
 # Ajoute <rep> à la fin des messages tronqués de leur séparateur final.
@@ -435,6 +455,22 @@ async def log(arg, message, code=False):
         await send_code_blocs(logchan, message)
     else:
         [await logchan.send(bloc) for bloc in smooth_split(message)]
+
+
+
+### ---------------------------------------------------------------------------
+### Autres fonctions diverses
+### ---------------------------------------------------------------------------
+
+# Crée un contexte à partir d'un message_id : simule que <member> a envoyé <content> dans son chan privé
+
+async def create_context(bot, message_id, member, content):
+    chan = private_chan(member)
+    message = (await chan.history(limit=1).flatten())[0]        # On a besoin de récupérer un message, ici le dernier de la conv privée
+    # message = await chan.fetch_message(message_id)
+    message.author = member
+    message.content = content
+    return await bot.get_context(message)
 
 
 # Retourne le nom du slug role (None si non trouvé)
@@ -487,39 +523,34 @@ def eval_accols(rep, globals=None, locals=None, debug=False):
         return rep
 
 
-# Formattage de texte dans Discord
+
+### ---------------------------------------------------------------------------
+### Utilitaires de formatage de texte
+### ---------------------------------------------------------------------------
 
 def bold(s):
     return f"**{s}**"
 
-
 def ital(s):
     return f"*{s}*"
-
 
 def soul(s):
     return f"__{s}__"
 
-
 def strike(s):
     return f"~~{s}~~"
-
 
 def code(s):
     return f"`{s}`"
 
-
 def code_bloc(s, langage=""):
     return f"```{langage}\n{s}```"
-
 
 def quote(s):
     return f"> {s}"
 
-
 def quote_bloc(s):
     return f">>> {s}"
-
 
 def spoiler(s):
     return f"||{s}||"

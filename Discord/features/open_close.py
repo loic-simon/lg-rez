@@ -9,7 +9,7 @@ from blocs import bdd_tools
 import tools
 
 
-async def retrieve_users(quoi, qui, heure=None):
+async def recup_joueurs(quoi, qui, heure=None):
     # Renvoie les joueurs concernés par la tâche !quoi qui <heure>
     # Ex : !open cond -> joueurs avec droit de vote, !close action 17h -> joueurs dont l'action se termine à 17h
 
@@ -65,10 +65,10 @@ async def retrieve_users(quoi, qui, heure=None):
 
 
 class OpenClose(commands.Cog):
-    """OpenClose - lancement, rappel et fermetures des votes ou des actions"""
+    """OpenClose - Commandes de lancement, rappel et fermeture des votes et actions"""
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
+    @tools.mjs_only
     async def open(self, ctx, qui, heure=None, heure_chain=None):
         """Lance un vote / des actions de rôle (COMMANDE BOT / MJ)
 
@@ -98,15 +98,17 @@ class OpenClose(commands.Cog):
             !open action 19h        lance toutes les actions commençant à 19h00
             !open 122               lance l'action d'ID 122
         """
-        users = await retrieve_users("open", qui, heure)        # Liste de joueurs (votes) ou dictionnaire joueur : action
+        joueurs = await recup_joueurs("open", qui, heure)        # Liste de joueurs (votes) ou dictionnaire joueur : action
 
-        str_users = "\n - ".join([user.nom for user in users])
-        await tools.send_code_blocs(ctx, f"Utilisateur(s) répondant aux critères ({len(users)}) : \n - {str_users}")
+        str_joueurs = "\n - ".join([joueur.nom for joueur in joueurs])
+        await tools.send_code_blocs(ctx, f"Utilisateur(s) répondant aux critères ({len(joueurs)}) : \n - {str_joueurs}")
 
-        for user in users:
-            chan = ctx.guild.get_channel(user._chan_id)
+        for joueur in joueurs:
+            chan = ctx.guild.get_channel(joueur._chan_id)
+            assert chan, f"!open : chan privé de {joueur} introuvable"
+
             if qui == "cond":
-                bdd_tools.modif(user, "_vote_condamne", "non défini")
+                bdd_tools.modif(joueur, "_vote_condamne", "non défini")
                 message = await chan.send(
                     f"""{tools.montre()}  Le vote pour le condamné du jour est ouvert !  {tools.emoji(ctx, "bucher")} \n"""
                     + (f"""Tu as jusqu'à {heure} pour voter. \n""" if heure else "")
@@ -114,7 +116,7 @@ class OpenClose(commands.Cog):
                 await message.add_reaction(tools.emoji(ctx, "bucher"))
 
             elif qui == "maire":
-                bdd_tools.modif(user, "_vote_maire", "non défini")
+                bdd_tools.modif(joueur, "_vote_maire", "non défini")
                 message = await chan.send(
                     f"""{tools.montre()}  Le vote pour l'élection du maire est ouvert !  {tools.emoji(ctx, "maire")} \n"""
                     + (f"""Tu as jusqu'à {heure} pour voter. \n""" if heure else "")
@@ -122,7 +124,7 @@ class OpenClose(commands.Cog):
                 await message.add_reaction(tools.emoji(ctx, "maire"))
 
             elif qui == "loups":
-                bdd_tools.modif(user, "_vote_loups", "non défini")
+                bdd_tools.modif(joueur, "_vote_loups", "non défini")
                 message = await chan.send(
                     f"""{tools.montre()}  Le vote pour la victime de cette nuit est ouvert !  {tools.emoji(ctx, "lune")} \n"""
                     + (f"""Tu as jusqu'à {heure} pour voter. \n""" if heure else "")
@@ -130,7 +132,7 @@ class OpenClose(commands.Cog):
                 await message.add_reaction(tools.emoji(ctx, "lune"))
 
             else:       # Action
-                action = users[user]
+                action = joueurs[joueur]
                 await gestion_actions.open_action(ctx, action, chan)
 
         db.session.commit()
@@ -151,7 +153,7 @@ class OpenClose(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
+    @tools.mjs_only
     async def close(self, ctx, qui, heure=None, heure_chain=None):
         """Ferme un vote / des actions de rôle (COMMANDE BOT / MJ)
 
@@ -182,30 +184,32 @@ class OpenClose(commands.Cog):
             !close 122              ferme l'action d'ID 122
         """
 
-        users = await retrieve_users("close", qui, heure)
+        joueurs = await recup_joueurs("close", qui, heure)
 
-        str_users = "\n - ".join([user.nom for user in users])
-        await ctx.send(tools.code_bloc(f"Utilisateur(s) répondant aux critères ({len(users)}) : \n{str_users}"))
+        str_joueurs = "\n - ".join([joueur.nom for joueur in joueurs])
+        await ctx.send(tools.code_bloc(f"Utilisateur(s) répondant aux critères ({len(joueurs)}) : \n{str_joueurs}"))
 
-        for user in users:
-            chan = ctx.guild.get_channel(user._chan_id)
+        for joueur in joueurs:
+            chan = ctx.guild.get_channel(joueur._chan_id)
+            assert chan, f"!close : chan privé de {joueur} introuvable"
+
             if qui == "cond":
                 await chan.send(f"""{tools.montre()}  Fin du vote pour le condamné du jour ! \n"""
-                                f"""Vote définitif : {user._vote_condamne}""")
-                bdd_tools.modif(user, "_vote_condamne", None)
+                                f"""Vote définitif : {joueur._vote_condamne}""")
+                bdd_tools.modif(joueur, "_vote_condamne", None)
 
             elif qui == "maire":
                 await chan.send(f"""{tools.montre()}  Fin du vote pour le maire ! \n"""
-                                f"""Vote définitif : {user._vote_maire}""")
-                bdd_tools.modif(user, "_vote_maire", None)
+                                f"""Vote définitif : {joueur._vote_maire}""")
+                bdd_tools.modif(joueur, "_vote_maire", None)
 
             elif qui == "loups":
                 await chan.send(f"""{tools.montre()}  Fin du vote pour la victime du soir ! \n"""
-                                f"""Vote définitif : {user._vote_loups}""")
-                bdd_tools.modif(user, "_vote_loups", None)
+                                f"""Vote définitif : {joueur._vote_loups}""")
+                bdd_tools.modif(joueur, "_vote_loups", None)
 
             else:       # Action
-                action = users[user]
+                action = joueurs[joueur]
                 await chan.send(f"""{tools.montre()}  Fin de la possiblité d'utiliser ton action {tools.code(action.action)} ! \n"""
                                 f"""Action définitive : {action._decision}""")
                 await gestion_actions.close_action(ctx, action, chan)
@@ -227,7 +231,7 @@ class OpenClose(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
+    @tools.mjs_only
     async def remind(self, ctx, qui, heure=None):
         """Envoi un rappel de vote / actions de rôle (COMMANDE BOT / MJ)
 
@@ -251,34 +255,38 @@ class OpenClose(commands.Cog):
             !remind 122             rappelle l'action d'ID 122
         """
 
-        users = await retrieve_users("remind", qui, heure)
+        joueurs = await recup_joueurs("remind", qui, heure)
 
-        str_users = "\n - ".join([user.nom for user in users])
-        await ctx.send(tools.code_bloc(f"Utilisateur(s) répondant aux critères ({len(users)}) : \n{str_users}"))
+        str_joueurs = "\n - ".join([joueur.nom for joueur in joueurs])
+        await ctx.send(tools.code_bloc(f"Utilisateur(s) répondant aux critères ({len(joueurs)}) : \n{str_joueurs}"))
 
-        for user in users:
-            chan = ctx.guild.get_channel(user._chan_id)
+        for joueur in joueurs:
+            chan = ctx.guild.get_channel(joueur._chan_id)
+            assert chan, f"!remind : chan privé de {joueur} introuvable"
+            member = ctx.guild.get_member(joueur.discord_id)
+            assert member, f"!remind : member {joueur} introuvable"
+
             if qui == "cond":
-                message = await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes pour voter pour le condamné du jour ! 😱 \n""")
+                message = await chan.send(f"""⏰ {member.mention} Plus que 10 minutes pour voter pour le condamné du jour ! 😱 \n""")
                 await message.add_reaction(tools.emoji(ctx, "bucher"))
 
             elif qui == "maire":
-                message = await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes pour élire le nouveau maire ! 😱 \n""")
+                message = await chan.send(f"""⏰ {member.mention} Plus que 10 minutes pour élire le nouveau maire ! 😱 \n""")
                 await message.add_reaction(tools.emoji(ctx, "maire"))
 
             elif qui == "loups":
-                message = await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes voter pour la victime du soir ! 😱 \n""")
+                message = await chan.send(f"""⏰ {member.mention} Plus que 10 minutes voter pour la victime du soir ! 😱 \n""")
                 await message.add_reaction(tools.emoji(ctx, "lune"))
 
             else:       # Action
-                action = users[user]
-                message = await chan.send(f"""⏰ {ctx.guild.get_member(user.discord_id).mention} Plus que 10 minutes pour utiliser ton action {tools.code(action.action)} ! 😱 \n""")
+                action = joueurs[joueur]
+                message = await chan.send(f"""⏰ {member.mention} Plus que 10 minutes pour utiliser ton action {tools.code(action.action)} ! 😱 \n""")
                 await message.add_reaction(tools.emoji(ctx, "action"))
 
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
+    @tools.mjs_only
     async def cparti(self, ctx):
         """Lance le jeu (COMMANDE MJ)
 
@@ -322,14 +330,18 @@ class OpenClose(commands.Cog):
 
                 r += "\n\nBon plus besoin de lancer les actions, c'est fait à la synchro des rôles mais les !open n'ont aucun impact tant que tout le monde est en role_actif == False, DU COUP passer tout le monde en True genre MAINTENANT (et en silencieux !) si on veut vraiment lancer\n\n"
 
-                # Programmation votes condamnés chainés
+                # Programmation votes condamnés chainés 10h-18h
                 r += "\nProgrammation des votes :\n"
                 taches.add_task(ctx.bot, tools.next_occurence(datetime.time(hour=10)), "!open cond 18h 10h")
-                r += " - !open cond 18h 10h\n"
+                r += " - À 10h : !open cond 18h 10h\n"
 
-                # Programmation premier vote maire
+                # Programmation votes loups chainés 19h-23h
+                taches.add_task(ctx.bot, tools.next_occurence(datetime.time(hour=19)), "!open loups 23h 19h")
+                r += " - À 19h : !open loups 23h 19h\n"
+
+                # Programmation premier vote maire 10h-17h
                 taches.add_task(ctx.bot, tools.next_occurence(datetime.time(hour=10)), "!open maire 17h")
-                r += " - !open maire 17h\n"
+                r += " - À 10h : !open maire 17h\n"
 
                 # Programmation actions au lancement et actions permanentes
                 r += "\nProgrammation des actions start / perma :\n"

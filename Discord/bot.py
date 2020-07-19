@@ -22,6 +22,8 @@ logging.basicConfig(level=logging.WARNING)
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 GUILD_ID = int(os.getenv("DISCORD_GUILD_ID"))
+assert TOKEN, "bot.py : TOKEN introuvable"
+assert TOKEN, "bot.py : DISCORD_GUILD_ID introuvable"
 
 
 ### 2 - Création du bot
@@ -66,6 +68,8 @@ async def remove_from_in_command(ctx):
 @bot.event
 async def on_ready():
     guild = bot.get_guild(GUILD_ID)
+    assert guild, f"on_ready : Guilde d'ID {GUILD_ID} introuvable"
+
     print(f"{bot.user} connecté au serveur « {guild.name} » (id : {guild.id})\n")
     print(f"Guild Members: " + " - ".join([member.display_name for member in guild.members]))
     print(f"\nChannels: " + " - ".join([channel.name for channel in guild.text_channels]))
@@ -97,11 +101,15 @@ async def on_member_join(member):
 # À chaque message
 @bot.event
 async def on_message(message):
-    if message.author == bot.user:          # Sécurité pour éviter les boucles infinies
+    if message.author == bot.user:              # Sécurité pour éviter les boucles infinies
         return
-    if not message.guild:                   # Message privé
+
+    if not message.guild:                       # Message privé
         await message.channel.send("Je n'accepte pas les messages privés, désolé !")
         return
+
+    if message.author.top_role == tools.role(message, "@everyone"):     # Pas de rôle affecté
+        return      # le bot te calcule même pas
 
     await bot.invoke(await bot.get_context(message))        # On trigger toutes les commandes
     # (ne PAS remplacer par bot.process_commands(message), en théorie c'est la même chose mais ça détecte pas les webhooks...)
@@ -145,24 +153,25 @@ async def on_raw_reaction_add(payload):
         await bot.invoke(ctx)       # On trigger !voteloups
 
 
-### 5 - Commandes (définies dans les fichiers annexes, un cog par fichier dans features)
+### 5 - Chargement des commandes (définies dans les fichiers annexes, un cog par fichier dans features)
 
-bot.add_cog(informations.Informations(bot))         # Information du joueur
-bot.add_cog(voter_agir.VoterAgir(bot))              # Voter ou agir
-bot.add_cog(IA.GestionIA(bot))                      # Ajout, liste, modification des règles d'IA
-bot.add_cog(open_close.OpenClose(bot))              # Ouverture/fermeture votes/actions (appel par webhook)
-bot.add_cog(sync.Sync(bot))                         # Synchronisation TDB (appel par webhook)
-bot.add_cog(taches.GestionTaches(bot))              # Tâches planifiées
-bot.add_cog(remplissage_bdd.RemplissageBDD(bot))    # Drop et remplissage table de données
-bot.add_cog(annexe.Annexe(bot))                     # Ouils divers et plus ou moins inutiles
-bot.add_cog(actions_publiques.ActionsPubliques(bot))
+bot.add_cog(informations.Informations(bot))             # Information du joueur
+bot.add_cog(voter_agir.VoterAgir(bot))                  # Voter ou agir
+bot.add_cog(actions_publiques.ActionsPubliques(bot))    # Haros et candidatures
+bot.add_cog(IA.GestionIA(bot))                          # Ajout, liste, modification des règles d'IA
+bot.add_cog(open_close.OpenClose(bot))                  # Ouverture/fermeture votes/actions (appel par webhook)
+bot.add_cog(sync.Sync(bot))                             # Synchronisation TDB (appel par webhook)
+bot.add_cog(taches.GestionTaches(bot))                  # Tâches planifiées
+bot.add_cog(remplissage_bdd.RemplissageBDD(bot))        # Drop et remplissage table de données
+bot.add_cog(annexe.Annexe(bot))                         # Ouils divers et plus ou moins inutiles
+
 
 ### 6 - Commandes spéciales
 class Special(commands.Cog):
     """Special - Commandes spéciales (méta-commandes, imitant ou impactant le déroulement des autres)"""
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def do(self, ctx, *, code):
         """Exécute du code Python et affiche le résultat (COMMANDE MJ)
 
@@ -184,7 +193,7 @@ class Special(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def co(self, ctx, cible=None):
         """Lance la procédure d'inscription comme si on se connectait au serveur pour la première fois (COMMANDE MJ)
 
@@ -193,19 +202,19 @@ class Special(commands.Cog):
         """
         if cible:
             id = ''.join([c for c in cible if c.isdigit()])         # Si la chaîne contient un nombre, on l'extrait
-            if id and ctx.guild.get_member(int(id)):                # Si c'est un ID d'un membre du serveur
-                joueur = ctx.guild.get_member(int(id))
+            if id and (member := ctx.guild.get_member(int(id))):          # Si c'est un ID d'un membre du serveur
+                pass
             else:
                 await ctx.send("Cible introuvable.")
                 return
         else:
-            joueur = ctx.author
+            member = ctx.author
 
-        await inscription.main(bot, joueur)
+        await inscription.main(bot, member)
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def doas(self, ctx, *, qui_quoi):
         """Exécute une commande en tant qu'un autre joueur (COMMANDE MJ)
 
@@ -215,16 +224,18 @@ class Special(commands.Cog):
         """
         qui, quoi = qui_quoi.split(" " + bot.command_prefix, maxsplit=1)       # !doas <@!id> !vote R ==> qui = "<@!id>", quoi = "vote R"
         joueur = await tools.boucle_query_joueur(ctx, qui.strip() or None, Tables["Joueurs"])
+        member = ctx.guild.get_member(joueur.discord_id)
+        assert member, f"!doas : Member {joueur} introuvable"
 
         ctx.message.content = bot.command_prefix + quoi
-        ctx.message.author = ctx.guild.get_member(joueur.discord_id)
+        ctx.message.author = member
 
         await ctx.send(f":robot: Exécution en tant que {joueur.nom} :")
         await ctx.bot.process_commands(ctx.message)
 
 
     @commands.command(aliases=["autodestruct", "ad"])
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def secret(self, ctx, *, quoi):
         """Supprime le message puis exécute la commande (COMMANDE MJ)
 
@@ -244,7 +255,7 @@ class Special(commands.Cog):
     @commands.command()
     @tools.private
     async def stop(self, ctx):
-        """Peut débloquer des situations compliquées
+        """Peut débloquer des situations compliquées (beta)
 
         Ne pas utiliser cette commande sauf en cas de force majeure où plus rien ne marche, et sur demande d'un MJ (après c'est pas dit que ça marche mieux après l'avoir utilisé)
         """
@@ -341,8 +352,15 @@ async def on_command_error(ctx, exc):
         ctx = await bot.get_context(ctx.message)
         await ctx.reinvoke()
 
-    elif isinstance(exc, commands.MissingRole) or isinstance(exc, commands.CheckAnyFailure):
+    elif isinstance(exc, commands.CheckAnyFailure):         # Normalement raise que par @tools.mjs_only
         await ctx.send("Hé ho toi, cette commande est réservée aux MJs !  :angry:")
+
+    elif isinstance(exc, commands.MissingAnyRole):          # Normalement raise que par @tools.joueurs_only
+        await ctx.send("Cette commande est réservée aux joueurs ! (parce qu'ils doivent être inscrits en base, toussa)"
+                       f"({tools.code('!doas')} est là en cas de besoin)")
+
+    elif isinstance(exc, commands.MissingRole):             # Normalement raise que par @tools.vivants_only
+        await ctx.send("Désolé, cette commande est réservée aux joueurs en vie !")
 
     elif isinstance(exc, AlreadyInCommand) and ctx.command.name not in ["addIA", "modifIA"]:
         await ctx.send(f"Impossible d'utiliser une commande pendant un processus ! (vote...)\n"
@@ -362,6 +380,8 @@ async def on_command_error(ctx, exc):
 async def on_error(event, *args, **kwargs):
     db.session.rollback()       # Dans le doute, on vide la session SQL
     guild = bot.get_guild(GUILD_ID)
+    assert guild, f"on_error : Serveur {GUILD_ID} introuvable - Erreur initiale : \n{traceback.format_exc}"
+
     await tools.log(guild, (
         f"{tools.role(guild, 'MJ').mention} ALED : Exception Python !"
         f"{tools.code_bloc(traceback.format_exc())}"

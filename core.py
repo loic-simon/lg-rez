@@ -106,7 +106,7 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 
             # CONVERSION INFOS GSHEET EN UTILISATEURS
 
-            users_TDB = []              # Liste des joueurs tels qu'actuellement dans le TDB
+            joueurs_TDB = []            # Liste des joueurs tels qu'actuellement dans le TDB
             ids_TDB = []                # discord_ids des différents joueurs du TDB
             rows_TDB = {}               # Indices des lignes ou sont les différents joueurs du TDB
 
@@ -115,44 +115,44 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
                 id_cell = L[TDB_index["discord_id"]]
                 if id_cell.isdigit():        # Si la cellule contient bien un ID (que des chiffres, et pas vide)
                     id = int(id_cell)
-                    user_TDB = {col: bdd_tools.transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
+                    joueur_TDB = {col: bdd_tools.transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
                         # Dictionnaire correspondant à l'utilisateur
-                    users_TDB.append(user_TDB)
+                    joueurs_TDB.append(joueur_TDB)
                     ids_TDB.append(id)
                     rows_TDB[id] = l
 
             ### RÉCUPÉRATION UTILISATEURS CACHE
 
-            users_cache = Joueurs.query.all()     # Liste des joueurs tels qu'actuellement en cache
-            ids_cache = [user_cache.discord_id for user_cache in users_cache]
+            joueurs_cache = Joueurs.query.all()     # Liste des joueurs tels qu'actuellement en cache
+            ids_cache = [joueur_cache.discord_id for joueur_cache in joueurs_cache]
 
             ### COMPARAISON
 
             Modifs = []         # Modifs à porter au TDB : tuple (id - colonne (nom) - valeur)
             Modified_ids = []
 
-            for user_cache in users_cache.copy():                   ## Joueurs dans le cache supprimés du TDB
-                if user_cache.discord_id not in ids_TDB:
-                    users_cache.remove(user_cache)
-                    db.session.delete(user_cache)
+            for joueur_cache in joueurs_cache.copy():                   ## Joueurs dans le cache supprimés du TDB
+                if joueur_cache.discord_id not in ids_TDB:
+                    joueurs_cache.remove(joueur_cache)
+                    db.session.delete(joueur_cache)
                     if verbose:
-                        r += f"\nJoueur dans le cache hors TDB : {user_cache}"
+                        r += f"\nJoueur dans le cache hors TDB : {joueur_cache}"
 
-            for user_TDB in users_TDB:                              ## Différences
-                id = user_TDB["discord_id"]
+            for joueur_TDB in joueurs_TDB:                              ## Différences
+                id = joueur_TDB["discord_id"]
 
                 if id not in ids_cache:             # Si joueur dans le cache pas dans le TDB
-                    raise ValueError(f"Joueur {user_TDB['nom']} hors BDD : vérifier processus d'inscription")
+                    raise ValueError(f"Joueur {joueur_TDB['nom']} hors BDD : vérifier processus d'inscription")
 
-                user_cache = [user for user in users_cache if user.discord_id == id][0]     # user correspondant dans le cache
+                joueur_cache = [joueur for joueur in joueurs_cache if joueur.discord_id == id][0]     # joueur correspondant dans le cache
 
                 for col in cols:
-                    if getattr(user_cache, col) != user_TDB[col]:   # Si <col> diffère entre TDB et cache
+                    if getattr(joueur_cache, col) != joueur_TDB[col]:   # Si <col> diffère entre TDB et cache
                         if verbose:
-                            r += f"\n---- Colonne différant : {col} (TDB : {user_TDB[col]}, Joueurs : {getattr(user_cache, col)})"
+                            r += f"\n---- Colonne différant : {col} (TDB : {joueur_TDB[col]}, Joueurs : {getattr(joueur_cache, col)})"
 
-                        bdd_tools.modif(user_cache, col, user_TDB[col])     # On modifie le cache (= BDD Joueurs)
-                        Modifs.append( (id, col, user_TDB[col]) )   # On ajoute les modifs
+                        bdd_tools.modif(joueur_cache, col, joueur_TDB[col])     # On modifie le cache (= BDD Joueurs)
+                        Modifs.append( (id, col, joueur_TDB[col]) )   # On ajoute les modifs
                         if id not in Modified_ids:
                             Modified_ids.append(id)
 

@@ -39,9 +39,12 @@ async def get_actions(quoi, trigger, heure=None):
 # Ouvre l'action <action> : vérification conditions, gestion tâches, information joueur dans <chan>.
 # <ctx> contexte où on log, i.e. contexte de !open, !sync...
 async def open_action(ctx, action, chan=None):
+    joueur = Joueurs.query.get(action.player_id)
+    assert joueur, f"!open_action : joueur de {action} introuvable"
+
     if not chan:        # chan non défini ==> chan perso du joueur
-        joueur = Joueurs.query.get(action.player_id)
         chan = ctx.guild.get_channel(joueur._chan_id)
+        assert chan, f"!open_action : chan privé de {joueur} introuvable"
 
     # Vérification cooldown
     if action.cooldown > 0:                 # Action en cooldown
@@ -54,7 +57,7 @@ async def open_action(ctx, action, chan=None):
         return
 
     # Vérification role_actif
-    if not Joueurs.query.get(action.player_id).role_actif:    # role_actif == False : on reprogramme la tâche au lendemain, tanpis
+    if not joueur.role_actif:    # role_actif == False : on reprogramme la tâche au lendemain, tanpis
         await ctx.send(f"role_actif == False, exit (reprogrammation si temporel).")
         if action.trigger_debut == "temporel":
             ts = tools.next_occurence(action.heure_debut)
@@ -106,9 +109,12 @@ async def open_action(ctx, action, chan=None):
 # Ferme l'action <action>, la supprime si nécessaire, gère les tâches et informe le joueur dans <chan>
 # <ctx> contexte où on log, i.e. contexte de !open, !sync...
 async def close_action(ctx, action, chan=None):
+    joueur = Joueurs.query.get(action.player_id)
+    assert joueur, f"!open_action : joueur de {action} introuvable"
+
     if not chan:        # chan non défini ==> chan perso du joueur
-        joueur = Joueurs.query.get(action.player_id)
         chan = ctx.guild.get_channel(joueur._chan_id)
+        assert chan, f"!open_action : chan privé de {joueur} introuvable"
 
     deleted = False
     if action._decision != "rien" and not action.instant:

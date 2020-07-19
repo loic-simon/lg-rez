@@ -9,6 +9,8 @@ def connect(key="1jsruJoeQ4LSbh8RlRGmiyDNGsoWZewqDKPd12M9jj20"):
     # use creds to create a client to interact with the Google Drive API
     load_dotenv()
     GSHEETS_CREDENTIALS = os.getenv("GSHEETS_CREDENTIALS")
+    assert GSHEETS_CREDENTIALS, "gsheets.connect : GSHEETS_CREDENTIALS introuvable"
+    
     scope = ['https://spreadsheets.google.com/feeds']
     creds = ServiceAccountCredentials.from_json_keyfile_dict(json.loads(GSHEETS_CREDENTIALS), scope)
     client = gspread.authorize(creds)

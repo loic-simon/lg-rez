@@ -53,22 +53,19 @@ class Annexe(commands.Cog):
         await ctx.send(random.choice(["Pile", "Face"]))
 
 
-    @commands.command()
+    @commands.command(aliases=["pong"])
     async def ping(self, ctx):
         """Envoie un ping au bot
 
         Pong
         """
         delta = datetime.datetime.utcnow() - ctx.message.created_at
-        await ctx.send(f"!pong ({delta.total_seconds():.2}s)")
-
-
-    current_embed = None
-    current_helper_embed = None
+        pingpong = "ping" if ctx.invoked_with == "pong" else "pong"
+        await ctx.send(f"!{pingpong} ({delta.total_seconds():.2}s)")
 
 
     @commands.command(aliases=["tell"])
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def send(self, ctx, cible, *, message):
         """Envoie un message à tous ou certains joueurs (COMMANDE MJ)
 
@@ -121,6 +118,10 @@ class Annexe(commands.Cog):
         for joueur in joueurs:
             member = ctx.guild.get_member(joueur.discord_id)
             chan = ctx.guild.get_channel(joueur._chan_id)
+
+            assert member, f"!send : Member associé à {joueur} introuvable"
+            assert chan, f"!sed : Chan privé de {joueur} introuvable"
+
             evaluated_message = tools.eval_accols(message, locals=locals())
             await chan.send(evaluated_message)
 
@@ -131,7 +132,7 @@ class Annexe(commands.Cog):
     current_helper_embed = None
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def embed(self, ctx, key=None, *, val=None):
         """Prépare un embed (message riche) et l'envoie (COMMANDE MJ)
 
@@ -267,7 +268,7 @@ class Annexe(commands.Cog):
         elif key == "post":
             if not val:     # channel non précisé
                 await ctx.send(embed=emb)
-            elif chan := tools.channel(ctx, val):
+            elif chan := tools.channel(ctx, val, must_be_found=False):
                 await chan.send(embed=emb)
                 await ctx.send("Et pouf !")
             else:
@@ -297,83 +298,3 @@ class Annexe(commands.Cog):
                        f"Autres options : {tools.code('!embed color <#xxxxxx> / url <url> / image <url> / thumb <url> / author_url <url> / footer_icon <url>')}")
 
         self.current_embed = emb
-
-
-    @commands.command(enabled=False)
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
-    async def test(self, ctx, *, arg):
-        """Test : test !"""
-
-        # arg = tools.command_arg(ctx)    # Arguments de la commande (sans le !test) --> en fait c'est faisable nativement, zrtYes
-        auteur = ctx.author.display_name
-        salon = ctx.channel.name if hasattr(ctx.channel, "name") else f"DMChannel de {ctx.channel.recipient.name}"
-        serveur = ctx.guild.name if hasattr(ctx.guild, "name") else "(DM)"
-        # pref = ctx.prefix
-        # com = ctx.command
-        # ivkw = ctx.invoked_with
-
-        await tools.log(ctx, "Alors, ça log ?")
-
-        await ctx.send(tools.code_bloc(
-            f"arg = {arg}\n"
-            f"auteur = {auteur}\n"
-            f"salon = {salon}\n"
-            f"serveur = {serveur}"
-        ))
-
-
-    @commands.command(enabled=False)
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
-    async def testreact(self, ctx, *reacts):
-        message = await ctx.send(tools.code_bloc(f"REACT TO THAT!\nReacts: {' - '.join(reacts)}"))
-        react = await tools.wait_for_react_clic(ctx.bot, message, ["🔴", "🟠", "🟢"])
-        await ctx.send(tools.code_bloc(f"REACTED : {react}"))
-
-
-    @commands.command(enabled=False)
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
-    async def testbdd(self, ctx):
-        """Test BDD"""
-
-        tous = Joueurs.query.all()
-        ret = '\n - '.join([u.nom for u in tous])
-        message = await ctx.send(tools.code_bloc(f"Liste des joueurs :\n - {ret}"))
-
-
-    @commands.command(enabled=False)
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
-    async def rename(self, ctx, id: int, nom: str):
-        """Renommer quelqu'un à partir de son ID"""
-
-        try:
-            u = Joueurs.query.filter_by(discord_id=id).one()
-        except:
-            await ctx.send(tools.code_bloc(f"Cible {id} non trouvée\n{traceback.format_exc()}"))
-        else:
-            oldnom = u.nom
-            u.nom = nom
-            db.session.commit()
-            await ctx.send(tools.code_bloc(f"Joueur {oldnom} renommé en {nom}."))
-
-
-    @commands.command(enabled=False)
-    @tools.private
-    async def private_test(self, ctx, *, arg):
-        """Test PRIVÉ"""
-
-        # arg = tools.command_arg(ctx)    # Arguments de la commande (sans le !test) --> en fait c'est faisable nativement, zrtYes
-        auteur = ctx.author.display_name
-        salon = ctx.channel.name if hasattr(ctx.channel, "name") else f"DMChannel de {ctx.channel.recipient.name}"
-        serveur = ctx.guild.name if hasattr(ctx.guild, "name") else "(DM)"
-        # pref = ctx.prefix
-        # com = ctx.command
-        # ivkw = ctx.invoked_with
-
-        await tools.log(ctx, "Alors, ça log ?")
-
-        await ctx.send(tools.code_bloc(
-            f"arg = {arg}\n"
-            f"auteur = {auteur}\n"
-            f"salon = {salon}\n"
-            f"serveur = {serveur}"
-        ))

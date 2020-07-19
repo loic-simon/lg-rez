@@ -97,12 +97,12 @@ async def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_
     for entry in query:
         slug2 = remove_accents(getattr(entry, carac)).lower()
 
-        SM.set_seq2(slug2)                              # Pour chaque joueur, on compare la cible à son nom (en non accentué)
+        SM.set_seq2(slug2)                              # Pour chaque élément, on compare la cible à son nom (en non accentué)
         score = SM.ratio()                              # On calcule la ressemblance
-        if score == 1 and solo_si_parfait:              # Cas particulier : joueur demandé correspondant exactement à un en BDD
+        if score == 1 and solo_si_parfait:              # Cas particulier : élément demandé correspondant exactement à un en BDD
             return [(entry, score)]
         scores.append((entry, score))
 
-    # Si pas de joueur correspondant parfaitement
+    # Si pas d'élément correspondant parfaitement
     bests = [(entry, score) for (entry, score) in sorted(scores, key=lambda x: x[1], reverse=True) if score >= sensi]  # Meilleurs noms, dans l'ordre
     return bests

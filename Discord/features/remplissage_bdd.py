@@ -1,12 +1,15 @@
 import os
 import traceback
+import time
 
 from dotenv import load_dotenv
+from discord import Embed
 from discord.ext import commands
 
 import tools
 from blocs import gsheets, bdd_tools
-from bdd_connect import db, Tables
+from bdd_connect import db, Tables, Roles
+from features import informations
 
 
 class RemplissageBDD(commands.Cog):
@@ -14,7 +17,7 @@ class RemplissageBDD(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def droptable(self, ctx, table):
         """Supprime sans ménagement une table de données (COMMANDE MJ)
 
@@ -40,17 +43,19 @@ class RemplissageBDD(commands.Cog):
 
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def fillroles(self, ctx):
-        """Remplit les table des rôles / actions depuis le GSheet ad hoc (COMMANDE MJ)
+        """Remplit les tables des rôles / actions et #roles depuis le GSheet ad hoc (COMMANDE MJ)
 
-        Remplit les tables Roles, BaseActions et BaseActionsRoles avec les informations du Google Sheets "Rôles et actions" (https://docs.google.com/spreadsheets/d/1Mfs22B_HtqSejaN0lX_Q555JW4KTYW5Pj-D-1ywoEIg)
+        - Remplit les tables Roles, BaseActions et BaseActionsRoles avec les informations du Google Sheets "Rôles et actions" (https://docs.google.com/spreadsheets/d/1Mfs22B_HtqSejaN0lX_Q555JW4KTYW5Pj-D-1ywoEIg) ;
+        - Vide le chan #roles puis le remplit avec les descriptifs de chaque rôle.
 
         Utile à chaque début de saison / changement dans les rôles/actions. Écrase toutes les entrées déjà en base, mais ne supprime pas celles obsolètes.
         """
 
         load_dotenv()
         SHEET_ID = os.getenv("ROLES_SHEET_ID")
+        assert SHEET_ID, "!fillroles : ROLES_SHEET_ID introuvable"
         workbook = gsheets.connect(SHEET_ID)    # Tableau de bord
 
         for table_name in ["Roles", "BaseActions", "BaseActionsRoles"]:
@@ -84,3 +89,24 @@ class RemplissageBDD(commands.Cog):
 
             await ctx.send(f"Table {tools.code(table_name)} remplie !")
             await tools.log(ctx, f"Table {tools.code(table_name)} remplie !")
+
+        chan_roles = tools.channel(ctx, "rôles")
+
+        await ctx.send(f"Vidage de {chan_roles.mention}...")
+        async with ctx.typing():
+            await chan_roles.purge(limit=1000)
+
+        roles = {camp: Roles.query.filter_by(camp=camp).all() for camp in ["village", "loups", "nécro", "solitaire", "autre"]}
+        await ctx.send(f"Remplissage... (temps estimé : {sum([len(v) + 2 for v in roles.values()]) + 1} secondes)")
+
+        t0 = time.time()
+        await chan_roles.send(f"Voici la liste des rôles : (accessible en faisant {tools.code('!roles')}, mais on l'a mis là parce que pourquoi pas)\n\n——————————————————————————")
+        async with ctx.typing():
+            for camp, roles_camp in roles.items():
+                if roles_camp:
+                    await chan_roles.send(embed=Embed(title=f"Camp : {camp}").set_image(url=informations.emoji_camp(ctx, camp).url))
+                    await chan_roles.send(f"——————————————————————————")
+                    for role in roles_camp:
+                        await chan_roles.send(f"{informations.emoji_camp(ctx, role.camp)} {role.prefixe}{role.nom} – {role.description_courte} (camp : {role.camp})\n\n{role.description_longue}\n\n——————————————————————————")
+
+        await ctx.send(f"{chan_roles.mention} rempli ! (en {(time.time() - t0):.4} secondes)")

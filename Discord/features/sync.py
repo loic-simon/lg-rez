@@ -9,12 +9,12 @@ from features import gestion_actions
 
 
 class Sync(commands.Cog):
-    """Sync - synchronisation du GSheets vers les tables SQL et les joueurs"""
+    """Sync - Commandes de synchronisation des GSheets vers la BDD et les joueurs"""
 
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
+    @tools.mjs_only
     async def sync(self, ctx, silent, *, serial):
-        """Applique les modifications lors d'un appel du tableau de bord (COMMANDE BOT)
+        """Applique les modifications lors d'un appel du Tableau de bord (COMMANDE BOT)
 
         <silent> prend les valeurs "False" (les joueurs sont notifiés si leur statut est modifié) ou "True" (les joueurs ne sont pas notifiés)
         <serial> est un dictionnaire de dictionnaires contenant les données à modifier, sérialisé en JSON sous la forme {"discord_id": {"attribut_modifié":"valeur_attribut"}}
@@ -31,9 +31,15 @@ class Sync(commands.Cog):
 
             for joueur_id in dic:               # Joueurs dont au moins un attribut a été modifié
                 joueur = Joueurs.query.get(int(joueur_id))
-                joueur_Discord = ctx.guild.get_member(joueur.discord_id)
+                assert joueur, f"!sync : joueur d'ID {joueur_id} introuvable"
+
+                member = ctx.guild.get_member(joueur.discord_id)
+                assert member, f"!sync : member {joueur} introuvable"
+
                 chan = ctx.guild.get_channel(joueur._chan_id)
-                changelog += f"\n- {joueur_Discord.display_name} (@{joueur_Discord.name}#{joueur_Discord.discriminator}) :\n"
+                assert chan, f"!sync : chan privé de {member} introuvable"
+
+                changelog += f"\n- {member.display_name} (@{member.name}#{member.discriminator}) :\n"
                 notif = ""
 
                 for col, val in dic[joueur_id].items():
@@ -41,7 +47,7 @@ class Sync(commands.Cog):
 
                     if col == "nom":                            # Renommage joueur
                         await chan.edit(name=f"conv-bot-{val}")
-                        await joueur_Discord.edit(nick=val)
+                        await member.edit(nick=val)
                         if not silent:
                             notif += f":arrow_forward: Tu t'appelles maintenant {tools.bold(val)}.\n"
 
@@ -50,14 +56,14 @@ class Sync(commands.Cog):
 
                     elif col == "statut":
                         if val == "vivant":                     # Statut = vivant
-                            await joueur_Discord.add_roles(tools.role(ctx, "Joueur en vie"))
-                            await joueur_Discord.remove_roles(tools.role(ctx, "Joueur mort"))
+                            await member.add_roles(tools.role(ctx, "Joueur en vie"))
+                            await member.remove_roles(tools.role(ctx, "Joueur mort"))
                             if not silent:
                                 notif += f":arrow_forward: Tu es maintenant en vie. EN VIE !!!\n"
 
                         elif val == "mort":                     # Statut = mort
-                            await joueur_Discord.add_roles(tools.role(ctx, "Joueur mort"))
-                            await joueur_Discord.remove_roles(tools.role(ctx, "Joueur en vie"))
+                            await member.add_roles(tools.role(ctx, "Joueur mort"))
+                            await member.remove_roles(tools.role(ctx, "Joueur en vie"))
                             if not silent:
                                 notif += f":arrow_forward: Tu es malheureusement décédé(e) :cry:\nÇa arrive même aux meilleurs, en espérant que ta mort ait été belle !\n"
                             # Actions à la mort
@@ -65,8 +71,8 @@ class Sync(commands.Cog):
                                 await gestion_actions.open_action(ctx, action, chan)
 
                         elif val == "MV":                       # Statut = MV
-                            await joueur_Discord.add_roles(tools.role(ctx, "Joueur en vie"))
-                            await joueur_Discord.remove_roles(tools.role(ctx, "Joueur mort"))
+                            await member.add_roles(tools.role(ctx, "Joueur en vie"))
+                            await member.remove_roles(tools.role(ctx, "Joueur mort"))
                             if not silent:
                                 notif += f":arrow_forward: Te voilà maintenant réduit(e) au statut de mort-vivant... Un MJ viendra te voir très vite, si ce n'est déjà fait, mais retient que la partie n'est pas finie pour toi !\n"
 

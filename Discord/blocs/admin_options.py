@@ -114,8 +114,8 @@ def additem(d, p):
 
     args = {col: bdd_tools.transtype(p[col] if col in p else False, col, SQL_type[col], SQL_nullable[col]) for col in cols}
 
-    user = table(**args)
-    db.session.add(user)
+    item = table(**args)
+    db.session.add(item)
     db.session.commit()
 
     r += "Ajout réussi.\n\n"
@@ -130,8 +130,8 @@ def delitem(d, p):
     r += f"Table : {table.__name__}, ID : {id}<br/><br/>"
 
     try:
-        user = table.query.filter_by(**id).one()
-        db.session.delete(user)
+        item = table.query.filter_by(**id).one()
+        db.session.delete(item)
         db.session.commit()
         r += "Suppression effectuée.<br/><br/>"
     except NoResultFound:
@@ -156,11 +156,11 @@ def editem(d, p):
     args = {col: bdd_tools.transtype(p[col] if col in p else False, col, SQL_type[col], SQL_nullable[col]) for col in cols}
 
     try:
-        user = table.query.filter_by(**id).one()
+        item = table.query.filter_by(**id).one()
         for col in cols:
-            if (old := getattr(user, col)) != (new := args[col]):
+            if (old := getattr(item, col)) != (new := args[col]):
                 r += f"<li>{col} : {old} &rarr; {new}</li>"
-                bdd_tools.modif(user, col, new)
+                bdd_tools.modif(item, col, new)
         r += "</ul>"
         db.session.commit()
         r += "Modification effectuée.<br/><br/>"

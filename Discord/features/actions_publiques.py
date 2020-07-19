@@ -8,11 +8,13 @@ from features import gestion_actions, taches
 from blocs import bdd_tools
 import tools
 
+
 class ActionsPubliques(commands.Cog):
-    """ActionsPubliques - Gestion des actions publiques comme haros, candidatures à la mairie, etc..."""
+    """ActionsPubliques - Commandes pour gérer les actions vous engageant publiquement"""
 
 
     @commands.command()
+    @tools.vivants_only
     @tools.private
     async def haro(self, ctx, target=None):
         """Lance un haro contre [target]"""
@@ -20,7 +22,7 @@ class ActionsPubliques(commands.Cog):
         cible = await tools.boucle_query_joueur(ctx, target, 'Contre qui souhaite-tu déverser ta haine ?')
 
         if cible.statut == "mort":
-            await ctx.send("Nan mais oh, tu crois qu'il a pas assez souffert en mourrant lui ?")
+            await ctx.send("Nan mais oh, tu crois qu'il a pas assez souffert en mourant lui ?")
             return
 
         elif cible.statut == "immortel":
@@ -30,12 +32,12 @@ class ActionsPubliques(commands.Cog):
         await tools.send_blocs(ctx, "Et quel est la raison de cette haine, d'ailleurs ?")
         motif = await ctx.bot.wait_for('message', check = lambda m: m.channel == ctx.channel and m.author != ctx.bot.user)
 
-        if not CandidHaro.query.filter_by(player_id = cible.discord_id, type = "haro").all():
-            haroted = CandidHaro(id = None, player_id = cible.discord_id, type = "haro")
+        if not CandidHaro.query.filter_by(player_id=cible.discord_id, type="haro").all():
+            haroted = CandidHaro(player_id=cible.discord_id, type="haro")
             db.session.add(haroted)
 
-        if not CandidHaro.query.filter_by(player_id = ctx.author.id, type = "haro").all():
-            haroteur = CandidHaro(id=None, player_id = ctx.author.id, type="haro")
+        if not CandidHaro.query.filter_by(player_id=ctx.author.id, type="haro").all():
+            haroteur = CandidHaro(player_id=ctx.author.id, type="haro")
             db.session.add(haroteur)
 
         db.session.commit()
@@ -45,11 +47,14 @@ class ActionsPubliques(commands.Cog):
         m = await ctx.send("C'est tout bon ?", embed=emb)
 
         if await tools.yes_no(ctx.bot, m):
-            await tools.channel(ctx, "haros").send(f"{ctx.guild.get_member(cible.discord_id).mention}", embed=emb)
-            await ctx.send("Allez c'est parti !")
+            cible_member = ctx.guild.get_member(cible.discord_id)
+            assert cible_member, f"!haro : Member associé à {cible} non trouvé"
+            await tools.channel(ctx, "haros").send(f"{cible_member.mention}", embed=emb)
+            await ctx.send(f"Allez c'est parti ! ({tools.channel(ctx, 'haros').mention})")
 
 
     @commands.command()
+    @tools.vivants_only
     @tools.private
     async def candid(self, ctx, target=None):
         """Permet de se présenter à une élection"""
@@ -74,36 +79,10 @@ class ActionsPubliques(commands.Cog):
             await tools.channel(ctx, "haros").send("Here comes a new challenger !", embed=emb)
             await ctx.send("Allez c'est parti !")
 
-    @commands.command(enabled=False)
-    @tools.private
-    async def listharo(self, ctx):
-        """Liste les gens qui ont subi un haro aujourd'hui"""
-        mess = "Les gens que tu pourras (peut être) voir sur le bûcher aujourd'hui sont:\n"
-        haroted = CandidHaro.query.filter_by(type="haro").all()
-        if not haroted:
-            await ctx.send("Le village est encore calme, personne n'a encore accusé personne...")
-        else:
-            for joueur in haroted:
-                mess += f"- {Joueurs.query.filter_by(discord_id = joueur.player_id).first().nom} \n"
-        await tools.send_code_blocs(ctx, mess)
-
-    @commands.command(enabled=False)
-    @tools.private
-    async def listcandid(self, ctx):
-        """Liste les candidats à la mairie aujourd'hui"""
-        mess = "Les candidats à la mairie pour aujourd'hui sont les suivants :\n"
-        candids = CandidHaro.query.filter_by(type="candidature").all()
-        if not candids:
-            await ctx.send("Pas de chance, personne ne s'est présenté...")
-            return
-        else:
-            for joueur in candids:
-                mess += f"- {Joueurs.query.filter_by(discord_id = joueur.player_id).first().nom} \n"
-        await tools.send_code_blocs(ctx, mess)
 
     ##Fonctions de gestion de la base CandidHaro (wipe les haros ou les votes)
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def wipe_haro(self, ctx):
         """Efface les HAROs du jour (COMMANDE MJ)"""
 
@@ -116,8 +95,9 @@ class ActionsPubliques(commands.Cog):
             db.session.commit()
             await tools.log(ctx, "Tous les haros ont bien été effacés !")
 
+
     @commands.command()
-    @commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_role("MJ"))
+    @tools.mjs_only
     async def wipe_candid(self, ctx):
         """Efface les candidatures à la mairie du jour (COMMANDE MJ)"""
 
@@ -129,3 +109,30 @@ class ActionsPubliques(commands.Cog):
                 db.session.delete(candid)
             db.session.commit()
             await tools.log(ctx, "Toutes les candidatures ont bien été effacés !")
+
+
+
+    @commands.command(enabled=False)
+    async def listharo(self, ctx):
+        """Liste les gens qui ont subi un haro aujourd'hui"""
+        mess = "Les gens que tu pourras (peut être) voir sur le bûcher aujourd'hui sont:\n"
+        haroted = CandidHaro.query.filter_by(type="haro").all()
+        if not haroted:
+            await ctx.send("Le village est encore calme, personne n'a encore accusé personne...")
+        else:
+            for joueur in haroted:
+                mess += f"- {Joueurs.query.filter_by(discord_id = joueur.player_id).first().nom} \n"
+        await tools.send_code_blocs(ctx, mess)
+
+    @commands.command(enabled=False)
+    async def listcandid(self, ctx):
+        """Liste les candidats à la mairie aujourd'hui"""
+        mess = "Les candidats à la mairie pour aujourd'hui sont les suivants :\n"
+        candids = CandidHaro.query.filter_by(type="candidature").all()
+        if not candids:
+            await ctx.send("Pas de chance, personne ne s'est présenté...")
+            return
+        else:
+            for joueur in candids:
+                mess += f"- {Joueurs.query.filter_by(discord_id = joueur.player_id).first().nom} \n"
+        await tools.send_code_blocs(ctx, mess)

@@ -15,12 +15,17 @@ VOTECOND_SHEET_ID = os.getenv("VOTECOND_SHEET_ID")
 VOTEMAIRE_SHEET_ID = os.getenv("VOTEMAIRE_SHEET_ID")
 VOTELOUPS_SHEET_ID = os.getenv("VOTELOUPS_SHEET_ID")
 ACTIONS_SHEET_ID = os.getenv("ACTIONS_SHEET_ID")
+assert VOTECOND_SHEET_ID, "voter_agir.py : VOTECOND_SHEET_ID introuvable"
+assert VOTEMAIRE_SHEET_ID, "voter_agir.py : VOTEMAIRE_SHEET_ID introuvable"
+assert VOTELOUPS_SHEET_ID, "voter_agir.py : VOTELOUPS_SHEET_ID introuvable"
+assert ACTIONS_SHEET_ID, "voter_agir.py : ACTIONS_SHEET_ID introuvable"
 
 
 class VoterAgir(commands.Cog):
     """VoterAgir - Commandes de vote et d'action de rôle"""
 
     @commands.command()
+    @tools.vivants_only
     @tools.private
     async def vote(self, ctx, *, cible=None):
         """Vote pour le condamné du jour
@@ -32,6 +37,7 @@ class VoterAgir(commands.Cog):
         La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
         """
         joueur = Joueurs.query.get(ctx.author.id)
+        assert joueur, f"!vote : joueur {ctx.author} introuvable"
 
         # Vérification vote en cours
         if not joueur.votant_village:
@@ -58,10 +64,12 @@ class VoterAgir(commands.Cog):
             sheet = gsheets.connect(VOTECOND_SHEET_ID).sheet1
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur._vote_condamne], value_input_option="USER_ENTERED")
 
-        await ctx.send(f"Votre contre {tools.code(cible.nom)} bien pris en compte.")
+        await ctx.send(f"Votre contre {tools.code(cible.nom)} bien pris en compte.\n"
+                       + tools.ital("Tu peux modifier ton vote autant que nécessaire avant sa fermeture."))
 
 
     @commands.command()
+    @tools.vivants_only
     @tools.private
     async def votemaire(self, ctx, *, cible=None):
         """Vote pour le nouveau maire
@@ -73,6 +81,7 @@ class VoterAgir(commands.Cog):
         La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
         """
         joueur = Joueurs.query.get(ctx.author.id)
+        assert joueur, f"!vote : joueur {ctx.author} introuvable"
 
         # Vérification vote en cours
         if not joueur.votant_village:
@@ -99,10 +108,12 @@ class VoterAgir(commands.Cog):
             sheet = gsheets.connect(VOTEMAIRE_SHEET_ID).sheet1
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur._vote_maire], value_input_option="USER_ENTERED")
 
-        await ctx.send(f"Votre pour {tools.code(cible.nom)} bien pris en compte.")
+        await ctx.send(f"Votre pour {tools.code(cible.nom)} bien pris en compte.\n"
+                       + tools.ital("Tu peux modifier ton vote autant que nécessaire avant sa fermeture."))
 
 
     @commands.command()
+    @tools.vivants_only
     @tools.private
     async def voteloups(self, ctx, *, cible=None):
         """Vote pour la victime de l'attaque des loups
@@ -113,8 +124,8 @@ class VoterAgir(commands.Cog):
         Le bot t'enverra un message à l'ouverture de chaque vote.
         La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
         """
-
         joueur = Joueurs.query.get(ctx.author.id)
+        assert joueur, f"!vote : joueur {ctx.author} introuvable"
 
         # Vérification vote en cours
         if not joueur.votant_loups:
@@ -145,6 +156,7 @@ class VoterAgir(commands.Cog):
 
 
     @commands.command()
+    @tools.vivants_only
     @tools.private
     async def action(self, ctx, *, decision=None):
         """Utilise l'action de ton rôle / une des actions associées
@@ -157,8 +169,8 @@ class VoterAgir(commands.Cog):
 
         La commande peut être utilisée autant que voulu pour changer d'action tant que la fenêtre d'action est en cours, SAUF pour certaines actions (dites "instantanées") ayant une conséquence immédiate (Barbier, Licorne...). Le bot mettra dans ce cas un message d'avertissement.
         """
-
         joueur = Joueurs.query.get(ctx.author.id)
+        assert joueur, f"!vote : joueur {ctx.author} introuvable"
 
         # Détermine la/les actions en cours pour le joueur
         def trigCheck(m):
@@ -208,8 +220,6 @@ class VoterAgir(commands.Cog):
                               "\n+\n".join([f"{action.action} : {action._decision}" for action in actions])],
                              value_input_option="USER_ENTERED")
 
-        await ctx.send(f"Action « {tools.code(action._decision)} » bien prise en compte pour {tools.code(action.action)}.")
-
         # Conséquences si action instantanée
         if action.instant:
             async with ctx.typing():
@@ -224,6 +234,10 @@ class VoterAgir(commands.Cog):
                 if not deleted:
                     bdd_tools.modif(action, "_decision", None)
 
-            await ctx.send(f"[Allo {tools.role(ctx, 'MJ').mention}, conséquance instantanée ici !]")
+            await ctx.send(tools.ital(f"[Allo {tools.role(ctx, 'MJ').mention}, conséquance instantanée ici !]"))
+
+        else:
+            await ctx.send(f"Action « {tools.code(action._decision)} » bien prise en compte pour {tools.code(action.action)}.\n"
+                           + tools.ital("Tu peux modifier ta décision autant que nécessaire avant la fin du créneau."))
 
         db.session.commit()

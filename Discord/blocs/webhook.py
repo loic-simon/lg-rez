@@ -6,6 +6,8 @@ from discord_webhook import DiscordWebhook
 load_dotenv()
 WEBHOOK_TP_URL = os.getenv("WEBHOOK_TP_URL")
 WEBHOOK_SYNC_URL = os.getenv("WEBHOOK_SYNC_URL")
+assert WEBHOOK_TP_URL, "webhook.py : WEBHOOK_TP_URL introuvable"
+assert WEBHOOK_SYNC_URL, "webhook.py : WEBHOOK_SYNC_URL introuvable"
 
 def send(message: str, source="tp"):
     """send(message: str, source: str) -> response

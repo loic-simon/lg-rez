@@ -15,15 +15,15 @@ def emoji_camp(arg, camp):
          "solitaire": "pion",
          "autre": "pion"}
     if camp in d:
-        return str(tools.emoji(arg, d[camp]))
+        return tools.emoji(arg, d[camp])
     else:
         return ""
 
 
 class Informations(commands.Cog):
-    """Informations - Commandes disponibles pour s'informer sur les rôles"""
+    """Informations - Commandes disponibles pour en savoir plus sur soi et les autres"""
 
-    @commands.command(aliases=["role"])
+    @commands.command(aliases=["role", "rôles", "rôle"])
     async def roles(self, ctx, *, filtre=None):
         """Affiche la liste des rôles / des informations sur un rôle
 
@@ -55,17 +55,18 @@ class Informations(commands.Cog):
                 else:
                     await ctx.send(f"Rôle / camp \"{filtre}\" non trouvé.")
                     return
-            await ctx.send(tools.code_bloc(f"{role.prefixe}{role.nom} – {role.description_courte}\n\n{role.description_longue}"))
+            await ctx.send(tools.code_bloc(f"{role.prefixe}{role.nom} – {role.description_courte} (camp : {role.camp})\n\n{role.description_longue}"))
             return
 
         await tools.send_blocs(ctx,
             f"Rôles trouvés :\n"
-            + "\n".join([emoji_camp(ctx, role.camp) + tools.code(f"{role.nom.ljust(25)} {role.description_courte}") for role in roles if not role.nom.startswith("(")])
+            + "\n".join([str(emoji_camp(ctx, role.camp)) + tools.code(f"{role.nom.ljust(25)} {role.description_courte}") for role in roles if not role.nom.startswith("(")])
             + "\n" + tools.ital(f"({tools.code('!roles <role>')} pour plus d'informations sur un rôle.)")
         )
 
 
     @commands.command()
+    @tools.vivants_only
     @tools.private
     async def menu(self, ctx):
         """Affiche des informations et boutons sur les votes / actions en cours
@@ -74,6 +75,8 @@ class Informations(commands.Cog):
         """
         member = ctx.author
         joueur = Joueurs.query.get(member.id)
+        assert joueur, f"!menu : joueur {member} introuvable"
+
         reacts = []
         r = "––– MENU –––\n\n"
 
@@ -104,6 +107,7 @@ class Informations(commands.Cog):
 
 
     @commands.command()
+    @tools.vivants_only
     @tools.private
     async def infos(self, ctx):
         """Affiche tes informations de rôle / actions
@@ -112,6 +116,7 @@ class Informations(commands.Cog):
         """
         member = ctx.author
         joueur = Joueurs.query.get(member.id)
+        assert joueur, f"!menu : joueur {member} introuvable"
         r = ""
 
         r += f"Ton rôle actuel : {tools.bold(tools.nom_role(joueur.role) or joueur.role)}\n"
@@ -130,6 +135,7 @@ class Informations(commands.Cog):
             r += "\n\nAucune action disponible."
 
         await ctx.send(r + f"\n{tools.code('!menu')} pour voir les votes et actions en cours, {tools.code('@MJ')} en cas de problème")
+
 
     @commands.command()
     async def vivants(self, ctx):
@@ -154,42 +160,3 @@ class Informations(commands.Cog):
             for joueur in joueurs:
                 mess += f" - {joueur} \n"
         await tools.send_code_blocs(ctx, mess)
-
-    @commands.command(enabled=False)
-    @tools.private
-    async def monrole(self, ctx, details="court") :
-        """Affiche les informations du rôle du joueur
-
-        L'option details permet d'avoir plus ou moins d'infos, elle est facultative
-        Valeurs possibles pour details : None, court, long, role
-        """
-        nom_user = ctx.author.display_name
-        try:
-            u = Joueurs.query.filter_by(nom = nom_user).one()
-        except:
-            await ctx.send(tools.code_bloc(f"Le joueur {nom_user} n'a pas été trouvé\n{traceback.format_exc()}"))
-        else:
-            user_role = u.role
-            if details == "role" :
-                await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role}"))
-            else:
-                try:
-                    r = Roles.query.filter_by(role = user_role).one()
-                except:
-                    await ctx.send(tools.code_bloc(f"Votre rôle : {user_role} n'existe pas\n{traceback.format_exc()}"))
-                else:
-                    user_begin_time = r.horaire_debut
-                    user_end_time = r.horaire_fin
-                    user_side = r.camp
-                    user_descript = r.description_longue
-                    user_short = r.description_courte
-                    if details == "long" and user_begin_time != None:
-                        await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action est entre : {user_begin_time} et {user_end_time}\nTon role consiste en :\n {user_descript}"))
-                    elif details == "court" and user_begin_time != None:
-                        await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action est entre : {user_begin_time} et {user_end_time}\nTon role consiste en :\n {user_short}"))
-                    elif details == "long" and user_begin_time == None:
-                        await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action n'a pas d'heure\nTon role consiste en :\n {user_descript}"))
-                    elif details == "court" and user_begin_time == None:
-                        await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role} dans le camp {user_side}\nTon action n'a pas d'heure\nTon role consiste en :\n {user_short}"))
-                    else:
-                        await ctx.send(tools.code_bloc(f"Bonjour {nom_user} !\n Ton rôle : {user_role}\nEt utilise les bons arguments (voir !help MonRole pour plus de détails)"))
