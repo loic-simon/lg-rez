@@ -9,6 +9,10 @@ import tools
 from blocs import bdd_tools
 
 def emoji_camp(arg, camp):
+    """Renvoie l'emoji associé à <camp>
+
+    <arg> peut être de type Context, Guild, User/Member, Channel
+    """
     d = {"village": "village",
          "loups": "lune",
          "nécro": "necro",

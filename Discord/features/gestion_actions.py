@@ -9,9 +9,17 @@ from blocs import bdd_tools
 from features import taches
 
 
-# Renvoie la liste des actions déclenchées par trigger, dans le cas ou c'est temporel, les actions possibles à heure (objet de type time)
 async def get_actions(quoi, trigger, heure=None):
+    """Renvoie la liste des actions répondant à un déclencheur donné
 
+    <quoi>      Type d'opération en cours :
+        "open"      Ouverture : Actions._decision doit être None
+        "close"     Fermeture : Actions._decision ne doit pas être None
+        "remind"    Rappel : Actions._decision doit être "rien"
+
+    <trigger>   valeur de Actions.trigger_debut/fin à détecter
+    [heure]     Si <trigger> = "temporel", ajoute la condition Actions.heure_debut/fin == <heure> (objet datetime.time)
+    """
     if trigger == "temporel":
         if not heure:
             raise ValueError("Merci de préciser une heure......\n https://tenor.com/view/mr-bean-checking-time-waiting-gif-11570520")
@@ -36,9 +44,16 @@ async def get_actions(quoi, trigger, heure=None):
     return Actions.query.filter(criteres).all()
 
 
-# Ouvre l'action <action> : vérification conditions, gestion tâches, information joueur dans <chan>.
-# <ctx> contexte où on log, i.e. contexte de !open, !sync...
 async def open_action(ctx, action, chan=None):
+    """Ouvre l'action <action>
+
+    Opérations réalisées :
+        - Vérification des conditions (cooldown, charges...) et reprogrammation si nécessaire ;
+        - Gestion des tâches planifiées (planifie remind/close si applicable) ;
+        - Information joueur dans <chan>.
+
+    <ctx> contexte où on log, i.e. contexte de !open, !sync...
+    """
     joueur = Joueurs.query.get(action.player_id)
     assert joueur, f"!open_action : joueur de {action} introuvable"
 
@@ -106,9 +121,16 @@ async def open_action(ctx, action, chan=None):
     db.session.commit()
 
 
-# Ferme l'action <action>, la supprime si nécessaire, gère les tâches et informe le joueur dans <chan>
-# <ctx> contexte où on log, i.e. contexte de !open, !sync...
 async def close_action(ctx, action, chan=None):
+    """Ferme l'action <action>
+
+    Opérations réalisées :
+        - Suppression si nécessaire ;
+        - Gestion des tâches planifiées (planifie prochaine ouverture si applicable) ;
+        - Information joueur dans <chan>.
+
+    <ctx> contexte où on log, i.e. contexte de !open, !sync...
+        """
     joueur = Joueurs.query.get(action.player_id)
     assert joueur, f"!open_action : joueur de {action} introuvable"
 
@@ -148,14 +170,18 @@ async def close_action(ctx, action, chan=None):
 
 
 def add_action(ctx, action):
+    """Ajoute et programme l'ouverture d'<action>"""
     db.session.add(action)
     db.session.commit()
     # Ajout tâche ouverture
-    if action.trigger_debut == "temporel":
+    if action.trigger_debut == "temporel":          # Temporel : on programme
         taches.add_task(ctx.bot, tools.next_occurence(action.heure_debut), f"!open {action.id}", action=action.id)
+    if action.trigger_debut == "perma":             # Perma : ON LANCE DIRECT
+        taches.add_task(ctx.bot, datetime.datetime.now(), f"!open {action.id}", action=action.id)
 
 
 def delete_action(ctx, action):
+    """Ajoute et programme l'ouverture d'<action>"""
     db.session.delete(action)
     db.session.commit()
     # Suppression tâches liées à l'action

@@ -16,8 +16,8 @@ MARKS = [MARK_OR, MARK_THEN, MARK_REACT, MARK_CMD]
 
 
 
-# Construction d'une séquence-réaction par l'utilisateur
 async def build_sequence(ctx):
+    """Construction d'une séquence-réaction par l'utilisateur"""
     reponse = ""
     fini = False
     while not fini:
@@ -239,8 +239,8 @@ class GestionIA(commands.Cog):
 
 
 
-# Réaction si un nom de rôle est donné
 async def trigger_roles(message):
+    """Réaction si un nom de rôle est donné"""
     roles = await bdd_tools.find_nearest(message.content, Roles, carac="nom", sensi=0.7)
 
     if roles:       # Au moins un trigger trouvé à cette sensi
@@ -251,8 +251,8 @@ async def trigger_roles(message):
     return False
 
 
-# Réaction à partir de la base Reactions
-async def trigger_reactions(message, chain=None, sensi=0.7, debug=False):
+async def trigger_reactions(bot, message, chain=None, sensi=0.7, debug=False):
+    """Réaction à partir de la base Reactions"""
     if not chain:                   # Si pas précisé,
         chain = message.content         # contenu de message
     trigs = await bdd_tools.find_nearest(chain, Triggers, carac="trigger", sensi=sensi)
@@ -286,19 +286,20 @@ async def trigger_reactions(message, chain=None, sensi=0.7, debug=False):
     return False
 
 
-async def trigger_sub_reactions(message, debug=False):
+async def trigger_sub_reactions(bot, message, debug=False):
+    """Réaction à partir de la base Reactions sur les mots"""
     mots = message.content.split(" ")
     if len(mots) > 1:       # Si le message fait plus d'un mot
         for mot in sorted(mots, key=lambda m:-len(m)):      # On parcourt les mots du plus long au plus court
             if len(mot) > 4:                                            # on élimine les mots de liaison
-                if await trigger_reactions(message, chain=mot, sensi=0.9, debug=debug):    # Si on trouve une sous-rect (à 0.9)
+                if await trigger_reactions(bot, message, chain=mot, sensi=0.9, debug=debug):    # Si on trouve une sous-rect (à 0.9)
                     return True
 
     return False
 
 
-# Réaction aux messages en di... / cri...
 async def trigger_di(message):
+    """Réaction aux messages en di... / cri..."""
     c = message.content
     diprefs = ["di", "dy", "dis ", "dit ", "dis-", "dit-"]
     criprefs = ["cri", "cry", "kri", "kry"]
@@ -318,17 +319,21 @@ async def trigger_di(message):
     return False
 
 
-# Réaction par défaut
 async def default(message):
+    """Réponse par défaut"""
     mess = "Désolé, je n'ai pas compris 🤷‍♂️"
+    if random.random() < 0.05:
+        mess += "\n(et toi, tu as perdu)"
     await message.channel.send(mess)                    # On envoie le texte par défaut
 
 
-# Exécute les règles d'IA en réaction à <message> (par ordre de priorité)
 async def process_IA(bot, message, debug=False):
-    (await trigger_roles(message)                               # Rôles
-        or await trigger_reactions(message, debug=debug)        # Table Reactions (IA proprement dite)
-        or await trigger_sub_reactions(message, debug=debug)    # IA sur les mots
-        or await trigger_di(message)                            # di... / cri...
-        or await default(message)                               # Réponse par défaut
+    """Exécute les règles d'IA en réaction à <message> (par ordre de priorité)
+    [debug] permet d'afficher des messages en cas d'erreur lors de l'évaluation des commandes.
+    """
+    (await trigger_roles(message)                                   # Rôles
+        or await trigger_reactions(bot, message, debug=debug)       # Table Reactions (IA proprement dite)
+        or await trigger_sub_reactions(bot, message, debug=debug)   # IA sur les mots
+        or await trigger_di(message)                                # di... / cri...
+        or await default(message)                                   # Réponse par défaut
     )

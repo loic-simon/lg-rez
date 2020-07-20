@@ -84,7 +84,7 @@ class Annexe(commands.Cog):
             chan            objet discord.TextChannel du chan privé du joueur
 
         Attention :
-            ctx             objet discord.commands.Context de !send  ==> ctx.author = lanceur de la commande !!!
+            ctx             objet discord.ext.commands.Context de !send  ==> ctx.author = lanceur de la commande !!!
 
         Les différentes tables de données sont accessibles sous leur nom (Joueurs, Roles...)
         Il est impossible d'appeller des coroutines (await) dans le code à évaluer.

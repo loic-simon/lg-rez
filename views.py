@@ -3,15 +3,18 @@ from core import *
 from flask import jsonify
 
 class InvalidUsage(Exception):
+    """Exception raise en cas d'erreur dans l'appel d'une URL (mauvais protocole ou paramètres)"""
     status_code = 400
 
     def __init__(self, message, status_code=None):
+        """Initialize self."""
         Exception.__init__(self)
         self.message = message
         if status_code is not None:
             self.status_code = status_code
 
     def to_dict(self):
+        """Return self.message"""
         return self.message
 
 @app.errorhandler(InvalidUsage)

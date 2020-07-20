@@ -10,6 +10,8 @@ from blocs import gsheets, bdd_tools
 
 # Routine d'inscription (fonction appellée par la commande !co)
 async def main(bot, member):
+    """Processus d'inscription pour <member>"""
+    
     if Joueurs.query.get(member.id):                                            # Joueur dans la bdd = déjà inscrit
         await tools.private_chan(member).send(f"Saloww ! {member.mention} tu es déjà inscrit, viens un peu ici enculé !")
         return

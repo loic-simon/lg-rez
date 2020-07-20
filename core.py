@@ -13,9 +13,8 @@ import sqlalchemy.ext
 from sqlalchemy.exc import *                            # Exceptions générales SQLAlchemy
 from sqlalchemy.orm.exc import *                        # Exceptions requêtes SQLAlchemy
 
-import Discord.blocs.chatfuel as chatfuel       # Envoi de blocs à Chatfuel (maison)
 import Discord.blocs.gsheets as gsheets         # Connection à Google Sheets (maison)
-import Discord.blocs.webhook as webhook
+import Discord.blocs.webhook as webhook         # Envoi de webhook Discord
 from Discord.blocs import bdd_tools             # Outils BDD
 from __init__ import db, Tables, Joueurs        # Récupération BDD
 
@@ -24,12 +23,10 @@ from __init__ import db, Tables, Joueurs        # Récupération BDD
 
 load_dotenv()
 GLOBAL_PASSWORD = os.getenv("GLOBAL_PASSWORD")
-
-BOT_ID = os.getenv("BOT_ID")
-CHATFUEL_TOKEN = os.getenv("CHATFUEL_TOKEN")
-CHATFUEL_TAG = os.getenv("CHATFUEL_TAG")
+assert GLOBAL_PASSWORD, "core.py : GLOBAL_PASSWORD introuvable"
 
 ALWAYSDATA_API_KEY = os.getenv("ALWAYSDATA_API_KEY")
+assert ALWAYSDATA_API_KEY, "core.py : ALWAYSDATA_API_KEY introuvable"
 
 jobs = ["open_cond", "remind_cond", "close_cond",
         "open_maire", "remind_maire", "close_maire",
@@ -37,25 +34,27 @@ jobs = ["open_cond", "remind_cond", "close_cond",
         "open_action", "remind_action", "close_action",
         ]
 
-MAX_TRIES = 5
-
 
 ### UTILITAIRES
 
 def strhtml(r):
+    r"""Échappe &, <, > et \n en leur code HTML correspondant"""
     return r.replace('&','&esp;').replace('<','&lt;').replace('>','&gt;').replace('\n', '<br/>')
 
 def html_escape(r):
+    r"""Échappe &, < et > en leur code HTML correspondant (comme strhtml, mais conserve les \n)"""
     return str(r).replace('&','&esp;').replace('<','&lt;').replace('>','&gt;')
 
 def infos_tb(quiet=False):
+    """Renvoie traceback.format_exc() tel quel (si <quiet>) ou en mode HTML"""
     tb = traceback.format_exc()
     if quiet:
         return tb
     else:
         return f"<br/><div> AN EXCEPTION HAS BEEN RAISED! <br/><pre>{html_escape(tb)}</pre></div>"
 
-def getjobs():                  # Récupère la liste des tâches planifiées sur l'API alwaysdata
+def getjobs():
+    """Récupère la liste des tâches planifiées sur l'API alwaysdata"""
     rep = requests.get('https://api.alwaysdata.com/v1/job/', auth=(ALWAYSDATA_API_KEY, ''))
     if rep:
         try:
@@ -69,7 +68,11 @@ def getjobs():                  # Récupère la liste des tâches planifiées su
 
 ### SYNCHRONISATION DU TABLEAU DE BORD
 
-def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+def sync_TDB(d):
+    """Fonction appellée par le script du Tableau de bord, à la synchronisation
+
+    <d> : pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    """
     r = ""
     try:
         verbose = ('v' in d)        # Messages d'erreur/... détaillés
@@ -196,6 +199,10 @@ def sync_TDB(d):    # d : pseudo-dictionnaire des arguments passés en GET (just
 ### APPEL D'UNE TÂCHE PLANIFIÉE
 
 def cron_call(d):
+    """Fonction appellée par une tâche planifiée Alwaysdata (normalement obsolète)
+
+    <d> : pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    """
     r = ""
     try:
         if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe
@@ -223,16 +230,21 @@ def cron_call(d):
 
 ### OPTIONS DU PANNEAU D'ADMIN
 
-exec(open("./Discord/blocs/admin_options.py").read())       # Come si le code de admin_options était écrit ici (séparé pour plus de lisibilité)
+exec(open("./Discord/blocs/admin_options.py").read())       # Comme si le code de admin_options était écrit ici (séparé pour plus de lisibilité)
 
 
 ### PANNEAU D'ADMIN
 
-# Options d'administration automatiques (ajout,...) - pour tests/debug seulement !
 def manual(d):
+    """Options d'administration automatiques (ajout,...) - pour tests/debug seulement !"""
     return admin(d, d)
 
-def admin(d, p):    # d : pseudo-dictionnaire des arguments passés en GET (pwd notemment) ; p : idem pour les arguments POST (différentes options du panneau)
+def admin(d, p):
+    """Fonction appellée par l'appel au panneau d'administration
+
+    <d> : pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    <p> : pseudo-dictionnaire des arguments passés en POST (option du panneau d'admin et paramètres)
+    """
     r = ""
     try:
         if ("pwd" in d) and (d["pwd"] == GLOBAL_PASSWORD):      # Vérification mot de passe

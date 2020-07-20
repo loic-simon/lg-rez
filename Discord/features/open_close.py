@@ -10,9 +10,10 @@ import tools
 
 
 async def recup_joueurs(quoi, qui, heure=None):
-    # Renvoie les joueurs concernés par la tâche !quoi qui <heure>
-    # Ex : !open cond -> joueurs avec droit de vote, !close action 17h -> joueurs dont l'action se termine à 17h
+    """Renvoie les joueurs concernés par la tâche !quoi <qui> [heure]
 
+    Ex : !open cond -> joueurs avec droit de vote, !close action 17h -> joueurs dont l'action se termine à 17h
+    """
     criteres = {
         "cond": {
             "open": and_(Joueurs.votant_village == True,        # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
@@ -347,7 +348,7 @@ class OpenClose(commands.Cog):
                 r += "\nProgrammation des actions start / perma :\n"
                 ts = tools.next_occurence(datetime.time(hour=19))
                 for action in Actions.query.filter_by(trigger_debut="start").all() + Actions.query.filter_by(trigger_debut="perma").all():
-                    r += f" - !open {action.id}\n"
+                    r += f" - !open {action.id} (trigger_debut == {action.trigger_debut})\n"
                     taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
 
                 await tools.log(ctx, r, code=True)

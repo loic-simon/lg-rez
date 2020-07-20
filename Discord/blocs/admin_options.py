@@ -4,6 +4,18 @@
 ### UTILITAIRES
 
 def html_table(LL, first_row=None, second_row=None, last_row=None, repeat_header=False, very_last_row=None, row_start="", row_end=""):
+    """Formate la liste de listes <LL> pour affichage comme tableau HTML
+
+    Toutes les lignes de <LL> doivent avoir la même longeur
+
+    [first_row]         Première ligne du tableau, affichée en gras (doit avoir la longeur des lignes de LL)
+    [second_row]        Seconde ligne du tableau, affichée en italique (doit avoir la longeur des lignes de LL)
+    [last_row]          Dernière ligne du tableau, affichée en gras (doit avoir la longeur des lignes de LL)
+    [repeat_header]     Si True, remet [first_row] en bas du tableau (après [last_row])
+    [very_last_row]     Toute dernière ligne du tableau, affichée regular (doit avoir la longeur des lignes de LL)
+    [row_start]         Code à ajouter au début de chaque ligne de <LL> (juste après le <tr>)
+    [row_end]           Code à ajouter à la fin de chaque ligne de <LL> (juste avant le </tr>)
+    """
     r = "<table style='border: 1px solid black; border-collapse: collapse;'>"
     if second_row:
         LL.insert(0, [f"<i>{e}</i>" for e in second_row])
@@ -26,6 +38,13 @@ def html_table(LL, first_row=None, second_row=None, last_row=None, repeat_header
 ### BASE DE DONNÉES
 
 def viewtable(d, p, sort_col=None, sort_asc=None):
+    """Option du panneau d'admin : visualisation de table
+
+    <d>             Pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    <p>             Pseudo-dictionnaire des arguments passés en POST (paramètres, notemment la table à afficher)
+    [sort_col]      Colonne par laquelle trier l'affichage de la table (pas de tri par défaut)
+    [sort_asc]      Si le tri doit être doit être ascendant (True) ou descendant (False)
+    """
     r = ""
 
     table = Tables[p["table"]]
@@ -103,6 +122,11 @@ def viewtable(d, p, sort_col=None, sort_asc=None):
 
 
 def additem(d, p):
+    """Option du panneau d'admin : ajout d'un élément à une table
+
+    <d>             Pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    <p>             Pseudo-dictionnaire des arguments passés en POST (paramètres, notemment l'item à ajouter)
+    """
     r = "<h2>Ajout d'élément</h2>"
 
     table = Tables[p["table"]]
@@ -123,6 +147,11 @@ def additem(d, p):
 
 
 def delitem(d, p):
+    """Option du panneau d'admin : suppression d'un élément d'une table
+
+    <d>             Pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    <p>             Pseudo-dictionnaire des arguments passés en POST (paramètres, notemment l'item à supprimer)
+    """
     r = "<h2>Suppression d'élément</h2>"
 
     table = Tables[p["table"]]
@@ -143,6 +172,11 @@ def delitem(d, p):
 
 
 def editem(d, p):
+    """Option du panneau d'admin : modification d'un élément d'une table
+
+    <d>             Pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    <p>             Pseudo-dictionnaire des arguments passés en POST (paramètres, notemment l'item à modifier)
+    """
     r = "<h2>Modification d'élément</h2>"
 
     table = Tables[p["table"]]
@@ -175,6 +209,11 @@ def editem(d, p):
 ### TÂCHES PLANIFIÉES
 
 def viewcron(d, p):
+    """Option du panneau d'admin : visualisation des tâches planifiées Alwaysdata (normalement obsolète)
+
+    <d>             Pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    <p>             Pseudo-dictionnaire des arguments passés en POST (paramètres)
+    """
     r = "<h2>Tâches planifiées alwaysdata</h2>"
 
     lst = getjobs()     # Récupération de la liste des tâches
@@ -228,6 +267,11 @@ def viewcron(d, p):
 
 
 def addcron(d, p):
+    """Option du panneau d'admin : ajoute une tâche planifiée Alwaysdata (normalement obsolète)
+
+    <d>             Pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    <p>             Pseudo-dictionnaire des arguments passés en POST (paramètres, notemment tâche à ajouter)
+    """
     r = "<h2>Ajout de tâche planifiée alwaysdata</h2>"
 
     dic = {"type": p["type"],
@@ -254,6 +298,11 @@ def addcron(d, p):
 
 
 def delcron(d, p):
+    """Option du panneau d'admin : supprime une tâche planifiée Alwaysdata (normalement obsolète)
+
+    <d>             Pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    <p>             Pseudo-dictionnaire des arguments passés en POST (paramètres, notemment tâche à supprimer)
+    """
     r = "<h2>Suppression de tâche planifiée alwaysdata</h2>"
 
     id = p["id"]
@@ -271,6 +320,12 @@ def delcron(d, p):
 
 
 def disablecron(d, p, id=False):
+    """Option du panneau d'admin : active/désactive une tâche planifiée Alwaysdata (normalement obsolète)
+
+    <d>     Pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    <p>     Pseudo-dictionnaire des arguments passés en POST (paramètres, notemment tâche à activer/désactiver)
+    [id]    Permet de préciser l'ID de la tâche directment, plutôt que via <p>
+    """
     r = "<h2>Désactivation/activation de tâche planifiée alwaysdata</h2>"
 
     if not id:
@@ -293,6 +348,11 @@ def disablecron(d, p, id=False):
 
 
 def sendjob(d, p):
+    """Option du panneau d'admin : simulation appel d'une tâche planifiée Alwaysdata (normalement obsolète)
+
+    <d>     Pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    <p>     Pseudo-dictionnaire des arguments passés en POST (paramètres, notemment tâche à simuler)
+    """
     r = "<h2>Envoi de tâche</h2>"
 
     dic = {"pwd": d["pwd"],
@@ -314,6 +374,11 @@ def sendjob(d, p):
 ### AUTRES FONCTIONNALITÉS
 
 def viewlogs(d, p):
+    """Option du panneau d'admin : affichage des logs d'appel cron pour un jour donné (normalement obsolète)
+
+    <d>     Pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    <p>     Pseudo-dictionnaire des arguments passés en POST (paramètres, notemment jour)
+    """
     fich = f"{p['Y']:0>4}-{p['m']:0>2}-{p['d']:0>2}"
 
     r = f"<h2>Logs de cron_call – {fich}</h2>"
@@ -329,6 +394,11 @@ def viewlogs(d, p):
 
 
 def restart_site(d, p):
+    """Option du panneau d'admin : redémarre le site Alwaysdata
+
+    <d>     Pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    <p>     Pseudo-dictionnaire des arguments passés en POST (paramètres)
+    """
     r = "<h2>Redémarrage du site</h2>"
 
     rep = requests.get('https://api.alwaysdata.com/v1/site/', auth=(ALWAYSDATA_API_KEY, ''), data={})
@@ -356,6 +426,11 @@ def restart_site(d, p):
 # STATUTS
 
 def show_statuts(d, p):
+    """Option du panneau d'admin : affiche les statuts des tâches planifiées (normalement obsolète)
+
+    <d>     Pseudo-dictionnaire des arguments passés en GET (juste pour pwd, normalement)
+    <p>     Pseudo-dictionnaire des arguments passés en POST (paramètres)
+    """
     r = f"<br />{time.ctime()} – Statuts :"
 
     # On récupère les tâches planifiées

@@ -17,9 +17,17 @@ from blocs import bdd_tools
 ### Utilitaires de récupération d'objets Discord (détectent les mentions)
 ### ---------------------------------------------------------------------------
 
+# Raccourci : tools.get = discord.utils.get
 get = discord.utils.get
 
-def find_by_mention_or_name(collec, val, pattern=None, must_be_found=False, raiser=None):         # Utilitaire pour la suite
+
+def find_by_mention_or_name(collec, val, pattern=None, must_be_found=False, raiser=None):
+    """Utilitaire pour la suite : trouve <val> dans <collec>
+
+    [pattern]           Motif RegEx à utiliser pour la recherche
+    [must_be_found]     Si True, raise une AssertionError si <val> est introuvable
+    [raiser]            Nom de la fonction à envoyer dans l'exception si introuvable
+    """
     if not val:
         item = None
     elif pattern and (match := re.search(pattern, val)):
@@ -33,7 +41,13 @@ def find_by_mention_or_name(collec, val, pattern=None, must_be_found=False, rais
     return item
 
 
-def channel(arg, nom, must_be_found=True):         # Renvoie le channel #nom. arg peut être de type Context, Guild, User/Member, Channel
+def channel(arg, nom, must_be_found=True):
+    """Renvoie l'objet discord.Channel du channel #<nom>.
+
+    <nom>               Nom du channel (texte/vocal/catégorie) ou sa mention (détection directe par RegEx)
+    <arg>               Argument permettant de remonter aux channels : discord.Context, discord.Guild, discord.Member ou discord.Channel
+    [must_be_found]     Si True (défaut), raise une AssertionError si le channel #<nom> n'existe pas (si False, renvoie None)
+    """
     try:
         channels = arg.channels if isinstance(arg, discord.Guild) else arg.guild.channels
     except AttributeError:
@@ -42,7 +56,13 @@ def channel(arg, nom, must_be_found=True):         # Renvoie le channel #nom. ar
                                    must_be_found=must_be_found, raiser="tools.channel")
 
 
-def role(arg, nom, must_be_found=True):            # Renvoie le rôle @&nom. arg peut être de type Context, Guild, User/Member, Channel
+def role(arg, nom, must_be_found=True):
+    """Renvoie l'objet discord.Role du rôle @&nom.
+
+    <nom>               Nom du rôle ou sa mention (détection directe par RegEx)
+    <arg>               Argument permettant de remonter aux rôles : discord.Context, discord.Guild, discord.Member ou discord.Channel
+    [must_be_found]     Si True (défaut), raise une AssertionError si le rôle @&nom n'existe pas (si False, renvoie None)
+    """
     try:
         roles = arg.roles if isinstance(arg, discord.Guild) else arg.guild.roles
     except AttributeError:
@@ -51,7 +71,13 @@ def role(arg, nom, must_be_found=True):            # Renvoie le rôle @&nom. arg
                                    must_be_found=must_be_found, raiser="tools.role")
 
 
-def member(arg, nom, must_be_found=True):          # Renvoie le membre @member. arg peut être de type Context, Guild, User/Member, Channel
+def member(arg, nom, must_be_found=True):
+    """Renvoie l'objet discord.Member du membre @member.
+
+    <nom>               Nom du joueur ou sa mention (détection directe par RegEx)
+    <arg>               Argument permettant de remonter aux rôles : discord.Context, discord.Guild, discord.Member ou discord.Channel
+    [must_be_found]     Si True (défaut), raise une AssertionError si le membre @member n'existe pas (si False, renvoie None)
+    """
     try:
         members = arg.members if isinstance(arg, discord.Guild) else arg.guild.members
     except AttributeError:
@@ -60,7 +86,13 @@ def member(arg, nom, must_be_found=True):          # Renvoie le membre @member. 
                                    must_be_found=must_be_found, raiser="tools.member")
 
 
-def emoji(arg, nom, must_be_found=True):           # Renvoie l'emoji :nom:. arg peut être de type Context, Guild, User/Member, Channel
+def emoji(arg, nom, must_be_found=True):
+    """Renvoie l'objet discord.Emoji de l'emoji :nom:.
+
+    <nom>               Nom de l'emoji ou son utilisation (détection directe par RegEx)
+    <arg>               Argument permettant de remonter aux rôles : discord.Context, discord.Guild, discord.Member ou discord.Channel
+    [must_be_found]     Si True (défaut), raise une AssertionError si l'emoji :nom: n'existe pas (si False, renvoie None)
+    """
     try:
         emojis = arg.emojis if isinstance(arg, discord.Guild) else arg.guild.emojis
     except AttributeError:
@@ -69,8 +101,11 @@ def emoji(arg, nom, must_be_found=True):           # Renvoie l'emoji :nom:. arg 
                                    must_be_found=must_be_found, raiser="tools.emoji")
 
 
-# Renvoie le channel privé d'un utilisateur
 def private_chan(member, must_be_found=True):
+    """Renvoie le channel privé de <member> (type discord.Member)
+
+    [must_be_found]     Si True (défaut), raise une AssertionError si le channel n'existe pas (si False, renvoie None)
+    """
     joueur = Joueurs.query.get(member.id)
     assert joueur, f"tools.private_chan : Joueur {member} introuvable"
     chan = member.guild.get_channel(joueur._chan_id)
@@ -80,7 +115,11 @@ def private_chan(member, must_be_found=True):
 
 
 # Appel aux MJs
-def mention_MJ(arg):        # Renvoie @MJ si le joueur n'est pas un MJ. arg peut être de type Context ou User/Member
+def mention_MJ(arg):
+    """Renvoie @MJ si le joueur n'est pas un MJ.
+
+    <arg> peut être de type discord.Context ou discord.Member
+    """
     member = arg.author if hasattr(arg, "author") else arg
     if hasattr(member, "top_role") and member.top_role.name == "MJ":    # Si webhook, pas de top_role
         return "@MJ"
@@ -102,9 +141,13 @@ joueurs_only = commands.has_any_role("Joueur en vie", "Joueur mort")
 # @tools.vivants_only : commande exécutables uniquement par un joueur vivant
 vivants_only = commands.has_role("Joueur en vie")
 
-# @tools.private : supprime le message et exécute la commande dans la conv privée si elle a été appellée ailleurs (utilisable que dans un Cog)
-# Utilisable en combinaison avec joueurs_only et vivants_only (pas avec les autres attention, vu que seuls les joueurs ont un channel privé)
+# @tools.private : utilisable en combinaison avec joueurs_only et vivants_only (pas avec les autres attention, vu que seuls les joueurs ont un channel privé)
 def private(cmd):
+    """Supprime le message et exécute la commande dans la conv privée si elle a été appellée ailleurs.
+
+    Ce décorateur n'est utilisable que sur une commande définie dans un Cog.
+    Si le joueur ayant utilisé la commande n'a pas de chan privé (pas en base), raise une AssertionError.
+    """
     @wraps(cmd)
     async def new_cmd(self, ctx, *args, **kwargs):              # Cette commande est renvoyée à la place de cmd
         if not ctx.channel.name.startswith("conv-bot-"):            # Si pas déjà dans une conv bot :
@@ -125,6 +168,14 @@ def private(cmd):
 
 # Commande générale, à utiliser à la place de bot.wait_for('message', ...)
 async def wait_for_message(bot, check, trigger_on_commands=False):
+    """Attend et renvoie le premier message reçu rencontrant les critères demandés.
+
+    Surcouche de bot.wait_for() permettant d'ignoer les commandes et de réagir au mot-clé STOP :
+    <check> fonction discord.Message -> bool
+    [trigger_on_commands]   Si False (défaut), un message respectant <check> sera ignoré si c'est une commande
+
+    Si le message est "stop" ou "!stop" (ou autre casse), raise une exception RuntimeError (même si le message respecte <check>).
+    """
     if trigger_on_commands:
         def trig_check(m):
             return (check(m) or m.content.lower() in ["stop", "!stop"])         # et on trigger en cas de STOP
@@ -143,26 +194,35 @@ async def wait_for_message(bot, check, trigger_on_commands=False):
 
 # Permet de boucler question -> réponse tant que la réponse vérifie pas les critères nécessaires dans chan
 async def boucle_message(bot, chan, in_message, condition_sortie, trig_check=lambda m: m.channel == chan and m.author != bot.user, rep_message=None):
-    """Permet de lancer une boucle question/réponse tant que la réponse ne vérifie pas condition_sortie
+    """Permet de lancer une boucle question/réponse tant que la réponse ne vérifie pas <condition_sortie>
 
-    chan est le channel dans lequel lancer la boucle
-    trig_check est la condition de détection du message dans le bot.wait_for
-    in_message est le premier message envoyé pour demander une réponse
-    rep_message permet de définir un message de boucle différent du message d'accueil (identique si None)
+    <chan>          Channel dans lequel lancer la boucle
+    [trig_check]    Condition de détection du message dans le bot.wait_for (défaut : tous les messages hors bot dans <chan>)
+    [in_message]    Si défini, message à envoyer avant la boucle
+    [rep_message]   Si défini, permet de définir un message de boucle différent de [in_message] (identique si None). Si [in_message] n'est pas défini, doit être défini.
     """
     if not rep_message:
         rep_message = in_message
+    if not rep_message:
+        raise ValueError("tools.boucle_message : [in_message] ou [rep_message] doit être défini !")
+
     await chan.send(in_message)
     rep = await wait_for_message(bot, check=trig_check)
     while not condition_sortie(rep):
         await chan.send(rep_message)
         rep = await wait_for_message(bot, check=trig_check)
+
     return rep
 
 
 async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
-    """Demande <message>, puis attend que le joueur entre un nom de joueur, et boucle 5 fois au max (avant de l'insulter)
-    pour chercher le plus proche joueurs dans la table Joueurs
+    """Récupère un nom de joueur dans le contexte <ctx>.
+
+    [cible]     Cible par défaut (donnée par le joueur dès le début)
+    [message]   Si défini (et [cible] non définie), message à envoyer avant la boucle
+    [sensi]     Sensibilité de la recherche (défaut 0.5)
+
+    Attend que le joueur entre un nom de joueur, et boucle 5 fois au max (avant de l'insulter) pour chercher le plus proche joueurs dans la table Joueurs.
     """
     if message and not cible:
         await ctx.send(message)
@@ -210,16 +270,16 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
 # Récupère un input par réaction
 async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
                               text_filter=lambda s: True, post_converter=None, trigger_all_reacts=False, trigger_on_commands=False):
-    """Ajoute les reacts dans emojis à message, attend que quelqu'un appuie sur une, puis renvoie :
-        - soit le nom de l'emoji si emoji est une liste ;
-        - soit la valeur associée si emoji est un dictionnaire.
+    """Ajoute les reacts dans [emojis] à message, attend que quelqu'un appuie sur une, puis renvoie :
+        - soit le nom de l'emoji si [emojis] est une liste ;
+        - soit la valeur associée si [emojis] est un dictionnaire.
 
-    Si process_text == True, détecte aussi la réponse par message et retourne ledit message (défaut False).
-    De plus, si text_filter (fonction str -> bool) est défini, ne réagit qu'aux messages pour lesquels text_filter(message) = True.
-    De plus, si post_converter (fonction str -> ?) est défini, le message détecté est passé dans cette fonction avant d'être renvoyé.
+    Si [process_text] == True, détecte aussi la réponse par message et retourne ledit message (défaut False).
+    De plus, si [text_filter] (fonction str -> bool) est défini, ne réagit qu'aux messages pour lesquels text_filter(message) = True.
+    De plus, si [post_converter] (fonction str -> ?) est défini, le message détecté est passé dans cette fonction avant d'être renvoyé.
 
-    Si trigger_all_reacts == True, détecte l'ajout des toutes les réactions (et pas seulement celles dans emojis) et renvoie, si l'emoji directement si il n'est pas dans emojis (défaut False).
-    Enfin, trigger_on_commands est passé directement à wait_for_message.
+    Si [trigger_all_reacts] == True, détecte l'ajout des toutes les réactions (et pas seulement celles dans emojis) et renvoie, si l'emoji directement si il n'est pas dans emojis (défaut False).
+    Enfin, [trigger_on_commands] est passé directement à wait_for_message.
     """
 
     if not isinstance(emojis, dict):        # Si emoji est une liste, on en fait un dictionnaire
@@ -292,8 +352,8 @@ async def choice(bot, message, N):
         text_filter=lambda s: s.isdigit() and 1 <= int(s) <= N, post_converter=int)
 
 
-# Attend x secondes en affichant l'indicateur typing... sur le chat
 async def sleep(chan, x):
+    """Attend <x> secondes en affichant l'indicateur typing... sur <chan>"""
     async with chan.typing():
         await asyncio.sleep(x)
 
@@ -304,16 +364,18 @@ async def sleep(chan, x):
 ### ---------------------------------------------------------------------------
 
 def montre(heure=None):
-    """Renvoie l'emoji horloge correspondant à l'heure demandée (str "XXh" our "XXh30", actuelle si non précisée)"""
+    """Renvoie l'emoji horloge correspondant à l'heure demandée.
 
+    [heure] str "XXh" ou "XXh30", actuelle si non précisée
+    """
     if heure and isinstance(heure, str):
         heure, minute = heure.split("h")
         heure = int(heure) % 12
         minute = int(minute) % 60 if minute else 0
     else:
-        tps = datetime.datetime.now().time()
-        heure = tps.hour % 12
-        minute = tps.minute
+        now = datetime.datetime.now()
+        heure = now.hour % 12
+        minute = now.minute
 
     if 15 < minute < 45:        # Demi heure
         L = ["🕧", "🕜", "🕝", "🕞", "🕟", "🕠", "🕡", "🕢", "🕣", "🕤", "🕥", "🕦"]
@@ -322,29 +384,46 @@ def montre(heure=None):
     return L[heure] if minute < 45 else L[(heure + 1) % 12]
 
 
-def emoji_chiffre(chiffre: int, multi=False):
-    if 0 <= chiffre <= 10:
+def emoji_chiffre(chiffre, multi=False):
+    """Renvoie l'emoji 0️⃣, 1️⃣, 2️⃣... correspond à <chiffre>.
+
+    Si [multi] == True, <chiffre> doit être un entier positif dont les chiffres seront convertis séparément.
+    Sinon (par défaut), <chiffre> doit être un entier entre 0 et 10.
+    """
+    if isinstance(chiffre, int) and 0 <= chiffre <= 10:
         return ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"][chiffre]
-    elif multi:
+    elif multi and chiffre.isdigit():
         return ''.join([emoji_chiffre(int(c)) for c in str(chiffre)])
     else:
-        raise ValueError("L'argument de emoji_chiffre doit être un entier entre 0 et 10")
+        raise ValueError("L'argument de tools.emoji_chiffre doit être un entier entre 0 et 10 OU un entier positif avec multi=True")
 
-def super_chiffre(chiffre: int, multi=False):
-    if 0 <= chiffre <= 9:
+
+def super_chiffre(chiffre, multi=False):
+    """Renvoie le caractère unicode ⁰, ¹, ²... correspond à <chiffre>.
+
+    Si [multi] == True, <chiffre> doit être un entier positif dont les chiffres seront convertis séparément.
+    Sinon (par défaut), <chiffre> doit être un entier entre 0 et 9.
+    """
+    if isinstance(chiffre, int) and 0 <= chiffre <= 9:
         return ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"][chiffre]
-    elif multi:
+    elif multi and chiffre.isdigit():
         return ''.join([super_chiffre(int(c)) for c in str(chiffre)])
     else:
-        raise ValueError("L'argument de super_chiffre doit être un entier entre 0 et 9")
+        raise ValueError("L'argument de tools.super_chiffre doit être un entier entre 0 et 9 OU un entier positif avec multi=True")
+
 
 def sub_chiffre(chiffre: int, multi=False):
-    if 0 <= chiffre <= 9:
+    """Renvoie le caractère unicode ₀, ₁, ₂... correspond à <chiffre>.
+
+    Si [multi] == True, <chiffre> doit être un entier positif dont les chiffres seront convertis séparément.
+    Sinon (par défaut), <chiffre> doit être un entier entre 0 et 9.
+    """
+    if isinstance(chiffre, int) and 0 <= chiffre <= 9:
         return ["₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"][chiffre]
-    elif multi:
+    elif multi and chiffre.isdigit():
         return ''.join([sub_chiffre(int(c)) for c in str(chiffre)])
     else:
-        raise ValueError("L'argument de sub_chiffre doit être un entier entre 0 et 9")
+        raise ValueError("L'argument de tools.sub_chiffre doit être un entier entre 0 et 9 OU un entier positif avec multi=True")
 
 
 
@@ -354,6 +433,7 @@ def sub_chiffre(chiffre: int, multi=False):
 
 # Convertit HHh[MM] en objet Time
 def heure_to_time(heure):
+    """Convertit <heure> = HHh[MM] (str) en objet datetime.time."""
     try:
         hh, mm = heure.split("h")
         return datetime.time(int(hh), int(mm) if mm else 0)
@@ -363,6 +443,11 @@ def heure_to_time(heure):
 
 # Renvoie le datetime correspondant au prochain moment ou tps arrive DANS LES HORAIRES DU JEU : du dimanche 19:00:00 au vendredi 18:59:59.
 def next_occurence(tps):
+    """Renvoie l'objet datetime.datetime correspondant à la prochaine occurence de <tps> dans le cadre du jeu.
+
+    <tps> objet datetime.time.
+    Renvoie le prochain timestamp arrivant DANS LES HORAIRES DU JEU : du dimanche 19:00:00 au vendredi 18:59:59.
+    """
     pause = datetime.time(hour=19)
 
     now = datetime.datetime.now()
@@ -386,8 +471,8 @@ def next_occurence(tps):
     return datetime.datetime.combine(jour, tps)         # passage de date et time à datetime
 
 
-# Renvoie le datetime correspondant au prochain vendredi 19h
 def debut_pause():
+    """Renvoie l'objet datetime.datetime correspondant au prochain vendredi 19h."""
     pause_time = datetime.time(hour=19)
     pause_wday = 4          # Vendredi
 
@@ -400,8 +485,8 @@ def debut_pause():
     return datetime.datetime.combine(pause_jour, pause_time)         # passage de date et time à datetime
 
 
-# Renvoie le datetime correspondant au prochain dimanche 19h
 def fin_pause():
+    """Renvoie l'objet datetime.datetime correspondant au prochain dimanche 19h."""
     reprise_time = datetime.time(hour=19)
     reprise_wday = 6        # Dimanche
 
@@ -421,7 +506,14 @@ def fin_pause():
 
 # Sépare <mess> en une liste de messages de moins de <N>=2000 mots (limitation Discord), en séparant aux <sep>=sauts de ligne si possible.
 # Ajoute <rep> à la fin des messages tronqués de leur séparateur final.
-def smooth_split(mess :str, N=1990, sep='\n', rep=''):
+def smooth_split(mess, N=1990, sep='\n', rep=''):
+    """Sépare <mess> en une liste de messages de moins de [N]=1990 mots.
+
+    [sep]   Caractères où séparer préférentiellement le texte (défaut sauts de ligne). Si <message> contient une sous-chaîne plus longue que [N] ne contenant pas [sep], le message est tronqué à la limite
+    <rep>   Chaîne ajoutée à la fin de chaque message (tronqué du séparateur final)
+
+    1990 car 2000 est la limitation Discord, et on laisse de la marge (typiquement si dans un bloc code, +6 caractères)
+    """
     mess = str(mess)
     LM = []             # Liste des messages
     psl = 0             # indice du Précédent Saut de Ligne
@@ -439,17 +531,24 @@ def smooth_split(mess :str, N=1990, sep='\n', rep=''):
         LM.append(mess[psl:])   # ce qui reste
     return LM
 
-# Envoie dans <messageable> (ctx / channel) mess sous forme de blocs de code
+
+async def send_blocs(messageable, mess, **kwargs):
+    """Envoie <mess> dans <messageable> (ctx / channel)"""
+    [await messageable.send(bloc) for bloc in smooth_split(mess, **kwargs)]
+
+
 async def send_code_blocs(messageable, mess, **kwargs):
+    """Envoie dans <messageable> (ctx / channel) <mess> sous forme de blocs de code"""
     [await messageable.send(code_bloc(bloc)) for bloc in smooth_split(mess, **kwargs)]
 
-# Envoie dans <messageable> (ctx / channel) mess
-async def send_blocs(messageable, mess, **kwargs):
-    [await messageable.send(bloc) for bloc in smooth_split(mess, **kwargs)]
 
 # Log dans #logs
 async def log(arg, message, code=False):
-    """Envoie <message> dans le channel #logs. <arg> peut être de type Context, Guild, User/Member, Channel"""
+    """Envoie <message> dans le channel #logs.
+
+    <arg>       Argument permettant de remonter aux rôles : discord.Context, discord.Guild, discord.Member ou discord.Channel
+    [code]      Si True, log sous forme de bloc(s) de code (défaut False)
+    """
     logchan = channel(arg, "logs")
     if code:
         await send_code_blocs(logchan, message)
@@ -463,8 +562,11 @@ async def log(arg, message, code=False):
 ### ---------------------------------------------------------------------------
 
 # Crée un contexte à partir d'un message_id : simule que <member> a envoyé <content> dans son chan privé
-
 async def create_context(bot, message_id, member, content):
+    """Renvoie un objet contexte de commande (objet discord.ext.commands.Context) à partir de <message_id>
+
+    Simule que <member> a envoyé <content> dans son chan privé et "génère" le contexte associé
+    """
     chan = private_chan(member)
     message = (await chan.history(limit=1).flatten())[0]        # On a besoin de récupérer un message, ici le dernier de la conv privée
     # message = await chan.fetch_message(message_id)
@@ -473,8 +575,8 @@ async def create_context(bot, message_id, member, content):
     return await bot.get_context(message)
 
 
-# Retourne le nom du slug role (None si non trouvé)
 def nom_role(role):
+    """Retourne le nom du slug <role> (None si non trouvé)"""
     if role := Roles.query.get(role):
         return role.nom
     else:
@@ -483,14 +585,22 @@ def nom_role(role):
 
 # Remove accents
 def remove_accents(s):
+    """Renvoie la chaîne non accentuée, mais conserve les caractères spéciaux (emojis...)"""
     p = re.compile("([À-ʲΆ-ת])")      # Abracadabrax, c'est moche mais ça marche (source : tkt frère)
     return p.sub(lambda c: unidecode.unidecode(c.group()), s)
 
 
-# Replace chaque bloc entouré par des {} par leur évaluation Python si aucune erreur n'est levée, sinon laisse l'expression telle quelle
-# Penser à passer les globals() et locals() si besoin. Généralement, il faut passer locals() qui contient ctx, etc... mais pas globals() si on veut bénéficier de tous les modules importés dans tools.py
-
+# Évaluation d'accolades
 def eval_accols(rep, globals=None, locals=None, debug=False):
+    """Replace chaque bloc entouré par des {} par leur évaluation Python.
+
+    [globals]   Dictionnaire des variables globales du contexte d'évaluation (passé à eval)
+    [locals]    Dictionnaire des variables locales du contexte d'évaluation (passé à eval)
+    [debug]     Si False (défaut), laisse l'expression telle quelle (avec les accolades) si une exception est levée durant l'évaluation.
+                Si True, insère le message d'erreur (type et texte de l'exception dans le message) ensuite.
+
+    Penser à passer les globals() et locals() si besoin. Généralement, il faut passer locals() qui contient ctx, etc... mais pas globals() si on veut bénéficier de tous les modules importés dans tools.py.
+    """
     if "{" in rep:              # Si contient des expressions
         evrep = ""                  # Réponse évaluée
         expr = ""                   # Expression à évaluer
@@ -529,28 +639,41 @@ def eval_accols(rep, globals=None, locals=None, debug=False):
 ### ---------------------------------------------------------------------------
 
 def bold(s):
+    """Retourne <s> formaté comme texte en gras dans Discord"""
     return f"**{s}**"
 
 def ital(s):
+    """Retourne <s> formaté comme texte en italique dans Discord"""
     return f"*{s}*"
 
 def soul(s):
+    """Retourne <s> formaté comme texte souligné dans Discord"""
     return f"__{s}__"
 
 def strike(s):
+    """Retourne <s> formaté comme texte barré dans Discord"""
     return f"~~{s}~~"
 
 def code(s):
+    """Retourne <s> formaté comme code (inline) dans Discord"""
     return f"`{s}`"
 
 def code_bloc(s, langage=""):
+    """Retourne <s> formaté comme un bloc de code dans Discord
+
+    [langage]  langage du code, permet la coloration syntaxique (ordinateur uniquement).
+    Langages supportés (non exhaustif ?) : asciidoc, autohotkey, bash, coffeescript, cpp (C++), cs (C#), css, diff, fix, glsl, ini, json, md, (markdown), ml, prolog, py, tex, xl, xml
+    """
     return f"```{langage}\n{s}```"
 
 def quote(s):
+    """Retourne <s> formaté comme citation (inline) dans Discord"""
     return f"> {s}"
 
 def quote_bloc(s):
+    """Retourne <s> formaté comme bloc de citation (multiline) dans Discord"""
     return f">>> {s}"
 
 def spoiler(s):
+    """Retourne <s> formaté comme spoiler (cliquer pour afficher) dans Discord"""
     return f"||{s}||"

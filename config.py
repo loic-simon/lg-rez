@@ -1,5 +1,10 @@
+import os
+from dotenv import load_dotenv
 
-SECRET_KEY = "!0oC/7.?URc!t712(Q\x0c_&<=q"
+load_dotenv()
+SECRET_KEY = os.getenv("SECRET_KEY")
+SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")
+assert SECRET_KEY, "config.py : SECRET_KEY introuvable"
+assert SQLALCHEMY_DATABASE_URI, "config.py : SQLALCHEMY_DATABASE_URI introuvable"
 
-SQLALCHEMY_DATABASE_URI = "postgresql://lg-rez:#^Wc8Kex2P6L@postgresql-lg-rez.alwaysdata.net/lg-rez_bdd"
 SQLALCHEMY_TRACK_MODIFICATIONS = False

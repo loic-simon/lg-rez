@@ -5,12 +5,13 @@ from dotenv import load_dotenv
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-def connect(key="1jsruJoeQ4LSbh8RlRGmiyDNGsoWZewqDKPd12M9jj20"):
+def connect(key):
+    """Charge les credentials GSheets et renvoie le classeur d'ID <key>"""
     # use creds to create a client to interact with the Google Drive API
     load_dotenv()
     GSHEETS_CREDENTIALS = os.getenv("GSHEETS_CREDENTIALS")
     assert GSHEETS_CREDENTIALS, "gsheets.connect : GSHEETS_CREDENTIALS introuvable"
-    
+
     scope = ['https://spreadsheets.google.com/feeds']
     creds = ServiceAccountCredentials.from_json_keyfile_dict(json.loads(GSHEETS_CREDENTIALS), scope)
     client = gspread.authorize(creds)
@@ -22,9 +23,11 @@ def connect(key="1jsruJoeQ4LSbh8RlRGmiyDNGsoWZewqDKPd12M9jj20"):
 
 
 def update(sheet, Modifs):
-    """Met à jour la feuille sheet avec les modifications indiquées dans Modifs.
-    Modifs doit être une liste de tuples (ligne, colonne, valeur)."""
+    """Met à jour la feuille <sheet> avec les modifications indiquées dans <Modifs>.
 
+    <Modifs> doit être une liste de tuples (ligne (id), colonne (id), valeur)
+    Les IDs sont indexés à partir de 0 (A1 en (0, 0, valeur)).
+    """
     lm = max([l for (l, c, v) in Modifs])       # ligne max de la zone à modifier
     cm = max([c for (l, c, v) in Modifs])       # colonne max de la zone à modifier
 

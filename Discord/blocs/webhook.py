@@ -10,14 +10,12 @@ assert WEBHOOK_TP_URL, "webhook.py : WEBHOOK_TP_URL introuvable"
 assert WEBHOOK_SYNC_URL, "webhook.py : WEBHOOK_SYNC_URL introuvable"
 
 def send(message: str, source="tp"):
-    """send(message: str, source: str) -> response
+    """Appelle le webhook Discord de l'url <source> avec le message <message>.
 
-    Appelle le webhook Discord de l'url <source> avec le message <message>.
     Raccourcis utilisables pour <source> :
         - "tp" ==> webhook Tâche planifiée (défini dans .env)
         - "sync" ==> webhook Synchronisation TDB (défini dans .env)
     """
-
     if source == "tp":
         url = WEBHOOK_TP_URL
     elif source == "sync":

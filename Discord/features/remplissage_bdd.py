@@ -15,7 +15,6 @@ from features import informations
 class RemplissageBDD(commands.Cog):
     """ RemplissageBDD - Commandes pour remplir la base de données du bot à partir des GSheets"""
 
-
     @commands.command()
     @tools.mjs_only
     async def droptable(self, ctx, table):

@@ -6,16 +6,28 @@ import unidecode
 from sqlalchemy.orm.attributes import flag_modified     # Permet de "signaler" les entrées modifiées, à commit en base
 
 def remove_accents(s):
+    """Renvoie la chaîne non accentuée, mais conserve les caractères spéciaux (emojis...)"""
     p = re.compile("([À-ʲΆ-ת])")      # Abracadabrax, c'est moche mais ça marche
     return p.sub(lambda c: unidecode.unidecode(c.group()), s)
 
 
 def modif(item, col, value):
+    """Utilitaire : setattr(<item>, <col>, <value>) et signale (flag_modified) la modification en vue d'un commit"""
     setattr(item, col, value)
     flag_modified(item, col)
 
 
-def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input brut (BDD, POST, GET...) selon le type de sa colonne
+def transtype(value, col, SQL_type, nullable):
+    """Utilitaire : type un input brut (BDD, POST, GET...) selon le type de sa colonne
+
+    <value>         valeur à transtyper (tous)
+    <col>           nom de la colonne associée
+    <SQL_type>      type SQL associé. Types pris en compte : "String", "Integer", "BigInteger", "Boolean", "Time", "DateTime"
+    <nullable>      True si la value peut être None, False sinon
+
+    Renvoie l'objet Python correspondant au type de la colonne (str, int, bool, datetime.time, datetime.datetime) ou None si autorisé
+    Raise ValueError si la conversion n'est pas possible (ou si None et nullable is False), KeyError pour un type de colonne non pris en compte
+    """
     try:
         if value in (None, '', 'None', 'none', 'Null', 'null', 'not set', 'non défini'):
             if nullable:
@@ -50,17 +62,20 @@ def transtype(value, col, SQL_type, nullable):      # Utilitaire : type un input
         raise ValueError(f"Valeur '{value}' incorrecte pour la colonne '{col}' (type '{SQL_type}'/{'NOT NULL' if not nullable else ''})")
 
 
-def get_cols(table):                    # Renvoie la liste des colonnes de la table
+def get_cols(table):
+    """Renvoie la liste des colonnes de <table>"""
     raw_cols = table.__table__.columns
     return [col.key for col in raw_cols]
 
 
-def get_primary_col(table):             # Renvoie la colonne étant une clé primaire de la table
+def get_primary_col(table):
+    """Renvoie le nom de la colonne clé primaire de <table>"""
     raw_cols = table.__table__.columns
     return [col.key for col in raw_cols if col.primary_key][0]
 
 
-def get_SQL_types(table, detail=False):  # Renvoie un dictionnaire {colonne: type SQL} pour la table
+def get_SQL_types(table, detail=False):
+    """Renvoie un dictionnaire {colonne (str): type SQL (str)} pour <table>"""
     raw_cols = table.__table__.columns
     if detail:                              # detail = True ==> types "VARCHAR(N)", "INTEGER"...
         return {col.key: col.type for col in raw_cols}
@@ -68,19 +83,21 @@ def get_SQL_types(table, detail=False):  # Renvoie un dictionnaire {colonne: typ
         return {col.key: type(col.type).__name__ for col in raw_cols}
 
 
-def get_SQL_nullable(table):               # Renvoie un dictionnaire {colonne: accepte les NULL ? (bool)} pour la table
+def get_SQL_nullable(table):
+    """Renvoie un dictionnaire {colonne (str): accepte les NULL ? (bool)} pour <table>"""
     raw_cols = table.__table__.columns
     return {col.key: col.nullable for col in raw_cols}
 
 
-# Recherche du plus proche résultat dans une table
 async def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_si_parfait=True):
-    """Renvoie le/les éléments de <table> correspondant le mieux à <chaine> (selon la colonne <carac>, défaut : colonne primaire de la table), répondant à <filtre> (défaut : tous) sous forme de liste de tuples (element, score*) triés par score* décroissant, en se limitant aux scores* supérieurs à <sensi>.
+    """Recherche le(s) plus proche résultat(s) dans une table
+
+    Renvoie le/les éléments de <table> correspondant le mieux à <chaine> (selon la colonne <carac>, défaut : colonne primaire de la table), répondant à <filtre> (défaut : tous) sous forme de liste de tuples (element, score*) triés par score* décroissant, en se limitant aux scores* supérieurs à <sensi>.
 
     Si <solo_si_parfait> (défaut), renvoie uniquement le premier élément de score 1 trouvé s'il existe (ignore les autres éléments, même si >= sensi)
 
-    *Score = ratio de difflib.SequenceMatcher, i.e. proportion de caractères communs aux deux chaînes"""
-
+    *Score = ratio de difflib.SequenceMatcher, i.e. proportion de caractères communs aux deux chaînes
+    """
     SM = difflib.SequenceMatcher()                      # Création du comparateur de chaînes
     slug1 = remove_accents(chaine).lower()              # Cible en minuscule et sans accents
     SM.set_seq1(slug1)                                  # Première chaîne à comparer : cible demandée

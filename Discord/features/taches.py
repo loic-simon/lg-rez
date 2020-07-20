@@ -7,13 +7,15 @@ import tools
 from bdd_connect import db, Taches, Actions, Joueurs
 
 
-def execute(tache):         # Exécute la tâche <tache> (objet BDD Taches) : appelle le webhook et nettoie
+def execute(tache):
+    """Exécute la tâche <tache> (objet BDD Taches) : appelle le webhook et nettoie"""
     webhook.send(tache.commande, source="tp")
     db.session.delete(tache)
     db.session.commit()
 
 
-def add_task(bot, timestamp, commande, action=None):        # Ajoute une tâche sur le bot + en base (fonction pour usage ici et dans d'autres features)
+def add_task(bot, timestamp, commande, action=None):
+    """Ajoute une tâche sur le bot + en base (fonction pour usage ici et dans d'autres features)"""
     now = datetime.datetime.now()
     tache = Taches(timestamp=timestamp, commande=commande, action=action)
 
@@ -24,7 +26,8 @@ def add_task(bot, timestamp, commande, action=None):        # Ajoute une tâche 
     bot.tasks[tache.id] = TH        # TaskHandler, pour pouvoir cancel
 
 
-def cancel_task(bot, tache):        # Supprime (annule) une tâche (fonction pour usage ici et dans d'autres features)
+def cancel_task(bot, tache):
+    """Supprime (annule) une tâche (fonction pour usage ici et dans d'autres features)"""
     bot.tasks[tache.id].cancel()        # Annulation (objet TaskHandler)
     db.session.delete(tache)            # Suppression en base
     db.session.commit()
@@ -78,7 +81,6 @@ class GestionTaches(commands.Cog):
               - !planif 13/06/2020-10:00 !open maire
               - !planif 23:25:12 !close maire
         """
-
         now = datetime.datetime.now()
 
         if "/" in quand:            # Date précisée
@@ -141,7 +143,6 @@ class GestionTaches(commands.Cog):
         Ex. : - !delay 2h !close maire
               - !delay 1h30m !doas @moi !vote Yacine Oussar
         """
-
         secondes = 0
         try:
             if "h" in duree.lower():

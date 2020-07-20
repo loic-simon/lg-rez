@@ -1,4 +1,5 @@
 import os
+import sys
 import asyncio
 import logging
 import traceback
@@ -23,13 +24,16 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 GUILD_ID = int(os.getenv("DISCORD_GUILD_ID"))
 assert TOKEN, "bot.py : TOKEN introuvable"
-assert TOKEN, "bot.py : DISCORD_GUILD_ID introuvable"
+assert GUILD_ID, "bot.py : DISCORD_GUILD_ID introuvable"
 
 
 ### 2 - Création du bot
 COMMAND_PREFIX = "!"
 class SuperBot(commands.Bot):
+    """discord.ext.commands.Bot avec quelques listes et dictionnaire"""
+
     def __init__(self, **kwargs):
+        """Initialize self"""
         commands.Bot.__init__(self, **kwargs)
         self.in_command = []        # IDs des joueurs dans une commande
         self.in_stfu = []           # IDs des salons en mode STFU (IA off)
@@ -46,18 +50,28 @@ class AlreadyInCommand(commands.CheckFailure):
 
 @bot.check
 async def already_in_command(ctx):
+    """Décorateur : vérifie si le joueur est actuellement dans une commande"""
     if (ctx.author.id in ctx.bot.in_command and ctx.command.name != "stop"):    # Cas particulier : !stop
         raise AlreadyInCommand()
     else:
         return True
 
-@bot.before_invoke      # Appelé seulement si les checks sont OK, donc pas déjà dans bot.in_command
+@bot.before_invoke
 async def add_to_in_command(ctx):
+    """Ajoute le joueur dans la liste des joueurs dans une commande
+
+    Cette fonction est appellée avant chaque appel de fonction.
+    Appel seulement si les checks sont OK, donc pas déjà dans bot.in_command
+    """
     if ctx.command.name != "stop" and not ctx.message.webhook_id:
         ctx.bot.in_command.append(ctx.author.id)
 
 @bot.after_invoke
 async def remove_from_in_command(ctx):
+    """Retire le joueur de la liste des joueurs dans une commande
+
+    Cette fonction est appellée après chaque appel de fonction.
+    """
     if ctx.command.name != "stop" and not ctx.message.webhook_id:
         ctx.bot.in_command.remove(ctx.author.id)
 
@@ -67,6 +81,8 @@ async def remove_from_in_command(ctx):
 # Au démarrage du bot
 @bot.event
 async def on_ready():
+    """Fonction appellée par Discord au démarrage du bot"""
+
     guild = bot.get_guild(GUILD_ID)
     assert guild, f"on_ready : Guilde d'ID {GUILD_ID} introuvable"
 
@@ -94,6 +110,8 @@ async def on_ready():
 # À l'arrivée d'un membre sur le serveur
 @bot.event
 async def on_member_join(member):
+    """Fonction appellée par Discord à l'arrivée de <member> sur le serveur"""
+
     await tools.log(member, f"Arrivée de {member.name}#{member.discriminator} sur le serveur")
     await inscription.main(bot, member)
 
@@ -101,6 +119,8 @@ async def on_member_join(member):
 # À chaque message
 @bot.event
 async def on_message(message):
+    """Fonction appellée par Discord à la réception de <message>"""
+
     if message.author == bot.user:              # Sécurité pour éviter les boucles infinies
         return
 
@@ -108,7 +128,8 @@ async def on_message(message):
         await message.channel.send("Je n'accepte pas les messages privés, désolé !")
         return
 
-    if message.author.top_role == tools.role(message, "@everyone"):     # Pas de rôle affecté
+    if (not message.webhook_id                  # Pas de rôle affecté (et pas un webhook)
+        and message.author.top_role == tools.role(message, "@everyone")):
         return      # le bot te calcule même pas
 
     await bot.invoke(await bot.get_context(message))        # On trigger toutes les commandes
@@ -125,6 +146,13 @@ async def on_message(message):
 # À chaque réaction ajoutée
 @bot.event
 async def on_raw_reaction_add(payload):
+    """Fonction appellée par Discord à l'ajout d'une réaction
+
+    <payload> paramètre "statique" (car message par forcément dans le cache du bot, si il a été reboot depuis) :
+        payload.member          Membre ayant posé la réaction
+        payload.emoji           PartialEmoji envoyé
+        payload.message_id      ID du message réacté
+    """
     reactor = payload.member
     if reactor == bot.user or reactor.id in bot.in_command:         # Boucles infinies + gens dans une commande
         return
@@ -330,6 +358,13 @@ bot.add_cog(Special(bot))
 ### 7 - Gestion des erreurs
 @bot.event
 async def on_command_error(ctx, exc):
+    """Fonction appellée par Discord à chaque exception raise dans une commande
+
+    <ctx>   Contexte où l'erreur a été raise
+    <exc>   Exception raise
+
+    Permet de gérer spécifiquement les erreurs de discord.ext.commands (commandes)
+    """
     db.session.rollback()       # Dans le doute, on vide la session SQL
     if isinstance(exc, commands.CommandInvokeError) and isinstance(exc.original, RuntimeError):     # STOP envoyé
         await ctx.send("Mission aborted.")
@@ -375,9 +410,17 @@ async def on_command_error(ctx, exc):
                        f"{tools.mention_MJ(ctx)} ALED – "
                        f"{tools.ital(f'{type(exc).__name__}: {str(exc)}')}")
 
+
 # Erreurs non gérées par le code précédent (hors du cadre d'une commande)
 @bot.event
 async def on_error(event, *args, **kwargs):
+    """Fonction appellée par Discord à chaque exception remontant plus haut qu'une commande
+
+    <event>             Type d'évènement ayant généré une erreur
+    *args, **kwargs     Arguments envoyés à la fonction récupérant l'évènement : ex. <member>, <message>...
+
+    Permet de gérer les exceptions sans briser la loop du bot (i.e. il reste en ligne)
+    """
     db.session.rollback()       # Dans le doute, on vide la session SQL
     guild = bot.get_guild(GUILD_ID)
     assert guild, f"on_error : Serveur {GUILD_ID} introuvable - Erreur initiale : \n{traceback.format_exc}"
@@ -386,15 +429,8 @@ async def on_error(event, *args, **kwargs):
         f"{tools.role(guild, 'MJ').mention} ALED : Exception Python !"
         f"{tools.code_bloc(traceback.format_exc())}"
     ))
-    raise        # On remonte l'exception à Python
+    raise        # On remonte l'exception à Python (pour log, ça ne casse pas la loop)
 
 
-### 8 - Exécute le tout (bloquant, rien n'est exécuté après)
+### 8 - Lance le bot (bloquant, rien n'est exécuté après)
 bot.run(TOKEN)
-# try:
-#     bot.loop.run_until_complete(bot.start(TOKEN))
-# except KeyboardInterrupt:
-#     bot.loop.run_until_complete(bot.logout())
-#     # cancel all tasks lingering
-# finally:
-#     bot.loop.close()
