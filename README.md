@@ -1,14 +1,14 @@
 # lg-rez
 
-:fr: lg-rez est un programme Python (pas vraiment un module, un jour peut-être) pour organiser des parties endiablées de Loup-Garou à la PCéenne.
+*(Français)* lg-rez est un programme Python (pas vraiment un module, un jour peut-être) pour organiser des parties endiablées de Loup-Garou à la PCéenne.
 
-:uk: lg-rez is a Python program (not really a library, maybe someday) for organizing boisterous Werewolf RP games ESPCI-style.
+*(English)* lg-rez is a Python program (not really a library, maybe someday) for organizing boisterous Werewolf RP games ESPCI-style.
 
 ## Installation
 
 Don't use the package manager [pip](https://pypi.org/project/pip/) to install lg-rez. Really, don't. It won't work.
 
-~~```pip install foobar```~~
+~~```pip install lg-rez```~~
 
 You can not really install this at the moment. If you really want, though, use a 3.6+ Python interpreter and install all packages required when running `bot.py`.
 
@@ -22,7 +22,8 @@ Online or not, this program needs to be connected to a database and several othe
 Pull requests are not welcome. Contact the authors for any question about this (half-private) project.
 
 ## License
-[MIT](https://choosealicense.com/licenses/mit/)
+This work is shared under [the MIT license](https://choosealicense.com/licenses/mit/).
+
 © 2020 Loïc Simon, Tom Lacoma et al. – Club BD-Jeux × GRIs – ESPCI Paris - PSL
 
 Reach us on Discord: [LaCarpe#1674](https://discordapp.com/users/264482202966818825), [TaupeOrAfk#3218](https://discordapp.com/users/176763552202358785) or by mail: [loic.simon@espci.org](mailto:loic.simon@espci.org)
