@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
-from bdd_connect import db, Joueurs, Actions
+from bdd_connect import db, Joueurs, Actions, CandidHaro
 from features import gestion_actions
 from blocs import bdd_tools, gsheets
 import tools
@@ -51,6 +51,14 @@ class VoterAgir(commands.Cog):
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
                                                 message=f"Contre qui veux-tu voter ? (vote actuel : {tools.code(joueur._vote_condamne)})")
 
+        #Test si la cible est sous le coup d'un haros
+        cible_ds_haro = CandidHaro.query.filter_by(player_id = cible.discord_id, type='haro').all()
+        if not cible_ds_haro:
+            mess = await ctx.send(f"{cible.nom} n'a pas (encore) subi de haro ! Si c'est toujours le cas à la fin du vote, ton vote sera compté comme blanc... \n Veux-tu continuer ?")
+            if not await tools.yes_no(ctx.bot, mess):
+                await ctx.send("Compris, mission aborted.")
+                return
+
         if joueur._vote_condamne is None:      # On revérifie, si ça a fermé entre temps !!
             await ctx.send("Le vote pour le condamné du jour a fermé entre temps, pas de chance !")
             return
@@ -94,6 +102,13 @@ class VoterAgir(commands.Cog):
         # Choix de la cible
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
                                                 message=f"Pour qui veux-tu voter ? (vote actuel : {tools.code(joueur._vote_maire)})")
+
+        cible_ds_candid = CandidHaro.query.filter_by(player_id = cible.discord_id, type='candidature').all()
+        if not cible_ds_candid:
+            mess = await ctx.send(f"{cible.nom} ne s'est pas (encore) présenté.e ! Si c'est toujours le cas à la fin de l'élection, ton vote sera compté comme blanc... \n Veux-tu continuer ?")
+            if not await tools.yes_no(ctx.bot, mess):
+                await ctx.send("Compris, mission aborted.")
+                return
 
         if joueur._vote_maire is None:          # On revérifie, si ça a fermé entre temps !!
             await ctx.send("Le vote pour le nouveau maire a fermé entre temps, pas de chance !")
@@ -234,7 +249,7 @@ class VoterAgir(commands.Cog):
                 if not deleted:
                     bdd_tools.modif(action, "_decision", None)
 
-            await ctx.send(tools.ital(f"[Allo {tools.role(ctx, 'MJ').mention}, conséquance instantanée ici !]"))
+            await ctx.send(tools.ital(f"[Allo {tools.role(ctx, 'MJ').mention}, conséquence instantanée ici !]"))
 
         else:
             await ctx.send(f"Action « {tools.code(action._decision)} » bien prise en compte pour {tools.code(action.action)}.\n"

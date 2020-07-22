@@ -3,7 +3,7 @@ import datetime
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
-from bdd_connect import db, Actions, BaseActions, Joueurs
+from bdd_connect import db, Actions, BaseActions, Joueurs, Taches
 import tools
 from blocs import bdd_tools
 from features import taches
@@ -26,7 +26,7 @@ async def get_actions(quoi, trigger, heure=None):
 
         if quoi == "open":
             criteres = and_(Actions.trigger_debut == trigger, Actions.heure_debut == heure,
-                            Action._decision == None)       # Obhects spéciaux SQLAlchemy : LAISSER le == !
+                            Actions._decision == None)       # Obhects spéciaux SQLAlchemy : LAISSER le == !
         elif quoi == "close":
             criteres = and_(Actions.trigger_fin == trigger, Actions.heure_fin == heure,
                             Actions._decision != None)      # Obhects spéciaux SQLAlchemy : LAISSER le == !
@@ -181,10 +181,10 @@ def add_action(ctx, action):
 
 
 def delete_action(ctx, action):
-    """Ajoute et programme l'ouverture d'<action>"""
+    """Supprime <action> de la bdd Actions"""
     db.session.delete(action)
     db.session.commit()
     # Suppression tâches liées à l'action
-    taches = Taches.query.filter_by(action=action.id).all()
-    for tache in taches:
+    tachesz = Taches.query.filter_by(action=action.id).all() ##tachesz pour pas faire doublon avec taches.py
+    for tache in tachesz:
         taches.cancel_task(ctx.bot, tache)
