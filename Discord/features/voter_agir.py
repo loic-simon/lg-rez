@@ -52,7 +52,7 @@ class VoterAgir(commands.Cog):
                                                 message=f"Contre qui veux-tu voter ? (vote actuel : {tools.code(joueur._vote_condamne)})")
 
         #Test si la cible est sous le coup d'un haros
-        cible_ds_haro = CandidHaro.query.filter_by(player_id = cible.discord_id, type='haro').all()
+        cible_ds_haro = CandidHaro.query.filter_by(player_id=cible.discord_id, type='haro').all()
         if not cible_ds_haro:
             mess = await ctx.send(f"{cible.nom} n'a pas (encore) subi de haro ! Si c'est toujours le cas à la fin du vote, ton vote sera compté comme blanc... \n Veux-tu continuer ?")
             if not await tools.yes_no(ctx.bot, mess):
@@ -103,9 +103,9 @@ class VoterAgir(commands.Cog):
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
                                                 message=f"Pour qui veux-tu voter ? (vote actuel : {tools.code(joueur._vote_maire)})")
 
-        cible_ds_candid = CandidHaro.query.filter_by(player_id = cible.discord_id, type='candidature').all()
+        cible_ds_candid = CandidHaro.query.filter_by(player_id=cible.discord_id, type='candidature').all()
         if not cible_ds_candid:
-            mess = await ctx.send(f"{cible.nom} ne s'est pas (encore) présenté.e ! Si c'est toujours le cas à la fin de l'élection, ton vote sera compté comme blanc... \n Veux-tu continuer ?")
+            mess = await ctx.send(f"{cible.nom} ne s'est pas (encore) présenté(e) ! Si c'est toujours le cas à la fin de l'élection, ton vote sera compté comme blanc... \n Veux-tu continuer ?")
             if not await tools.yes_no(ctx.bot, mess):
                 await ctx.send("Compris, mission aborted.")
                 return

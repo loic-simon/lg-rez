@@ -127,7 +127,9 @@ class Sync(commands.Cog):
                     bdd_tools.modif(joueur, col, val)           # Dans tous les cas, on modifie en base (après, pour pouvoir accéder aux vieux attribus plus haut)
 
                 if not silent:
-                    await chan.send(":zap: Une action divine vient de modifier ton existence ! :zap:\n" + notif)
+                    await chan.send(":zap: Une action divine vient de modifier ton existence ! :zap:\n"
+                                    + notif
+                                    + tools.it("\n:warning: Si tu penses qu'il y a erreur, appelle un MJ au plus vite ! :warning:"))
 
             db.session.commit()
 

@@ -26,10 +26,10 @@ async def get_actions(quoi, trigger, heure=None):
 
         if quoi == "open":
             criteres = and_(Actions.trigger_debut == trigger, Actions.heure_debut == heure,
-                            Actions._decision == None)       # Obhects spéciaux SQLAlchemy : LAISSER le == !
+                            Actions._decision == None)      # Objets spéciaux SQLAlchemy : LAISSER le == !
         elif quoi == "close":
             criteres = and_(Actions.trigger_fin == trigger, Actions.heure_fin == heure,
-                            Actions._decision != None)      # Obhects spéciaux SQLAlchemy : LAISSER le == !
+                            Actions._decision != None)      # Objets spéciaux SQLAlchemy : LAISSER le == !
         elif quoi == "remind":
             criteres = and_(Actions.trigger_fin == trigger, Actions.heure_fin == heure,
                             Actions._decision == "rien")
@@ -181,10 +181,9 @@ def add_action(ctx, action):
 
 
 def delete_action(ctx, action):
-    """Supprime <action> de la bdd Actions"""
+    """Supprime <action> et annule les tâches en cours liées"""
     db.session.delete(action)
     db.session.commit()
     # Suppression tâches liées à l'action
-    tachesz = Taches.query.filter_by(action=action.id).all() ##tachesz pour pas faire doublon avec taches.py
-    for tache in tachesz:
+    for tache in Taches.query.filter_by(action=action.id).all():
         taches.cancel_task(ctx.bot, tache)

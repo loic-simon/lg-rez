@@ -431,7 +431,6 @@ def sub_chiffre(chiffre: int, multi=False):
 ### Utilitaires de date / temps, notemment liées aux horaires de jeu
 ### ---------------------------------------------------------------------------
 
-# Convertit HHh[MM] en objet Time
 def heure_to_time(heure):
     """Convertit <heure> = HHh[MM] (str) en objet datetime.time."""
     try:
@@ -439,6 +438,20 @@ def heure_to_time(heure):
         return datetime.time(int(hh), int(mm) if mm else 0)
     except ValueError as exc:
         raise ValueError(f"Valeur \"{heure}\" non convertible en temps") from exc
+
+
+def time_to_heure(tps, sep="h", force_minutes=False):
+    """Convertit <tps> (objet datetime.time) en str "HH[sep]" / "HH[sep]MM".
+
+    [sep]               séparateur heures / minutes (défaut "h")
+    [force_minutes]     si False (défaut), les minutes ne sont indiquées que si différentes de 0.
+    """
+    sep = sep.replace("%", "%%")    # Échappement des % pour utilisation dans strftime
+
+    if force_minutes or tps.minute > 0:
+        return tps.strftime(f"%H{sep}%M")
+    else:
+        return tps.strftime(f"%H{sep}")
 
 
 # Renvoie le datetime correspondant au prochain moment ou tps arrive DANS LES HORAIRES DU JEU : du dimanche 19:00:00 au vendredi 18:59:59.
