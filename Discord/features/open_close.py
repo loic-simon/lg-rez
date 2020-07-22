@@ -196,7 +196,8 @@ class OpenClose(commands.Cog):
 
             if qui == "cond":
                 await chan.send(f"""{tools.montre()}  Fin du vote pour le condamné du jour ! \n"""
-                                f"""Vote définitif : {joueur._vote_condamne}""")
+                                f"""Vote définitif : {joueur._vote_condamne}\n"""
+                                f"""Les résultats arrivent dans l'heure !\n""")
                 bdd_tools.modif(joueur, "_vote_condamne", None)
 
             elif qui == "maire":

@@ -1,13 +1,19 @@
+import os
+
 import datetime
 import discord
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
+from dotenv import load_dotenv
+
+from blocs import gsheets
 
 from bdd_connect import db, Joueurs, Actions, BaseActions, BaseActionsRoles, CandidHaro
 from features import gestion_actions, taches
 from blocs import bdd_tools
 import tools
 
+import matplotlib.pyplot as plt
 
 class ActionsPubliques(commands.Cog):
     """ActionsPubliques - Commandes pour gérer les actions vous engageant publiquement"""
@@ -19,6 +25,14 @@ class ActionsPubliques(commands.Cog):
     async def haro(self, ctx, target=None):
         """Lance un haro contre [target]"""
         auteur = ctx.author
+
+        joueur = Joueurs.query.get(auteur.id)
+        assert joueur, f"Joueur {auteur.display_name} introuvable"
+
+        if joueur._vote_condamne is None:
+            await ctx.send("Pas de vote pour le condamné de jour en cours !")
+            return
+
         cible = await tools.boucle_query_joueur(ctx, target, 'Contre qui souhaite-tu déverser ta haine ?')
 
         if cible.statut == "mort":
@@ -44,16 +58,23 @@ class ActionsPubliques(commands.Cog):
 
         db.session.commit()
 
-        emb = discord.Embed(title = f"{tools.emoji(ctx, 'ha')}{tools.emoji(ctx, 'ro')} contre {cible.nom} !",
-                            description = f"**« {motif.content} »**\n \n" + f"{ctx.author.display_name} en a gros     :rage: :rage:", color=0xff0000 )
+        emb = discord.Embed(title = f"**{tools.emoji(ctx, 'ha')}{tools.emoji(ctx, 'ro')} contre {cible.nom} !**",
+                            description = f"**« {motif.content} »\n**",
+                            color=0xff0000)
+        emb.set_author(name = f"{ctx.author.display_name} en a gros 😡😡")
+        emb.set_thumbnail(url = tools.emoji(ctx, "bucher").url)
+        emb.set_footer(text = f"Utilise !vote {cible.nom} pour voter contre lui")
         m = await ctx.send("C'est tout bon ?", embed=emb)
 
         if await tools.yes_no(ctx.bot, m):
             cible_member = ctx.guild.get_member(cible.discord_id)
             assert cible_member, f"!haro : Member associé à {cible} non trouvé"
-            await tools.channel(ctx, "haros").send(f"{cible_member.mention}", embed=emb)
+            await tools.channel(ctx, "haros").send( f"(Psst, {ctx.guild.get_member(cible.discord_id).mention} :3)", embed=emb)
+            await tools.channel(ctx, "débats").send( f"{tools.emoji(ctx, 'ha')}{tools.emoji(ctx, 'ro')} de {auteur.display_name} sur {cible.nom} ! Vous en pensez quoi vous (et allez voir {tools.channel(ctx, 'haros').mention} hein)?")
             await ctx.send(f"Allez c'est parti ! ({tools.channel(ctx, 'haros').mention})")
 
+        else:
+            await ctx.send("Compris, mission aborted.")
 
     @commands.command()
     @tools.vivants_only
@@ -112,6 +133,54 @@ class ActionsPubliques(commands.Cog):
             db.session.commit()
             await tools.log(ctx, "Toutes les candidatures ont bien été effacés !")
 
+
+
+    @commands.command()
+    @tools.mjs_only
+    async def plot(self, ctx, type=None):
+        """Trace le résultat du vote indiqué sous forme d'histogramme, en fait un embed et l'envoie sur le chan #annonces
+
+        <type> - Choisir entre maire et cond pour l'élection municipale ou le condamné du jour"""
+
+        d = {"maire":"MaireRéel", "cond":"CondamnéRéel"}
+
+        assert type in ["maire", "cond"], "Merci de spécifier l'histogramme à tracer parmi 'maire' et 'cond'"
+
+        #Sorcellerie sur la feuille gsheets pour trouver la colonne "CondamnéRéel"
+        load_dotenv()
+        SHEET_ID = os.getenv("TDB_SHEET_ID")
+        assert SHEET_ID, "inscription.main : TDB_SHEET_ID introuvable"
+
+        workbook = gsheets.connect(SHEET_ID)    # Tableau de bord
+        sheet = workbook.worksheet("Journée en cours")
+        values = sheet.get_all_values()         # Liste de liste des valeurs des cellules
+        NL = len(values)
+
+        head = values[2]            # Ligne d'en-têtes (noms des colonnes) = 3e ligne du TDB
+        col_cond = head.index(d[type])
+        conds = [values[i][col_cond] for i in range(3,NL) if values[i][col_cond]]
+
+        await tools.log(ctx, conds)
+
+        """
+        cond_count = {} #dict {élem : nb ocurrences}
+        for cond in conds:
+            if not cond in cond_count:
+                cond_count[cond]=1
+            else:
+                cond_count[cond]+=1
+        """
+        plt.clf()
+        plt.figure()
+        #plt.plot([k for k in cond_count], [v for v in cond_count.values()])
+        plt.hist(conds, align="mid")
+        plt.grid()
+        plt.savefig(f"www/figures/hist_{type}.png")
+
+        embed = discord.Embed(title="Title", description="Desc", color=0x00ff00) #creates embed
+        file = discord.File(f"www/figures/hist_{type}.png", filename="image.png")
+        embed.set_image(url="attachment://image.png")
+        await ctx.send(file=file, embed=embed)
 
 
     @commands.command(enabled=False)
