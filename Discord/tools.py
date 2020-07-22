@@ -445,13 +445,18 @@ def time_to_heure(tps, sep="h", force_minutes=False):
 
     [sep]               séparateur heures / minutes (défaut "h")
     [force_minutes]     si False (défaut), les minutes ne sont indiquées que si différentes de 0.
-    """
-    sep = sep.replace("%", "%%")    # Échappement des % pour utilisation dans strftime
 
-    if force_minutes or tps.minute > 0:
-        return tps.strftime(f"%H{sep}%M")
+    Renvoit une chaîne vide si <tps> est None.
+    """
+    if tps:
+        sep = sep.replace("%", "%%")    # Échappement des % pour utilisation dans strftime
+
+        if force_minutes or tps.minute > 0:
+            return f"{tps.hour}{sep}{tps.minute:02}"
+        else:
+            return f"{tps.hour}{sep}"
     else:
-        return tps.strftime(f"%H{sep}")
+        return ""
 
 
 # Renvoie le datetime correspondant au prochain moment ou tps arrive DANS LES HORAIRES DU JEU : du dimanche 19:00:00 au vendredi 18:59:59.

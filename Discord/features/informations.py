@@ -116,8 +116,39 @@ class Informations(commands.Cog):
     async def infos(self, ctx):
         """Affiche tes informations de rôle / actions
 
-        Tout est dit, pas de vanne
+        Toutes les actions liées à ton rôle (et parfois d'autres) sont indiquées, même celles que tu ne peux pas utiliser pour l'instant (plus de charges, déclenchées automatiquement...)
         """
+        def disponible(action):
+            """Renvoie une description human readible des conditions de déclenchement d'<action>"""
+            if action.trigger_debut == "temporel":
+                dispo = f"De {tools.time_to_heure(action.heure_debut)} à {tools.time_to_heure(action.heure_fin)}"
+            elif action.trigger_debut == "perma":
+                dispo = f"N'importe quand"
+            elif action.trigger_debut == "start":
+                dispo = f"Au lancement de la partie"
+            elif action.trigger_debut == "mort":
+                dispo = f"S'active à ta mort"
+            elif "_" in action.trigger_debut:
+                quoi, qui = action.trigger_debut.split("_")
+                d_quoi = {"open": "l'ouverture",
+                          "close": "la fermeture",
+                          "remind": "personne utilise ça",
+                }
+                d_qui = {"cond": "du vote condamné",
+                         "maire": "du vote pour la mairie",
+                         "loups": "du vote pour les loups",
+                         "action": "personne utilise ça",
+                }
+                try:
+                    dispo = f"S'active à {d_quoi[quoi]} {d_qui[qui]}"
+                except KeyError:
+                    dispo = f"S'active à {quoi}_{qui}"
+            else:
+                dispo = action.trigger_debut
+
+            return dispo
+
+
         member = ctx.author
         joueur = Joueurs.query.get(member.id)
         assert joueur, f"!menu : joueur {member} introuvable"
@@ -127,13 +158,14 @@ class Informations(commands.Cog):
         r += tools.ital(f"({tools.code(f'!roles {joueur.role}')} pour tout savoir sur ce rôle)")
 
         actions = Actions.query.filter_by(player_id=member.id).all()
+
         if actions:
             r += "\n\nActions :"
-            r += tools.code_bloc("\n".join([
+            r += tools.code_bloc("\n".join([(
                 f" - {str(action.action).ljust(20)} "
-                + (f"Cooldown : {cooldown}  " if (cooldown := action.cooldown) else "Disponible     ")
-                + (f"{charges} charge(s){' pour cette semaine' if 'weekends' in action.refill else ''}" if (charges := action.charges) else "Illimitée")
-                for action in actions]
+                + (f"Cooldown : {cooldown}" if (cooldown := action.cooldown) else disponible(action)).ljust(25)
+                + (f"{action.charges} charge(s){' pour cette semaine' if (action.refill and 'weekends' in action.refill) else ''}" if isinstance(action.charges, int) else "Illimitée")     # Vraiment désolé pour cette immondice
+                ) for action in actions]
             ))
         else:
             r += "\n\nAucune action disponible."
@@ -141,21 +173,26 @@ class Informations(commands.Cog):
         await ctx.send(r + f"\n{tools.code('!menu')} pour voir les votes et actions en cours, {tools.code('@MJ')} en cas de problème")
 
 
+
     @commands.command()
     async def vivants(self, ctx):
-        """Affiche la liste des joueurs vivants"""
+        """Affiche la liste des joueurs vivants
 
+        Aussi dite : « liste des joueurs qui seront bientôt morts »
+        """
         mess = "Les joueurs vivants sont : \n"
-        joueurs = [joueur.nom for joueur in Joueurs.query.filter(Joueurs.statut != "mort").order_by(Joueurs.nom)]
+        joueurs = [joueur for joueur in Joueurs.query.filter(Joueurs.statut != "mort").order_by(Joueurs.nom)]
         for joueur in joueurs:
-            mess += f" - {joueur} \n"
+            mess += f" - {joueur.nom.ljust(15)} en chambre {joueur.chambre}\n"
         await tools.send_code_blocs(ctx, mess)
 
 
     @commands.command()
     async def morts(self, ctx):
-        """Affiche la liste des joueurs morts"""
+        """Affiche la liste des joueurs morts
 
+        Aussi dite : « liste des joueurs qui mangent leurs morts »
+        """
         mess = "Les morts sont :\n"
         joueurs = [joueur.nom for joueur in Joueurs.query.filter_by(statut = "mort").order_by(Joueurs.nom)]
         if not joueurs:

@@ -92,6 +92,7 @@ class Sync(commands.Cog):
                         cols = [col for col in bdd_tools.get_cols(BaseActions) if not col.startswith("base")]
                         new_actions = [Actions(player_id=joueur.discord_id, **{col: getattr(ba, col) for col in cols},
                                                cooldown=0, charges=ba.base_charges) for ba in new_bas]
+                        await tools.log(ctx, str(new_actions))
 
                         for action in new_actions:
                             gestion_actions.add_action(ctx, action)     # Ajout et création des tâches si trigger temporel
@@ -128,8 +129,8 @@ class Sync(commands.Cog):
 
                 if not silent:
                     await chan.send(":zap: Une action divine vient de modifier ton existence ! :zap:\n"
-                                    + notif
-                                    + tools.it("\n:warning: Si tu penses qu'il y a erreur, appelle un MJ au plus vite ! :warning:"))
+                                    + f"\n{notif}\n"
+                                    + tools.ital(":warning: Si tu penses qu'il y a erreur, appelle un MJ au plus vite !"))
 
             db.session.commit()
 
