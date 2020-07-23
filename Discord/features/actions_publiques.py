@@ -137,12 +137,19 @@ class ActionsPubliques(commands.Cog):
 
     @commands.command()
     @tools.mjs_only
+    @tools.private
     async def plot(self, ctx, type=None):
         """Trace le résultat du vote indiqué sous forme d'histogramme, en fait un embed et l'envoie sur le chan #annonces
 
         <type> - Choisir entre maire et cond pour l'élection municipale ou le condamné du jour"""
 
         d = {"maire":"MaireRéel", "cond":"CondamnéRéel"}
+        cibleur = {"maire":"VotantMaire", "cond":"VotantCond"}
+
+        typo = {"maire":"maire", "cond":"condamné"}
+        pour_contre = {"maire":"pour", "cond":"contre"}
+        couleur = {"cond":0xFF6A00, "maire":0x007F0E}
+
 
         assert type in ["maire", "cond"], "Merci de spécifier l'histogramme à tracer parmi 'maire' et 'cond'"
 
@@ -157,30 +164,61 @@ class ActionsPubliques(commands.Cog):
         NL = len(values)
 
         head = values[2]            # Ligne d'en-têtes (noms des colonnes) = 3e ligne du TDB
+
         col_cond = head.index(d[type])
         conds = [values[i][col_cond] for i in range(3,NL) if values[i][col_cond]]
 
-        await tools.log(ctx, conds)
+        col_votants = head.index(cibleur[type])
+        votants_dict = {values[i][col_cond]:[values[j][col_votants] for j in range(NL) if (values[j][col_votants] and values[j][col_cond] == values[i][col_cond])] for i in range(3,NL) if values[i][col_votants]} #dictionnaire {cible:[liste des votants contre cible]}
 
-        """
-        cond_count = {} #dict {élem : nb ocurrences}
+
+        cond_dict = {} #dict {élem : nb ocurrences}
         for cond in conds:
-            if not cond in cond_count:
-                cond_count[cond]=1
+            if not cond in cond_dict:
+                cond_dict[cond]=1
             else:
-                cond_count[cond]+=1
-        """
-        plt.clf()
-        plt.figure()
-        #plt.plot([k for k in cond_count], [v for v in cond_count.values()])
-        plt.hist(conds, align="mid")
-        plt.grid()
+                cond_dict[cond]+=1
+
+        nb_votes = sum(cond_dict.values())
+
+        plt.figure(facecolor='#2F3136')
+
+        ax = plt.axes(facecolor='#8F9194') #coloration de TOUT le graphe
+        ax.tick_params(axis='both', colors='white')
+        ax.spines['bottom'].set_color('white')
+        ax.spines['left'].set_color('#2F3136')
+        ax.spines['right'].set_color('#2F3136')
+        ax.spines['top'].set_color('#2F3136')
+        ax.set_facecolor('#2F3136')
+
+        plt.bar(list(range(len(cond_dict))),list(cond_dict.values()), tick_label=list(cond_dict.keys()))
+        plt.grid(axis = "y")
         plt.savefig(f"www/figures/hist_{type}.png")
 
-        embed = discord.Embed(title="Title", description="Desc", color=0x00ff00) #creates embed
+        embed = discord.Embed(title = f"**Résultats du vote pour le {typo[type]} :**", description = f"{nb_votes} au total", color=couleur[type]) #creates embed
         file = discord.File(f"www/figures/hist_{type}.png", filename="image.png")
         embed.set_image(url="attachment://image.png")
-        await ctx.send(file=file, embed=embed)
+        m = await ctx.send("Ça part ?", file=file, embed=embed)
+
+        if await tools.yes_no(ctx.bot, m):
+            #Envoi du graphe
+            embed = discord.Embed(title = f'**Résultats du vote pour le {typo[type]} :**', description = f"{nb_votes} votes au total", color=couleur[type]) #creates embed
+            file = discord.File(f"www/figures/hist_{type}.png", filename="image.png")
+            embed.set_image(url="attachment://image.png")
+            await tools.channel(ctx, "annonces").send(file = file, embed = embed)
+
+            #Résultats détaillés
+            m2 = "Résultats détaillés :\n"
+            for k,v in votants_dict.items():
+                m2 += f"- Ont voté {pour_contre[type]} {k}: "
+                for i in v:
+                    m2+= f"{i} "
+                m2 += "\n"
+            await tools.send_code_blocs(tools.channel(ctx, "annonces"), m2)
+            await ctx.send("Et c'est parti dans #annonces !")
+
+        else:
+            await ctx.send("Compris, mission aborted.")
 
 
     @commands.command(enabled=False)
