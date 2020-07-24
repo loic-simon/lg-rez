@@ -550,14 +550,14 @@ def smooth_split(mess, N=1990, sep='\n', rep=''):
     return LM
 
 
-async def send_blocs(messageable, mess, **kwargs):
+async def send_blocs(messageable, mess, N=1990, sep='\n', rep=''):
     """Envoie <mess> dans <messageable> (ctx / channel)"""
-    [await messageable.send(bloc) for bloc in smooth_split(mess, **kwargs)]
+    [await messageable.send(bloc) for bloc in smooth_split(mess, N=N, sep=sep, rep=rep)]
 
 
-async def send_code_blocs(messageable, mess, **kwargs):
+async def send_code_blocs(messageable, mess, N=1990, sep='\n', rep='', langage=""):
     """Envoie dans <messageable> (ctx / channel) <mess> sous forme de blocs de code"""
-    [await messageable.send(code_bloc(bloc)) for bloc in smooth_split(mess, **kwargs)]
+    [await messageable.send(code_bloc(bloc, langage=langage)) for bloc in smooth_split(mess, N=N, sep=sep, rep=rep)]
 
 
 # Log dans #logs

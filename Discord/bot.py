@@ -4,6 +4,7 @@ import asyncio
 import logging
 import traceback
 import datetime
+import re
 import copy
 
 import discord
@@ -214,10 +215,133 @@ class Special(commands.Cog):
             def __init__(self):
                 self.rep = ""
         a = Answer()
-        exec(f"a.rep = {code}", globals(), locals())
+        exec(f"a.rep = {code}")
         if asyncio.iscoroutine(a.rep):
             a.rep = await a.rep
         await ctx.send(f"Entrée : {tools.code(code)}\nSortie :\n{a.rep}")
+
+
+    @commands.command()
+    @tools.mjs_only
+    async def shell(self, ctx):
+        """Lance un pseudo-terminal Python [BETA] (COMMANDE MJ)
+
+        Bon flemme d'écrire toute la doc' pour ça, en gros il faut bien comprendre que seules les syntaxes simples marcheront :
+            - assignation   (var = expression)
+            - évaluation    (expression)
+            - boucle for : syntaxe normale MAIS impossible d'en imbriquer ET fin avec "endfor"
+
+        Pas de if dispo pour l'instant, notemment.
+
+        Évidemment, les avertissements dans !help do s'appliquent ici : ne pas faire n'imp avec cette commande !! (même si ça peut être très utile, genre pour ajouter des gens en masse à un channel)
+        """
+
+        ### AVERTISSMENT : le code ci-dessous est peu commenté et pas mal technique, notemment avec de l'orienté objet et des regex
+
+        class Shell():          # Les attributs de cette classe peuvent être modifiés via exec
+            """Pseudo-terminal Python"""
+
+            def __init__(self):
+                """Initialize self"""
+                self.rep = ""
+                self.vars = {}
+                self.iter = None            # Si on est dans un boucle : itérateur à parcourir (objet)
+
+            async def exec(self, ctx, _g, _d, _i=None):
+                """Exécute "<_g> = <_d>", en remplaçant les variables dans <self>.vars, avec <ctx> et [_i] dans les locals"""
+                for _var in self.vars:          # Remplacement variables whole world sans remplacer les self.vars['var']
+                    _g = re.sub(rf"(^|[^'])\b({_var})\b", r"\1self.vars['\2']", _g)
+                    _d = re.sub(rf"(^|[^'])\b({_var})\b", r"\1self.vars['\2']", _d)
+
+                if _d.startswith("await "):             # Si coroutine :
+                    exec(f"self.rep = {_d[6:]}")
+                    self.rep = await self.rep       # on l'await (en passant par _shell.rep)
+                    exec(f"{_g} = self.rep")
+                else:
+                    exec(f"{_g} = {_d}")
+
+                return self
+
+
+        _shell = Shell()
+        # _if = None            # Si on est dans un test (et la valeur dudit test)
+        _for = None             # Si on est dans un boucle : header
+        _variter = None         # Si on est dans un boucle : variable parcourant (str)
+        _buffer = []            # Lignes en attente (if/for)
+
+        version_info = sys.version.replace('\n', ' ')
+        await tools.send_code_blocs(ctx,
+            f"""Python {version_info}\n"""
+            f"""Variables accessibles : "ctx", "Tables" (clés {list(Tables.keys())}), modules usuels.\n"""
+            """>>>"""
+        )
+
+        _exit = False
+        while not _exit:
+            try:
+                _shell.rep = None
+                _entree = None      # Entrée à évaluer (traitée)
+                _mess = await tools.wait_for_message(ctx.bot, check=lambda m:(m.channel == ctx.channel and m.author != ctx.bot.user))
+                _r = _mess.content
+
+                if _re := re.match(r"(\w+)\s*=\s*([^=].*)", _r):                # Affectation
+                    _entree = (f"self.vars['{_re.group(1)}']", _re.group(2).strip())
+
+                # elif _re := re.match(r"if\s*(.+):", _r):                        # Test
+                #     await ctx.send("(Test)")
+                #     _if = bool(exec(_re.group(1)))
+
+                elif _re := re.match(r"for\s*(.+?)\s*in\s*(.+?)\s*:", _r):      # Entrée dans boucle
+                    _for = _r
+                    _variter = _re.group(1).strip()
+                    _shell = await _shell.exec(ctx, "self.iter", _re.group(2))      # déclaration itérateur
+
+                elif _r == "endfor":                                            # Fin de boucle - exécution
+                    for _i in _shell.iter:
+                        for (_g, _d) in _buffer:
+                            _g_i = re.sub(rf"\b{_variter}\b", "_i", _g)     # remplacement whole world
+                            _d_i = re.sub(rf"\b{_variter}\b", "_i", _d)
+                            _shell = await _shell.exec(ctx, _g_i, _d_i, _i)
+
+                    _for = None
+                    _variter = None
+                    _shell.iter = None
+                    _buffer = None
+
+                else:                                                           # Sinon, évaluation
+                    _entree = ("self.rep", _r.strip())
+
+
+                if _entree:
+                    if not _for:                        # Exécution
+                        _g, _d = _entree
+                        _shell = await _shell.exec(ctx, _g, _d)
+                    else:
+                        _buffer.append(_entree)
+
+
+                if _for:                      # Prompt
+                    _prompt = f""">>> {_for}\n"""
+                    for (_g, _d) in _buffer:
+                        _prompt += f">>>     {_g} = {_d}\n"
+                    _prompt += ">>>                       (endfor pour finir)"
+                else:
+                    _prompt = f""">>> {_g} = {_d}\n"""
+                    if _shell.rep:
+                        _prompt += f"{_shell.rep}\n"
+                    _prompt += ">>>"
+
+                await tools.send_code_blocs(ctx, _prompt, langage="py")
+
+            except RuntimeError:
+                raise
+
+            except Exception:
+                await tools.send_code_blocs(ctx,
+                    f""">>> {_r}\n"""
+                    f"{traceback.format_exc()}\n"
+                    + """>>>"""
+                )
 
 
     @commands.command()
