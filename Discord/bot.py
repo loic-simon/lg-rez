@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 import blocs
 import tools
 from bdd_connect import db, Tables
-from features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques
+from features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques, pseudoshell
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -231,117 +231,23 @@ class Special(commands.Cog):
             - évaluation    (expression)
             - boucle for : syntaxe normale MAIS impossible d'en imbriquer ET fin avec "endfor"
 
-        Pas de if dispo pour l'instant, notemment.
+        Pas de if / while / try dispo pour l'instant, notemment.
 
         Évidemment, les avertissements dans !help do s'appliquent ici : ne pas faire n'imp avec cette commande !! (même si ça peut être très utile, genre pour ajouter des gens en masse à un channel)
         """
+        async def in_func():
+            mess = await tools.wait_for_message(ctx.bot, check=lambda m:(m.channel == ctx.channel and m.author != ctx.bot.user))
+            return mess.content
 
-        ### AVERTISSMENT : le code ci-dessous est peu commenté et pas mal technique, notemment avec de l'orienté objet et des regex
+        async def out_func(text):
+            await tools.send_code_blocs(ctx, text)
 
-        class Shell():          # Les attributs de cette classe peuvent être modifiés via exec
-            """Pseudo-terminal Python"""
-
-            def __init__(self):
-                """Initialize self"""
-                self.rep = ""
-                self.vars = {}
-                self.iter = None            # Si on est dans un boucle : itérateur à parcourir (objet)
-
-            async def exec(self, ctx, _g, _d, _i=None):
-                """Exécute "<_g> = <_d>", en remplaçant les variables dans <self>.vars, avec <ctx> et [_i] dans les locals"""
-                for _var in self.vars:          # Remplacement variables whole world sans remplacer les self.vars['var']
-                    _g = re.sub(rf"(^|[^'])\b({_var})\b", r"\1self.vars['\2']", _g)
-                    _d = re.sub(rf"(^|[^'])\b({_var})\b", r"\1self.vars['\2']", _d)
-
-                if _d.startswith("await "):             # Si coroutine :
-                    exec(f"self.rep = {_d[6:]}")
-                    self.rep = await self.rep       # on l'await (en passant par _shell.rep)
-                    exec(f"{_g} = self.rep")
-                else:
-                    exec(f"{_g} = {_d}")
-
-                return self
-
-
-        _shell = Shell()
-        # _if = None            # Si on est dans un test (et la valeur dudit test)
-        _for = None             # Si on est dans un boucle : header
-        _variter = None         # Si on est dans un boucle : variable parcourant (str)
-        _buffer = []            # Lignes en attente (if/for)
-
-        version_info = sys.version.replace('\n', ' ')
-        await tools.send_code_blocs(ctx,
-            f"""Python {version_info}\n"""
-            f"""Variables accessibles : "ctx", "Tables" (clés {list(Tables.keys())}), modules usuels.\n"""
-            """>>>"""
+        ps = pseudoshell.Shell(
+            globals(), locals(), in_func, out_func,
+            welcome_text="""Variables accessibles : "ctx", "Tables" (dictionnaire {nom: Table}), "bot", modules usuels.\n"""
+                         """Les mots-clés "stop" (arrêt immédiat), "end", "endfor", "endif", "endwhile" (sortie de structure) et "_shell" sont réservés.\n"""
         )
-
-        _exit = False
-        while not _exit:
-            try:
-                _shell.rep = None
-                _entree = None      # Entrée à évaluer (traitée)
-                _mess = await tools.wait_for_message(ctx.bot, check=lambda m:(m.channel == ctx.channel and m.author != ctx.bot.user))
-                _r = _mess.content
-
-                if _re := re.match(r"(\w+)\s*=\s*([^=].*)", _r):                # Affectation
-                    _entree = (f"self.vars['{_re.group(1)}']", _re.group(2).strip())
-
-                # elif _re := re.match(r"if\s*(.+):", _r):                        # Test
-                #     await ctx.send("(Test)")
-                #     _if = bool(exec(_re.group(1)))
-
-                elif _re := re.match(r"for\s*(.+?)\s*in\s*(.+?)\s*:", _r):      # Entrée dans boucle
-                    _for = _r
-                    _variter = _re.group(1).strip()
-                    _shell = await _shell.exec(ctx, "self.iter", _re.group(2))      # déclaration itérateur
-
-                elif _r == "endfor":                                            # Fin de boucle - exécution
-                    for _i in _shell.iter:
-                        for (_g, _d) in _buffer:
-                            _g_i = re.sub(rf"\b{_variter}\b", "_i", _g)     # remplacement whole world
-                            _d_i = re.sub(rf"\b{_variter}\b", "_i", _d)
-                            _shell = await _shell.exec(ctx, _g_i, _d_i, _i)
-
-                    _for = None
-                    _variter = None
-                    _shell.iter = None
-                    _buffer = None
-
-                else:                                                           # Sinon, évaluation
-                    _entree = ("self.rep", _r.strip())
-
-
-                if _entree:
-                    if not _for:                        # Exécution
-                        _g, _d = _entree
-                        _shell = await _shell.exec(ctx, _g, _d)
-                    else:
-                        _buffer.append(_entree)
-
-
-                if _for:                      # Prompt
-                    _prompt = f""">>> {_for}\n"""
-                    for (_g, _d) in _buffer:
-                        _prompt += f">>>     {_g} = {_d}\n"
-                    _prompt += ">>>                       (endfor pour finir)"
-                else:
-                    _prompt = f""">>> {_g} = {_d}\n"""
-                    if _shell.rep:
-                        _prompt += f"{_shell.rep}\n"
-                    _prompt += ">>>"
-
-                await tools.send_code_blocs(ctx, _prompt, langage="py")
-
-            except RuntimeError:
-                raise
-
-            except Exception:
-                await tools.send_code_blocs(ctx,
-                    f""">>> {_r}\n"""
-                    f"{traceback.format_exc()}\n"
-                    + """>>>"""
-                )
+        await ps.run()
 
 
     @commands.command()
