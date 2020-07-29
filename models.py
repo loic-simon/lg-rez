@@ -165,12 +165,12 @@ class Actions(db.Model):
         self.action = action                # Nom de l'action en rapport avec la table BaseActions
         self.trigger_debut = trigger_debut
         self.trigger_fin = trigger_fin
-        self.instant = instant
+        self.instant = instant              #Est-ce que l'action a des conséquences instantanées ?
         self.heure_debut = heure_debut
         self.heure_fin = heure_fin
         self.cooldown = cooldown            # Cooldown restant pour l'action (0 = action disponible)
         self.charges = charges              # Nombre de charges restantes (mettre à Null si toujours dispo)
-        self.refill = refill
+        self.refill = refill                #Comment l'action peut-elle être refill
         self.lieu = lieu
         self.interaction_notaire = interaction_notaire
         self.interaction_gardien = interaction_gardien

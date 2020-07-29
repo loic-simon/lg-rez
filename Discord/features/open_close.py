@@ -49,14 +49,24 @@ async def recup_joueurs(quoi, qui, heure=None):
             #     tps += datetime.timedelta(hours=1)      # Si remind, on considère l'heure qui arrive
 
         actions = await gestion_actions.get_actions(quoi, "temporel", tps)
-        return {Joueurs.query.get(action.player_id):action for action in actions}
+
+        dic = {}
+        for action in actions:
+            if (joueur := Joueurs.query.get(action.player_id)) in dic:
+                dic[joueur].append(action)
+            else:
+                dic[joueur] = [action]
+
+        return dic
+        #Formerly :
+        #{joueur.player_id:[action for action in actions if action.player_id == joueur.player_id] for joueur in [Joueurs.query.get(action.player_id) for action in actions]}
 
     elif qui.isdigit() and (action := Actions.query.get(int(qui))):     # Appel direct action par son numéro
         if ((quoi == "open" and not action._decision)       # Sécurité : ne pas lancer une action déjà lancer,
             or (quoi == "close" and action._decision)       #   ni fermer une déjà fermée
             or (quoi == "remind" and action._decision == "rien")):
 
-            return {Joueurs.query.get(action.player_id):action}
+            return {Joueurs.query.get(action.player_id):[action]}
         else:
             return {}
 
@@ -133,8 +143,9 @@ class OpenClose(commands.Cog):
                 await message.add_reaction(tools.emoji(ctx, "lune"))
 
             else:       # Action
-                action = joueurs[joueur]
-                await gestion_actions.open_action(ctx, action, chan)
+
+                for action in joueurs[joueur]:
+                    await gestion_actions.open_action(ctx, action, chan)
 
         db.session.commit()
 
@@ -211,10 +222,10 @@ class OpenClose(commands.Cog):
                 bdd_tools.modif(joueur, "_vote_loups", None)
 
             else:       # Action
-                action = joueurs[joueur]
-                await chan.send(f"""{tools.montre()}  Fin de la possiblité d'utiliser ton action {tools.code(action.action)} ! \n"""
-                                f"""Action définitive : {action._decision}""")
-                await gestion_actions.close_action(ctx, action, chan)
+                for action in joueurs[joueur]:
+                    await chan.send(f"""{tools.montre()}  Fin de la possiblité d'utiliser ton action {tools.code(action.action)} ! \n"""
+                                    f"""Action définitive : {action._decision}""")
+                    await gestion_actions.close_action(ctx, action, chan)
 
         db.session.commit()
 
