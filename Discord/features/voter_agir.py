@@ -188,9 +188,6 @@ class VoterAgir(commands.Cog):
         assert joueur, f"!vote : joueur {ctx.author} introuvable"
 
         # Détermine la/les actions en cours pour le joueur
-        def trigCheck(m):
-            return (m.channel == ctx.channel and m.author != ctx.bot.user)
-
         actions = Actions.query.filter(Actions.player_id == joueur.discord_id, Actions._decision != None).all()
         if not actions:
             await ctx.send("Aucune action en cours pour toi.")
@@ -209,7 +206,7 @@ class VoterAgir(commands.Cog):
         # Choix de la décision : très simple pour l'instant, car pas de résolution auto
         if not decision:                    # Si décision pas précisée à l'appel de la commande
             await ctx.send(f"Que veux-tu faire pour l'action {tools.code(action.action)} ? (action actuelle : {tools.code(action._decision)})")
-            message = await tools.wait_for_message(ctx.bot, check=trigCheck)
+            message = await tools.wait_for_message_here(ctx)
             decision = message.content
 
         if action._decision is None:        # On revérifie, si ça a fermé entre temps !!

@@ -98,7 +98,7 @@ class GestionIA(commands.Cog):
         """
         if not triggers:
             await ctx.send("Mots/expressions déclencheurs (non sensibles à la casse / accents), séparés par des points-virgules ou des sauts de ligne :")
-            mess = await tools.wait_for_message(ctx.bot, check=lambda m: m.channel == ctx.channel and m.author != ctx.bot.user)
+            mess = await tools.wait_for_message_here(ctx)
             triggers = mess.content
 
         triggers = triggers.replace('\n', ';').split(';')
@@ -168,7 +168,7 @@ class GestionIA(commands.Cog):
         """
         if not trigger:
             await ctx.send("Mot/expression déclencheur de la réaction à modifier :")
-            mess = await tools.wait_for_message(ctx.bot, check=lambda m: m.channel == ctx.channel and m.author != ctx.bot.user)
+            mess = await tools.wait_for_message_here(ctx)
             trigger = mess.content
 
         trigs = await bdd_tools.find_nearest(trigger, Triggers, carac="trigger")

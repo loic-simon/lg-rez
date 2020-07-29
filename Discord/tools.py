@@ -192,12 +192,25 @@ async def wait_for_message(bot, check, trigger_on_commands=False):
         return message
 
 
+# Raccourci pratique
+async def wait_for_message_here(ctx, trigger_on_commands=False):
+    """Attend et renvoie le premier message reçu dans <ctx>.
+
+    Surcouche de wait_for_message filtrant uniquement les messages envoyés dans <ctx>.channel par quelqu'un d'autre que le bot
+    [trigger_on_commands]   Passé directement à wait_for_message
+    """
+    def trig_check(message):
+        return (message.channel == ctx.channel and message.author != ctx.bot.user)
+
+    message = await wait_for_message(ctx.bot, check=trig_check, trigger_on_commands=trigger_on_commands)
+    return message
+
+
 # Permet de boucler question -> réponse tant que la réponse vérifie pas les critères nécessaires dans chan
-async def boucle_message(bot, chan, in_message, condition_sortie, trig_check=lambda m: m.channel == chan and m.author != bot.user, rep_message=None):
+async def boucle_message(bot, chan, in_message, condition_sortie, rep_message=None):
     """Permet de lancer une boucle question/réponse tant que la réponse ne vérifie pas <condition_sortie>
 
     <chan>          Channel dans lequel lancer la boucle
-    [trig_check]    Condition de détection du message dans le bot.wait_for (défaut : tous les messages hors bot dans <chan>)
     [in_message]    Si défini, message à envoyer avant la boucle
     [rep_message]   Si défini, permet de définir un message de boucle différent de [in_message] (identique si None). Si [in_message] n'est pas défini, doit être défini.
     """
@@ -207,10 +220,10 @@ async def boucle_message(bot, chan, in_message, condition_sortie, trig_check=lam
         raise ValueError("tools.boucle_message : [in_message] ou [rep_message] doit être défini !")
 
     await chan.send(in_message)
-    rep = await wait_for_message(bot, check=trig_check)
+    rep = await wait_for_message_here(ctx)
     while not condition_sortie(rep):
         await chan.send(rep_message)
-        rep = await wait_for_message(bot, check=trig_check)
+        rep = await wait_for_message_here(ctx)
 
     return rep
 
@@ -227,13 +240,11 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
     if message and not cible:
         await ctx.send(message)
 
-    trig_check = lambda m: m.channel == ctx.channel and m.author != ctx.bot.user
-
     for i in range(5):
         if i == 0 and cible:            # Au premier tour, si on a donné une cible
             rep = cible
         else:
-            mess = await wait_for_message(ctx.bot, check=trig_check)
+            mess = await wait_for_message_here(ctx)
             rep = mess.content
 
         if id := ''.join([c for c in rep if c.isdigit()]):      # Si la chaîne contient un nombre, on l'extrait
@@ -278,7 +289,7 @@ async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
     De plus, si [text_filter] (fonction str -> bool) est défini, ne réagit qu'aux messages pour lesquels text_filter(message) = True.
     De plus, si [post_converter] (fonction str -> ?) est défini, le message détecté est passé dans cette fonction avant d'être renvoyé.
 
-    Si [trigger_all_reacts] == True, détecte l'ajout des toutes les réactions (et pas seulement celles dans emojis) et renvoie, si l'emoji directement si il n'est pas dans emojis (défaut False).
+    Si [trigger_all_reacts] == True, détecte l'ajout des toutes les réactions (et pas seulement celles dans [emojis]) et renvoie l'emoji directement si il n'est pas dans [emojis] (défaut False).
     Enfin, [trigger_on_commands] est passé directement à wait_for_message.
     """
 

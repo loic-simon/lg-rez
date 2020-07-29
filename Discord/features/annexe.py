@@ -1,9 +1,12 @@
 import random
 import traceback
 import datetime
+import asyncio
 
 from discord import Embed
 from discord.ext import commands
+from akinator.async_aki import Akinator
+import akinator
 
 import tools
 from bdd_connect import db, Joueurs
@@ -64,6 +67,40 @@ class Annexe(commands.Cog):
         await ctx.send(f"!{pingpong} ({delta.total_seconds():.2}s)")
 
 
+    @commands.command()
+    async def akinator(self, ctx):
+        """J'ai glissé chef
+
+        Implémentation directe de https://pypi.org/project/akinator.py
+        """
+        # Un jour mettre ça dans des embeds avec les https://fr.akinator.com/bundles/elokencesite/images/akitudes_670x1096/<akitude>.png croppées, <akitude> in ["defi", "serein", "inspiration_legere", "inspiration_forte", "confiant", "mobile", "leger_decouragement", "vrai_decouragement", "deception", "triomphe"]
+        await ctx.send(f"Vous avez demandé à être mis en relation avec {tools.ital('Akinator : Le Génie du web')}.\nVeuillez patienter...")
+        async with ctx.typing():
+            # Connection
+            aki = Akinator()
+            question = await aki.start_game(language="fr")
+
+        exit = False
+        while not exit and aki.progression <= 80:
+            mess = await ctx.send(question)
+            reponse = await tools.wait_for_react_clic(ctx.bot, mess, {"👍":"yes", "🤷":"idk", "👎":"no", "⏭️":"stop"})
+            if reponse == "stop":
+                exit = True
+            else:
+                async with ctx.typing():
+                    question = await aki.answer(reponse)
+
+        async with ctx.typing():
+            await aki.win()
+
+        mess = await ctx.send(f"Tu penses à {tools.bold(aki.first_guess['name'])} ({tools.ital(aki.first_guess['description'])}) !\nJ'ai bon ?\n{aki.first_guess['absolute_picture_path']}")
+        if await tools.yes_no(ctx.bot, mess):
+            await ctx.send("Yay\nhttps://fr.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png")
+        else:
+            await ctx.send("Oof\nhttps://fr.akinator.com/bundles/elokencesite/images/akitudes_670x1096/deception.png")
+
+
+
     @commands.command(aliases=["tell"])
     @tools.mjs_only
     async def send(self, ctx, cible, *, message):
@@ -91,7 +128,7 @@ class Annexe(commands.Cog):
 
         Ex. !send all Bonsoir à tous c'est Fanta
             !send vivants Attention {member.mention}, derrière toi c'est affreux !
-            !send "role=Servante Dévouée" Ça va vous ? Vous êtes bien {joueur.role} ?
+            !send "role=Servante Dévouée" Çreponse va vous ? Vous êtes bien {joueur.role} ?
         """
         if cible == "all":
             joueurs = Joueurs.query.all()

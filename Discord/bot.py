@@ -236,18 +236,20 @@ class Special(commands.Cog):
         Évidemment, les avertissements dans !help do s'appliquent ici : ne pas faire n'imp avec cette commande !! (même si ça peut être très utile, genre pour ajouter des gens en masse à un channel)
         """
         async def in_func():
-            mess = await tools.wait_for_message(ctx.bot, check=lambda m:(m.channel == ctx.channel and m.author != ctx.bot.user))
+            mess = await tools.wait_for_message_here(ctx)
             return mess.content
 
         async def out_func(text):
             await tools.send_code_blocs(ctx, text)
 
         ps = pseudoshell.Shell(
-            globals(), locals(), in_func, out_func,
-            welcome_text="""Variables accessibles : "ctx", "Tables" (dictionnaire {nom: Table}), "bot", modules usuels.\n"""
-                         """Les mots-clés "stop" (arrêt immédiat), "end", "endfor", "endif", "endwhile" (sortie de structure) et "_shell" sont réservés.\n"""
+            globals(), locals(), in_func, out_func, shut_keywords=["stop"],
+            welcome_text="""Variables accessibles : "ctx", "Tables" (dictionnaire {nom: Table}), "bot", modules usuels."""
         )
-        await ps.run()
+        try:
+            await ps.run()
+        except pseudoshell.ShellIOError:
+            raise RuntimeError("!shell: Pseudo-shell forced to end.")
 
 
     @commands.command()

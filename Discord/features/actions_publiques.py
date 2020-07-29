@@ -44,7 +44,7 @@ class ActionsPubliques(commands.Cog):
             return
 
         await tools.send_blocs(ctx, "Et quel est la raison de cette haine, d'ailleurs ?")
-        motif = await tools.wait_for_message(ctx.bot, check=lambda m: m.channel == ctx.channel and m.author != ctx.bot.user)
+        motif = await tools.wait_for_message_here(ctx)
         # ATTENTION : Ne JAMAIS utiliser bot.wait_for, toujours tools.wait_for_message (il détecte les stop)
         # motif = await ctx.bot.wait_for('message', check = lambda m: m.channel == ctx.channel and m.author != ctx.bot.user)
 
