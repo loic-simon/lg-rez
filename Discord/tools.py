@@ -129,6 +129,16 @@ def mention_MJ(arg):
 
 
 ### ---------------------------------------------------------------------------
+### Exceptions
+### ---------------------------------------------------------------------------
+
+class CommandExit(Exception):
+    """Force l'arrêt immédiat d'une commande, et empêche le bot de réagir de nouveau à <ctx>"""
+
+    pass
+
+
+### ---------------------------------------------------------------------------
 ### Décorateurs pour les différentes commandes, en fonction de leur usage
 ### ---------------------------------------------------------------------------
 
@@ -174,7 +184,7 @@ async def wait_for_message(bot, check, trigger_on_commands=False):
     <check> fonction discord.Message -> bool
     [trigger_on_commands]   Si False (défaut), un message respectant <check> sera ignoré si c'est une commande
 
-    Si le message est "stop" ou "!stop" (ou autre casse), raise une exception RuntimeError (même si le message respecte <check>).
+    Si le message est "stop" ou "!stop" (ou autre casse), raise une exception CommandExit (même si le message respecte <check>).
     """
     if trigger_on_commands:
         def trig_check(m):
@@ -187,7 +197,7 @@ async def wait_for_message(bot, check, trigger_on_commands=False):
 
     message = await bot.wait_for('message', check=trig_check)
     if message.content.lower() in ["stop", "!stop"]:
-        raise RuntimeError("Arrêt demandé")
+        raise CommandExit(ctx, "Arrêt demandé")
     else:
         return message
 
@@ -229,13 +239,13 @@ async def boucle_message(bot, chan, in_message, condition_sortie, rep_message=No
 
 
 async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
-    """Récupère un nom de joueur dans le contexte <ctx>.
+    """Retourne un nom de joueur dans le contexte <ctx>.
 
     [cible]     Cible par défaut (donnée par le joueur dès le début)
     [message]   Si défini (et [cible] non définie), message à envoyer avant la boucle
     [sensi]     Sensibilité de la recherche (défaut 0.5)
 
-    Attend que le joueur entre un nom de joueur, et boucle 5 fois au max (avant de l'insulter) pour chercher le plus proche joueurs dans la table Joueurs.
+    Attend que le joueur entre un nom de joueur, et boucle 5 fois au max (avant de l'insulter et de raise une erreur) pour chercher le plus proche joueurs dans la table Joueurs.
     """
     if message and not cible:
         await ctx.send(message)

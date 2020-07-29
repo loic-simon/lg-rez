@@ -52,7 +52,7 @@ class AlreadyInCommand(commands.CheckFailure):
 @bot.check
 async def already_in_command(ctx):
     """Décorateur : vérifie si le joueur est actuellement dans une commande"""
-    if (ctx.author.id in ctx.bot.in_command and ctx.command.name != "stop"):    # Cas particulier : !stop
+    if ctx.author.id in ctx.bot.in_command and ctx.command.name != "stop":    # Cas particulier : !stop
         raise AlreadyInCommand()
     else:
         return True
@@ -72,8 +72,10 @@ async def remove_from_in_command(ctx):
     """Retire le joueur de la liste des joueurs dans une commande
 
     Cette fonction est appellée après chaque appel de fonction.
+    Elle attend 0.5 secondes avant d'enlever le joueur afin d'éviter que le bot réagisse « nativement » (IA) à un message déjà traité par un tools.wait_for_message ayant mené à la fin de la commande.
     """
-    if ctx.command.name != "stop" and not ctx.message.webhook_id:
+    await asyncio.sleep(0.5)        # On attend un peu
+    if ctx.author.id in ctx.bot.in_command:
         ctx.bot.in_command.remove(ctx.author.id)
 
 
@@ -248,8 +250,8 @@ class Special(commands.Cog):
         )
         try:
             await ps.run()
-        except pseudoshell.ShellIOError:
-            raise RuntimeError("!shell: Pseudo-shell forced to end.")
+        except pseudoshell.PseudoShellExit:
+            raise tools.CommandExit(ctx, "!shell: Pseudo-shell forced to end.")
 
 
     @commands.command()
@@ -390,7 +392,7 @@ bot.add_cog(Special(bot))
 ### 7 - Gestion des erreurs
 @bot.event
 async def on_command_error(ctx, exc):
-    """Fonction appellée par Discord à chaque exception raise dans une commande
+    """Fonction appellée à chaque exception raise dans une commande
 
     <ctx>   Contexte où l'erreur a été raise
     <exc>   Exception raise
@@ -398,7 +400,7 @@ async def on_command_error(ctx, exc):
     Permet de gérer spécifiquement les erreurs de discord.ext.commands (commandes)
     """
     db.session.rollback()       # Dans le doute, on vide la session SQL
-    if isinstance(exc, commands.CommandInvokeError) and isinstance(exc.original, RuntimeError):     # STOP envoyé
+    if isinstance(exc, commands.CommandInvokeError) and isinstance(exc.original, tools.CommandExit):     # STOP envoyé
         await ctx.send("Mission aborted.")
 
     elif isinstance(exc, commands.CommandInvokeError):
@@ -446,7 +448,7 @@ async def on_command_error(ctx, exc):
 # Erreurs non gérées par le code précédent (hors du cadre d'une commande)
 @bot.event
 async def on_error(event, *args, **kwargs):
-    """Fonction appellée par Discord à chaque exception remontant plus haut qu'une commande
+    """Fonction appellée à chaque exception remontant plus haut qu'une commande
 
     <event>             Type d'évènement ayant généré une erreur
     *args, **kwargs     Arguments envoyés à la fonction récupérant l'évènement : ex. <member>, <message>...
