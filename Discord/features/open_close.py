@@ -292,11 +292,17 @@ class OpenClose(commands.Cog):
                 await message.add_reaction(tools.emoji(ctx, "lune"))
 
             else:       # Action
-                action = joueurs[joueur]
-                message = await chan.send(f"""⏰ {member.mention} Plus que 10 minutes pour utiliser ton action {tools.code(action.action)} ! 😱 \n""")
-                await message.add_reaction(tools.emoji(ctx, "action"))
+                for action in joueurs[joueur]:
+                    message = await chan.send(f"""⏰ {member.mention} Plus que 10 minutes pour utiliser ton action {tools.code(action.action)} ! 😱 \n""")
+                    await message.add_reaction(tools.emoji(ctx, "action"))
 
 
+
+    @commands.command()
+    @tools.mjs_only
+    async def refill(self, ctx):
+        return NotImplemented
+    ##Prochainement ici, une fonction
 
     @commands.command()
     @tools.mjs_only
