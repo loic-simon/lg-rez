@@ -50,7 +50,7 @@ async def open_action(ctx, action, chan=None):
     Opérations réalisées :
         - Vérification des conditions (cooldown, charges...) et reprogrammation si nécessaire ;
         - Gestion des tâches planifiées (planifie remind/close si applicable) ;
-        - Information joueur dans <chan>.
+        - Information joueur dans [chan].
 
     <ctx> contexte où on log, i.e. contexte de !open, !sync...
     """
