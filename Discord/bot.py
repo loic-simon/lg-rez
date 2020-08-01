@@ -11,10 +11,10 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-import blocs
 import tools
 from bdd_connect import db, Tables
-from features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques, pseudoshell
+from blocs import bdd_tools, gsheets, webhook, pseudoshell
+from features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -226,14 +226,9 @@ class Special(commands.Cog):
     @commands.command()
     @tools.mjs_only
     async def shell(self, ctx):
-        """Lance un pseudo-terminal Python [BETA] (COMMANDE MJ)
+        """Lance un pseudo-terminal Python (COMMANDE MJ)
 
-        Bon flemme d'écrire toute la doc' pour ça, en gros il faut bien comprendre que seules les syntaxes simples marcheront :
-            - assignation   (var = expression)
-            - évaluation    (expression)
-            - boucle for : syntaxe normale MAIS impossible d'en imbriquer ET fin avec "endfor"
-
-        Pas de if / while / try dispo pour l'instant, notemment.
+        Envoyer "help" dans le pseudo-terminal pour plus d'informations sur son fonctionnement.
 
         Évidemment, les avertissements dans !help do s'appliquent ici : ne pas faire n'imp avec cette commande !! (même si ça peut être très utile, genre pour ajouter des gens en masse à un channel)
         """
@@ -241,8 +236,8 @@ class Special(commands.Cog):
             mess = await tools.wait_for_message_here(ctx)
             return mess.content
 
-        async def out_func(text):
-            await tools.send_code_blocs(ctx, text)
+        async def out_func(text, color=False):
+            await tools.send_code_blocs(ctx, text, langage="py" if color else "")
 
         ps = pseudoshell.Shell(
             globals(), locals(), in_func, out_func, shut_keywords=["stop"],
@@ -250,8 +245,8 @@ class Special(commands.Cog):
         )
         try:
             await ps.run()
-        except pseudoshell.PseudoShellExit:
-            raise tools.CommandExit(ctx, "!shell: Pseudo-shell forced to end.")
+        except pseudoshell.PseudoShellExit as exc:
+            raise tools.CommandExit(str(exc) or "!shell: Pseudo-shell forced to end.")
 
 
     @commands.command()
@@ -401,7 +396,7 @@ async def on_command_error(ctx, exc):
     """
     db.session.rollback()       # Dans le doute, on vide la session SQL
     if isinstance(exc, commands.CommandInvokeError) and isinstance(exc.original, tools.CommandExit):     # STOP envoyé
-        await ctx.send("Mission aborted.")
+        await ctx.send(str(exc.original) or "Mission aborted.")
 
     elif isinstance(exc, commands.CommandInvokeError):
         await ctx.send(f"Oups ! Un problème est survenu à l'exécution de la commande  :grimacing:\n"

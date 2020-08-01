@@ -197,7 +197,7 @@ async def wait_for_message(bot, check, trigger_on_commands=False):
 
     message = await bot.wait_for('message', check=trig_check)
     if message.content.lower() in ["stop", "!stop"]:
-        raise CommandExit(ctx, "Arrêt demandé")
+        raise CommandExit("Arrêt demandé")
     else:
         return message
 
