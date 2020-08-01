@@ -12,7 +12,7 @@ def remove_accents(s):
 
 
 def modif(item, col, value):
-    """Utilitaire : setattr(<item>, <col>, <value>) et signale (flag_modified) la modification en vue d'un commit"""
+    """Utilitaire : fait <item>.<col> = <value> et le marque (flag_modified) pour le commit"""
     setattr(item, col, value)
     flag_modified(item, col)
 

@@ -23,7 +23,7 @@ async def recup_joueurs(quoi, qui, heure=None):
             },
         "maire": {
             "open": and_(Joueurs.votant_village == True,        # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
-                         Joueurs._vote_condamne == None),
+                         Joueurs._vote_maire == None),
             "close": Joueurs._vote_maire != None,
             "remind": Joueurs._vote_maire == "non défini",
             },
@@ -300,9 +300,57 @@ class OpenClose(commands.Cog):
 
     @commands.command()
     @tools.mjs_only
-    async def refill(self, ctx):
-        return NotImplemented
-    ##Prochainement ici, une fonction
+    async def refill(self, ctx, motif, cible = None):
+        """Permet de recharger le/les pouvoirs rechargeables (COMMANDE BOT / MJ)
+        
+        <motif> doit être "weekends", "forgeron", "rebouteux" ou "divin" (forcer le refill car les MJs tout-puissants l'ont décidé)
+        [cible] peut être 'all', sinon il faudra spécifier un joueur
+        """
+        if motif not in ["weekends", "forgeron", "rebouteux", "divin"]:
+            await ctx.send(f"{motif} n'est pas un <motif> valide")
+            return
+
+        if motif == "divin":
+            if cible != "all":
+                target = await tools.boucle_query_joueur(ctx, cible=cible, message = "Qui veux-tu recharger ?")
+                refillable = Actions.query.filter(Actions.player_id == target.discord_id, Actions.charges != None).all()
+            else:
+                m = await ctx.send("Tu as choisi de recharger le pouvoir de TOUS les joueurs actifs, en es-tu sûr ?")
+
+                if await tools.yes_no(ctx.bot, m):
+                    refillable = Actions.query.filter(Actions.charges != None).all()
+
+                else:
+                    await ctx.send("Mission aborted.")
+                    return
+
+        else: #refill WE, forgeron ou rebouteux
+            if cible != "all":
+                target = await tools.boucle_query_joueur(ctx, cible=cible, message = "Qui veux-tu recharger ?")
+                refillable = Actions.query.filter(Actions.refill.contains(motif), Actions.player_id == target.discord_id).all()
+            else:
+                refillable = Actions.query.filter(Actions.refill.contains(motif)).all()
+
+        await tools.log(ctx, refillable)
+
+        txt = "Action(s) répondant aux critères :\n"
+        for action in refillable:
+            txt += f"- {action.action}, id = {action.id} \n"
+
+        await tools.send_code_blocs(ctx, txt)
+
+        if motif == "weekends":
+            remplissage = {action: BaseActions.query.get(action.action).base_charges for action in refillable}
+        else:
+            remplissage = {action: action.charges + 1 for action in refillable}
+
+        for action, charge in remplissage.items():
+            bdd_tools.modif(action, "charges", charge)
+
+            await tools.send_blocs(tools.private_chan(ctx.guild.get_member(action.player_id)),f"Ton action {action.action} vient d'être rechargée, tu as maintenant {charge} charge(s) disponible(s) !")
+
+        db.session.commit()
+
 
     @commands.command()
     @tools.mjs_only

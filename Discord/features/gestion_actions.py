@@ -50,7 +50,7 @@ async def open_action(ctx, action, chan=None):
     Opérations réalisées :
         - Vérification des conditions (cooldown, charges...) et reprogrammation si nécessaire ;
         - Gestion des tâches planifiées (planifie remind/close si applicable) ;
-        - Information joueur dans [chan].
+        - Information joueur dans [chan] (défaut chan privé du joueur).
 
     <ctx> contexte où on log, i.e. contexte de !open, !sync...
     """
@@ -86,7 +86,11 @@ async def open_action(ctx, action, chan=None):
 
     # Action "automatiques" (passives : notaire...) : lance la procédure de clôture / résolution
     if action.trigger_fin == "auto":
-        await ctx.send(f"Action automatique, appel processus de clôture")
+        if action.trigger_debut == "temporel":
+            await ctx.send(f"Action {action.action} pour {Joueurs.query.get(action.player_id).nom} pas vraiment automatique, {tools.mention_MJ(ctx)} VENEZ M'AIDER JE PANIQUE 😱 (comme je suis vraiment sympa je vous file son chan, {tools.private_chan(ctx.guild.get_member(Joueurs.query.get(action.player_id).discord_id)).mention})")
+        else:
+            await ctx.send(f"Action automatique, appel processus de clôture")
+
         await close_action(ctx, action, chan)
         return
 
