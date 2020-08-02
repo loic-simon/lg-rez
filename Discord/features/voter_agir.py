@@ -1,24 +1,18 @@
-import os
 import datetime
 
-from dotenv import load_dotenv
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
 from bdd_connect import db, Joueurs, Actions, CandidHaro
 from features import gestion_actions
-from blocs import bdd_tools, gsheets
+from blocs import env, bdd_tools, gsheets
 import tools
 
-load_dotenv()
-VOTECOND_SHEET_ID = os.getenv("VOTECOND_SHEET_ID")
-VOTEMAIRE_SHEET_ID = os.getenv("VOTEMAIRE_SHEET_ID")
-VOTELOUPS_SHEET_ID = os.getenv("VOTELOUPS_SHEET_ID")
-ACTIONS_SHEET_ID = os.getenv("ACTIONS_SHEET_ID")
-assert VOTECOND_SHEET_ID, "voter_agir.py : VOTECOND_SHEET_ID introuvable"
-assert VOTEMAIRE_SHEET_ID, "voter_agir.py : VOTEMAIRE_SHEET_ID introuvable"
-assert VOTELOUPS_SHEET_ID, "voter_agir.py : VOTELOUPS_SHEET_ID introuvable"
-assert ACTIONS_SHEET_ID, "voter_agir.py : ACTIONS_SHEET_ID introuvable"
+
+VOTECOND_SHEET_ID = env.load("VOTECOND_SHEET_ID")
+VOTEMAIRE_SHEET_ID = env.load("VOTEMAIRE_SHEET_ID")
+VOTELOUPS_SHEET_ID = env.load("VOTELOUPS_SHEET_ID")
+ACTIONS_SHEET_ID = env.load("ACTIONS_SHEET_ID")
 
 
 class VoterAgir(commands.Cog):

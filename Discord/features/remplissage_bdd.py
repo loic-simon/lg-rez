@@ -1,13 +1,11 @@
-import os
 import traceback
 import time
 
-from dotenv import load_dotenv
 from discord import Embed
 from discord.ext import commands
 
 import tools
-from blocs import gsheets, bdd_tools
+from blocs import env, gsheets, bdd_tools
 from bdd_connect import db, Tables, Roles
 from features import informations
 
@@ -52,9 +50,7 @@ class RemplissageBDD(commands.Cog):
         Utile à chaque début de saison / changement dans les rôles/actions. Écrase toutes les entrées déjà en base, mais ne supprime pas celles obsolètes.
         """
 
-        load_dotenv()
-        SHEET_ID = os.getenv("ROLES_SHEET_ID")
-        assert SHEET_ID, "!fillroles : ROLES_SHEET_ID introuvable"
+        SHEET_ID = env.load("ROLES_SHEET_ID")
         workbook = gsheets.connect(SHEET_ID)    # Tableau de bord
 
         for table_name in ["Roles", "BaseActions", "BaseActionsRoles"]:

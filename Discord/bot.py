@@ -1,4 +1,3 @@
-import os
 import sys
 import asyncio
 import logging
@@ -9,11 +8,10 @@ import copy
 
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
 
 import tools
 from bdd_connect import db, Tables
-from blocs import bdd_tools, gsheets, webhook, pseudoshell
+from blocs import env, bdd_tools, gsheets, webhook, pseudoshell
 from features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques
 
 
@@ -21,11 +19,8 @@ logging.basicConfig(level=logging.WARNING)
 
 
 ### 1 - Récupération du token du bot et de l'ID du serveur
-load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
-GUILD_ID = int(os.getenv("DISCORD_GUILD_ID"))
-assert TOKEN, "bot.py : TOKEN introuvable"
-assert GUILD_ID, "bot.py : DISCORD_GUILD_ID introuvable"
+TOKEN = env.load("DISCORD_TOKEN")
+GUILD_ID = int(env.load("DISCORD_GUILD_ID"))
 
 
 ### 2 - Création du bot
@@ -114,6 +109,8 @@ async def on_ready():
 @bot.event
 async def on_member_join(member):
     """Fonction appellée par Discord à l'arrivée de <member> sur le serveur"""
+    if member.guild.id != GUILD_ID:            # Bon serveur
+        return
 
     await tools.log(member, f"Arrivée de {member.name}#{member.discriminator} sur le serveur")
     await inscription.main(bot, member)
@@ -134,6 +131,9 @@ async def on_message(message):
     if (not message.webhook_id                  # Pas de rôle affecté (et pas un webhook)
         and message.author.top_role == tools.role(message, "@everyone")):
         return      # le bot te calcule même pas
+
+    if message.guild.id != GUILD_ID:            # Mauvais serveur
+        return
 
     await bot.invoke(await bot.get_context(message))        # On trigger toutes les commandes
     # (ne PAS remplacer par bot.process_commands(message), en théorie c'est la même chose mais ça détecte pas les webhooks...)
@@ -156,6 +156,9 @@ async def on_raw_reaction_add(payload):
         payload.emoji           PartialEmoji envoyé
         payload.message_id      ID du message réacté
     """
+    if payload.guild.id != GUILD_ID:            # Mauvais serveur
+        return
+
     reactor = payload.member
     if reactor == bot.user or reactor.id in bot.in_command:         # Boucles infinies + gens dans une commande
         return
@@ -394,6 +397,9 @@ async def on_command_error(ctx, exc):
 
     Permet de gérer spécifiquement les erreurs de discord.ext.commands (commandes)
     """
+    if ctx.guild.id != GUILD_ID:            # Mauvais serveur
+        return
+
     db.session.rollback()       # Dans le doute, on vide la session SQL
     if isinstance(exc, commands.CommandInvokeError) and isinstance(exc.original, tools.CommandExit):     # STOP envoyé
         await ctx.send(str(exc.original) or "Mission aborted.")

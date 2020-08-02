@@ -2,14 +2,17 @@ import datetime
 
 from discord.ext import commands
 
-from blocs import webhook
+from blocs import env, webhook
 import tools
 from bdd_connect import db, Taches, Actions, Joueurs
 
 
+WEBHOOK_TP_URL = env.load("WEBHOOK_TP_URL")
+
+
 def execute(tache):
     """Exécute la tâche <tache> (objet BDD Taches) : appelle le webhook et nettoie"""
-    webhook.send(tache.commande, source="tp")
+    webhook.send(tache.commande, url=WEBHOOK_TP_URL)
     db.session.delete(tache)
     db.session.commit()
 

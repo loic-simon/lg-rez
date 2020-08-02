@@ -1,4 +1,3 @@
-import os
 import time             # Accès à date/heure actuelle
 import traceback        # Récupération des messages d'erreur Python, pour les afficher plutôt que planter le site
 import random           # Génération de nombres aléatoires, choix aléatoires...
@@ -8,11 +7,11 @@ import requests         # Requêtes HTML (GET, POST...)
 import json             # JSON -> dictionnaire et inversement, pour échange données
 import unidecode        # Comparaison de chaînes en enlèvant les accents
 
-from dotenv import load_dotenv
 import sqlalchemy.ext
 from sqlalchemy.exc import *                            # Exceptions générales SQLAlchemy
 from sqlalchemy.orm.exc import *                        # Exceptions requêtes SQLAlchemy
 
+from Discord.blocs import env                   # Variables d'environnement
 import Discord.blocs.gsheets as gsheets         # Connection à Google Sheets (maison)
 import Discord.blocs.webhook as webhook         # Envoi de webhook Discord
 from Discord.blocs import bdd_tools             # Outils BDD
@@ -21,12 +20,10 @@ from __init__ import db, Tables, Joueurs        # Récupération BDD
 
 # CONSTANTES
 
-load_dotenv()
-GLOBAL_PASSWORD = os.getenv("GLOBAL_PASSWORD")
-assert GLOBAL_PASSWORD, "core.py : GLOBAL_PASSWORD introuvable"
-
-ALWAYSDATA_API_KEY = os.getenv("ALWAYSDATA_API_KEY")
-assert ALWAYSDATA_API_KEY, "core.py : ALWAYSDATA_API_KEY introuvable"
+GLOBAL_PASSWORD = env.load("GLOBAL_PASSWORD")
+ALWAYSDATA_API_KEY = env.load("ALWAYSDATA_API_KEY")
+WEBHOOK_TP_URL = env.load("WEBHOOK_TP_URL")
+WEBHOOK_SYNC_URL = env.load("WEBHOOK_SYNC_URL")
 
 jobs = ["open_cond", "remind_cond", "close_cond",
         "open_maire", "remind_maire", "close_maire",
@@ -165,7 +162,7 @@ def sync_TDB(d):
                 dico = {id: {col: v for (idM, col, v) in Modifs if idM == id} for id in Modified_ids}
                 message = f"!sync {silent} {json.dumps(dico)}"      # On transfère les infos sous forme de JSON (dictionnaire sérialisé)
 
-                rep = webhook.send(message, "sync")
+                rep = webhook.send(message, url=WEBHOOK_SYNC_URL)
                 if not rep:
                     raise Exception(f"L'envoi du webhook Discord a échoué : {rep} {rep.text}")
 
@@ -213,7 +210,7 @@ def cron_call(d):
 
                 heure = d["heure"] if "heure" in d and d["heure"].isdigit() else ""
 
-                rep = webhook.send(f"!{quoi} {qui} {heure}", "tp")      # Envoi Webhook Discord
+                rep = webhook.send(f"!{quoi} {qui} {heure}", url=WEBHOOK_TP_URL)      # Envoi Webhook Discord
                 if not rep:
                     raise Exception(f"L'envoi du webhook Discord a échoué : {rep} {rep.text}")
             else:

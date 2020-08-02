@@ -1,17 +1,14 @@
-import os
-
-from dotenv import load_dotenv
 from discord.ext import commands
 
 import tools
 from bdd_connect import db, Joueurs
-from blocs import gsheets, bdd_tools
+from blocs import env, gsheets, bdd_tools
 
 
 # Routine d'inscription (fonction appellée par la commande !co)
 async def main(bot, member):
     """Processus d'inscription pour <member>"""
-    
+
     if Joueurs.query.get(member.id):                                            # Joueur dans la bdd = déjà inscrit
         await tools.private_chan(member).send(f"Saloww ! {member.mention} tu es déjà inscrit, viens un peu ici enculé !")
         return
@@ -50,15 +47,15 @@ async def main(bot, member):
 
     await chan.send(f"Parfait. Je vais d'abord avoir besoin de ton (vrai) prénom, celui par lequel on t'appelle au quotidien. Attention, tout troll sera foudracanonné {tools.emoji(chan, 'foudra')}")
 
-    def checkChan(m): #Check que le message soit envoyé par l'utilisateur et dans son channel perso
+    def check_chan(m): #Check que le message soit envoyé par l'utilisateur et dans son channel perso
         return m.channel == chan and m.author != bot.user
     ok = False
     while not ok:
         await chan.send(f"""Quel est ton prénom, donc ?\n{tools.ital("(Répond simplement dans ce channel, à l'aide du champ de texte normal)")}""")
-        prenom = await tools.wait_for_message(bot, check=checkChan)
+        prenom = await tools.wait_for_message(bot, check=check_chan)
 
         await chan.send(f"Très bien, et ton nom de famille ?")
-        nom_famille = await tools.wait_for_message(bot, check=checkChan)
+        nom_famille = await tools.wait_for_message(bot, check=check_chan)
         nom = f"{prenom.content.title()} {nom_famille.content.title()}"         # .title met en majuscule la permière lettre de chaque mot
 
         message = await chan.send(f"""Tu me dis donc t'appeller {tools.bold(nom)}. C'est bon pour toi ? Pas d'erreur, pas de troll ?""")
@@ -77,9 +74,9 @@ async def main(bot, member):
 
 
     if a_la_rez:
-        def sortieNumRez(m):
+        def sortie_num_rez(m):
             return len(m.content) < 200     # Longueur de chambre de rez maximale
-        chambre = (await tools.boucle_message(bot, chan, "Alors, quelle est ta chambre ?", sortieNumRez, checkChan, repMessage="Désolé, ce n'est pas un numéro de chambre valide, réessaie...")).content
+        chambre = (await tools.boucle_message(bot, chan, "Alors, quelle est ta chambre ?", sortie_num_rez, check_chan, rep_message="Désolé, ce n'est pas un numéro de chambre valide, réessaie...")).content
     else:
         chambre = "XXX (chambre MJ)"
 
@@ -98,9 +95,7 @@ async def main(bot, member):
 
         cols = [col for col in bdd_tools.get_cols(Joueurs) if not col.startswith('_')]    # On élimine les colonnes locales
 
-        load_dotenv()
-        SHEET_ID = os.getenv("TDB_SHEET_ID")
-        assert SHEET_ID, "inscription.main : TDB_SHEET_ID introuvable"
+        SHEET_ID = env.load("TDB_SHEET_ID")
 
         workbook = gsheets.connect(SHEET_ID)    # Tableau de bord
         sheet = workbook.worksheet("Journée en cours")

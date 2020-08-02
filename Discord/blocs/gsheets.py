@@ -1,16 +1,13 @@
-import os
 import json
 
-from dotenv import load_dotenv
+from . import env
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 def connect(key):
     """Charge les credentials GSheets et renvoie le classeur d'ID <key>"""
     # use creds to create a client to interact with the Google Drive API
-    load_dotenv()
-    GSHEETS_CREDENTIALS = os.getenv("GSHEETS_CREDENTIALS")
-    assert GSHEETS_CREDENTIALS, "gsheets.connect : GSHEETS_CREDENTIALS introuvable"
+    GSHEETS_CREDENTIALS = env.load("GSHEETS_CREDENTIALS")
 
     scope = ['https://spreadsheets.google.com/feeds']
     creds = ServiceAccountCredentials.from_json_keyfile_dict(json.loads(GSHEETS_CREDENTIALS), scope)

@@ -1,14 +1,12 @@
-import os
 import datetime
 
 import discord
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
-from dotenv import load_dotenv
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-from blocs import gsheets, bdd_tools
+from blocs import env, gsheets, bdd_tools
 from bdd_connect import db, Joueurs, Actions, BaseActions, BaseActionsRoles, CandidHaro
 from features import gestion_actions, taches
 import tools
@@ -186,9 +184,7 @@ class ActionsPubliques(commands.Cog):
         await ctx.send("Récupération des votes...")
         async with ctx.typing():
         # Sorcellerie sur la feuille gsheets pour trouver la colonne "CondamnéRéel"
-            load_dotenv()
-            SHEET_ID = os.getenv("TDB_SHEET_ID")
-            assert SHEET_ID, "inscription.main : TDB_SHEET_ID introuvable"
+            SHEET_ID = env.load("TDB_SHEET_ID")
 
             workbook = gsheets.connect(SHEET_ID)    # Tableau de bord
             sheet = workbook.worksheet("Journée en cours")
