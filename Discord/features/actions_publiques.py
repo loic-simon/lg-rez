@@ -86,6 +86,10 @@ class ActionsPubliques(commands.Cog):
 
         Cette commande n'est utilisable que lorsqu'un vote pour le nouveau maire est en cours.
         """
+        if joueur._vote_maire is None:
+            await ctx.send("Pas de vote pour le nouveau maire en cours !")
+            return
+
         if CandidHaro.query.filter_by(player_id = ctx.author.id, type = "candidature").all():
             await ctx.send("Hola collègue, tout doux, tu t'es déjà présenté !")
             return

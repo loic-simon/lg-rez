@@ -156,7 +156,7 @@ async def on_raw_reaction_add(payload):
         payload.emoji           PartialEmoji envoyé
         payload.message_id      ID du message réacté
     """
-    if payload.guild.id != GUILD_ID:            # Mauvais serveur
+    if payload.guild_id != GUILD_ID:            # Mauvais serveur
         return
 
     reactor = payload.member

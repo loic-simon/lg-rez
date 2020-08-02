@@ -76,7 +76,7 @@ async def main(bot, member):
     if a_la_rez:
         def sortie_num_rez(m):
             return len(m.content) < 200     # Longueur de chambre de rez maximale
-        chambre = (await tools.boucle_message(bot, chan, "Alors, quelle est ta chambre ?", sortie_num_rez, check_chan, rep_message="Désolé, ce n'est pas un numéro de chambre valide, réessaie...")).content
+        chambre = (await tools.boucle_message(bot, chan, "Alors, quelle est ta chambre ?", sortie_num_rez, rep_message="Désolé, ce n'est pas un numéro de chambre valide, réessaie...")).content
     else:
         chambre = "XXX (chambre MJ)"
 

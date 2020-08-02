@@ -229,11 +229,14 @@ async def boucle_message(bot, chan, in_message, condition_sortie, rep_message=No
     if not rep_message:
         raise ValueError("tools.boucle_message : [in_message] ou [rep_message] doit être défini !")
 
+    def check_chan(m): #C heck que le message soit envoyé par l'utilisateur et dans son channel perso
+        return m.channel == chan and m.author != bot.user
+
     await chan.send(in_message)
-    rep = await wait_for_message_here(ctx)
+    rep = await wait_for_message(bot, check_chan)
     while not condition_sortie(rep):
         await chan.send(rep_message)
-        rep = await wait_for_message_here(ctx)
+        rep = await wait_for_message(bot, check_chan)
 
     return rep
 
