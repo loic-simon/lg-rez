@@ -102,6 +102,6 @@ class RemplissageBDD(commands.Cog):
                     await chan_roles.send(embed=Embed(title=f"Camp : {camp}").set_image(url=informations.emoji_camp(ctx, camp).url))
                     await chan_roles.send(f"——————————————————————————")
                     for role in roles_camp:
-                        await chan_roles.send(f"{informations.emoji_camp(ctx, role.camp)} {role.prefixe}{role.nom} – {role.description_courte} (camp : {role.camp})\n\n{role.description_longue}\n\n——————————————————————————")
+                        await chan_roles.send(f"{informations.emoji_camp(ctx, role.camp)} {tools.bold(role.prefixe + role.nom)} – {role.description_courte} (camp : {role.camp})\n\n{role.description_longue}\n\n——————————————————————————")
 
         await ctx.send(f"{chan_roles.mention} rempli ! (en {(time.time() - t0):.4} secondes)")

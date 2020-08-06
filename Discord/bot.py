@@ -1,4 +1,5 @@
 import sys
+import os
 import asyncio
 import logging
 import traceback
@@ -10,7 +11,7 @@ import discord
 from discord.ext import commands
 
 import tools
-from bdd_connect import db, Tables
+from bdd_connect import db, Tables, Joueurs, Actions, Roles
 from blocs import env, bdd_tools, gsheets, webhook, pseudoshell
 from features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques
 
@@ -31,7 +32,7 @@ class SuperBot(commands.Bot):
     def __init__(self, **kwargs):
         """Initialize self"""
         commands.Bot.__init__(self, **kwargs)
-        self.in_command = []        # IDs des joueurs dans une commande
+        self.in_command = []        # IDs des salons dans une commande
         self.in_stfu = []           # IDs des salons en mode STFU (IA off)
         self.tasks = {}             # Dictionnaire des tâches en attente (id: TimerHandle)
 
@@ -47,7 +48,7 @@ class AlreadyInCommand(commands.CheckFailure):
 @bot.check
 async def already_in_command(ctx):
     """Décorateur : vérifie si le joueur est actuellement dans une commande"""
-    if ctx.author.id in ctx.bot.in_command and ctx.command.name != "stop":    # Cas particulier : !stop
+    if ctx.channel.id in ctx.bot.in_command and ctx.command.name != "stop":    # Cas particulier : !stop
         raise AlreadyInCommand()
     else:
         return True
@@ -60,7 +61,7 @@ async def add_to_in_command(ctx):
     Appel seulement si les checks sont OK, donc pas déjà dans bot.in_command
     """
     if ctx.command.name != "stop" and not ctx.message.webhook_id:
-        ctx.bot.in_command.append(ctx.author.id)
+        ctx.bot.in_command.append(ctx.channel.id)
 
 @bot.after_invoke
 async def remove_from_in_command(ctx):
@@ -70,8 +71,8 @@ async def remove_from_in_command(ctx):
     Elle attend 0.5 secondes avant d'enlever le joueur afin d'éviter que le bot réagisse « nativement » (IA) à un message déjà traité par un tools.wait_for_message ayant mené à la fin de la commande.
     """
     await asyncio.sleep(0.5)        # On attend un peu
-    if ctx.author.id in ctx.bot.in_command:
-        ctx.bot.in_command.remove(ctx.author.id)
+    if ctx.channel.id in ctx.bot.in_command:
+        ctx.bot.in_command.remove(ctx.channel.id)
 
 
 ### 4 - Réactions aux différents évènements
@@ -116,6 +117,16 @@ async def on_member_join(member):
     await inscription.main(bot, member)
 
 
+# Au départ d'un membre du serveur
+@bot.event
+async def on_member_remove(member):
+    """Fonction appellée par Discord au départ de <member> du serveur"""
+    if member.guild.id != GUILD_ID:            # Bon serveur
+        return
+
+    await tools.log(member, f"{tools.mention_MJ(member)} ALERTE : départ de {member.display_name} ({member.name}#{member.discriminator}) du serveur !!")
+
+
 # À chaque message
 @bot.event
 async def on_message(message):
@@ -140,7 +151,7 @@ async def on_message(message):
 
     if (not message.content.startswith(bot.command_prefix)  # Si pas une commande
         and message.channel.name.startswith("conv-bot")     # et dans un channel de conversation bot
-        and message.author.id not in bot.in_command         # et pas déjà dans une commande (vote...)
+        and message.channel.id not in bot.in_command        # et pas déjà dans une commande (vote...)
         and message.channel.id not in bot.in_stfu):         # et le channel est pas en mode STFU
 
         await IA.process_IA(bot, message)                       # On trigger les règles d'IA
@@ -160,7 +171,8 @@ async def on_raw_reaction_add(payload):
         return
 
     reactor = payload.member
-    if reactor == bot.user or reactor.id in bot.in_command:         # Boucles infinies + gens dans une commande
+    if reactor == bot.user or not Joueurs.query.get(reactor.id):        # Boucles infinies + gens pas en base
+    # if reactor == bot.user or reactor.id in bot.in_command:         # Boucles infinies + gens dans une commande
         return
 
     if payload.emoji == tools.emoji(reactor, "volatron"):
@@ -291,7 +303,9 @@ class Special(commands.Cog):
         ctx.message.author = member
 
         await ctx.send(f":robot: Exécution en tant que {joueur.nom} :")
+        await remove_from_in_command(ctx)       # Bypass la limitation de 1 commande à la fois
         await ctx.bot.process_commands(ctx.message)
+        await add_to_in_command(ctx)
 
 
     @commands.command(aliases=["autodestruct", "ad"])
@@ -319,15 +333,15 @@ class Special(commands.Cog):
 
         Ne pas utiliser cette commande sauf en cas de force majeure où plus rien ne marche, et sur demande d'un MJ (après c'est pas dit que ça marche mieux après l'avoir utilisé)
         """
-        if ctx.author.id in bot.in_command:
-            bot.in_command.remove(ctx.author.id)
+        if ctx.channel.id in bot.in_command:
+            bot.in_command.remove(ctx.channel.id)
         ctx.send("Te voilà libre, camarade !")
 
 
     ### 6 bis - Gestion de l'aide
     bot.remove_command("help")
 
-    @commands.command()
+    @commands.command(aliases=["aide", "aled", "oskour"])
     async def help(self, ctx, *, command=None):
         """Affiche la liste des commandes utilisables et leur utilisation
 
@@ -343,7 +357,7 @@ class Special(commands.Cog):
         n_max = max([len(cmd) for cmd in commandes])
 
         if not command:
-            bot.in_command.remove(ctx.author.id)
+            bot.in_command.remove(ctx.channel.id)
             async def runnable_commands(cog):       # obligé parce que can_run doit être await, donc c'est compliqué
                 L = []
                 for cmd in cog.get_commands():
@@ -360,7 +374,7 @@ class Special(commands.Cog):
                     [pref + cmd.name.ljust(n_max+2) + cmd.short_doc for cmd in runnables]           # pour chaque commande runnable
                 ) for cog in cogs.values() if (runnables := await runnable_commands(cog))])         # pour chaque cog contenant des runnables
             r += f"\n\nUtilise <{pref}help command> pour plus d'information sur une commande."
-            bot.in_command.append(ctx.author.id)
+            bot.in_command.append(ctx.channel.id)
 
         else:
             if command.startswith(pref):        # Si le joueur fait !help !command

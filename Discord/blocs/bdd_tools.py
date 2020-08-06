@@ -116,6 +116,13 @@ async def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_
 
         SM.set_seq2(slug2)                              # Pour chaque élément, on compare la cible à son nom (en non accentué)
         score = SM.ratio()                              # On calcule la ressemblance
+
+        if carac == "nom":          # CP Prénom Nom : on test sur prénom only aussi
+            SM.set_seq2(slug2.split(maxsplit=1)[0])
+            scorep = SM.ratio()
+            if scorep > score:
+                score = scorep
+
         if score == 1 and solo_si_parfait:              # Cas particulier : élément demandé correspondant exactement à un en BDD
             return [(entry, score)]
         scores.append((entry, score))

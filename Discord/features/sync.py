@@ -67,7 +67,7 @@ class Sync(commands.Cog):
                             if not silent:
                                 notif += f":arrow_forward: Tu es malheureusement décédé(e) :cry:\nÇa arrive même aux meilleurs, en espérant que ta mort ait été belle !\n"
                             # Actions à la mort
-                            for action in Actions.query.filter_by(player_id=joueur.id, trigger_debut="mort"):
+                            for action in Actions.query.filter_by(player_id=joueur.discord_id, trigger_debut="mort"):
                                 await gestion_actions.open_action(ctx, action, chan)
 
                         elif val == "MV":                       # Statut = MV

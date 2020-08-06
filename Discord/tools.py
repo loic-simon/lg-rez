@@ -132,8 +132,8 @@ def mention_MJ(arg):
 ### Exceptions
 ### ---------------------------------------------------------------------------
 
-class CommandExit(Exception):
-    """Force l'arrêt immédiat d'une commande, et empêche le bot de réagir de nouveau à <ctx>"""
+class CommandExit(RuntimeError):
+    """Force l'arrêt immédiat d'une commande, et empêche le bot de réagir à nouveau"""
 
     pass
 
@@ -144,6 +144,9 @@ class CommandExit(Exception):
 
 # @tools.mjs_only : commande exécutables uniquement par un MJ ou un webhook
 mjs_only = commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_any_role("MJ", "Bot"))
+
+# @tools.mjs_et_redacteurs : commande exécutables par un MJ, un rédacteur ou un webhook (pour IA)
+mjs_et_redacteurs = commands.check_any(commands.check(lambda ctx: ctx.message.webhook_id), commands.has_any_role("MJ", "Bot", "Rédacteur"))
 
 # @tools.joueurs_only : commande exécutables uniquement par un joueur (inscrit en base), vivant ou mort
 joueurs_only = commands.has_any_role("Joueur en vie", "Joueur mort")
@@ -242,7 +245,7 @@ async def boucle_message(bot, chan, in_message, condition_sortie, rep_message=No
 
 
 async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
-    """Retourne un nom de joueur dans le contexte <ctx>.
+    """Retourne un joueur dans le contexte <ctx>.
 
     [cible]     Cible par défaut (donnée par le joueur dès le début)
     [message]   Si défini (et [cible] non définie), message à envoyer avant la boucle
@@ -267,7 +270,7 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
         nearest = await bdd_tools.find_nearest(rep, Joueurs, carac="nom", sensi=sensi)     # Sinon, recherche au plus proche
 
         if not nearest:
-            await ctx.send("Aucune entrée trouvée, merci de réessayer")
+            await ctx.send("Aucune entrée trouvée, merci de réessayer :")
 
         elif nearest[0][1] == 1:        # Si le score le plus haut est égal à 1...
             return nearest[0][0]        # ...renvoyer l'entrée correspondante
@@ -283,7 +286,7 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
             s = "Les joueurs les plus proches de ton entrée sont les suivants : \n"
             for i, j in enumerate(nearest[:10]):
                 s += f"{emoji_chiffre(i+1)}. {j[0].nom} \n"
-            m = await ctx.send(s + "Tu peux les choisir en réagissant à ce message, ou en répondant au clavier.")
+            m = await ctx.send(s + tools.ital("Tu peux les choisir en réagissant à ce message, ou en répondant au clavier."))
             n = await choice(ctx.bot, m, min(10, len(nearest)))
             return nearest[n-1][0]
 
@@ -416,7 +419,7 @@ def emoji_chiffre(chiffre, multi=False):
     """
     if isinstance(chiffre, int) and 0 <= chiffre <= 10:
         return ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"][chiffre]
-    elif multi and chiffre.isdigit():
+    elif multi and str(chiffre).isdigit():
         return ''.join([emoji_chiffre(int(c)) for c in str(chiffre)])
     else:
         raise ValueError("L'argument de tools.emoji_chiffre doit être un entier entre 0 et 10 OU un entier positif avec multi=True")
@@ -430,7 +433,7 @@ def super_chiffre(chiffre, multi=False):
     """
     if isinstance(chiffre, int) and 0 <= chiffre <= 9:
         return ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"][chiffre]
-    elif multi and chiffre.isdigit():
+    elif multi and str(chiffre).isdigit():
         return ''.join([super_chiffre(int(c)) for c in str(chiffre)])
     else:
         raise ValueError("L'argument de tools.super_chiffre doit être un entier entre 0 et 9 OU un entier positif avec multi=True")
@@ -444,7 +447,7 @@ def sub_chiffre(chiffre: int, multi=False):
     """
     if isinstance(chiffre, int) and 0 <= chiffre <= 9:
         return ["₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"][chiffre]
-    elif multi and chiffre.isdigit():
+    elif multi and str(chiffre).isdigit():
         return ''.join([sub_chiffre(int(c)) for c in str(chiffre)])
     else:
         raise ValueError("L'argument de tools.sub_chiffre doit être un entier entre 0 et 9 OU un entier positif avec multi=True")
@@ -608,6 +611,7 @@ async def create_context(bot, message_id, member, content):
     """Renvoie un objet contexte de commande (objet discord.ext.commands.Context) à partir de <message_id>
 
     Simule que <member> a envoyé <content> dans son chan privé et "génère" le contexte associé
+    <member> doit être un joueur inscrit en base (pour avoir un chan privé)
     """
     chan = private_chan(member)
     message = (await chan.history(limit=1).flatten())[0]        # On a besoin de récupérer un message, ici le dernier de la conv privée

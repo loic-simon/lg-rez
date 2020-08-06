@@ -27,7 +27,7 @@ def emoji_camp(arg, camp):
 class Informations(commands.Cog):
     """Informations - Commandes disponibles pour en savoir plus sur soi et les autres"""
 
-    @commands.command(aliases=["role", "rôles", "rôle"])
+    @commands.command(aliases=["role", "rôles", "rôle", "camp", "camps"])
     async def roles(self, ctx, *, filtre=None):
         """Affiche la liste des rôles / des informations sur un rôle
 
@@ -41,13 +41,13 @@ class Informations(commands.Cog):
 
         if not filtre:
             roles = Roles.query.order_by(Roles.nom).all()
-        elif "villag" in filtre:
+        elif filtre.startswith("villag"):
             roles = Roles.query.filter_by(camp="village").all()
-        elif "loup" in filtre:
+        elif filtre.startswith("loup"):
             roles = Roles.query.filter_by(camp="loups").all()
-        elif "necro" in filtre:
+        elif filtre.startswith("necro"):
             roles = Roles.query.filter_by(camp="nécro").all()
-        elif "autre" in filtre:
+        elif filtre.startswith("autre") or filtre.startswith("solitaire"):
             roles = Roles.query.filter_by(camp="solitaire").all()
         elif filtre:
             if role := Roles.query.get(filtre):     # Slug du rôle trouvé direct
@@ -128,6 +128,8 @@ class Informations(commands.Cog):
                 dispo = f"Au lancement de la partie"
             elif action.trigger_debut == "mort":
                 dispo = f"S'active à ta mort"
+            elif action.trigger_debut == "mot_mjs":
+                dispo = f"S'active à l'annonce des résultats du vote"
             elif "_" in action.trigger_debut:
                 quoi, qui = action.trigger_debut.split("_")
                 d_quoi = {"open": "l'ouverture",
@@ -163,8 +165,8 @@ class Informations(commands.Cog):
             r += "\n\nActions :"
             r += tools.code_bloc("\n".join([(
                 f" - {str(action.action).ljust(20)} "
-                + (f"Cooldown : {cooldown}" if (cooldown := action.cooldown) else disponible(action)).ljust(25)
-                + (f"{action.charges} charge(s){' pour cette semaine' if (action.refill and 'weekends' in action.refill) else ''}" if isinstance(action.charges, int) else "Illimitée")     # Vraiment désolé pour cette immondice
+                + (f"Cooldown : {cooldown}" if (cooldown := action.cooldown) else disponible(action)).ljust(22)
+                + (f"   {action.charges} charge(s){' pour cette semaine' if (action.refill and 'weekends' in action.refill) else ''}" if isinstance(action.charges, int) else "Illimitée")     # Vraiment désolé pour cette immondice
                 ) for action in actions]
             ))
         else:

@@ -302,7 +302,7 @@ class OpenClose(commands.Cog):
     @tools.mjs_only
     async def refill(self, ctx, motif, cible = None):
         """Permet de recharger le/les pouvoirs rechargeables (COMMANDE BOT / MJ)
-        
+
         <motif> doit être "weekends", "forgeron", "rebouteux" ou "divin" (forcer le refill car les MJs tout-puissants l'ont décidé)
         [cible] peut être 'all', sinon il faudra spécifier un joueur
         """
@@ -365,7 +365,7 @@ class OpenClose(commands.Cog):
         À utiliser le jour du lancement après 10h (lance les premières actions le soir et les votes le lendemain)
         """
 
-        message = await ctx.send("C'est parti ?\nLes rôles ont bien été attribués et synchronisés ? (si non, le faire AVANT de valider)")
+        message = await ctx.send("C'est parti ?\nLes rôles ont bien été attribués et synchronisés ? (si non, le faire AVANT de valider)\n\nOn est bien après 10h le jour du lancement ?\n\nTu es conscient que tous les joueurs reçevront à 18h55 un message en mode « happy Hunger Games » ? (codé en dur parce que flemme)")
         if await tools.yes_no(ctx.bot, message):
             async with ctx.typing():
                 joueurs = Joueurs.query.all()
@@ -414,8 +414,12 @@ class OpenClose(commands.Cog):
                 r += "\nProgrammation des actions start / perma :\n"
                 ts = tools.next_occurence(datetime.time(hour=19))
                 for action in Actions.query.filter_by(trigger_debut="start").all() + Actions.query.filter_by(trigger_debut="perma").all():
-                    r += f" - !open {action.id} (trigger_debut == {action.trigger_debut})\n"
+                    r += f" - À 19h : !open {action.id} (trigger_debut == {action.trigger_debut})\n"
                     taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
+
+                # Programmation envoi d'un message aux connards
+                r += f"\nEt, à 18h50 : !send all [message de hype oue oue c'est génial]\n"
+                taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=10), "!send all Ah {member.mention}... J'espère que tu es prêt, parce que la partie commence DANS 10 MINUTES !!! https://tenor.com/view/thehungergames-hungergames-thggifs-effie-gif-5114734")
 
                 await tools.log(ctx, r, code=True)
 

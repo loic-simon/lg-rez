@@ -89,9 +89,9 @@ class GestionIA(commands.Cog):
 
 
     @commands.command()
-    @tools.mjs_only
+    @tools.mjs_et_redacteurs
     async def addIA(self, ctx, *, triggers=None):
-        """Ajoute au bot une règle d'IA : mots ou expressions déclenchant une réaction (COMMANDE MJ)
+        """Ajoute au bot une règle d'IA : mots ou expressions déclenchant une réaction (COMMANDE MJ/RÉDACTEURS)
 
         [trigger] mot(s), phrase(s), ou expression(s) séparées par des points-virgules ou sauts de lignes
         Dans le cas où plusieurs expressions sont spécifiées, toutes déclencheront l'action demandée.
@@ -120,9 +120,9 @@ class GestionIA(commands.Cog):
 
 
     @commands.command()
-    @tools.mjs_only
+    @tools.mjs_et_redacteurs
     async def listIA(self, ctx, trigger=None, sensi=0.5):
-        """Liste les règles d'IA actuellement reconnues par le bot (COMMANDE MJ)
+        """Liste les règles d'IA actuellement reconnues par le bot (COMMANDE MJ/RÉDACTEURS)
 
         [trigger] (optionnel) mot/expression permettant de filter et trier les résultats. SI TRIGGER FAIT PLUS D'UN MOT, IL DOIT ÊTRE ENTOURÉ PAR DES GUILLEMETS !
         Si trigger est précisé, les triggers sont détectés avec une sensibilité [sensi] (ratio des caractères correspondants, entre 0 et 1).
@@ -158,9 +158,9 @@ class GestionIA(commands.Cog):
 
 
     @commands.command()
-    @tools.mjs_only
+    @tools.mjs_et_redacteurs
     async def modifIA(self, ctx, *, trigger=None):
-        """Modifie/supprime une règle d'IA (COMMANDE MJ)
+        """Modifie/supprime une règle d'IA (COMMANDE MJ/RÉDACTEURS)
 
         [trigger] mot/expression déclenchant la réaction à modifier/supprimer
 
@@ -237,6 +237,16 @@ class GestionIA(commands.Cog):
 
         await ctx.send("Fini.")
 
+
+
+async def trigger_at_mj(message):
+    """Réaction si le message mentionne les MJs"""
+    if message.role_mentions:           # Au moins un rôle mentionné
+        if tools.role(message, "MJ") in message.role_mentions:      # MJs mentionnés (pas check direct pour des raisons de performance)
+            await message.channel.send("Les MJs ont entenu ton appel, ils sont en route ! :superhero:")
+            return True
+
+    return False
 
 
 async def trigger_roles(message):
@@ -331,7 +341,8 @@ async def process_IA(bot, message, debug=False):
     """Exécute les règles d'IA en réaction à <message> (par ordre de priorité)
     [debug] permet d'afficher des messages en cas d'erreur lors de l'évaluation des commandes.
     """
-    (await trigger_roles(message)                                   # Rôles
+    (await trigger_at_mj(message)                                   # @MJ (aled)
+        or await trigger_roles(message)                             # Rôles
         or await trigger_reactions(bot, message, debug=debug)       # Table Reactions (IA proprement dite)
         or await trigger_sub_reactions(bot, message, debug=debug)   # IA sur les mots
         or await trigger_di(message)                                # di... / cri...

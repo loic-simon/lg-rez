@@ -44,7 +44,7 @@ class Annexe(commands.Cog):
         except Exception:
             await ctx.send(f"Pattern non reconu. Utilisez {tools.code('!help roll')} pour plus d'informations.")
         else:
-            await ctx.send(r[3:])
+            await tools.send_blocs(ctx, r[3:])
 
 
     @commands.command(aliases=["cf", "pf"])
@@ -68,6 +68,36 @@ class Annexe(commands.Cog):
 
 
     @commands.command()
+    @tools.mjs_only
+    async def addhere(self, ctx, *joueurs):
+        """AJ
+
+        Pong
+        """
+        ts_debut = ctx.message.created_at
+
+        if len(joueurs) == 1 and "=" in joueurs[0]:      # Si critère : on remplace joueurs
+            crit, filtre = joueurs[0].split("=", maxsplit=1)
+            if hasattr(Joueurs, crit):
+                joueurs = Joueurs.query.filter(getattr(Joueurs, crit) == filtre).all()
+            else:
+                await ctx.send(f"Critère \"{crit}\" incorrect. !help {ctx.invoked_with} pour plus d'infos.")
+                return
+        else:                                           # Sinon, si noms / mentions
+            joueurs = [await tools.boucle_query_joueur(ctx, cible) for cible in joueurs]
+
+        for joueur in joueurs:
+            member = ctx.guild.get_member(joueur.discord_id)
+            assert member, f"Member {joueur} introuvable"
+            await ctx.channel.set_permissions(member, read_messages=True, send_messages=True)
+            await ctx.send(f"{joueur.nom} ajouté")
+
+        mess = await ctx.send("Fini, purge ?")
+        if await tools.yes_no(ctx.bot, mess):
+            await ctx.channel.purge(after=ts_debut)
+
+
+    @commands.command()
     async def akinator(self, ctx):
         """J'ai glissé chef
 
@@ -82,7 +112,7 @@ class Annexe(commands.Cog):
 
         exit = False
         while not exit and aki.progression <= 80:
-            mess = await ctx.send(question)
+            mess = await ctx.send(f"({aki.step + 1}) {question}")
             reponse = await tools.wait_for_react_clic(ctx.bot, mess, {"👍":"yes", "🤷":"idk", "👎":"no", "⏭️":"stop"})
             if reponse == "stop":
                 exit = True

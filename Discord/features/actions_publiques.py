@@ -86,11 +86,14 @@ class ActionsPubliques(commands.Cog):
 
         Cette commande n'est utilisable que lorsqu'un vote pour le nouveau maire est en cours.
         """
+        joueur = Joueurs.query.get(ctx.author.id)
+        assert joueur, f"Joueur {auteur.display_name} introuvable"
+
         if joueur._vote_maire is None:
             await ctx.send("Pas de vote pour le nouveau maire en cours !")
             return
 
-        if CandidHaro.query.filter_by(player_id = ctx.author.id, type = "candidature").all():
+        if CandidHaro.query.filter_by(player_id=ctx.author.id, type = "candidature").all():
             await ctx.send("Hola collègue, tout doux, tu t'es déjà présenté !")
             return
 
@@ -99,7 +102,7 @@ class ActionsPubliques(commands.Cog):
         await tools.send_blocs(ctx, "Quel est ton programme politique ?")
         motif = await tools.wait_for_message_here(ctx)
 
-        candidat = CandidHaro(id=None, player_id = ctx.author.id, type="candidature")
+        candidat = CandidHaro(id=None, player_id=ctx.author.id, type="candidature")
         db.session.add(candidat)
         db.session.commit()
 
@@ -181,6 +184,7 @@ class ActionsPubliques(commands.Cog):
 
         else:
             await ctx.send("Merci de spécifier les résultats à tracer parmi 'maire' et 'cond'")
+            return
 
         # assert type in ["maire", "cond"], "Merci de spécifier l'histogramme à tracer parmi 'maire' et 'cond'"
         # NON !!!  Enfin ça marche, mais assert n'est censé être utilisée QUE dans des cas où c'est normalement impossible que ce ne soit pas le cas, pas pour vérifier une entrée utilisateur
@@ -213,9 +217,12 @@ class ActionsPubliques(commands.Cog):
             nb_votes = sum(cibles_cpte.values())
 
             eligibles = [Joueurs.query.get(ch.player_id).nom for ch in CandidHaro.query.filter_by(type=haro_candidature).all()]     # Personnes ayant subi un haro / candidaté
+            await ctx.send(f"Éligibles : {eligibles}")
             cibles_elig = {cible: (cible in eligibles) for cible in cibles}
+            await ctx.send(f"Cibles éligibles ? : {cibles_elig}")
 
             cibles_ok = [cible for cible in cibles if cibles_elig[cible]]
+            await ctx.send(f"Cibles OK : {cibles_ok}")
             if cibles_ok:           # Personne n'est haroté dans les votants
                 cible_max = max(cibles_ok, key=lambda cible: cibles_cpte[cible])
             else:
@@ -249,7 +256,7 @@ class ActionsPubliques(commands.Cog):
 
             plt.grid(axis="y")
             ax.bar(x=x, height=y, tick_label=labels, color=colors)
-            image_path=f"www/figures/hist_{datetime.datetime.now().strftime('%Y-%m-%d')}_{type}.png"
+            image_path=f"figures/hist_{datetime.datetime.now().strftime('%Y-%m-%d')}_{type}.png"
             plt.savefig(image_path, bbox_inches="tight")
 
             # Création embed
