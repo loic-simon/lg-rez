@@ -372,11 +372,11 @@ async def yes_no(bot, message):
 
 
 # Surcouche de wait_for_react_clic pour demander de choisir dans une liste simplement
-async def choice(bot, message, N):
-    """Ajoute les reacts 1️⃣, 2️⃣, 3️⃣... [N] à message et renvoie le numéro cliqué OU détecté par réponse textuelle. (N <= 10)"""
+async def choice(bot, message, N, start=1):
+    """Ajoute les reacts [start]=1️⃣, 2️⃣, 3️⃣... <N> à message et renvoie le numéro cliqué OU détecté par réponse textuelle. (N <= 10)"""
     return await wait_for_react_clic(
-        bot, message, emojis={emoji_chiffre(i): i for i in range(1, N+1)}, process_text=True,
-        text_filter=lambda s: s.isdigit() and 1 <= int(s) <= N, post_converter=int)
+        bot, message, emojis={emoji_chiffre(i): i for i in range(start, N+1)}, process_text=True,
+        text_filter=lambda s: s.isdigit() and start <= int(s) <= N, post_converter=int)
 
 
 async def sleep(chan, x):
@@ -621,10 +621,13 @@ async def create_context(bot, message_id, member, content):
     return await bot.get_context(message)
 
 
-def nom_role(role):
+def nom_role(role, prefixe=False):
     """Retourne le nom du slug <role> (None si non trouvé)"""
     if role := Roles.query.get(role):
-        return role.nom
+        if prefixe:
+            return f"{role.prefixe}{role.nom}"
+        else:
+            return role.nom
     else:
         return None
 

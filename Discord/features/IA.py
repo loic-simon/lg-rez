@@ -1,4 +1,5 @@
 import random
+import requests
 
 from discord.ext import commands
 
@@ -50,7 +51,7 @@ class GestionIA(commands.Cog):
     async def stfu(self, ctx, force=None):
         """Active/désactive la réponse automatique du bot sur ton channel privé
 
-        [force=start/stop] permet de forcer l'activation / la désactivation.
+        [force] = start/on / stop/off permet de forcer l'activation / la désactivation.
         Sans argument, la commande agit comme un toggle (active les réactions si désactivées et vice-versa).
 
         N'agit que sur les messages classiques envoyés dans le channel : les commandes restent reconnues.
@@ -58,11 +59,11 @@ class GestionIA(commands.Cog):
         """
         id = ctx.channel.id
 
-        if force in [None, "start"] and id not in ctx.bot.in_stfu:
+        if force in [None, "start", "on"] and id not in ctx.bot.in_stfu:
             ctx.bot.in_stfu.append(id)
             await ctx.send("Okay, je me tais ! Tape !stfu quand tu voudras de nouveau de moi :cry:")
 
-        elif force in [None, "stop"] and id in ctx.bot.in_stfu:
+        elif force in [None, "stop", "off"] and id in ctx.bot.in_stfu:
             ctx.bot.in_stfu.remove(id)
             await ctx.send("Ahhh, ça fait plaisir de pouvoir reparler !")
 
@@ -71,6 +72,34 @@ class GestionIA(commands.Cog):
                 ctx.bot.in_stfu.remove(id)
             else:
                 ctx.bot.in_stfu.append(id)
+
+
+    @commands.command(aliases=["cancer"])
+    @tools.private
+    async def fals(self, ctx, force=None):
+        """Active/désactive le mode « foire à la saucisse »
+
+        [force=start/stop] permet de forcer l'activation / la désactivation.
+        Sans argument, la commande agit comme un toggle (active le mode si désactivé et vice-versa).
+
+        En mode « foire à la saucisse », le bot réagira à (presque) tous les messages, et pas seulement sur les motifs qu'on lui a appris.
+        À utiliser à vos risques et périls !
+        """
+        id = ctx.channel.id
+
+        if force in [None, "start", "on"] and id not in ctx.bot.in_fals:
+            ctx.bot.in_fals.append(id)
+            await ctx.send("https://tenor.com/view/saucisse-sausage-gif-5426973")
+
+        elif force in [None, "stop", "off"] and id in ctx.bot.in_fals:
+            ctx.bot.in_fals.remove(id)
+            await ctx.send("T'as raison, faut pas abuser des bonnes choses")
+
+        else:       # Quelque chose d'autre que start/stop précisé après !fals : bot discret
+            if id in ctx.bot.in_fals:
+                ctx.bot.in_fals.remove(id)
+            else:
+                ctx.bot.in_fals.append(id)
 
 
     @commands.command(aliases=["r"])
@@ -251,7 +280,7 @@ async def trigger_at_mj(message):
 
 async def trigger_roles(message):
     """Réaction si un nom de rôle est donné"""
-    roles = await bdd_tools.find_nearest(message.content, Roles, carac="nom", sensi=0.7)
+    roles = await bdd_tools.find_nearest(message.content, Roles, carac="nom", sensi=0.75)
 
     if roles:       # Au moins un trigger trouvé à cette sensi
         role = roles[0][0]                                  # Meilleur trigger (score max)
@@ -329,6 +358,37 @@ async def trigger_di(message):
     return False
 
 
+async def tenor(bot, message):
+    if message.channel.id in bot.in_fals:       # Chan en mode Foire à la saucisse
+        apikey = "J5UVWPVIM4A5"  # API key module ternorpy (parce que la flemme de créer un compte Tenor)
+
+        async with message.channel.typing():
+            rep = requests.get(
+                url="https://api.tenor.com/v1/search",
+                params={
+                    "q": message.content, "key": apikey, "limit": 1, "locale": "fr_FR",
+                    "contentfilter": "off", "media_filter": "minimal", "ar_range": "all"
+                }
+            )
+
+        if rep:
+            gifs = rep.json()["results"]        # Payload Tenor : {..., "results":[ (https://tenor.com/gifapi/documentation#responseobjects-gif) ]}
+            if gifs:
+                await message.channel.send(gifs[0]["itemurl"])
+                return True
+
+    return False
+
+
+async def trigger_mot_unique(message):
+    if len(message.content.split()) == 1:
+        rep = f"{message.content.capitalize()} ?"
+        await message.channel.send(rep)
+        return True
+
+    return False
+
+
 async def default(message):
     """Réponse par défaut"""
     mess = "Désolé, je n'ai pas compris 🤷‍♂️"
@@ -342,9 +402,11 @@ async def process_IA(bot, message, debug=False):
     [debug] permet d'afficher des messages en cas d'erreur lors de l'évaluation des commandes.
     """
     (await trigger_at_mj(message)                                   # @MJ (aled)
+        or await tenor(bot, message)                                # Un petit GIF ? (en mode FALS uniquement)
         or await trigger_roles(message)                             # Rôles
         or await trigger_reactions(bot, message, debug=debug)       # Table Reactions (IA proprement dite)
         or await trigger_sub_reactions(bot, message, debug=debug)   # IA sur les mots
         or await trigger_di(message)                                # di... / cri...
+        or await trigger_mot_unique(message)                        # Un seul mot ==> on répète
         or await default(message)                                   # Réponse par défaut
     )

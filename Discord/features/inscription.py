@@ -10,11 +10,11 @@ async def main(bot, member):
     """Processus d'inscription pour <member>"""
 
     if Joueurs.query.get(member.id):                                            # Joueur dans la bdd = déjà inscrit
-        await member.channel.set_permissions(member, read_messages=True, send_messages=True)
+        await tools.private_chan(member).set_permissions(member, read_messages=True, send_messages=True)
         await tools.private_chan(member).send(f"Saloww ! {member.mention} tu es déjà inscrit, viens un peu ici enculé !")
         return
     elif chan := tools.get(member.guild.text_channels, topic=f"{member.id}"):   # Inscription en cours
-        await member.channel.set_permissions(member, read_messages=True, send_messages=True)
+        await chan.set_permissions(member, read_messages=True, send_messages=True)
         await chan.send(f"Tu as déjà un channel à ton nom, {member.mention}, par ici !")
     else:
         chan = await member.guild.create_text_channel(f"conv-bot-{member.name}",  topic=str(member.id),

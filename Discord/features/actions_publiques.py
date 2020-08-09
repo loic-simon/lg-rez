@@ -1,4 +1,6 @@
 import datetime
+import traceback
+from collections import Counter
 
 import discord
 from discord.ext import commands
@@ -160,79 +162,112 @@ class ActionsPubliques(commands.Cog):
         Trace les votes sous forme d'histogramme à partir du Tableau de bord, en fait un embed en présisant les résultats détaillés et l'envoie sur le chan #annonces.
         Si <type> == "cond", déclenche aussi les actions liées au mot des MJs.
         """
-        if type == "cond":
-            colonne_cible = "CondamnéRéel"
-            colonne_votant = "VotantCond"
-            haro_candidature = "haro"
-            typo = "condamné du jour"
-            mort_election = "Mort"
-            pour_contre = "contre"
-            emoji = "bucher"
-            couleur = 0x730000
-            couleur_txt = "#730000"
+        class Cible():
+            def __init__(self, nom, votes=0):
+                self.nom = nom
+                self.label = self.nom.replace(" ", "\n", 1)
 
-        elif type == "maire":
-            colonne_cible = "MaireRéel"
-            colonne_votant = "VotantMaire"
-            haro_candidature = "candidature"
-            typo = "nouveau maire"
-            mort_election = "Élection"
-            pour_contre = "pour"
-            emoji = "maire"
-            couleur = 0xd4af37
-            couleur_txt = "#d4af37"
+                self.votes = votes
 
-        else:
-            await ctx.send("Merci de spécifier les résultats à tracer parmi 'maire' et 'cond'")
-            return
+                votants = [values[i][ind_col_votants] or "zzz" for i in range(3, NL) if values[i][ind_col_cible] == self.nom]
+                votants.sort()
+                self.votants = ["Corbeau" if nom == "zzz" else nom for nom in votants]         # On trie par ordre alphabétique en mettant les corbeaux (= pas de votant) à la fin
 
-        # assert type in ["maire", "cond"], "Merci de spécifier l'histogramme à tracer parmi 'maire' et 'cond'"
-        # NON !!!  Enfin ça marche, mais assert n'est censé être utilisée QUE dans des cas où c'est normalement impossible que ce ne soit pas le cas, pas pour vérifier une entrée utilisateur
+                self.joueur = Joueurs.query.filter_by(nom=nom).one()
+                if not self.joueur:
+                    raise ValueError(f"Joueur \"{nom}\" non trouvé en base")
 
-        await ctx.send("Récupération des votes...")
-        async with ctx.typing():
-        # Sorcellerie sur la feuille gsheets pour trouver la colonne "CondamnéRéel"
-            SHEET_ID = env.load("TDB_SHEET_ID")
+                self.eligible = bool(CandidHaro.query.filter_by(type=haro_candidature, player_id=self.joueur.discord_id).all())
 
-            workbook = gsheets.connect(SHEET_ID)    # Tableau de bord
-            sheet = workbook.worksheet("Journée en cours")
-            values = sheet.get_all_values()         # Liste de liste des valeurs des cellules
-            NL = len(values)
+            def __repr__(self):
+                return f"{self.nom} ({self.votes})"
 
-            head = values[2]            # Ligne d'en-têtes (noms des colonnes) = 3e ligne du TDB
+            def __eq__(self, other):
+                return self.nom == other.nom
 
-            ind_col_cible = head.index(colonne_cible)
-            cibles = [val for i in range(3, NL) if (val := values[i][ind_col_cible])]       # Liste des cibles
-
-            ind_col_votants = head.index(colonne_votant)
-            votants_dict = {cible: [values[i][ind_col_votants] for i in range(3, NL) if values[i][ind_col_cible] == cible] for cible in cibles} # dictionnaire {cible:[liste des votants contre cible]}
-
-            cibles_cpte = {}  # dict {cible : nb ocurrences}
-            for cible in cibles:
-                if cible in cibles_cpte:
-                    cibles_cpte[cible] += 1
+            def couleur(self, choisi):
+                if self == choisi:
+                    return hex(couleur).replace("0x", "#")
+                if self.eligible:
+                    return "#64b9e9"
                 else:
-                    cibles_cpte[cible] = 1
+                    return "gray"
 
-            nb_votes = sum(cibles_cpte.values())
+            def nometrole(self):
+                return f"{tools.bold(self.nom)}, {tools.nom_role(self.joueur.role, prefixe=True)}"
 
-            eligibles = [Joueurs.query.get(ch.player_id).nom for ch in CandidHaro.query.filter_by(type=haro_candidature).all()]     # Personnes ayant subi un haro / candidaté
-            await ctx.send(f"Éligibles : {eligibles}")
-            cibles_elig = {cible: (cible in eligibles) for cible in cibles}
-            await ctx.send(f"Cibles éligibles ? : {cibles_elig}")
 
-            cibles_ok = [cible for cible in cibles if cibles_elig[cible]]
-            await ctx.send(f"Cibles OK : {cibles_ok}")
-            if cibles_ok:           # Personne n'est haroté dans les votants
-                cible_max = max(cibles_ok, key=lambda cible: cibles_cpte[cible])
+        try:
+            if type == "cond":
+                colonne_cible = "CondamnéRéel"
+                colonne_votant = "VotantCond"
+                haro_candidature = "haro"
+                typo = "condamné du jour"
+                mort_election = "Mort"
+                pour_contre = "contre"
+                emoji = "bucher"
+                couleur = 0x730000
+                couleur_txt = "#730000"
+
+            elif type == "maire":
+                colonne_cible = "MaireRéel"
+                colonne_votant = "VotantMaire"
+                haro_candidature = "candidature"
+                typo = "nouveau maire"
+                mort_election = "Élection"
+                pour_contre = "pour"
+                emoji = "maire"
+                couleur = 0xd4af37
+                couleur_txt = "#d4af37"
+
             else:
-                cible_max = "personne, bande de tocards"
+                await ctx.send("Merci de spécifier les résultats à tracer parmi 'maire' et 'cond'")
+                return
 
+            # assert type in ["maire", "cond"], "Merci de spécifier l'histogramme à tracer parmi 'maire' et 'cond'"
+            # NON !!!  Enfin ça marche, mais assert n'est censé être utilisée QUE dans des cas où c'est normalement impossible que ce ne soit pas le cas, pas pour vérifier une entrée utilisateur
+
+            await ctx.send("Récupération des votes...")
+            async with ctx.typing():
+            # Sorcellerie sur la feuille gsheets pour trouver la colonne "CondamnéRéel"
+
+                workbook = gsheets.connect(env.load("TDB_SHEET_ID"))    # Tableau de bord
+                sheet = workbook.worksheet("Journée en cours")
+                values = sheet.get_all_values()         # Liste de liste des valeurs des cellules
+                NL = len(values)
+
+                head = values[2]            # Ligne d'en-têtes (noms des colonnes) = 3e ligne du TDB
+                ind_col_cible = head.index(colonne_cible)
+                ind_col_votants = head.index(colonne_votant)
+
+                cibles_brutes = [val for i in range(3, NL) if (val := values[i][ind_col_cible])]
+                nb_votes = len(cibles_brutes)
+
+                cibles = [Cible(nom, votes) for (nom, votes) in Counter(cibles_brutes).most_common()]       # Liste des cibles (récupère les votants, vérifie l'éligibilité...) triées du plus au moins votées
+
+            choisi = None
+            eligibles = [c for c in cibles if c.eligible]
+
+            if eligibles:
+                maxvotes = eligibles[0].votes
+                egalites = [c for c in eligibles if c.votes == maxvotes]
+
+                if len(egalites) > 1:       # Égalité
+                    mess = await ctx.send("Égalité entre\n" + "\n".join(f"{tools.emoji_chiffre(i+1)} {c.nom}" for i, c in enumerate(egalites)) + "\nQui meurt / est élu ? (regarder vote du maire, 0️⃣ pour personne / si le vainqueur est garde-loupé, inéligible ou autre)")
+                    choice = await tools.choice(ctx.bot, mess, len(egalites), start=0)
+                    if choice:      # pas 0
+                        choisi = eligibles[choice-1]
+
+                else:
+                    mess = await ctx.send(f"Joueur éligible le plus voté : {tools.bold(eligibles[0].nom)}\nÇa meurt / est élu ? (pas garde-loupé, inéligible ou autre)")
+                    if await tools.yes_no(ctx.bot, mess):
+                        choisi = eligibles[0]
+
+
+            # Paramètres plot
             discord_gray = '#2F3136'
             plt.figure(facecolor=discord_gray)
-
             plt.rcParams.update({'font.size': 16})
-
             ax = plt.axes(facecolor='#8F9194') #coloration de TOUT le graphe
             ax.tick_params(axis='both', colors='white')
             ax.spines['bottom'].set_color('white')
@@ -241,49 +276,42 @@ class ActionsPubliques(commands.Cog):
             ax.spines['top'].set_color(discord_gray)
             ax.set_facecolor(discord_gray)
             ax.set_axisbelow(True)
-
             ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-            # plt.margins(x=0, y=10)
 
-            x, y, labels, colors = [], [], [], []
-            i = 0
-            for cible, N in cibles_cpte.items():
-                x.append(i)
-                y.append(N)
-                labels.append(cible.replace(" ", "\n", 1))
-                colors.append(couleur_txt if cible == cible_max else "#64b9e9" if cibles_elig[cible] else "gray")
-                i += 1
-
+            # Plot
+            ax.bar(x=range(len(cibles)),
+                   height=[c.votes for c in cibles],
+                   tick_label=[c.label for c in cibles],
+                   color=[c.couleur(choisi) for c in cibles],
+            )
             plt.grid(axis="y")
-            ax.bar(x=x, height=y, tick_label=labels, color=colors)
+
             image_path=f"figures/hist_{datetime.datetime.now().strftime('%Y-%m-%d')}_{type}.png"
             plt.savefig(image_path, bbox_inches="tight")
 
             # Création embed
             embed = discord.Embed(
-                title=f"{mort_election} de **{cible_max}**",
+                title=f"{mort_election} de {choisi.nometrole() if choisi else 'personne, bande de tocards'}",
                 description=f"{nb_votes} votes au total",
                 color=couleur
             )
             embed.set_author(name=f"Résultats du vote pour le {typo}", icon_url=tools.emoji(ctx, emoji).url)
-            # embed.set_footer(text=f"{nb_votes} votes au total")
 
-            rd = []
-            for cible, votants in votants_dict.items():     # Résultats détaillés
-                votants = [votant or "Corbeau" for votant in votants]
-                # embed.add_field(name=f"Votes {pour_contre} {cible} :", value=", ".join(votants), inline=False)
-                rd.append(("A" if len(votants) == 1 else "Ont") + f" voté {pour_contre} {cible} : " + ", ".join(votants))
-            embed.set_footer(text="\n".join(rd))
+            rd = "\n".join(("A" if cible.votes == 1 else "Ont") + f" voté {pour_contre} {cible.nom} : " + ", ".join(cible.votants) for cible in cibles)
+            embed.set_footer(text=rd)
 
             file = discord.File(image_path, filename="image.png")
             embed.set_image(url="attachment://image.png")
 
+        except Exception:
+            await tools.send_code_blocs(ctx, traceback.format_exc())
 
+        # Envoi
         mess = await ctx.send("Ça part ?", file=file, embed=embed)
         if await tools.yes_no(ctx.bot, mess):
             # Envoi du graphe
-            file = discord.File(image_path, filename="image.png")
-            embed.set_image(url="attachment://image.png")
+            file = discord.File(image_path, filename="image.png")       # Un objet File ne peut servir qu'une fois, il faut le recréer
+            # embed.set_image(url="attachment://image.png")
 
             await tools.channel(ctx, "annonces").send("@everyone Résultat du vote ! :fire:", file=file, embed=embed)
             await ctx.send(f"Et c'est parti dans {tools.channel(ctx, 'annonces').mention} !")

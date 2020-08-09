@@ -34,6 +34,7 @@ class SuperBot(commands.Bot):
         commands.Bot.__init__(self, **kwargs)
         self.in_command = []        # IDs des salons dans une commande
         self.in_stfu = []           # IDs des salons en mode STFU (IA off)
+        self.in_fals = []           # IDs des salons en mode Foire à la saucisse
         self.tasks = {}             # Dictionnaire des tâches en attente (id: TimerHandle)
 
 bot = SuperBot(command_prefix=COMMAND_PREFIX,
