@@ -169,9 +169,7 @@ class ActionsPubliques(commands.Cog):
 
                 self.votes = votes
 
-                votants = [values[i][ind_col_votants] or "zzz" for i in range(3, NL) if values[i][ind_col_cible] == self.nom]
-                votants.sort()
-                self.votants = ["Corbeau" if nom == "zzz" else nom for nom in votants]         # On trie par ordre alphabétique en mettant les corbeaux (= pas de votant) à la fin
+                self.votants = []
 
                 self.joueur = Joueurs.query.filter_by(nom=nom).one()
                 if not self.joueur:
@@ -183,7 +181,12 @@ class ActionsPubliques(commands.Cog):
                 return f"{self.nom} ({self.votes})"
 
             def __eq__(self, other):
-                return self.nom == other.nom
+                return isinstance(other, Cible) and self.nom == other.nom
+
+            def set_votants(self, raw_votants):
+                votants = [rv or "zzz" for rv in raw_votants]
+                votants.sort()
+                self.votants = ["Corbeau" if nom == "zzz" else nom for nom in votants]         # On trie par ordre alphabétique en mettant les corbeaux (= pas de votant) à la fin
 
             def couleur(self, choisi):
                 if self == choisi:
@@ -243,7 +246,10 @@ class ActionsPubliques(commands.Cog):
                 cibles_brutes = [val for i in range(3, NL) if (val := values[i][ind_col_cible])]
                 nb_votes = len(cibles_brutes)
 
-                cibles = [Cible(nom, votes) for (nom, votes) in Counter(cibles_brutes).most_common()]       # Liste des cibles (récupère les votants, vérifie l'éligibilité...) triées du plus au moins votées
+                cibles = [Cible(nom, votes) for (nom, votes) in Counter(cibles_brutes).most_common()]       # Liste des cibles (vérifie l'éligibilité...) triées du plus au moins votées
+                for cible in cibles:        # Récupération votants
+                    cible.set_votants([values[i][ind_col_votants] for i in range(3, NL) if values[i][ind_col_cible] == cible.nom])
+
 
             choisi = None
             eligibles = [c for c in cibles if c.eligible]

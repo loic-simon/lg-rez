@@ -15,7 +15,7 @@ class RemplissageBDD(commands.Cog):
 
     @commands.command()
     @tools.mjs_only
-    async def droptable(self, ctx, table):
+    async def droptable(self, ctx, *, table):
         """Supprime sans ménagement une table de données (COMMANDE MJ)
 
         <table> table à supprimer (doit exister)

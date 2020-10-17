@@ -39,6 +39,7 @@ class SuperBot(commands.Bot):
 
 bot = SuperBot(command_prefix=COMMAND_PREFIX,
                description="LG-bot – Plateforme pour parties endiablées de Loup-Garou",
+               case_insensitive=True,
 )
 
 
@@ -473,7 +474,7 @@ async def on_error(event, *args, **kwargs):
     """
     db.session.rollback()       # Dans le doute, on vide la session SQL
     guild = bot.get_guild(GUILD_ID)
-    assert guild, f"on_error : Serveur {GUILD_ID} introuvable - Erreur initiale : \n{traceback.format_exc}"
+    assert guild, f"on_error : Serveur {GUILD_ID} introuvable - Erreur initiale : \n{traceback.format_exc()}"
 
     await tools.log(guild, (
         f"{tools.role(guild, 'MJ').mention} ALED : Exception Python !"

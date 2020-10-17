@@ -74,7 +74,7 @@ class GestionIA(commands.Cog):
                 ctx.bot.in_stfu.append(id)
 
 
-    @commands.command(aliases=["cancer"])
+    @commands.command(aliases=["cancer", "214"])
     @tools.private
     async def fals(self, ctx, force=None):
         """Active/désactive le mode « foire à la saucisse »

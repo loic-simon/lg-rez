@@ -62,17 +62,34 @@ class Annexe(commands.Cog):
 
         Pong
         """
-        delta = datetime.datetime.utcnow() - ctx.message.created_at
-        pingpong = "ping" if ctx.invoked_with == "pong" else "pong"
-        await ctx.send(f"!{pingpong} ({delta.total_seconds():.2}s)")
+        ts_rec = datetime.datetime.utcnow()
+        delta_rec = ts_rec - ctx.message.created_at     # Temps de réception = temps entre création message et sa réception
+        pingpong = ctx.invoked_with.replace("i", "x").replace("I", "X").replace("o", "i").replace("O", "I").replace("x", "o").replace("X", "O")
+        cont = (
+            f" Réception : {delta_rec.total_seconds()*1000:4.0f} ms\n"
+            f" Latence :   {ctx.bot.latency*1000:4.0f} ms\n"
+        )
+        mess = await ctx.send(f"!{pingpong}\n" + tools.code_bloc(cont + " (...)"))
+
+        ts_ret = datetime.datetime.utcnow()
+        delta_ret = ts_ret - mess.created_at            # Retour information message réponse créé
+        delta_env = ts_ret - ts_rec - delta_ret         # Temps d'envoi = temps entre réception 1er message (traitement quasi instantané) et création 2e, moins temps de retour d'information
+        delta_tot = delta_rec + delta_ret + delta_env   # Total = temps entre création message !pong et réception information réponse envoyée
+        await mess.edit(content=f"!{pingpong}\n" + tools.code_bloc(cont +
+            f" Envoi :     {delta_env.total_seconds()*1000:4.0f} ms\n"
+            f" Retour :    {delta_ret.total_seconds()*1000:4.0f} ms\n"
+            f"——————————————————————\n"
+            f" Total :     {delta_tot.total_seconds()*1000:4.0f} ms"
+        ))
 
 
     @commands.command()
     @tools.mjs_only
     async def addhere(self, ctx, *joueurs):
-        """AJ
+        """Ajoute les membres au chan courant
 
-        Pong
+        *[joueurs] membres à ajouter
+        Si *[joueurs] est un seul élément, il peut être de la forme <crit>=<filtre> tel que décrit dans l'aide de !send.
         """
         ts_debut = ctx.message.created_at
 
@@ -92,9 +109,25 @@ class Annexe(commands.Cog):
             await ctx.channel.set_permissions(member, read_messages=True, send_messages=True)
             await ctx.send(f"{joueur.nom} ajouté")
 
-        mess = await ctx.send("Fini, purge ?")
+        mess = await ctx.send("Fini, purge les messages ?")
         if await tools.yes_no(ctx.bot, mess):
             await ctx.channel.purge(after=ts_debut)
+
+
+    @commands.command()
+    @tools.mjs_only
+    async def purge(self, ctx, N=None):
+        """Supprime tous les messages de ce chan
+
+        [N] nombre de messages à supprimer (défaut : tous)
+        """
+        if N:
+            mess = await ctx.send(f"Supprimer les {N} messages les plus récents de ce chan ? (celui-ci inclus)")
+        else:
+            mess = await ctx.send(f"Supprimer tous les messages de ce chan ?")
+
+        if await tools.yes_no(ctx.bot, mess):
+            await ctx.channel.purge(limit=N)
 
 
     @commands.command()
