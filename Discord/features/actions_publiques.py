@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from blocs import env, gsheets, bdd_tools
-from bdd_connect import db, Joueurs, Actions, BaseActions, BaseActionsRoles, CandidHaro
+from bdd import session, Joueurs, Actions, BaseActions, BaseActionsRoles, CandidHaro
 from features import gestion_actions, taches
 import tools
 
@@ -52,13 +52,13 @@ class ActionsPubliques(commands.Cog):
 
         if not CandidHaro.query.filter_by(player_id=cible.discord_id, type="haro").all():       # Inscription haroté
             haroted = CandidHaro(player_id=cible.discord_id, type="haro")
-            db.session.add(haroted)
+            session.add(haroted)
 
         if not CandidHaro.query.filter_by(player_id=ctx.author.id, type="haro").all():          # Inscription haroteur
             haroteur = CandidHaro(player_id=ctx.author.id, type="haro")
-            db.session.add(haroteur)
+            session.add(haroteur)
 
-        db.session.commit()
+        session.commit()
 
         emb = discord.Embed(title = f"**{tools.emoji(ctx, 'ha')}{tools.emoji(ctx, 'ro')} contre {cible.nom} !**",
                             description = f"**« {motif.content} »\n**",
@@ -105,8 +105,8 @@ class ActionsPubliques(commands.Cog):
         motif = await tools.wait_for_message_here(ctx)
 
         candidat = CandidHaro(id=None, player_id=ctx.author.id, type="candidature")
-        db.session.add(candidat)
-        db.session.commit()
+        session.add(candidat)
+        session.commit()
 
         emb = discord.Embed(title = f"**{tools.emoji(ctx, 'maire')} {auteur.display_name} candidate à la Mairie !** {tools.emoji(ctx, 'mc')}",
                             description = "Voici ce qu'il a à vous dire :\n" + tools.bold(motif.content),
@@ -143,8 +143,8 @@ class ActionsPubliques(commands.Cog):
             await tools.log(ctx, f"!wipe {qui} : rien à faire")
         else:
             for item in items:
-                db.session.delete(item)
-            db.session.commit()
+                session.delete(item)
+            session.commit()
             await ctx.send("Fait.")
             await tools.log(ctx, f"!wipe {qui} : fait")
 

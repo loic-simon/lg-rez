@@ -9,7 +9,7 @@ from akinator.async_aki import Akinator
 import akinator
 
 import tools
-from bdd_connect import db, Joueurs
+from bdd import session, Joueurs
 
 
 class Annexe(commands.Cog):

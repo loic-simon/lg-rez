@@ -1,7 +1,7 @@
 from discord.ext import commands
 
 import tools
-from bdd_connect import db, Joueurs
+from bdd import session, Joueurs
 from blocs import env, gsheets, bdd_tools
 
 
@@ -90,8 +90,8 @@ async def main(bot, member):
         joueur = Joueurs(discord_id=member.id, _chan_id=chan.id, nom=member.display_name,
                          chambre=chambre, statut="vivant", role="nonattr", camp="Non attribué",
                          votant_village=True, votant_loups=False, role_actif=False)
-        db.session.add(joueur)
-        db.session.commit()
+        session.add(joueur)
+        session.commit()
 
         # Ajout au TDB
 

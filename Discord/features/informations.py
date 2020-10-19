@@ -3,7 +3,7 @@ import unidecode
 
 from discord.ext import commands
 
-from bdd_connect import db, Joueurs, Roles, Actions, BaseActions
+from bdd import session, Joueurs, Roles, Actions, BaseActions
 from blocs import bdd_tools
 import tools
 from blocs import bdd_tools

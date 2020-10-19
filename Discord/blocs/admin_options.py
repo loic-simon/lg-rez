@@ -139,8 +139,8 @@ def additem(d, p):
     args = {col: bdd_tools.transtype(p[col] if col in p else False, col, SQL_type[col], SQL_nullable[col]) for col in cols}
 
     item = table(**args)
-    db.session.add(item)
-    db.session.commit()
+    session.add(item)
+    session.commit()
 
     r += "Ajout réussi.\n\n"
     return r
@@ -160,8 +160,8 @@ def delitem(d, p):
 
     try:
         item = table.query.filter_by(**id).one()
-        db.session.delete(item)
-        db.session.commit()
+        session.delete(item)
+        session.commit()
         r += "Suppression effectuée.<br/><br/>"
     except NoResultFound:
         r += "Aucun résultat trouvé. Suppression non effectuée.<br/><br/>"
@@ -196,7 +196,7 @@ def editem(d, p):
                 r += f"<li>{col} : {old} &rarr; {new}</li>"
                 bdd_tools.modif(item, col, new)
         r += "</ul>"
-        db.session.commit()
+        session.commit()
         r += "Modification effectuée.<br/><br/>"
     except NoResultFound:
         r += "Aucun résultat trouvé. Modification non effectuée.<br/><br/>"

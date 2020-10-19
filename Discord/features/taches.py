@@ -4,7 +4,7 @@ from discord.ext import commands
 
 from blocs import env, webhook
 import tools
-from bdd_connect import db, Taches, Actions, Joueurs
+from bdd import session, Taches, Actions, Joueurs
 
 
 WEBHOOK_TP_URL = env.load("WEBHOOK_TP_URL")
@@ -13,8 +13,8 @@ WEBHOOK_TP_URL = env.load("WEBHOOK_TP_URL")
 def execute(tache):
     """Exécute la tâche <tache> (objet BDD Taches) : appelle le webhook et nettoie"""
     webhook.send(tache.commande, url=WEBHOOK_TP_URL)
-    db.session.delete(tache)
-    db.session.commit()
+    session.delete(tache)
+    session.commit()
 
 
 def add_task(bot, timestamp, commande, action=None):
@@ -22,8 +22,8 @@ def add_task(bot, timestamp, commande, action=None):
     now = datetime.datetime.now()
     tache = Taches(timestamp=timestamp, commande=commande, action=action)
 
-    db.session.add(tache)                                                           # Enregistre la tâche en BDD
-    db.session.commit()
+    session.add(tache)                                                           # Enregistre la tâche en BDD
+    session.commit()
 
     TH = bot.loop.call_later((timestamp - now).total_seconds(), execute, tache)     # Programme la tâche (appellera execute(tache) à timestamp)
     bot.tasks[tache.id] = TH        # TaskHandler, pour pouvoir cancel
@@ -32,8 +32,8 @@ def add_task(bot, timestamp, commande, action=None):
 def cancel_task(bot, tache):
     """Supprime (annule) une tâche (fonction pour usage ici et dans d'autres features)"""
     bot.tasks[tache.id].cancel()        # Annulation (objet TaskHandler)
-    db.session.delete(tache)            # Suppression en base
-    db.session.commit()
+    session.delete(tache)            # Suppression en base
+    session.commit()
     del bot.tasks[tache.id]             # Suppression TaskHandler
 
 

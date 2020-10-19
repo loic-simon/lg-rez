@@ -3,7 +3,7 @@ import datetime
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
-from bdd_connect import db, Joueurs, Actions, CandidHaro
+from bdd import session, Joueurs, Actions, CandidHaro
 from features import gestion_actions
 from blocs import env, bdd_tools, gsheets
 import tools
@@ -60,7 +60,7 @@ class VoterAgir(commands.Cog):
         async with ctx.typing():
             # Modification en base
             bdd_tools.modif(joueur, "_vote_condamne", cible.nom)
-            db.session.commit()
+            session.commit()
 
             # Écriture dans sheet Données brutes
             sheet = gsheets.connect(VOTECOND_SHEET_ID).sheet1
@@ -111,7 +111,7 @@ class VoterAgir(commands.Cog):
         async with ctx.typing():
             # Modification en base
             bdd_tools.modif(joueur, "_vote_maire", cible.nom)
-            db.session.commit()
+            session.commit()
 
             # Écriture dans sheet Données brutes
             sheet = gsheets.connect(VOTEMAIRE_SHEET_ID).sheet1
@@ -155,7 +155,7 @@ class VoterAgir(commands.Cog):
         async with ctx.typing():
             # Modification en base
             bdd_tools.modif(joueur, "_vote_loups", cible.nom)
-            db.session.commit()
+            session.commit()
 
             # Écriture dans sheet Données brutes
             sheet = gsheets.connect(VOTELOUPS_SHEET_ID).sheet1
@@ -235,7 +235,7 @@ class VoterAgir(commands.Cog):
                     pcs = " pour cette semaine" if "weekends" in action.refill else ""
                     await ctx.send(f"Il te reste {action.charges} charge(s){pcs}.")
                     if action.charges == 0 and not action.refill:
-                        db.session.delete(action)
+                        session.delete(action)
                         deleted = True
                 if not deleted:
                     bdd_tools.modif(action, "_decision", None)
@@ -246,4 +246,4 @@ class VoterAgir(commands.Cog):
             await ctx.send(f"Action « {tools.code(action._decision)} » bien prise en compte pour {tools.code(action.action)}.\n"
                            + tools.ital("Tu peux modifier ta décision autant que nécessaire avant la fin du créneau."))
 
-        db.session.commit()
+        session.commit()

@@ -2,7 +2,7 @@ import traceback
 
 from discord.ext import commands
 import tools
-from bdd_connect import db, Joueurs, Actions, BaseActions, BaseActionsRoles, Taches
+from bdd import session, Joueurs, Actions, BaseActions, BaseActionsRoles, Taches
 from blocs import bdd_tools, env, gsheets
 from features import gestion_actions
 

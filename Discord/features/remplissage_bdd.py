@@ -6,14 +6,14 @@ from discord.ext import commands
 
 import tools
 from blocs import env, gsheets, bdd_tools
-from bdd_connect import db, Tables, Roles
+from bdd import session, engine, Tables, Roles
 from features import informations
 
 
 class RemplissageBDD(commands.Cog):
     """ RemplissageBDD - Commandes pour remplir la base de données du bot à partir des GSheets"""
 
-    @commands.command()
+    @commands.command(disabled=True)
     @tools.mjs_only
     async def droptable(self, ctx, *, table):
         """Supprime sans ménagement une table de données (COMMANDE MJ)
@@ -28,7 +28,7 @@ class RemplissageBDD(commands.Cog):
 
         if table in Tables:
             if await tools.yes_no(ctx.bot, await ctx.send("Sûr ?")):
-                Tables[table].__table__.drop(db.engine)
+                Tables[table].__table__.drop(engine)
 
                 await ctx.send(f"Table {tools.code(table)} supprimée.")
                 await tools.log(ctx, f"Table {tools.code(table)} supprimée.")
@@ -78,9 +78,9 @@ class RemplissageBDD(commands.Cog):
                             if getattr(existants[id], col) != args[col]:
                                 bdd_tools.modif(existants[id], col, args[col])
                     else:
-                        db.session.add(table(**args))
+                        session.add(table(**args))
 
-                db.session.commit()
+                session.commit()
 
             await ctx.send(f"Table {tools.code(table_name)} remplie !")
             await tools.log(ctx, f"Table {tools.code(table_name)} remplie !")

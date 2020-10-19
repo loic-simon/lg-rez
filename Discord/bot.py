@@ -11,7 +11,7 @@ import discord
 from discord.ext import commands
 
 import tools
-from bdd_connect import db, Tables, Joueurs, Actions, Roles
+from bdd import session, Tables, Joueurs, Actions, Roles
 from blocs import env, bdd_tools, gsheets, webhook, pseudoshell
 from features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques
 
@@ -223,7 +223,7 @@ class Special(commands.Cog):
     async def do(self, ctx, *, code):
         """Exécute du code Python et affiche le résultat (COMMANDE MJ)
 
-        <code> doit être du code valide dans le contexte du fichier bot.py (utilisables notemment : bot, ctx, db, Tables...)
+        <code> doit être du code valide dans le contexte du fichier bot.py (utilisables notemment : bot, ctx, session, Tables...)
         Si <code> est une coroutine, elle sera awaited (ne pas inclure "await" dans <code>).
 
         Aussi connue sous le nom de « faille de sécurité », cette commande permet de faire environ tout ce qu'on veut sur le bot (y compris le crasher, importer des modules, exécuter des fichiers .py... même si c'est un peu compliqué) voire d'impacter le serveur sur lequel le bot tourne si on est motivé.
@@ -416,7 +416,7 @@ async def on_command_error(ctx, exc):
     if ctx.guild.id != GUILD_ID:            # Mauvais serveur
         return
 
-    db.session.rollback()       # Dans le doute, on vide la session SQL
+    session.rollback()       # Dans le doute, on vide la session SQL
     if isinstance(exc, commands.CommandInvokeError) and isinstance(exc.original, tools.CommandExit):     # STOP envoyé
         await ctx.send(str(exc.original) or "Mission aborted.")
 
@@ -472,7 +472,7 @@ async def on_error(event, *args, **kwargs):
 
     Permet de gérer les exceptions sans briser la loop du bot (i.e. il reste en ligne)
     """
-    db.session.rollback()       # Dans le doute, on vide la session SQL
+    session.rollback()       # Dans le doute, on vide la session SQL
     guild = bot.get_guild(GUILD_ID)
     assert guild, f"on_error : Serveur {GUILD_ID} introuvable - Erreur initiale : \n{traceback.format_exc()}"
 

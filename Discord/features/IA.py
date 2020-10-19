@@ -5,7 +5,7 @@ from discord.ext import commands
 
 import tools
 from blocs import bdd_tools
-from bdd_connect import db, Triggers, Reactions, Roles
+from bdd import session, Triggers, Reactions, Roles
 
 
 # Marqueurs de séparation du mini-langage des séquences-réactions
@@ -139,12 +139,12 @@ class GestionIA(commands.Cog):
         await ctx.send(f"Résumé de la séquence : {tools.code(reponse)}")
         async with ctx.typing():
             reac = Reactions(reponse=reponse)
-            db.session.add(reac)
-            db.session.flush()          # On "fait comme si" on commitait l'ajout de reac, ce qui calcule read.id (autoincrément)
+            session.add(reac)
+            session.flush()          # On "fait comme si" on commitait l'ajout de reac, ce qui calcule read.id (autoincrément)
 
             trigs = [Triggers(trigger=trigger, reac_id=reac.id) for trigger in triggers]
-            db.session.add_all(trigs)
-            db.session.commit()
+            session.add_all(trigs)
+            session.commit()
         await ctx.send(f"Règle ajoutée en base.")
 
 
@@ -231,19 +231,19 @@ class GestionIA(commands.Cog):
                 if r == "0":
                     fini = True
                 elif r.isdigit() and (n := int(r)) <= len(trigs):
-                    db.session.delete(trigs[n-1])
-                    db.session.commit()
+                    session.delete(trigs[n-1])
+                    session.commit()
                     del trigs[n-1]
                 else:
                     trig = Triggers(trigger=r, reac_id=rep.id)
                     trigs.append(trig)
-                    db.session.add(trig)
-                    db.session.commit()
+                    session.add(trig)
+                    session.commit()
 
             if not trigs:        # on a tout supprimé !
                 await ctx.send("Tous les triggers supprimés, suppression de la réaction")
-                db.session.delete(rep)
-                db.session.commit()
+                session.delete(rep)
+                session.commit()
                 return
 
         if MR:                  # Modification de la réponse
@@ -258,11 +258,11 @@ class GestionIA(commands.Cog):
             bdd_tools.modif(rep, "reponse", reponse)
 
         if not (MT or MR):      # Suppression
-            db.session.delete(rep)
+            session.delete(rep)
             for trig in trigs:
-                db.session.delete(trig)
+                session.delete(trig)
 
-        db.session.commit()
+        session.commit()
 
         await ctx.send("Fini.")
 
