@@ -10,44 +10,30 @@ import copy
 import discord
 from discord.ext import commands
 
-import tools
-from bdd import session, Tables, Joueurs, Actions, Roles
-from blocs import env, bdd_tools, gsheets, webhook, pseudoshell
-from features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques
+from Discord import tools
+from Discord.bdd import session, Tables, Joueurs, Actions, Roles
+from Discord.blocs import env, bdd_tools, gsheets, webhook, pseudoshell
+from Discord.features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques
 
 
 logging.basicConfig(level=logging.WARNING)
 
 
 ### 1 - Récupération du token du bot et de l'ID du serveur
-TOKEN = env.load("DISCORD_TOKEN")
+DISCORD_TOKEN = env.load("DISCORD_TOKEN")
 GUILD_ID = int(env.load("DISCORD_GUILD_ID"))
 
 
 ### 2 - Création du bot
 COMMAND_PREFIX = "!"
-class SuperBot(commands.Bot):
-    """discord.ext.commands.Bot avec quelques listes et dictionnaire"""
 
-    def __init__(self, **kwargs):
-        """Initialize self"""
-        commands.Bot.__init__(self, **kwargs)
-        self.in_command = []        # IDs des salons dans une commande
-        self.in_stfu = []           # IDs des salons en mode STFU (IA off)
-        self.in_fals = []           # IDs des salons en mode Foire à la saucisse
-        self.tasks = {}             # Dictionnaire des tâches en attente (id: TimerHandle)
-
-bot = SuperBot(command_prefix=COMMAND_PREFIX,
-               description="LG-bot – Plateforme pour parties endiablées de Loup-Garou",
-               case_insensitive=True,
-)
 
 
 ### 3 - Checks et système de blocage
 class AlreadyInCommand(commands.CheckFailure):
     pass
 
-@bot.check
+
 async def already_in_command(ctx):
     """Décorateur : vérifie si le joueur est actuellement dans une commande"""
     if ctx.channel.id in ctx.bot.in_command and ctx.command.name != "stop":    # Cas particulier : !stop
@@ -55,7 +41,8 @@ async def already_in_command(ctx):
     else:
         return True
 
-@bot.before_invoke
+
+# @bot.before_invoke
 async def add_to_in_command(ctx):
     """Ajoute le joueur dans la liste des joueurs dans une commande
 
@@ -65,7 +52,9 @@ async def add_to_in_command(ctx):
     if ctx.command.name != "stop" and not ctx.message.webhook_id:
         ctx.bot.in_command.append(ctx.channel.id)
 
-@bot.after_invoke
+
+
+# @bot.after_invoke
 async def remove_from_in_command(ctx):
     """Retire le joueur de la liste des joueurs dans une commande
 
@@ -80,8 +69,7 @@ async def remove_from_in_command(ctx):
 ### 4 - Réactions aux différents évènements
 
 # Au démarrage du bot
-@bot.event
-async def on_ready():
+async def _on_ready(bot):
     """Fonction appellée par Discord au démarrage du bot"""
 
     guild = bot.get_guild(GUILD_ID)
@@ -109,8 +97,7 @@ async def on_ready():
 
 
 # À l'arrivée d'un membre sur le serveur
-@bot.event
-async def on_member_join(member):
+async def _on_member_join(bot, member):
     """Fonction appellée par Discord à l'arrivée de <member> sur le serveur"""
     if member.guild.id != GUILD_ID:            # Bon serveur
         return
@@ -120,8 +107,7 @@ async def on_member_join(member):
 
 
 # Au départ d'un membre du serveur
-@bot.event
-async def on_member_remove(member):
+async def _on_member_remove(bot, member):
     """Fonction appellée par Discord au départ de <member> du serveur"""
     if member.guild.id != GUILD_ID:            # Bon serveur
         return
@@ -130,8 +116,7 @@ async def on_member_remove(member):
 
 
 # À chaque message
-@bot.event
-async def on_message(message):
+async def _on_message(bot, message):
     """Fonction appellée par Discord à la réception de <message>"""
 
     if message.author == bot.user:              # Sécurité pour éviter les boucles infinies
@@ -160,8 +145,7 @@ async def on_message(message):
 
 
 # À chaque réaction ajoutée
-@bot.event
-async def on_raw_reaction_add(payload):
+async def _on_raw_reaction_add(bot, payload):
     """Fonction appellée par Discord à l'ajout d'une réaction
 
     <payload> paramètre "statique" (car message par forcément dans le cache du bot, si il a été reboot depuis) :
@@ -201,17 +185,7 @@ async def on_raw_reaction_add(payload):
         await bot.invoke(ctx)       # On trigger !voteloups
 
 
-### 5 - Chargement des commandes (définies dans les fichiers annexes, un cog par fichier dans features)
 
-bot.add_cog(informations.Informations(bot))             # Information du joueur
-bot.add_cog(voter_agir.VoterAgir(bot))                  # Voter ou agir
-bot.add_cog(actions_publiques.ActionsPubliques(bot))    # Haros et candidatures
-bot.add_cog(IA.GestionIA(bot))                          # Ajout, liste, modification des règles d'IA
-bot.add_cog(open_close.OpenClose(bot))                  # Ouverture/fermeture votes/actions (appel par webhook)
-bot.add_cog(sync.Sync(bot))                             # Synchronisation TDB (appel par webhook)
-bot.add_cog(taches.GestionTaches(bot))                  # Tâches planifiées
-bot.add_cog(remplissage_bdd.RemplissageBDD(bot))        # Drop et remplissage table de données
-bot.add_cog(annexe.Annexe(bot))                         # Ouils divers et plus ou moins inutiles
 
 
 ### 6 - Commandes spéciales
@@ -223,7 +197,7 @@ class Special(commands.Cog):
     async def do(self, ctx, *, code):
         """Exécute du code Python et affiche le résultat (COMMANDE MJ)
 
-        <code> doit être du code valide dans le contexte du fichier bot.py (utilisables notemment : bot, ctx, session, Tables...)
+        <code> doit être du code valide dans le contexte du fichier bot.py (utilisables notemment : ctx, session, Tables...)
         Si <code> est une coroutine, elle sera awaited (ne pas inclure "await" dans <code>).
 
         Aussi connue sous le nom de « faille de sécurité », cette commande permet de faire environ tout ce qu'on veut sur le bot (y compris le crasher, importer des modules, exécuter des fichiers .py... même si c'est un peu compliqué) voire d'impacter le serveur sur lequel le bot tourne si on est motivé.
@@ -258,7 +232,7 @@ class Special(commands.Cog):
 
         ps = pseudoshell.Shell(
             globals(), locals(), in_func, out_func, shut_keywords=["stop"],
-            welcome_text="""Variables accessibles : "ctx", "Tables" (dictionnaire {nom: Table}), "bot", modules usuels."""
+            welcome_text="""Variables accessibles : "ctx", "Tables" (dictionnaire {nom: Table}), modules usuels."""
         )
         try:
             await ps.run()
@@ -284,7 +258,7 @@ class Special(commands.Cog):
         else:
             member = ctx.author
 
-        await inscription.main(bot, member)
+        await inscription.main(ctx.bot, member)
 
 
     @commands.command()
@@ -296,12 +270,12 @@ class Special(commands.Cog):
 
         Ex. !doas Vincent Croquette !vote Annie Colin
         """
-        qui, quoi = qui_quoi.split(" " + bot.command_prefix, maxsplit=1)       # !doas <@!id> !vote R ==> qui = "<@!id>", quoi = "vote R"
+        qui, quoi = qui_quoi.split(" " + ctx.bot.command_prefix, maxsplit=1)       # !doas <@!id> !vote R ==> qui = "<@!id>", quoi = "vote R"
         joueur = await tools.boucle_query_joueur(ctx, qui.strip() or None, Tables["Joueurs"])
         member = ctx.guild.get_member(joueur.discord_id)
         assert member, f"!doas : Member {joueur} introuvable"
 
-        ctx.message.content = bot.command_prefix + quoi
+        ctx.message.content = ctx.bot.command_prefix + quoi
         ctx.message.author = member
 
         await ctx.send(f":robot: Exécution en tant que {joueur.nom} :")
@@ -336,12 +310,11 @@ class Special(commands.Cog):
         Ne pas utiliser cette commande sauf en cas de force majeure où plus rien ne marche, et sur demande d'un MJ (après c'est pas dit que ça marche mieux après l'avoir utilisé)
         """
         if ctx.channel.id in bot.in_command:
-            bot.in_command.remove(ctx.channel.id)
+            ctx.bot.in_command.remove(ctx.channel.id)
         ctx.send("Te voilà libre, camarade !")
 
 
     ### 6 bis - Gestion de l'aide
-    bot.remove_command("help")
 
     @commands.command(aliases=["aide", "aled", "oskour"])
     async def help(self, ctx, *, command=None):
@@ -351,15 +324,15 @@ class Special(commands.Cog):
         Si [command] n'est pas précisé, liste l'ensemble des commandes accessibles à l'utilisateur.
         """
 
-        pref = bot.command_prefix
-        cogs = bot.cogs                                                                     # Dictionnaire nom: cog
+        pref = ctx.bot.command_prefix
+        cogs = ctx.bot.cogs                                                                     # Dictionnaire nom: cog
         commandes = {cmd.name: cmd for cmd in bot.commands}                                 # Dictionnaire nom: commande
         aliases = {alias: nom for nom, cmd in commandes.items() for alias in cmd.aliases}   # Dictionnaire alias: nom de la commande
 
         n_max = max([len(cmd) for cmd in commandes])
 
         if not command:
-            bot.in_command.remove(ctx.channel.id)
+            ctx.bot.in_command.remove(ctx.channel.id)
             async def runnable_commands(cog):       # obligé parce que can_run doit être await, donc c'est compliqué
                 L = []
                 for cmd in cog.get_commands():
@@ -371,12 +344,12 @@ class Special(commands.Cog):
                         L.append(cmd)
                 return L
 
-            r = f"""{bot.description}\n\n"""
+            r = f"""{ctx.bot.description}\n\n"""
             r += "\n\n".join([f"{cog.description} : \n  - " + "\n  - ".join(
                     [pref + cmd.name.ljust(n_max+2) + cmd.short_doc for cmd in runnables]           # pour chaque commande runnable
                 ) for cog in cogs.values() if (runnables := await runnable_commands(cog))])         # pour chaque cog contenant des runnables
             r += f"\n\nUtilise <{pref}help command> pour plus d'information sur une commande."
-            bot.in_command.append(ctx.channel.id)
+            ctx.bot.in_command.append(ctx.channel.id)
 
         else:
             if command.startswith(pref):        # Si le joueur fait !help !command
@@ -400,12 +373,10 @@ class Special(commands.Cog):
         await tools.send_code_blocs(ctx, r, sep="\n\n")     # On envoie, en séparant en blocs de 2000 caractères max
 
 
-bot.add_cog(Special(bot))
 
 
 ### 7 - Gestion des erreurs
-@bot.event
-async def on_command_error(ctx, exc):
+async def _on_command_error(bot, ctx, exc):
     """Fonction appellée à chaque exception raise dans une commande
 
     <ctx>   Contexte où l'erreur a été raise
@@ -463,8 +434,7 @@ async def on_command_error(ctx, exc):
 
 
 # Erreurs non gérées par le code précédent (hors du cadre d'une commande)
-@bot.event
-async def on_error(event, *args, **kwargs):
+async def _on_error(bot, event, *args, **kwargs):
     """Fonction appellée à chaque exception remontant plus haut qu'une commande
 
     <event>             Type d'évènement ayant généré une erreur
@@ -483,5 +453,76 @@ async def on_error(event, *args, **kwargs):
     raise        # On remonte l'exception à Python (pour log, ça ne casse pas la loop)
 
 
+
+class LGBot(commands.Bot):
+    """discord.ext.commands.Bot avec quelques listes et dictionnaire"""
+
+    def __init__(self, command_prefix=COMMAND_PREFIX, description=None, case_insensitive=True, **kwargs):
+        """Initialize self"""
+        if not description:
+            description = "LG-bot – Plateforme pour parties endiablées de Loup-Garou"
+
+        super().__init__(command_prefix=command_prefix,
+                         description=description,
+                         case_insensitive=case_insensitive, **kwargs)
+
+        self.in_command = []        # IDs des salons dans une commande
+        self.in_stfu = []           # IDs des salons en mode STFU (IA off)
+        self.in_fals = []           # IDs des salons en mode Foire à la saucisse
+        self.tasks = {}             # Dictionnaire des tâches en attente (id: TimerHandle)
+
+        ### 3 - Checks et système de blocage
+        self.add_check(already_in_command)
+
+
+        self.before_invoke(add_to_in_command)
+        self.after_invoke(remove_from_in_command)
+
+
+        ### 5 - Chargement des commandes (définies dans les fichiers annexes, un cog par fichier dans features)
+        self.add_cog(informations.Informations(self))            # Information du joueur
+        self.add_cog(voter_agir.VoterAgir(self))                 # Voter ou agir
+        self.add_cog(actions_publiques.ActionsPubliques(self))   # Haros et candidatures
+        self.add_cog(IA.GestionIA(self))                         # Ajout, liste, modification des règles d'IA
+        self.add_cog(open_close.OpenClose(self))                 # Ouverture/fermeture votes/actions (appel par webhook)
+        self.add_cog(sync.Sync(self))                            # Synchronisation TDB (appel par webhook)
+        self.add_cog(taches.GestionTaches(self))                 # Tâches planifiées
+        self.add_cog(remplissage_bdd.RemplissageBDD(self))       # Drop et remplissage table de données
+        self.add_cog(annexe.Annexe(self))                        # Ouils divers et plus ou moins inutiles
+
+        self.remove_command("help")
+
+        self.add_cog(Special(self))
+
+
+
+    ### 4 - Réactions aux différents évènements
+    async def on_ready(self):
+        await _on_ready(self)
+    async def on_member_join(self, member):
+        await _on_member_join(self, member)
+    async def on_member_remove(self, member):
+        await _on_member_remove(self, member)
+    async def on_message(self, message):
+        await _on_message(self, message)
+    async def on_raw_reaction_add(self, payload):
+        await _on_raw_reaction_add(self, payload)
+
+
+    ### 7 - Gestion des erreurs
+    async def on_command_error(self, ctx, exc):
+        await _on_command_error(self, ctx, exc)
+
+    async def on_error(self, event, *args, **kwargs):
+        await _on_error(self, event, *args, **kwargs)
+
+
+    def run(self):
+        super().run(DISCORD_TOKEN)
+
+
+# bot = LGBot()
+
+
 ### 8 - Lance le bot (bloquant, rien n'est exécuté après)
-bot.run(TOKEN)
+# bot.run(TOKEN)

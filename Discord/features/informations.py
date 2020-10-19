@@ -3,10 +3,10 @@ import unidecode
 
 from discord.ext import commands
 
-from bdd import session, Joueurs, Roles, Actions, BaseActions
-from blocs import bdd_tools
-import tools
-from blocs import bdd_tools
+from Discord.bdd import session, Joueurs, Roles, Actions, BaseActions
+from Discord.blocs import bdd_tools
+from Discord import tools
+from Discord.blocs import bdd_tools
 
 def emoji_camp(arg, camp):
     """Renvoie l'emoji associé à <camp>

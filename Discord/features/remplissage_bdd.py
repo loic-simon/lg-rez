@@ -4,10 +4,10 @@ import time
 from discord import Embed
 from discord.ext import commands
 
-import tools
-from blocs import env, gsheets, bdd_tools
-from bdd import session, engine, Tables, Roles
-from features import informations
+from Discord import tools
+from Discord.blocs import env, gsheets, bdd_tools
+from Discord.bdd import session, engine, Tables, Roles
+from Discord.features import informations
 
 
 class RemplissageBDD(commands.Cog):

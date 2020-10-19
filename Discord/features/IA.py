@@ -3,9 +3,9 @@ import requests
 
 from discord.ext import commands
 
-import tools
-from blocs import bdd_tools
-from bdd import session, Triggers, Reactions, Roles
+from Discord import tools
+from Discord.blocs import bdd_tools
+from Discord.bdd import session, Triggers, Reactions, Roles
 
 
 # Marqueurs de séparation du mini-langage des séquences-réactions

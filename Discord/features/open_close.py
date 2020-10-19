@@ -3,10 +3,10 @@ import datetime
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
-from bdd import session, Joueurs, Actions, BaseActions, BaseActionsRoles
-from features import gestion_actions, taches
-from blocs import bdd_tools
-import tools
+from Discord.bdd import session, Joueurs, Actions, BaseActions, BaseActionsRoles
+from Discord.features import gestion_actions, taches
+from Discord.blocs import bdd_tools
+from Discord import tools
 
 
 async def recup_joueurs(quoi, qui, heure=None):

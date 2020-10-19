@@ -8,10 +8,10 @@ from sqlalchemy.sql.expression import and_, or_, not_
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-from blocs import env, gsheets, bdd_tools
-from bdd import session, Joueurs, Actions, BaseActions, BaseActionsRoles, CandidHaro
-from features import gestion_actions, taches
-import tools
+from Discord.blocs import env, gsheets, bdd_tools
+from Discord.bdd import session, Joueurs, Actions, BaseActions, BaseActionsRoles, CandidHaro
+from Discord.features import gestion_actions, taches
+from Discord import tools
 
 
 class ActionsPubliques(commands.Cog):

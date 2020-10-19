@@ -8,9 +8,9 @@ import discord
 import discord.utils
 from discord.ext import commands
 
-from bdd import session, Tables, Joueurs, Roles, BaseActions, Actions, BaseActionsRoles, Taches, Triggers, Reactions, CandidHaro
+from .bdd import session, Tables, Joueurs, Roles, BaseActions, Actions, BaseActionsRoles, Taches, Triggers, Reactions, CandidHaro
 # on importe toutes les tables, plus simple pour y accéder depuis des réactions etc (via eval_accols)
-from blocs import bdd_tools
+from .blocs import bdd_tools
 
 
 ### ---------------------------------------------------------------------------

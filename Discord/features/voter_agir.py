@@ -3,10 +3,10 @@ import datetime
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
-from bdd import session, Joueurs, Actions, CandidHaro
-from features import gestion_actions
-from blocs import env, bdd_tools, gsheets
-import tools
+from Discord.bdd import session, Joueurs, Actions, CandidHaro
+from Discord.features import gestion_actions
+from Discord.blocs import env, bdd_tools, gsheets
+from Discord import tools
 
 
 VOTECOND_SHEET_ID = env.load("VOTECOND_SHEET_ID")

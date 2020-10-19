@@ -2,9 +2,9 @@ import datetime
 
 from discord.ext import commands
 
-from blocs import env, webhook
-import tools
-from bdd import session, Taches, Actions, Joueurs
+from Discord.blocs import env, webhook
+from Discord import tools
+from Discord.bdd import session, Taches, Actions, Joueurs
 
 
 WEBHOOK_TP_URL = env.load("WEBHOOK_TP_URL")
