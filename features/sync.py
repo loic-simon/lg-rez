@@ -2,10 +2,10 @@ import traceback
 
 from discord.ext import commands
 
-from Discord import tools
-from Discord.bdd import session, Joueurs, Actions, BaseActions, BaseActionsRoles, Taches
-from Discord.blocs import bdd_tools, env, gsheets
-from Discord.features import gestion_actions
+from lgrez.blocs import tools
+from lgrez.blocs.bdd import session, Joueurs, Actions, BaseActions, BaseActionsRoles, Taches
+from lgrez.blocs import bdd_tools, env, gsheets
+from lgrez.features import gestion_actions
 
 
 async def get_sync():

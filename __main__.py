@@ -1,6 +1,6 @@
 # Assistant d'installation
 import sys
-# from discord.blocs import env
+from lgrez.blocs import env
 
 
 print("LG-Rez Installation Assistant - v0.0.1\n")
@@ -18,30 +18,34 @@ step = 0
 if exists:
     print("Found! Checking progress...")
 
-    if env.load("SQLALCHEMY_DATABASE_URI"):
+    try:
+        env.load("SQLALCHEMY_DATABASE_URI")
         step = 1
         print("    step 1 ok")
 
-    if env.load("DISCORD_TOKEN"):
+        env.load("DISCORD_TOKEN")
         step = 2
         print("    step 2 ok")
-    if env.load("DISCORD_GUILD_ID"):
+        env.load("DISCORD_GUILD_ID")
         step = 3
         print("    step 3 ok")
-    if env.load("WEBHOOK_TP_URL"):
+        env.load("WEBHOOK_TP_URL")
         step = 4
         print("    step 4 ok")
 
-    if env.load("TDB_SHEET_ID") and env.load("ROLES_SHEET_ID") and env.load("DONNEES_SHEET_ID"):
+        env.load("TDB_SHEET_ID") and env.load("ROLES_SHEET_ID") and env.load("DONNEES_SHEET_ID")
         step = 5
         print("    step 5 ok")
-    if env.load("GSHEET_CREDENTIALS"):
+        env.load("GSHEET_CREDENTIALS")
         step = 6
         print("    step 6 ok")
 
-    if env.load("INSTALLATION"):
+        env.load("INSTALLATION")
         step = 7
         print("    step 7 ok")
+
+    except AssertionError:
+        pass
 
     if step == 7:
         print("Installation already complete in this folder. To create a fresh installation, delete the .env file; otherwise, directly edit values in it.")
@@ -58,7 +62,7 @@ print("""
 Welcome to the LG-Rez Installation Assistant! Il will guide you through the whole process of making a functionnal installation for your bot.
 
 You can pause the installation anytime by killing this assistant, it will resume at the current step.
-Press Enter to begin installation.""")
+Press Enter to begin.""")
 input()
 
 
@@ -81,7 +85,7 @@ if step < 1:
 
 This program needs to be connected to a database.
 
-Since it uses SQLAlchemy, every language it supports can theoretically be used, but the package has been developed and tested with PostgreSQL (otherwise, you may need to install complementary packages such as PyMySQL).
+Since it uses SQLAlchemy, every language it supports can theoretically be used, but the package has been developed and tested with PostgreSQL exclusively (otherwise, you may need to install complementary packages such as PyMySQL).
 
 You will need an empty database, local or on a specified host.
 The database schema will be created by the bot the first time it runs.
@@ -197,12 +201,12 @@ Follow the basic setup guide, then open the "IAM & Admin" pane, go to "Service A
     print("""
 Now, share the three sheets (or the whole folder) with the service account mail adress (account@project.iam.gserviceaccount.com) with Editor rights.
 Hit Enter when done.""")
-input()
+    input()
 
     # CONNECTION TEST
 
     with open(".env", "a") as fich:
-        fich.write(f"GSHEETS_CREDENTIALS = {GSHEETS_CREDENTIALS}\n")
+        fich.write(f"GSHEETS_CREDENTIALS = {GSHEETS_CREDENTIALS}\n\n")
     step = 6
 
 
@@ -219,11 +223,9 @@ In the "Tableau de bord" sheet, edit the AN1 and BG1 cells to put the URLs of th
 Hit Enter when done.
 """)
     input()
-    print("""
-    Open the scripts editor ("Tools/Scripts editor"), and select "Edit/Triggers of this project". This page allows you to automatically backup and clear the "Tableau de bord" each day: when the season starts, clic "Add a trigger" and configure it: Backupfeuille / Head / Temporal trigger / Daily / Between 1am and 2am (important, because the data sheet clears data between 3pm and 4pm).
+    print("""Now, open the scripts editor ("Tools/Scripts editor"), and select "Edit/Triggers of this project". This page allows you to automatically backup and clear the "Tableau de bord" each day: when the season starts, clic "Add a trigger" and configure it: Backupfeuille / Head / Temporal trigger / Daily / Between 1am and 2am (important, because the data sheet clears data between 3pm and 4pm).
 
-    Hit Enter when done.
-    """)
+Hit Enter when done.""")
     input()
 
     with open(".env", "a") as fich:
@@ -246,10 +248,10 @@ with open("bot.py", "w") as fich:
 
 
 
-print("""------ THE END ------
+print("""\n------ THE END ------
 
-Congrats, the installation is now complete!
-A file named "bot.py" has been created in the current folder: use it to run the bot. It will be running unless it crashes or is manually killed.
+Congrats, the installation is now complete! Variables have been written to the ".env" file: edit it directly for minor changes.
+A file named "bot.py" has been created in the current folder: it contains the minimal code needed to run the bot. It will be running unless it crashes or is manually killed.
 
 The bot execution is quiet, except at startup and if an exception occurs, so we advise you to log the output stream somewhere!
 We also advise you to use an external script to ensure the bot has not crashed (pretty unlikely, but it might always happen).

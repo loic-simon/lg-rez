@@ -3,10 +3,10 @@ import datetime
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
-from Discord.bdd import session, Actions, BaseActions, Joueurs, Taches
-from Discord import tools
-from Discord.blocs import bdd_tools
-from Discord.features import taches
+from lgrez.blocs.bdd import session, Actions, BaseActions, Joueurs, Taches
+from lgrez.blocs import tools
+from lgrez.blocs import bdd_tools
+from lgrez.features import taches
 
 
 async def get_actions(quoi, trigger, heure=None):

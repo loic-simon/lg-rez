@@ -1,27 +1,21 @@
-import sys
 import os
 import asyncio
 import logging
 import traceback
 import datetime
-import re
-import copy
 
 import discord
 from discord.ext import commands
 
-from Discord import tools
-from Discord.bdd import session, Tables, Joueurs, Actions, Roles
-from Discord.blocs import env, bdd_tools, gsheets, webhook, pseudoshell
-from Discord.features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques
+from lgrez.blocs import tools, bdd, env, bdd_tools, gsheets, webhook, pseudoshell
+from lgrez.blocs.bdd import session, Tables, Joueurs, Actions, Roles
+from lgrez.features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques
 
 
 logging.basicConfig(level=logging.WARNING)
 
 
 ### 1 - Récupération du token du bot et de l'ID du serveur
-DISCORD_TOKEN = env.load("DISCORD_TOKEN")
-GUILD_ID = int(env.load("DISCORD_GUILD_ID"))
 
 
 ### 2 - Création du bot
@@ -72,8 +66,8 @@ async def remove_from_in_command(ctx):
 async def _on_ready(bot):
     """Fonction appellée par Discord au démarrage du bot"""
 
-    guild = bot.get_guild(GUILD_ID)
-    assert guild, f"on_ready : Guilde d'ID {GUILD_ID} introuvable"
+    guild = bot.get_guild(bot.GUILD_ID)
+    assert guild, f"on_ready : Guilde d'ID {bot.GUILD_ID} introuvable"
 
     print(f"{bot.user} connecté au serveur « {guild.name} » (id : {guild.id})\n")
     print(f"Guild Members: " + " - ".join([member.display_name for member in guild.members]))
@@ -99,7 +93,7 @@ async def _on_ready(bot):
 # À l'arrivée d'un membre sur le serveur
 async def _on_member_join(bot, member):
     """Fonction appellée par Discord à l'arrivée de <member> sur le serveur"""
-    if member.guild.id != GUILD_ID:            # Bon serveur
+    if member.guild.id != bot.GUILD_ID:            # Bon serveur
         return
 
     await tools.log(member, f"Arrivée de {member.name}#{member.discriminator} sur le serveur")
@@ -109,7 +103,7 @@ async def _on_member_join(bot, member):
 # Au départ d'un membre du serveur
 async def _on_member_remove(bot, member):
     """Fonction appellée par Discord au départ de <member> du serveur"""
-    if member.guild.id != GUILD_ID:            # Bon serveur
+    if member.guild.id != bot.GUILD_ID:            # Bon serveur
         return
 
     await tools.log(member, f"{tools.mention_MJ(member)} ALERTE : départ de {member.display_name} ({member.name}#{member.discriminator}) du serveur !!")
@@ -130,7 +124,7 @@ async def _on_message(bot, message):
         and message.author.top_role == tools.role(message, "@everyone")):
         return      # le bot te calcule même pas
 
-    if message.guild.id != GUILD_ID:            # Mauvais serveur
+    if message.guild.id != bot.GUILD_ID:            # Mauvais serveur
         return
 
     await bot.invoke(await bot.get_context(message))        # On trigger toutes les commandes
@@ -153,7 +147,7 @@ async def _on_raw_reaction_add(bot, payload):
         payload.emoji           PartialEmoji envoyé
         payload.message_id      ID du message réacté
     """
-    if payload.guild_id != GUILD_ID:            # Mauvais serveur
+    if payload.guild_id != bot.GUILD_ID:            # Mauvais serveur
         return
 
     reactor = payload.member
@@ -384,7 +378,7 @@ async def _on_command_error(bot, ctx, exc):
 
     Permet de gérer spécifiquement les erreurs de discord.ext.commands (commandes)
     """
-    if ctx.guild.id != GUILD_ID:            # Mauvais serveur
+    if ctx.guild.id != bot.GUILD_ID:            # Mauvais serveur
         return
 
     session.rollback()       # Dans le doute, on vide la session SQL
@@ -442,9 +436,10 @@ async def _on_error(bot, event, *args, **kwargs):
 
     Permet de gérer les exceptions sans briser la loop du bot (i.e. il reste en ligne)
     """
-    session.rollback()       # Dans le doute, on vide la session SQL
-    guild = bot.get_guild(GUILD_ID)
-    assert guild, f"on_error : Serveur {GUILD_ID} introuvable - Erreur initiale : \n{traceback.format_exc()}"
+    if session:
+        session.rollback()       # Dans le doute, on vide la session SQL
+    guild = bot.get_guild(bot.GUILD_ID)
+    assert guild, f"on_error : Serveur {bot.GUILD_ID} introuvable - Erreur initiale : \n{traceback.format_exc()}"
 
     await tools.log(guild, (
         f"{tools.role(guild, 'MJ').mention} ALED : Exception Python !"
@@ -518,6 +513,11 @@ class LGBot(commands.Bot):
 
 
     def run(self):
+        DISCORD_TOKEN = env.load("DISCORD_TOKEN")
+        self.GUILD_ID = int(env.load("DISCORD_GUILD_ID"))
+
+        bdd.connect()
+
         super().run(DISCORD_TOKEN)
 
 

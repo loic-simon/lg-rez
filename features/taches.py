@@ -2,16 +2,15 @@ import datetime
 
 from discord.ext import commands
 
-from Discord.blocs import env, webhook
-from Discord import tools
-from Discord.bdd import session, Taches, Actions, Joueurs
+from lgrez.blocs import env, webhook
+from lgrez.blocs import tools
+from lgrez.blocs.bdd import session, Taches, Actions, Joueurs
 
-
-WEBHOOK_TP_URL = env.load("WEBHOOK_TP_URL")
 
 
 def execute(tache):
     """Exécute la tâche <tache> (objet BDD Taches) : appelle le webhook et nettoie"""
+    WEBHOOK_TP_URL = env.load("WEBHOOK_TP_URL")
     webhook.send(tache.commande, url=WEBHOOK_TP_URL)
     session.delete(tache)
     session.commit()

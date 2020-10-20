@@ -4,6 +4,7 @@ from . import env
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
+
 def connect(key):
     """Charge les credentials GSheets et renvoie le classeur d'ID <key>"""
     # use creds to create a client to interact with the Google Drive API

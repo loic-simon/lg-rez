@@ -19,7 +19,7 @@ We strongly suggest you to install and use this package in a seperate virtualenv
 This package comes with a configuration tool that create a ready-to-use bot: run it with
 
 ```bash
-python3 -m lg-rez
+python3 -m lgrez
 ```
 
 then follow its instructions.
@@ -33,13 +33,13 @@ then follow its instructions.
 This program needs to be connected to several independent services, with tokens stored as environments variables. All necessary variables are listed in the [`model.env`](model.env) file ; change their value and rename the file as `.env`.
 
 
-### Database connection
+### Database-side
 
 This program needs to be connected to a database.
 
 Since it uses SQLAlchemy, every language it supports can theoretically be used, but the package has been developed and tested with PostgreSQL (otherwise, you may need to install complementary packages such as PyMySQL).
 
-You will need an empty database, local or on a specified host. The database schema will be created by the bot the first time it runs. Put your database
+You will need an empty database, local or on a specified host. The database schema will be created by the bot the first time it runs. Put your database URI (`protocol://user:password@host/base`) in the `.env` file (`DISCORD_TOKEN` variable).
 
 
 ### Discord-side
@@ -80,7 +80,8 @@ For each season:
 
 ## Contributing
 
-Pull requests are not welcome. Contact the authors for any question about this project.
+Community contributions are currently not welcome. Contact the authors (see below) for any question or suggestion about this project.
+
 
 ## License
 This work is shared under [the MIT license](https://choosealicense.com/licenses/mit/).

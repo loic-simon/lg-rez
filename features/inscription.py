@@ -1,8 +1,8 @@
 from discord.ext import commands
 
-from Discord import tools
-from Discord.bdd import session, Joueurs
-from Discord.blocs import env, gsheets, bdd_tools
+from lgrez.blocs import tools
+from lgrez.blocs.bdd import session, Joueurs
+from lgrez.blocs import env, gsheets, bdd_tools
 
 
 # Routine d'inscription (fonction appellée par la commande !co)

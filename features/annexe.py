@@ -8,8 +8,8 @@ from discord.ext import commands
 from akinator.async_aki import Akinator
 import akinator
 
-from Discord import tools
-from Discord.bdd import session, Joueurs
+from lgrez.blocs import tools
+from lgrez.blocs.bdd import session, Joueurs
 
 
 class Annexe(commands.Cog):

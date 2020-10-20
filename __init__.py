@@ -1,5 +1,4 @@
-import discord
-from discord import *
+from lgrez import bot
 
-LGBot = bot.SuperBot                        # Accès direct à lgrez.LGBot
-__all__ = discord.__all__ + ["LGBot"]
+LGBot = bot.LGBot                        # Accès direct à lgrez.LGBot
+__all__ = ["bot", "blocs", "features", "LGBot"]

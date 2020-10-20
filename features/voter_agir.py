@@ -3,16 +3,11 @@ import datetime
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
-from Discord.bdd import session, Joueurs, Actions, CandidHaro
-from Discord.features import gestion_actions
-from Discord.blocs import env, bdd_tools, gsheets
-from Discord import tools
+from lgrez.blocs.bdd import session, Joueurs, Actions, CandidHaro
+from lgrez.features import gestion_actions
+from lgrez.blocs import env, bdd_tools, gsheets
+from lgrez.blocs import tools
 
-
-VOTECOND_SHEET_ID = env.load("VOTECOND_SHEET_ID")
-VOTEMAIRE_SHEET_ID = env.load("VOTEMAIRE_SHEET_ID")
-VOTELOUPS_SHEET_ID = env.load("VOTELOUPS_SHEET_ID")
-ACTIONS_SHEET_ID = env.load("ACTIONS_SHEET_ID")
 
 
 class VoterAgir(commands.Cog):
@@ -63,7 +58,8 @@ class VoterAgir(commands.Cog):
             session.commit()
 
             # Écriture dans sheet Données brutes
-            sheet = gsheets.connect(VOTECOND_SHEET_ID).sheet1
+            DONNES_SHEET_ID = env.load("DONNES_SHEET_ID")
+            sheet = gsheets.connect(DONNES_SHEET_ID).worksheet("votecond_brut")
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur._vote_condamne], value_input_option="USER_ENTERED")
 
         await ctx.send(f"Votre contre {tools.code(cible.nom)} bien pris en compte.\n"
@@ -114,7 +110,8 @@ class VoterAgir(commands.Cog):
             session.commit()
 
             # Écriture dans sheet Données brutes
-            sheet = gsheets.connect(VOTEMAIRE_SHEET_ID).sheet1
+            DONNES_SHEET_ID = env.load("DONNES_SHEET_ID")
+            sheet = gsheets.connect(DONNES_SHEET_ID).worksheet("votemaire_brut")
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur._vote_maire], value_input_option="USER_ENTERED")
 
         await ctx.send(f"Votre pour {tools.code(cible.nom)} bien pris en compte.\n"
@@ -158,7 +155,8 @@ class VoterAgir(commands.Cog):
             session.commit()
 
             # Écriture dans sheet Données brutes
-            sheet = gsheets.connect(VOTELOUPS_SHEET_ID).sheet1
+            DONNES_SHEET_ID = env.load("DONNES_SHEET_ID")
+            sheet = gsheets.connect(DONNES_SHEET_ID).worksheet("voteloups_brut")
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.camp, joueur._vote_loups], value_input_option="USER_ENTERED")
 
         await ctx.send(f"Votre contre {tools.code(cible.nom)} bien pris en compte.")
@@ -221,7 +219,8 @@ class VoterAgir(commands.Cog):
             bdd_tools.modif(action, "_decision", decision)
 
             # Écriture dans sheet Données brutes
-            sheet = gsheets.connect(ACTIONS_SHEET_ID).sheet1
+            DONNES_SHEET_ID = env.load("DONNES_SHEET_ID")
+            sheet = gsheets.connect(DONNES_SHEET_ID).worksheet("actions_brut")
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.role, joueur.camp,
                               "\n+\n".join([f"{action.action} : {action._decision}" for action in actions])],
                              value_input_option="USER_ENTERED")

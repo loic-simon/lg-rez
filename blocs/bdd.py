@@ -2,17 +2,17 @@ import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from .blocs import env
+from lgrez.blocs import env
 
 
-
-
-SQLALCHEMY_DATABASE_URI = env.load("SQLALCHEMY_DATABASE_URI")
-engine = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URI)           # Moteur SQL : connexion avec le serveur
 
 Base = declarative_base()
 Tables = {}
 
+
+# Objets de connection (créés dans connect)
+engine = None
+session = None
 
 
 class ClassProperty(property):      # https://stackoverflow.com/a/1383402
@@ -216,12 +216,15 @@ class CandidHaro(MyTable, Base): #, tablename="candid_haro"
 
 
 
-# Création des tables si elles n'existent pas déjà
+def connect():
+    global engine, session
 
-Base.metadata.create_all(engine)
+    SQLALCHEMY_DATABASE_URI = env.load("SQLALCHEMY_DATABASE_URI")
+    engine = sqlalchemy.create_engine(SQLALCHEMY_DATABASE_URI)           # Moteur SQL : connexion avec le serveur
 
+    # Création des tables si elles n'existent pas déjà
+    Base.metadata.create_all(engine)
 
-# Ouverture de la session
-
-Session = sessionmaker(bind=engine)
-session = Session()
+    # Ouverture de la session
+    Session = sessionmaker(bind=engine)
+    session = Session()
