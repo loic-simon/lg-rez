@@ -3,7 +3,7 @@ import datetime
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
-from lgrez.blocs import tools, session, bdd_tools
+from lgrez.blocs import tools, bdd, bdd_tools
 from lgrez.features import gestion_actions, taches
 from lgrez.blocs.bdd import Joueurs, Actions, BaseActions, BaseActionsRoles
 
