@@ -2,9 +2,8 @@ import traceback
 
 from discord.ext import commands
 
-from lgrez.blocs import tools
-from lgrez.blocs.bdd import session, Joueurs, Actions, BaseActions, BaseActionsRoles, Taches
-from lgrez.blocs import bdd_tools, env, gsheets
+from lgrez.blocs import tools, bdd, bdd_tools, env, gsheets
+from lgrez.blocs.bdd import Joueurs, Actions, BaseActions, BaseActionsRoles, Taches
 from lgrez.features import gestion_actions
 
 
@@ -58,7 +57,7 @@ async def get_sync():
     for joueur_BDD in joueurs_BDD.copy():                   ## Joueurs dans le cache supprimés du TDB
         if joueur_BDD.discord_id not in ids_TDB:
             joueurs_BDD.remove(joueur_BDD)
-            session.delete(joueur_BDD)
+            bdd.session.delete(joueur_BDD)
 
     for joueur_TDB in joueurs_TDB:                              ## Différences
         id = joueur_TDB["discord_id"]
@@ -231,7 +230,7 @@ class Sync(commands.Cog):
                             changelog += traceback.format_exc()
                             await ctx.send(f"Erreur joueur {joueur_id}, passage au suivant, voir logs pour les détails")
 
-                    session.commit()
+                    bdd.session.commit()
 
                     await tools.log(ctx, changelog, code=True)
 

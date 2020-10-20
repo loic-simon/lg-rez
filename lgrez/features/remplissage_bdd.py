@@ -4,8 +4,7 @@ import time
 from discord import Embed
 from discord.ext import commands
 
-from lgrez.blocs import tools
-from lgrez.blocs import env, gsheets, bdd_tools
+from lgrez.blocs import tools, bdd, env, gsheets, bdd_tools
 from lgrez.blocs.bdd import session, engine, Tables, Roles
 from lgrez.features import informations
 
@@ -78,9 +77,9 @@ class RemplissageBDD(commands.Cog):
                             if getattr(existants[id], col) != args[col]:
                                 bdd_tools.modif(existants[id], col, args[col])
                     else:
-                        session.add(table(**args))
+                        bdd.session.add(table(**args))
 
-                session.commit()
+                bdd.session.commit()
 
             await ctx.send(f"Table {tools.code(table_name)} remplie !")
             await tools.log(ctx, f"Table {tools.code(table_name)} remplie !")

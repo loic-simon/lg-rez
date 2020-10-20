@@ -2,6 +2,9 @@
 import sys
 import os
 import traceback
+import warnings
+import time
+import asyncio
 import json
 
 from dotenv import load_dotenv
@@ -15,7 +18,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 def export(varname):
     """Returns "export varname={formated value}\n" """
     var = str(globals()[varname])
-    formated_var = var.strip("'\"").replace("\"", "\'")
+    formated_var = var.strip("'\"").replace("\"", "\\\"")
     return f"export {varname}=\"{formated_var}\"\n"
 
 def report_error(exc):
@@ -45,35 +48,38 @@ if exists:
 
     load_dotenv(".env")
 
-    if os.getenv("LGREZ_DATABASE_URI"):
+    if (LGREZ_DATABASE_URI := os.getenv("LGREZ_DATABASE_URI")):
         step = 1
         print("    step 1 ok")
 
-    if os.getenv("LGREZ_DISCORD_TOKEN"):
+    if (LGREZ_DISCORD_TOKEN := os.getenv("LGREZ_DISCORD_TOKEN")):
         step = 2
         print("    step 2 ok")
-    if os.getenv("LGREZ_SERVER_ID"):
+    if (LGREZ_SERVER_ID := os.getenv("LGREZ_SERVER_ID")):
         step = 3
         print("    step 3 ok")
-    if os.getenv("LGREZ_WEBHOOK_URL"):
+    if (LGREZ_WEBHOOK_URL := os.getenv("LGREZ_WEBHOOK_URL")):
         step = 4
         print("    step 4 ok")
 
-    if os.getenv("LGREZ_TDB_SHEET_ID") and env.load("LGREZ_ROLES_SHEET_ID") and env.load("LGREZ_DATA_SHEET_ID"):
+    if (LGREZ_GCP_CREDENTIALS := os.getenv("LGREZ_GCP_CREDENTIALS")):
         step = 5
         print("    step 5 ok")
-    if os.getenv("LGREZ_GCP_CREDENTIALS"):
+    if ((LGREZ_TDB_SHEET_ID := os.getenv("LGREZ_TDB_SHEET_ID"))
+        and (LGREZ_ROLES_SHEET_ID := os.getenv("LGREZ_ROLES_SHEET_ID"))
+        and (LGREZ_DATA_SHEET_ID := os.getenv("LGREZ_DATA_SHEET_ID"))):
+
         step = 6
         print("    step 6 ok")
 
-    if os.getenv("LGREZ_CONFIG_STATUS"):
+    if (LGREZ_CONFIG_STATUS := os.getenv("LGREZ_CONFIG_STATUS")):
         step = 7
         print("    step 7 ok")
 
 
     if step == 7:
         print("Installation already complete in this folder. To create a fresh installation, delete the .env file; otherwise, directly edit values in it.")
-        sys.exit(0)
+        exit(0)
 
     print(f"Found ongoing installation on step {step}/7. Press Enter to continue installation.")
     input()
@@ -82,16 +88,18 @@ else:
     print("Nothing found.")
 
 
-print("""
+
+# Base de .env
+if step == 0:
+    print("""
+-----------------------------------------------------
+
 Welcome to the LG-Rez Installation Assistant! Il will guide you through the whole process of making a functionnal installation for your bot.
 
 You can pause the installation anytime by killing this assistant, it will resume at the current step.
 Press Enter to begin.""")
-input()
+    input()
 
-
-# Base de .env
-if step == 0:
     content = """# .env: file containing text variables, considered by Python as environment
 # variables thanks to dotenv.loadenv() and then accessible through os.getenv
 # Here should be put:
@@ -150,12 +158,13 @@ Generate a new "client secret" on your app main page. This token gives anyone fu
         print("Testing connection...")
         try:
             client = discord.Client()
-            client.login(LGREZ_DISCORD_TOKEN)
+            loop = asyncio.new_event_loop()
+            loop.run_until_complete(client.login(LGREZ_DISCORD_TOKEN))
         except Exception as e:
             report_error(e)
         else:
             print("Connected!")
-            client.logout()
+            loop.run_until_complete(client.logout())
             ok = True
             time.sleep(1)
 
@@ -171,9 +180,24 @@ if step < 3:
 For each season, we recommand you to create a new Discord server. We provide the following model, with recommanded channels and permissions: https://discord.new/RPGXChXXcKQZ
 """)
 
-    LGREZ_SERVER_ID = input("Server ID (Server settings / Widget): ")
+    ok = False
+    while not ok:
+        LGREZ_SERVER_ID = input("Server ID (Server settings / Widget): ")
 
-    print("""Unfortunately, a Discord model doesn't contain the following:
+        try:
+            if not(LGREZ_SERVER_ID.isdigit() and len(LGREZ_SERVER_ID) == 18):
+                raise ValueError("Server ID must be a 18-digits number")
+        except Exception as e:
+            report_error(e)
+        else:
+            ok = True
+            time.sleep(1)
+
+    with open(".env", "a") as fich:
+        fich.write(export("LGREZ_SERVER_ID"))
+
+    print("""
+Unfortunately, a Discord model doesn't contain the following:
 - Icon: create your own!
 - Emojis: the bot itself needs a few custom emojis to work correctly. We provide them in [the Templates folder](https://drive.google.com/drive/folders/1kjHzUSp-QfgI77Yg0GCxdM6YcFkHPYVw) (described below). Download them, go in your server settings / Emoji / Upload emoji and select them all; they well be named correctly.
 When done, press Enter to continue.""")
@@ -186,30 +210,9 @@ When done, press Enter to continue.""")
 - Go back to Discord and give the "Bot" role to the bot account. That will grant him every needed permissions.
 
 The bot should appear offline: you'll be able to run it at the end of this installation.
-When done, press Enter to continue.""")
+ONCE THE BOT IS SHOWN IN YOUR SERVER MEMBERS, press Enter to continue.""")
     input()
 
-    ok = False
-    while not ok:
-        print("Verifying bot access...")
-        try:
-            client = discord.Client()
-            client.start(LGREZ_DISCORD_TOKEN)
-            guild_ids = [guild.id for guild in client.guilds]
-            if LGREZ_SERVER_ID not in guild_ids:
-                raise ValueError(f"LGREZ_SERVER_ID not in detected guilds. Does the bot appears on the server?")
-        except Exception as e:
-            report_error(e)
-            LGREZ_SERVER_ID = input("Server ID (Server settings / Widget): ")
-        else:
-            print("Server detected!")
-            client.stop()
-            ok = True
-            time.sleep(1)
-
-
-    with open(".env", "a") as fich:
-        fich.write(export("LGREZ_SERVER_ID"))
     step = 3
 
 
@@ -235,7 +238,6 @@ This bot supports task postponing. This feature requires a "webhook" (a protocol
                 raise RuntimeError(f"Bad response: {response}")
         except Exception as e:
             report_error(e)
-            LGREZ_SERVER_ID = input("Server ID (Server settings / Widget): ")
         else:
             print("OK!")
             ok = True
@@ -264,8 +266,12 @@ Follow the basic setup guide, then open the "IAM & Admin" pane, go to "Service A
         print("Authentificating...")
         try:
             scope = ['https://spreadsheets.google.com/feeds']
-            creds = ServiceAccountCredentials.from_json_keyfile_dict(json.loads(LGREZ_GCP_CREDENTIALS), scope)
-            client = gspread.authorize(creds)
+            with warnings.catch_warnings(record=True) as warns:
+                creds = ServiceAccountCredentials.from_json_keyfile_dict(json.loads(LGREZ_GCP_CREDENTIALS), scope)
+                client = gspread.Client(creds)
+                if warns:
+                    raise RuntimeError(wl[0].message)
+
         except Exception as e:
             report_error(e)
         else:
@@ -336,7 +342,7 @@ IMPORTANT: to allow your bot to read and write the sheets, share the three (or t
 
 
 if step < 7:
-    print("""\n------ STEP 7 : dashboard setup ------
+    print("""\n\n------ STEP 7 : dashboard setup ------
 
 In the "Tableau de bord" sheet, edit the AN1 and BG1 cells to put the URLs of the "Données brutes" and "Rôles et actions" sheets, respectively. You should be prompted to grant access to those files, do it.
 

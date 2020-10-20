@@ -8,7 +8,7 @@ import discord
 from discord.ext import commands
 
 from lgrez.blocs import tools, bdd, env, bdd_tools, gsheets, webhook, pseudoshell
-from lgrez.blocs.bdd import session, Tables, Joueurs, Actions, Roles
+from lgrez.blocs.bdd import Tables, Joueurs, Actions, Roles
 from lgrez.features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques
 
 
@@ -190,7 +190,7 @@ class Special(commands.Cog):
     async def do(self, ctx, *, code):
         """Exécute du code Python et affiche le résultat (COMMANDE MJ)
 
-        <code> doit être du code valide dans le contexte du fichier bot.py (utilisables notemment : ctx, session, Tables...)
+        <code> doit être du code valide dans le contexte du fichier bot.py (utilisables notemment : ctx, bdd.session, Tables...)
         Si <code> est une coroutine, elle sera awaited (ne pas inclure "await" dans <code>).
 
         Aussi connue sous le nom de « faille de sécurité », cette commande permet de faire environ tout ce qu'on veut sur le bot (y compris le crasher, importer des modules, exécuter des fichiers .py... même si c'est un peu compliqué) voire d'impacter le serveur sur lequel le bot tourne si on est motivé.
@@ -318,8 +318,8 @@ class Special(commands.Cog):
         """
 
         pref = ctx.bot.command_prefix
-        cogs = ctx.bot.cogs                                                                     # Dictionnaire nom: cog
-        commandes = {cmd.name: cmd for cmd in bot.commands}                                 # Dictionnaire nom: commande
+        cogs = ctx.bot.cogs                                                                 # Dictionnaire nom: cog
+        commandes = {cmd.name: cmd for cmd in ctx.bot.commands}                             # Dictionnaire nom: commande
         aliases = {alias: nom for nom, cmd in commandes.items() for alias in cmd.aliases}   # Dictionnaire alias: nom de la commande
 
         n_max = max([len(cmd) for cmd in commandes])
@@ -380,7 +380,8 @@ async def _on_command_error(bot, ctx, exc):
     if ctx.guild.id != bot.GUILD_ID:            # Mauvais serveur
         return
 
-    session.rollback()       # Dans le doute, on vide la session SQL
+    if bdd.session:
+        bdd.bdd.session.rollback()       # Dans le doute, on vide la session SQL
     if isinstance(exc, commands.CommandInvokeError) and isinstance(exc.original, tools.CommandExit):     # STOP envoyé
         await ctx.send(str(exc.original) or "Mission aborted.")
 
@@ -435,8 +436,8 @@ async def _on_error(bot, event, *args, **kwargs):
 
     Permet de gérer les exceptions sans briser la loop du bot (i.e. il reste en ligne)
     """
-    if session:
-        session.rollback()       # Dans le doute, on vide la session SQL
+    if bdd.session:
+        bdd.bdd.session.rollback()       # Dans le doute, on vide la session SQL
     guild = bot.get_guild(bot.GUILD_ID)
     assert guild, f"on_error : Serveur {bot.GUILD_ID} introuvable - Erreur initiale : \n{traceback.format_exc()}"
 

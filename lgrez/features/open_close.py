@@ -3,10 +3,9 @@ import datetime
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
-from lgrez.blocs.bdd import session, Joueurs, Actions, BaseActions, BaseActionsRoles
+from lgrez.blocs import tools, session, bdd_tools
 from lgrez.features import gestion_actions, taches
-from lgrez.blocs import bdd_tools
-from lgrez.blocs import tools
+from lgrez.blocs.bdd import Joueurs, Actions, BaseActions, BaseActionsRoles
 
 
 async def recup_joueurs(quoi, qui, heure=None):
@@ -147,7 +146,7 @@ class OpenClose(commands.Cog):
                 for action in joueurs[joueur]:
                     await gestion_actions.open_action(ctx, action, chan)
 
-        session.commit()
+        bdd.session.commit()
 
         # Actions déclenchées par ouverture
         for action in Actions.query.filter_by(trigger_debut=f"open_{qui}"):
@@ -227,7 +226,7 @@ class OpenClose(commands.Cog):
                                     f"""Action définitive : {action._decision}""")
                     await gestion_actions.close_action(ctx, action, chan)
 
-        session.commit()
+        bdd.session.commit()
 
         # Actions déclenchées par fermeture
         for action in Actions.query.filter_by(trigger_debut=f"close_{qui}"):
@@ -349,7 +348,7 @@ class OpenClose(commands.Cog):
 
             await tools.send_blocs(tools.private_chan(ctx.guild.get_member(action.player_id)),f"Ton action {action.action} vient d'être rechargée, tu as maintenant {charge} charge(s) disponible(s) !")
 
-        session.commit()
+        bdd.session.commit()
 
 
     @commands.command()
@@ -383,8 +382,8 @@ class OpenClose(commands.Cog):
                 #                             cooldown=0, charges=ba.base_charges) for ba in base_actions])
                 #
                 # for action in actions:
-                #     session.add(action)  # add_all marche pas, problème d'ids étou étou
-                # session.commit()
+                #     bdd.session.add(action)  # add_all marche pas, problème d'ids étou étou
+                # bdd.session.commit()
                 # for action in actions:      # Après le commit pour que action.id existe
                 #     r += f" - {action.id} ({joueur.nom} > {action.action})\n"
                 #

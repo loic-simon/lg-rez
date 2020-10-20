@@ -3,10 +3,9 @@ import datetime
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
-from lgrez.blocs.bdd import session, Joueurs, Actions, CandidHaro
+from lgrez.blocs import env, bdd, bdd_tools, gsheets, tools
+from lgrez.blocs.bdd import Joueurs, Actions, CandidHaro
 from lgrez.features import gestion_actions
-from lgrez.blocs import env, bdd_tools, gsheets
-from lgrez.blocs import tools
 
 
 
@@ -55,7 +54,7 @@ class VoterAgir(commands.Cog):
         async with ctx.typing():
             # Modification en base
             bdd_tools.modif(joueur, "_vote_condamne", cible.nom)
-            session.commit()
+            bdd.session.commit()
 
             # Écriture dans sheet Données brutes
             DONNES_SHEET_ID = env.load("DONNES_SHEET_ID")
@@ -107,7 +106,7 @@ class VoterAgir(commands.Cog):
         async with ctx.typing():
             # Modification en base
             bdd_tools.modif(joueur, "_vote_maire", cible.nom)
-            session.commit()
+            bdd.session.commit()
 
             # Écriture dans sheet Données brutes
             DONNES_SHEET_ID = env.load("DONNES_SHEET_ID")
@@ -152,7 +151,7 @@ class VoterAgir(commands.Cog):
         async with ctx.typing():
             # Modification en base
             bdd_tools.modif(joueur, "_vote_loups", cible.nom)
-            session.commit()
+            bdd.session.commit()
 
             # Écriture dans sheet Données brutes
             DONNES_SHEET_ID = env.load("DONNES_SHEET_ID")
@@ -234,7 +233,7 @@ class VoterAgir(commands.Cog):
                     pcs = " pour cette semaine" if "weekends" in action.refill else ""
                     await ctx.send(f"Il te reste {action.charges} charge(s){pcs}.")
                     if action.charges == 0 and not action.refill:
-                        session.delete(action)
+                        bdd.session.delete(action)
                         deleted = True
                 if not deleted:
                     bdd_tools.modif(action, "_decision", None)
@@ -245,4 +244,4 @@ class VoterAgir(commands.Cog):
             await ctx.send(f"Action « {tools.code(action._decision)} » bien prise en compte pour {tools.code(action.action)}.\n"
                            + tools.ital("Tu peux modifier ta décision autant que nécessaire avant la fin du créneau."))
 
-        session.commit()
+        bdd.session.commit()

@@ -3,9 +3,8 @@ import datetime
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
-from lgrez.blocs.bdd import session, Actions, BaseActions, Joueurs, Taches
-from lgrez.blocs import tools
-from lgrez.blocs import bdd_tools
+from lgrez.blocs import tools, bdd, bdd_tools
+from lgrez.blocs.bdd import Actions, BaseActions, Joueurs, Taches
 from lgrez.features import taches
 
 
@@ -64,7 +63,7 @@ async def open_action(ctx, action, chan=None):
     # Vérification cooldown
     if action.cooldown > 0:                 # Action en cooldown
         bdd_tools.modif(action, "cooldown", action.cooldown - 1)
-        session.commit()
+        bdd.session.commit()
         await ctx.send(f"Action en cooldown, exit (reprogrammation si temporel).")
         if action.trigger_debut == "temporel":      # Programmation action du lendemain
             ts = tools.next_occurence(action.heure_debut)
@@ -122,7 +121,7 @@ async def open_action(ctx, action, chan=None):
         ts = tools.debut_pause()
         taches.add_task(ctx.bot, ts, f"!close {action.id}", action=action.id)
 
-    session.commit()
+    bdd.session.commit()
 
 
 async def close_action(ctx, action, chan=None):
@@ -151,7 +150,7 @@ async def close_action(ctx, action, chan=None):
             await chan.send(f"Il te reste {action.charges} charge(s){pcs}.")
 
             if action.charges == 0 and not action.refill:
-                session.delete(action)
+                bdd.session.delete(action)
                 deleted = True
 
     if not deleted:
@@ -170,13 +169,13 @@ async def close_action(ctx, action, chan=None):
             ts = tools.fin_pause()
             taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
 
-    session.commit()
+    bdd.session.commit()
 
 
 def add_action(ctx, action):
     """Ajoute et programme l'ouverture d'<action>"""
-    session.add(action)
-    session.commit()
+    bdd.session.add(action)
+    bdd.session.commit()
     # Ajout tâche ouverture
     if action.trigger_debut == "temporel":          # Temporel : on programme
         taches.add_task(ctx.bot, tools.next_occurence(action.heure_debut), f"!open {action.id}", action=action.id)
@@ -186,8 +185,8 @@ def add_action(ctx, action):
 
 def delete_action(ctx, action):
     """Supprime <action> et annule les tâches en cours liées"""
-    session.delete(action)
-    session.commit()
+    bdd.session.delete(action)
+    bdd.session.commit()
     # Suppression tâches liées à l'action
     for tache in Taches.query.filter_by(action=action.id).all():
         taches.cancel_task(ctx.bot, tache)

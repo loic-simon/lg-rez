@@ -1,8 +1,7 @@
 from discord.ext import commands
 
-from lgrez.blocs import tools
-from lgrez.blocs.bdd import session, Joueurs
-from lgrez.blocs import env, gsheets, bdd_tools
+from lgrez.blocs.bdd import Joueurs
+from lgrez.blocs import tools, bdd, env, gsheets, bdd_tools
 
 
 # Routine d'inscription (fonction appellée par la commande !co)
@@ -90,8 +89,8 @@ async def main(bot, member):
         joueur = Joueurs(discord_id=member.id, _chan_id=chan.id, nom=member.display_name,
                          chambre=chambre, statut="vivant", role="nonattr", camp="Non attribué",
                          votant_village=True, votant_loups=False, role_actif=False)
-        session.add(joueur)
-        session.commit()
+        bdd.session.add(joueur)
+        bdd.session.commit()
 
         # Ajout au TDB
 

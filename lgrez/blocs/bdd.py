@@ -2,7 +2,7 @@ import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from lgrez.blocs import env
+from lgrez.blocs import env, bdd
 
 
 
@@ -30,9 +30,9 @@ class MyTable(object):
 
     @classmethod
     def get_query(cls):
-        return session.query(cls)
+        return bdd.session.query(cls)
 
-    query = ClassProperty(get_query)        # Permet d'utiliser Table.query.<...> au lieu de session.query(Table).<...>
+    query = ClassProperty(get_query)        # Permet d'utiliser Table.query.<...> au lieu de bdd.session.query(Table).<...>
 
 
 

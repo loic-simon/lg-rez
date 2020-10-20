@@ -2,9 +2,8 @@ import datetime
 
 from discord.ext import commands
 
-from lgrez.blocs import env, webhook
-from lgrez.blocs import tools
-from lgrez.blocs.bdd import session, Taches, Actions, Joueurs
+from lgrez.blocs import env, webhook, bdd, tools
+from lgrez.blocs.bdd import Taches, Actions, Joueurs
 
 
 
@@ -12,8 +11,8 @@ def execute(tache):
     """Exécute la tâche <tache> (objet BDD Taches) : appelle le webhook et nettoie"""
     LGREZ_WEBHOOK_URL = env.load("LGREZ_WEBHOOK_URL")
     webhook.send(tache.commande, url=LGREZ_WEBHOOK_URL)
-    session.delete(tache)
-    session.commit()
+    bdd.session.delete(tache)
+    bdd.session.commit()
 
 
 def add_task(bot, timestamp, commande, action=None):
@@ -21,8 +20,8 @@ def add_task(bot, timestamp, commande, action=None):
     now = datetime.datetime.now()
     tache = Taches(timestamp=timestamp, commande=commande, action=action)
 
-    session.add(tache)                                                           # Enregistre la tâche en BDD
-    session.commit()
+    bdd.session.add(tache)                                                           # Enregistre la tâche en BDD
+    bdd.session.commit()
 
     TH = bot.loop.call_later((timestamp - now).total_seconds(), execute, tache)     # Programme la tâche (appellera execute(tache) à timestamp)
     bot.tasks[tache.id] = TH        # TaskHandler, pour pouvoir cancel
@@ -31,8 +30,8 @@ def add_task(bot, timestamp, commande, action=None):
 def cancel_task(bot, tache):
     """Supprime (annule) une tâche (fonction pour usage ici et dans d'autres features)"""
     bot.tasks[tache.id].cancel()        # Annulation (objet TaskHandler)
-    session.delete(tache)            # Suppression en base
-    session.commit()
+    bdd.session.delete(tache)            # Suppression en base
+    bdd.session.commit()
     del bot.tasks[tache.id]             # Suppression TaskHandler
 
 

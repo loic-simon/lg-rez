@@ -8,10 +8,9 @@ from sqlalchemy.sql.expression import and_, or_, not_
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-from lgrez.blocs import env, gsheets, bdd_tools
-from lgrez.blocs.bdd import session, Joueurs, Actions, BaseActions, BaseActionsRoles, CandidHaro
+from lgrez.blocs import env, gsheets, bdd_tools, bdd, tools
+from lgrez.blocs.bdd import Joueurs, Actions, BaseActions, BaseActionsRoles, CandidHaro
 from lgrez.features import gestion_actions, taches
-from lgrez.blocs import tools
 
 
 class ActionsPubliques(commands.Cog):
@@ -52,13 +51,13 @@ class ActionsPubliques(commands.Cog):
 
         if not CandidHaro.query.filter_by(player_id=cible.discord_id, type="haro").all():       # Inscription haroté
             haroted = CandidHaro(player_id=cible.discord_id, type="haro")
-            session.add(haroted)
+            bdd.session.add(haroted)
 
         if not CandidHaro.query.filter_by(player_id=ctx.author.id, type="haro").all():          # Inscription haroteur
             haroteur = CandidHaro(player_id=ctx.author.id, type="haro")
-            session.add(haroteur)
+            bdd.session.add(haroteur)
 
-        session.commit()
+        bdd.session.commit()
 
         emb = discord.Embed(title = f"**{tools.emoji(ctx, 'ha')}{tools.emoji(ctx, 'ro')} contre {cible.nom} !**",
                             description = f"**« {motif.content} »\n**",
@@ -105,8 +104,8 @@ class ActionsPubliques(commands.Cog):
         motif = await tools.wait_for_message_here(ctx)
 
         candidat = CandidHaro(id=None, player_id=ctx.author.id, type="candidature")
-        session.add(candidat)
-        session.commit()
+        bdd.session.add(candidat)
+        bdd.session.commit()
 
         emb = discord.Embed(title = f"**{tools.emoji(ctx, 'maire')} {auteur.display_name} candidate à la Mairie !** {tools.emoji(ctx, 'mc', must_be_found=False) or ''}",
                             description = "Voici ce qu'il a à vous dire :\n" + tools.bold(motif.content),
@@ -143,8 +142,8 @@ class ActionsPubliques(commands.Cog):
             await tools.log(ctx, f"!wipe {qui} : rien à faire")
         else:
             for item in items:
-                session.delete(item)
-            session.commit()
+                bdd.session.delete(item)
+            bdd.session.commit()
             await ctx.send("Fait.")
             await tools.log(ctx, f"!wipe {qui} : fait")
 
