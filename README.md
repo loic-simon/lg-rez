@@ -1,10 +1,9 @@
 # lg-rez
 
-Source folder?
-
 *(Français)* lg-rez est un bot Discord pour encadrer des parties endiablées de Loup-Garou à la PCéenne.
 
 *(English)* lg-rez is a Discord bot for organizing boisterous Werewolf RP games ESPCI-style.
+
 
 
 ## Installation
@@ -15,7 +14,7 @@ Use the package manager [pip](https://pypi.org/project/pip/) to install lg-rez:
 pip install lg-rez
 ```
 
-We strongly advise installing this package in a dedicated virtualenv (`python3 -m venv <yourfolder>`).
+We strongly recommand to install this package in a dedicated virtualenv (`python3 -m venv <yourfolder>`).
 
 
 ### Dependencies
@@ -24,11 +23,13 @@ We strongly advise installing this package in a dedicated virtualenv (`python3 -
 * Packages: **...** (see [`requirements.txt`](requirements.txt))
 
 
+
 ## Configuration
 
-To run correctly, the bot needs to be connected to several external services, each needing more or less sensitive tokens, stocked as environments variables. We usually use [`python-dotenv`](https://pypi.org/project/python-dotenv/) to read them from a `.env` file, but you may prefer exporting them as usual environment variables.
+To run correctly, the bot needs to be connected to several external services, each needing more or less sensitive tokens, stocked as environments variables. We support and encourage the use of [`python-dotenv`](https://pypi.org/project/python-dotenv/) to read them from a `.env` file, but you may prefer exporting them as usual environment variables.
 
-All necessary variables are listed in the [`model.env`](model.env) file; they are prefixed with "`LGREZ_`".
+All necessary variables, prefixed by `LGREZ_`, are listed in the [`model.env`](model.env) file.
+
 
 ### Configuration Assistant Tool
 
@@ -73,7 +74,7 @@ For precisions relative to other features (such as "IA" reactions to messages), 
 
 ### Customization
 
-Since `LGBot` is a subclass of [`discord.ext.commands.Bot`](https://discordpy.readthedocs.io/en/latest/ext/commands/api.html#bot), every initialization arguments described in the documentation can be use and you can subclass it to add your own commands and methods.
+Since `LGBot` is a subclass of [`discord.ext.commands.Bot`](https://discordpy.readthedocs.io/en/latest/ext/commands/api.html#bot), every arguments and methods described in the documentation can be used, and you can subclass it to override existing behaviour.
 
 Some useful examples:
 
@@ -124,11 +125,14 @@ class MyBot(LGBot):
     """Your customized bot class"""
     async def on_member_join(self, member):
         await say_hello(self, member)
-        super().on_member_join(member)      # Call the original response
+        super().on_member_join(member)      # Call the original reaction
 
 bot = MyBot()
 bot.run()
 ```
+
+See [discord.py documentation](https://discordpy.readthedocs.io/) for more ideas.
+
 
 
 ## Contributing
@@ -136,8 +140,9 @@ bot.run()
 Community contributions are not welcome for now. Get in touch with the authors (see below) for any question or suggestion about this project.
 
 
+
 ## License
-This work is shared under [the MIT license](https://choosealicense.com/licenses/mit/).
+This work is shared under [the MIT license](LICENSE).
 
 © 2020 Loïc Simon, Tom Lacoma et al. – Club BD-Jeux × GRIs – ESPCI Paris - PSL
 

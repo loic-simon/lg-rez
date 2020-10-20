@@ -118,7 +118,7 @@ The database schema will be created by the bot the first time it runs.
 
     ok = False
     while not ok:
-        LGREZ_DATABASE_URI = input("Database URI (protocol://user:password@host/base): ")
+        LGREZ_DATABASE_URI = input("Database URI (dialect[+driver]://user:password@host/base): ")
 
         print("Testing connection...")
         try:
@@ -217,7 +217,7 @@ When done, press Enter to continue.""")
 if step < 4:
     print("""\n\n------ STEP 4 : scheduled tasks webhook ------
 
-This bot supports task postponing. This feature requires a "webhook" (a protocol to post messages externally to a channel), called at scheduled time to trigger bot reaction. Create a new webhook (Parameters / Integrations / Webhooks) posting on the '#logs' channel.
+This bot supports task postponing. This feature requires a "webhook" (a protocol to post messages externally to a channel), called at scheduled time to trigger bot reaction. Create a new webhook (Server settings / Integrations / Webhooks) posting on the '#logs' channel.
 """)
 
     ok = False
