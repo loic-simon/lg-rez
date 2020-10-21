@@ -15,17 +15,10 @@ from lgrez.features import annexe, IA, inscription, informations, sync, open_clo
 logging.basicConfig(level=logging.WARNING)
 
 
-### 1 - Récupération du token du bot et de l'ID du serveur
 
-
-### 2 - Création du bot
-
-
-
-### 3 - Checks et système de blocage
+### Checks et système de blocage
 class AlreadyInCommand(commands.CheckFailure):
     pass
-
 
 async def already_in_command(ctx):
     """Décorateur : vérifie si le joueur est actuellement dans une commande"""
@@ -33,7 +26,6 @@ async def already_in_command(ctx):
         raise AlreadyInCommand()
     else:
         return True
-
 
 # @bot.before_invoke
 async def add_to_in_command(ctx):
@@ -44,8 +36,6 @@ async def add_to_in_command(ctx):
     """
     if ctx.command.name != "stop" and not ctx.message.webhook_id:
         ctx.bot.in_command.append(ctx.channel.id)
-
-
 
 # @bot.after_invoke
 async def remove_from_in_command(ctx):
@@ -59,7 +49,8 @@ async def remove_from_in_command(ctx):
         ctx.bot.in_command.remove(ctx.channel.id)
 
 
-### 4 - Réactions aux différents évènements
+
+### Réactions aux différents évènements
 
 # Au démarrage du bot
 async def _on_ready(bot):
@@ -179,9 +170,7 @@ async def _on_raw_reaction_add(bot, payload):
 
 
 
-
-
-### 6 - Commandes spéciales
+### Commandes spéciales
 class Special(commands.Cog):
     """Special - Commandes spéciales (méta-commandes, imitant ou impactant le déroulement des autres)"""
 
@@ -367,8 +356,7 @@ class Special(commands.Cog):
 
 
 
-
-### 7 - Gestion des erreurs
+### Gestion des erreurs
 async def _on_command_error(bot, ctx, exc):
     """Fonction appellée à chaque exception raise dans une commande
 
@@ -449,9 +437,13 @@ async def _on_error(bot, event, *args, **kwargs):
 
 
 
-class LGBot(commands.Bot):
-    """discord.ext.commands.Bot avec quelques listes et dictionnaire"""
+# Définition classe principale
 
+class LGBot(commands.Bot):
+    """Bot Discord pour parties de Loup-Garou à la PCéenne.
+
+    Classe fille de discord.ext.commands.Bot, utilisable exactement de la même manière.
+    """
     def __init__(self, command_prefix="!", description=None, case_insensitive=True, **kwargs):
         """Initialize self"""
         if not description:
@@ -466,15 +458,13 @@ class LGBot(commands.Bot):
         self.in_fals = []           # IDs des salons en mode Foire à la saucisse
         self.tasks = {}             # Dictionnaire des tâches en attente (id: TimerHandle)
 
-        ### 3 - Checks et système de blocage
+        # Checks et système de blocage
         self.add_check(already_in_command)
-
 
         self.before_invoke(add_to_in_command)
         self.after_invoke(remove_from_in_command)
 
-
-        ### 5 - Chargement des commandes (définies dans les fichiers annexes, un cog par fichier dans features)
+        # Chargement des commandes (définies dans les fichiers annexes, un cog par fichier dans features)
         self.add_cog(informations.Informations(self))            # Information du joueur
         self.add_cog(voter_agir.VoterAgir(self))                 # Voter ou agir
         self.add_cog(actions_publiques.ActionsPubliques(self))   # Haros et candidatures
@@ -486,25 +476,27 @@ class LGBot(commands.Bot):
         self.add_cog(annexe.Annexe(self))                        # Ouils divers et plus ou moins inutiles
 
         self.remove_command("help")
-
-        self.add_cog(Special(self))
-
+        self.add_cog(Special(self))         # Commandes spéciales, méta-commandes...
 
 
-    ### 4 - Réactions aux différents évènements
+    # Réactions aux différents évènements
     async def on_ready(self):
         await _on_ready(self)
+
     async def on_member_join(self, member):
         await _on_member_join(self, member)
+
     async def on_member_remove(self, member):
         await _on_member_remove(self, member)
+
     async def on_message(self, message):
         await _on_message(self, message)
+
     async def on_raw_reaction_add(self, payload):
         await _on_raw_reaction_add(self, payload)
 
 
-    ### 7 - Gestion des erreurs
+    # Gestion des erreurs
     async def on_command_error(self, ctx, exc):
         await _on_command_error(self, ctx, exc)
 
@@ -512,17 +504,18 @@ class LGBot(commands.Bot):
         await _on_error(self, event, *args, **kwargs)
 
 
-    def run(self):
+    # Lancement du bot
+    def run(self, *args, **kwargs):
+        """Prépare puis lance le bot (bloquant)
+
+        Récupère les informations de connection, établit la connection à la base de données puis lance le bot
+        """
+        # Récupération du token du bot et de l'ID du serveur
         LGREZ_DISCORD_TOKEN = env.load("LGREZ_DISCORD_TOKEN")
         self.GUILD_ID = int(env.load("LGREZ_SERVER_ID"))
 
+        # Connection BDD
         bdd.connect()
 
-        super().run(LGREZ_DISCORD_TOKEN)
-
-
-# bot = LGBot()
-
-
-### 8 - Lance le bot (bloquant, rien n'est exécuté après)
-# bot.run(TOKEN)
+        # Lancement du bot
+        super().run(LGREZ_DISCORD_TOKEN, *args, **kwargs)
