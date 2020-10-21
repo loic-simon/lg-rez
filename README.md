@@ -144,4 +144,4 @@ This work is shared under [the MIT license](LICENSE).
 
 © 2020 Loïc Simon, Tom Lacoma et al. – Club BD-Jeux × GRIs – ESPCI Paris - PSL
 
-Reach us on Discord: [LaCarpe#1674](https://discordapp.com/users/264482202966818825), [TaupeOrAfk#3218](https://discordapp.com/users/176763552202358785) or by mail: [loic.simon@espci.org](mailto:loic.simon@espci.org)
+Reach us on Discord: [LaCarpe#1674](https://discordapp.com/users/264482202966818825), [TaupeOrAfk#3218](https://discordapp.com/users/176763552202358785) or by mail: [loic.simon@espci.org](mailto:loic.simon@espci.org), [tom.lacoma@espci.org](mailto:tom.lacoma@espci.org)

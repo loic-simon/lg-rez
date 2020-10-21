@@ -11,7 +11,7 @@ __license__ = "MIT"
 __copyright__ = "Copyright 2020 Loïc Simon & Tom Lacoma – Club BD-Jeux × GRIs – ESPCI Paris - PSL"
 __version__ = "1.0.3"
 
-# from lgrez import bot
-# LGBot = bot.LGBot                        # Accès direct à lgrez.LGBot
+from lgrez import bot
+LGBot = bot.LGBot                        # Accès direct à lgrez.LGBot
 
 __all__ = ["LGBot"]

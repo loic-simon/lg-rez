@@ -482,26 +482,33 @@ class LGBot(commands.Bot):
     # Réactions aux différents évènements
     async def on_ready(self):
         await _on_ready(self)
+    on_ready.__doc__ = _on_ready.__doc__
 
     async def on_member_join(self, member):
         await _on_member_join(self, member)
+    on_member_join.__doc__ = _on_member_join.__doc__
 
     async def on_member_remove(self, member):
         await _on_member_remove(self, member)
+    on_member_remove.__doc__ = _on_member_remove.__doc__
 
     async def on_message(self, message):
         await _on_message(self, message)
+    on_message.__doc__ = _on_message.__doc__
 
     async def on_raw_reaction_add(self, payload):
         await _on_raw_reaction_add(self, payload)
+    on_raw_reaction_add.__doc__ = _on_raw_reaction_add.__doc__
 
 
     # Gestion des erreurs
     async def on_command_error(self, ctx, exc):
         await _on_command_error(self, ctx, exc)
+    on_command_error.__doc__ = _on_command_error.__doc__
 
     async def on_error(self, event, *args, **kwargs):
         await _on_error(self, event, *args, **kwargs)
+    on_error.__doc__ = _on_error.__doc__
 
 
     # Lancement du bot
