@@ -29,17 +29,17 @@ async def already_in_command(ctx):
 
 # @bot.before_invoke
 async def add_to_in_command(ctx):
-    """Ajoute le joueur dans la liste des joueurs dans une commande
+    """Ajoute le channel de `ctx` à la liste des channels dans une commande
 
     Cette fonction est appellée avant chaque appel de fonction.
-    Appel seulement si les checks sont OK, donc pas déjà dans bot.in_command
+    Elle est appellée seulement si les checks sont OK, donc pas si le salon est déjà dans bot.in_command.
     """
     if ctx.command.name != "stop" and not ctx.message.webhook_id:
         ctx.bot.in_command.append(ctx.channel.id)
 
 # @bot.after_invoke
 async def remove_from_in_command(ctx):
-    """Retire le joueur de la liste des joueurs dans une commande
+    """Retire le channel de `ctx` de la liste des channels dans une commande
 
     Cette fonction est appellée après chaque appel de fonction.
     Elle attend 0.5 secondes avant d'enlever le joueur afin d'éviter que le bot réagisse « nativement » (IA) à un message déjà traité par un tools.wait_for_message ayant mené à la fin de la commande.
@@ -54,7 +54,10 @@ async def remove_from_in_command(ctx):
 
 # Au démarrage du bot
 async def _on_ready(bot):
-    """Fonction appellée par Discord au démarrage du bot"""
+    """Méthode appellée par Discord au démarrage du bot.
+
+    Vérifie le serveur, log et affiche publiquement que le bot est fonctionnel ; restaure les tâches planifiées éventuelles et exécute celles manquées.
+    """
 
     guild = bot.get_guild(bot.GUILD_ID)
     assert guild, f"on_ready : Guilde d'ID {bot.GUILD_ID} introuvable"
@@ -82,7 +85,15 @@ async def _on_ready(bot):
 
 # À l'arrivée d'un membre sur le serveur
 async def _on_member_join(bot, member):
-    """Fonction appellée par Discord à l'arrivée de <member> sur le serveur"""
+    """Méthode appellée par Discord à l'arrivée d'un joueur sur le serveur.
+
+    Log et lance le processus d'inscription.
+
+    Ne fait rien si l'arrivée n'est pas sur le serveur :py:attr:`GUILD_ID`.
+
+    Args:
+        member (:ref:`discord.Member`): Le joueur qui vient d'arriver.
+    """
     if member.guild.id != bot.GUILD_ID:            # Bon serveur
         return
 
@@ -92,7 +103,15 @@ async def _on_member_join(bot, member):
 
 # Au départ d'un membre du serveur
 async def _on_member_remove(bot, member):
-    """Fonction appellée par Discord au départ de <member> du serveur"""
+    """Méthode appellée par Discord au départ d'un joueur du serveur.
+
+    Log en mentionnant les MJs.
+
+    Ne fait rien si le départ n'est pas du serveur :py:attr:`GUILD_ID`.
+
+    Args:
+        member (:ref:`discord.Member`): Le joueur qui vient de partir.
+    """
     if member.guild.id != bot.GUILD_ID:            # Bon serveur
         return
 
@@ -101,7 +120,19 @@ async def _on_member_remove(bot, member):
 
 # À chaque message
 async def _on_message(bot, message):
-    """Fonction appellée par Discord à la réception de <message>"""
+    """Méthode appellée par Discord à la réception d'un message.
+
+    Invoque l'ensemble des commandes, ou les règles d'IA si
+        - Le message n'est pas une commande
+        - Le message est posté dans un channel privé (#conv-bot-...)
+        - Il n'y a pas déjà de commande en cours dans ce channel
+        - Le channel n'est pas en mode STFU
+
+    Ne fait rien si le message n'est pas sur le serveur :py:attr:`GUILD_ID`, qu'il est envoyé par le bot lui-même ou par un membre sans aucun rôle affecté.
+
+    Args:
+        member (:ref:`discord.Member`): Le joueur qui vient d'arriver.
+    """
 
     if message.author == bot.user:              # Sécurité pour éviter les boucles infinies
         return
@@ -130,19 +161,23 @@ async def _on_message(bot, message):
 
 # À chaque réaction ajoutée
 async def _on_raw_reaction_add(bot, payload):
-    """Fonction appellée par Discord à l'ajout d'une réaction
+    """Méthode appellée par Discord à l'ajout d'une réaction sur un message.
 
-    <payload> paramètre "statique" (car message par forcément dans le cache du bot, si il a été reboot depuis) :
-        payload.member          Membre ayant posé la réaction
-        payload.emoji           PartialEmoji envoyé
-        payload.message_id      ID du message réacté
+    Appelle la fonction adéquate si le joueur est en base et a cliqué sur ":bucher:", ":maire:", ":lune:" ou ":action:".
+
+    Ne fait rien si la réaction n'est pas sur le serveur :py:attr:`GUILD_ID`.
+
+    Args:
+        payload (:ref:`discord.RawReactionActionEvent`): Paramètre "statique" (car le message n'est pas forcément dans le cache du bot, par exemple si il a été reboot depuis). Quelques attributs utiles :
+            payload.member (:ref:`discord.Member`) : Membre ayant posé la réaction
+            payload.emoji (:ref:`discord.PartialEmoji`) : PartialEmoji envoyé
+            payload.message_id (int) : ID du message réacté
     """
     if payload.guild_id != bot.GUILD_ID:            # Mauvais serveur
         return
 
     reactor = payload.member
     if reactor == bot.user or not Joueurs.query.get(reactor.id):        # Boucles infinies + gens pas en base
-    # if reactor == bot.user or reactor.id in bot.in_command:         # Boucles infinies + gens dans une commande
         return
 
     if payload.emoji == tools.emoji(reactor, "volatron", must_be_found=False):
@@ -358,12 +393,15 @@ class Special(commands.Cog):
 
 ### Gestion des erreurs
 async def _on_command_error(bot, ctx, exc):
-    """Fonction appellée à chaque exception raise dans une commande
+    """Méthode appellée par Discord à chaque exception levée dans une commande.
 
-    <ctx>   Contexte où l'erreur a été raise
-    <exc>   Exception raise
+    Analyse l'erreur survenue et informe le joueur de manière adéquate en fonction, en mentionnant les MJs si besoin.
 
-    Permet de gérer spécifiquement les erreurs de discord.ext.commands (commandes)
+    Ne fait rien si l'exception n'a pas eu lieu sur le serveur :py:attr:`GUILD_ID`.
+
+    Args:
+        ctx (:ref:`discord.ext.commands.Context`): Contexte dans lequel l'exception a été levée
+        exc (`discord.ext.commands.CommandError`): Exception levée
     """
     if ctx.guild.id != bot.GUILD_ID:            # Mauvais serveur
         return
@@ -417,12 +455,13 @@ async def _on_command_error(bot, ctx, exc):
 
 # Erreurs non gérées par le code précédent (hors du cadre d'une commande)
 async def _on_error(bot, event, *args, **kwargs):
-    """Fonction appellée à chaque exception remontant plus haut qu'une commande
+    """Méthode appellée par Discord à chaque exception remontant au-delà d'une commande.
 
-    <event>             Type d'évènement ayant généré une erreur
-    *args, **kwargs     Arguments envoyés à la fonction récupérant l'évènement : ex. <member>, <message>...
+    Log en mentionnant les MJs. Cette méthode permet de gérer les exceptions sans briser la loop du bot (i.e. il reste en ligne).
 
-    Permet de gérer les exceptions sans briser la loop du bot (i.e. il reste en ligne)
+    Args:
+        event (str): Nom de l'évènement ayant généré une erreur (`"member_join"`, `"message"`...)
+        *args, **kwargs: Arguments passés à la fonction traitant :arg:`event`: `member`, `message`...
     """
     if bdd.session:
         bdd.bdd.session.rollback()       # Dans le doute, on vide la session SQL
@@ -442,7 +481,16 @@ async def _on_error(bot, event, *args, **kwargs):
 class LGBot(commands.Bot):
     """Bot Discord pour parties de Loup-Garou à la PCéenne.
 
-    Classe fille de discord.ext.commands.Bot, utilisable exactement de la même manière.
+    Classe fille de :ref:`discord.ext.commands.Bot`, utilisable exactement de la même manière.
+
+    Attributes:
+        GUILD_ID (id, optionnal): l'ID du serveur sur lequel tourne le bot. Vaut None avant l'appel à :meth:`run`, puis la valeur d'environnement LGREZ_SERVER_ID.
+        in_command (List[int]): IDs des salons où une commande est actuellement exécutée.
+        in_stfu (List[int]): IDs des salons en mode STFU.
+        in_fals (List[int]): IDs des salons en mode Foire à la saucisse.
+        tasks (Mapping[int, :py:class:`asyncio.TimerHandle`]): Tâches actuellement en attente.
+
+    ainsi que tous les autres attributs de :ref:`discord.ext.commands.Bot`.
     """
     def __init__(self, command_prefix="!", description=None, case_insensitive=True, **kwargs):
         """Initialize self"""
@@ -452,6 +500,8 @@ class LGBot(commands.Bot):
         super().__init__(command_prefix=command_prefix,
                          description=description,
                          case_insensitive=case_insensitive, **kwargs)
+
+        self.GUILD_ID = None
 
         self.in_command = []        # IDs des salons dans une commande
         self.in_stfu = []           # IDs des salons en mode STFU (IA off)
@@ -513,9 +563,12 @@ class LGBot(commands.Bot):
 
     # Lancement du bot
     def run(self, *args, **kwargs):
-        """Prépare puis lance le bot (bloquant)
+        """Prépare puis lance le bot (bloquant).
 
-        Récupère les informations de connection, établit la connection à la base de données puis lance le bot
+        Récupère les informations de connection, établit la connection à la base de données puis lance le bot.
+
+        Args:
+            *args, **kwargs: Arguments passés à :ref:`discord.ext.commands.Bot.run`.
         """
         # Récupération du token du bot et de l'ID du serveur
         LGREZ_DISCORD_TOKEN = env.load("LGREZ_DISCORD_TOKEN")

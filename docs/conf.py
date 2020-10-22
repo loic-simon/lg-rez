@@ -58,7 +58,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'lg-rez'
-copyright = u'2020, Loïc Simon, Tom Lacoma'
+copyright = u'2020, Loïc Simon / Tom Lacoma. Sphinx theme by Rapptz for discord.py'
 author = u'Loïc Simon, Tom Lacoma'
 
 # The version info for the project you're documenting, acts as replacement for

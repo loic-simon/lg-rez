@@ -1,18 +1,24 @@
-Welcome to lg-rez's documentation!
+Documentation de lg-rez
 ==================================
 
+Note
+---------------
 
-.. automodule:: lgrez.bot
-    :members:
-
+Cette documentation est encore en bêta, et n'est disponible que pour la classe principale proposée par ce package, :py:class:`lgrez.LGBot`.
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
 
+Référence
+---------------
 
-Indices and tables
+.. automodule:: lgrez
+    :members:
+
+
+Index
 ==================
 
 * :ref:`genindex`
