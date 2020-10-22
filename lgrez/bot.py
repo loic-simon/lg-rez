@@ -92,7 +92,7 @@ async def _on_member_join(bot, member):
     Ne fait rien si l'arrivée n'est pas sur le serveur :py:attr:`GUILD_ID`.
 
     Args:
-        member (:ref:`discord.Member`): Le joueur qui vient d'arriver.
+        member (:py:class:`discord.Member`): Le joueur qui vient d'arriver.
     """
     if member.guild.id != bot.GUILD_ID:            # Bon serveur
         return
@@ -110,7 +110,7 @@ async def _on_member_remove(bot, member):
     Ne fait rien si le départ n'est pas du serveur :py:attr:`GUILD_ID`.
 
     Args:
-        member (:ref:`discord.Member`): Le joueur qui vient de partir.
+        member (:py:class:`discord.Member`): Le joueur qui vient de partir.
     """
     if member.guild.id != bot.GUILD_ID:            # Bon serveur
         return
@@ -128,10 +128,10 @@ async def _on_message(bot, message):
         - Il n'y a pas déjà de commande en cours dans ce channel
         - Le channel n'est pas en mode STFU
 
-    Ne fait rien si le message n'est pas sur le serveur :py:attr:`GUILD_ID`, qu'il est envoyé par le bot lui-même ou par un membre sans aucun rôle affecté.
+    Ne fait rien si le message n'est pas sur le serveur :py:attr:`GUILD_ID` ou qu'il est envoyé par le bot lui-même ou par un membre sans aucun rôle affecté.
 
     Args:
-        member (:ref:`discord.Member`): Le joueur qui vient d'arriver.
+        member (:py:class:`discord.Member`): Le joueur qui vient d'arriver.
     """
 
     if message.author == bot.user:              # Sécurité pour éviter les boucles infinies
@@ -168,10 +168,10 @@ async def _on_raw_reaction_add(bot, payload):
     Ne fait rien si la réaction n'est pas sur le serveur :py:attr:`GUILD_ID`.
 
     Args:
-        payload (:ref:`discord.RawReactionActionEvent`): Paramètre "statique" (car le message n'est pas forcément dans le cache du bot, par exemple si il a été reboot depuis). Quelques attributs utiles :
-            payload.member (:ref:`discord.Member`) : Membre ayant posé la réaction
-            payload.emoji (:ref:`discord.PartialEmoji`) : PartialEmoji envoyé
-            payload.message_id (int) : ID du message réacté
+        payload (:py:class:`discord.RawReactionActionEvent`): Paramètre "statique" (car le message n'est pas forcément dans le cache du bot, par exemple si il a été reboot depuis). Quelques attributs utiles :
+            - ``payload.member`` (:py:class:`discord.Member`) : Membre ayant posé la réaction
+            - ``payload.emoji`` (:py:class:`discord.PartialEmoji`) : PartialEmoji envoyé
+            - ``payload.message_id`` (int) : ID du message réacté
     """
     if payload.guild_id != bot.GUILD_ID:            # Mauvais serveur
         return
@@ -400,8 +400,8 @@ async def _on_command_error(bot, ctx, exc):
     Ne fait rien si l'exception n'a pas eu lieu sur le serveur :py:attr:`GUILD_ID`.
 
     Args:
-        ctx (:ref:`discord.ext.commands.Context`): Contexte dans lequel l'exception a été levée
-        exc (`discord.ext.commands.CommandError`): Exception levée
+        ctx (:py:class:`discord.ext.commands.Context`): Contexte dans lequel l'exception a été levée
+        exc (:py:class:`discord.ext.commands.CommandError`): Exception levée
     """
     if ctx.guild.id != bot.GUILD_ID:            # Mauvais serveur
         return
@@ -460,8 +460,8 @@ async def _on_error(bot, event, *args, **kwargs):
     Log en mentionnant les MJs. Cette méthode permet de gérer les exceptions sans briser la loop du bot (i.e. il reste en ligne).
 
     Args:
-        event (str): Nom de l'évènement ayant généré une erreur (`"member_join"`, `"message"`...)
-        *args, **kwargs: Arguments passés à la fonction traitant :arg:`event`: `member`, `message`...
+        event (str): Nom de l'évènement ayant généré une erreur (``"member_join"``, ``"message"``...)
+        *args, **kwargs: Arguments passés à la fonction traitant l'évènement : ``member``, ``message``...
     """
     if bdd.session:
         bdd.bdd.session.rollback()       # Dans le doute, on vide la session SQL
@@ -481,16 +481,18 @@ async def _on_error(bot, event, *args, **kwargs):
 class LGBot(commands.Bot):
     """Bot Discord pour parties de Loup-Garou à la PCéenne.
 
-    Classe fille de :ref:`discord.ext.commands.Bot`, utilisable exactement de la même manière.
+    Classe fille de :py:class:`discord.ext.commands.Bot`, utilisable exactement de la même manière.
+
+    Attributs propres à cette classe :
 
     Attributes:
-        GUILD_ID (id, optionnal): l'ID du serveur sur lequel tourne le bot. Vaut None avant l'appel à :meth:`run`, puis la valeur d'environnement LGREZ_SERVER_ID.
-        in_command (List[int]): IDs des salons où une commande est actuellement exécutée.
-        in_stfu (List[int]): IDs des salons en mode STFU.
-        in_fals (List[int]): IDs des salons en mode Foire à la saucisse.
-        tasks (Mapping[int, :py:class:`asyncio.TimerHandle`]): Tâches actuellement en attente.
+        GUILD_ID (id, optionnal): l'ID du serveur sur lequel tourne le bot. Vaut `None` avant l'appel à :meth:`run`, puis la valeur de la variable d'environnement `LGREZ_SERVER_ID`.
+        in_command (list[int]): IDs des salons où une commande est actuellement exécutée.
+        in_stfu (list[int]): IDs des salons en mode STFU.
+        in_fals (list[int]): IDs des salons en mode Foire à la saucisse.
+        tasks (dict[int, :py:class:`asyncio.TimerHandle`]): Tâches actuellement en attente.
 
-    ainsi que tous les autres attributs de :ref:`discord.ext.commands.Bot`.
+    Méthodes remplacées par cette module :
     """
     def __init__(self, command_prefix="!", description=None, case_insensitive=True, **kwargs):
         """Initialize self"""
@@ -568,7 +570,7 @@ class LGBot(commands.Bot):
         Récupère les informations de connection, établit la connection à la base de données puis lance le bot.
 
         Args:
-            *args, **kwargs: Arguments passés à :ref:`discord.ext.commands.Bot.run`.
+            *args, **kwargs: Arguments passés à :py:meth:`discord.ext.commands.Bot.run`.
         """
         # Récupération du token du bot et de l'ID du serveur
         LGREZ_DISCORD_TOKEN = env.load("LGREZ_DISCORD_TOKEN")

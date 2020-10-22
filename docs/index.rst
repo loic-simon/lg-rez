@@ -14,7 +14,7 @@ Cette documentation est encore en bêta, et n'est disponible que pour la classe 
 Référence
 ---------------
 
-.. automodule:: lgrez
+.. autoclass:: lgrez.LGBot
     :members:
 
 
