@@ -486,7 +486,7 @@ class LGBot(commands.Bot):
     Attributs propres à cette classe :
 
     Attributes:
-        GUILD_ID (id, optionnal): l'ID du serveur sur lequel tourne le bot. Vaut `None` avant l'appel à :meth:`run`, puis la valeur de la variable d'environnement `LGREZ_SERVER_ID`.
+        GUILD_ID (id, optionnal): l'ID du serveur sur lequel tourne le bot. Vaut ``None`` avant l'appel à :meth:`run`, puis la valeur de la variable d'environnement ``LGREZ_SERVER_ID``.
         in_command (list[int]): IDs des salons où une commande est actuellement exécutée.
         in_stfu (list[int]): IDs des salons en mode STFU.
         in_fals (list[int]): IDs des salons en mode Foire à la saucisse.
