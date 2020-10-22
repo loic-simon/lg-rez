@@ -1,3 +1,9 @@
+.. lg-rez documentation master file, created by
+   sphinx-quickstart on Thu Oct 22 19:23:58 2020.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
+
 Documentation de lg-rez
 ==================================
 

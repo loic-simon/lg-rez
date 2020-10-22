@@ -5,17 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Unreleased
+## 1.0.3 - 2020-10-22
 ### Added
 
 - Created this changelog
 - Added module and submodules docstrings and meta informations.
-- Created Sphinx documentation on lg-rez.readthedocs.io.
+- Created Sphinx documentation (beta) on lg-rez.readthedocs.io.
 
 ### Changed
 
 - README improvements (badges!) and corrections.
-- Enhanced bot.LGBot class and methods docstrings.
+- Rewriting of bot.LGBot class and methods docstrings.
 - More PyPI classifiers.
 
 ### Fixed

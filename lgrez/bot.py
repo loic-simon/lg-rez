@@ -168,10 +168,12 @@ async def _on_raw_reaction_add(bot, payload):
     Ne fait rien si la réaction n'est pas sur le serveur :py:attr:`GUILD_ID`.
 
     Args:
-        payload (:py:class:`discord.RawReactionActionEvent`): Paramètre "statique" (car le message n'est pas forcément dans le cache du bot, par exemple si il a été reboot depuis). Quelques attributs utiles :
-            - ``payload.member`` (:py:class:`discord.Member`) : Membre ayant posé la réaction
-            - ``payload.emoji`` (:py:class:`discord.PartialEmoji`) : PartialEmoji envoyé
-            - ``payload.message_id`` (int) : ID du message réacté
+        payload (:py:class:`discord.RawReactionActionEvent`): Paramètre "statique" (car le message n'est pas forcément dans le cache du bot, par exemple si il a été reboot depuis).
+
+    Quelques attributs utiles :
+        - ``payload.member`` (:py:class:`discord.Member`) : Membre ayant posé la réaction
+        - ``payload.emoji`` (:py:class:`discord.PartialEmoji`) : PartialEmoji envoyé
+        - ``payload.message_id`` (int) : ID du message réacté
     """
     if payload.guild_id != bot.GUILD_ID:            # Mauvais serveur
         return

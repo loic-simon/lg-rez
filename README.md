@@ -79,6 +79,8 @@ For precisions relative to non-command features (such as "IA" reactions to messa
 
 Since `LGBot` is a subclass of [`discord.ext.commands.Bot`](https://discordpy.readthedocs.io/en/latest/ext/commands/api.html#bot), you can use every arguments and methods it supports or subclass it to override existing behavior.
 
+See additional attributes and overriden methods on [the doc](https://lg-rez.readthedocs.io/) (beta, French)
+
 Some useful examples:
 
 #### Change command prefix
