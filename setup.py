@@ -10,8 +10,6 @@ with open("lgrez/__init__.py") as f:
 
 assert version, "__version__ not found in __init__.py"
 
-print(version)
-exit()
 
 def absolute_links(string, base):
     """Replace all relative Markdown links in <string> by absolute links with base <base>"""
@@ -58,3 +56,6 @@ setuptools.setup(
     install_requires=requirements,
     python_requires='>=3.8',
 )
+
+# python3 setup.py sdist bdist_wheel
+# twine upload dist/*
