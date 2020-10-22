@@ -490,9 +490,9 @@ class LGBot(commands.Bot):
         in_command (list[int]): IDs des salons où une commande est actuellement exécutée.
         in_stfu (list[int]): IDs des salons en mode STFU.
         in_fals (list[int]): IDs des salons en mode Foire à la saucisse.
-        tasks (dict[int, :py:class:`asyncio.TimerHandle`]): Tâches actuellement en attente.
+        tasks (dict[int, :py:class:`asyncio.TimerHandle`]): Tâches planifiées actuellement en attente.
 
-    Méthodes remplacées par cette module :
+    Méthodes propres à cette classe :
     """
     def __init__(self, command_prefix="!", description=None, case_insensitive=True, **kwargs):
         """Initialize self"""
