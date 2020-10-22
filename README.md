@@ -1,8 +1,9 @@
 # lg-rez
 
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/lg-rez)](https://pypi.org/project/lg-rez)
 [![PyPI](https://img.shields.io/pypi/v/lg-rez)](https://pypi.org/project/lg-rez)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/lg-rez)](https://pypi.org/project/lg-rez)
 [![PyPI - Wheel](https://img.shields.io/pypi/wheel/lg-rez)](https://pypi.org/project/lg-rez)
+[![Read the Docs](https://img.shields.io/pypi/wheel/lg-rez)](https://lg-rez.readthedocs.io)
 
 Discord bot for organizing boisterous Werewolf RP games ESPCI-style.
 

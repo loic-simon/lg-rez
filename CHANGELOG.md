@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Created this changelog
 - Added module and submodules docstrings and meta informations.
-- First installation of Sphinx documentation.
+- Created Sphinx documentation on lg-rez.readthedocs.io.
 
 ### Changed
 
