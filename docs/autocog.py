@@ -5,8 +5,8 @@ from discord.ext.commands import Cog  # the class that needs modified documentat
 
 class CogDocumenter(ClassDocumenter):
     # directivetype = 'autoclass'
-    objtype = 'class'
-    priority = 10  # higher priority than ClassDocumenter
+    objtype = 'cog'
+    priority = 20  # higher priority than ClassDocumenter
 
     @classmethod
     def can_document_member(cls, member, membername, isattr, parent):

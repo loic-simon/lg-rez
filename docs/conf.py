@@ -48,13 +48,13 @@ release = version
 sys.path.append(os.path.abspath(''))
 
 extensions = [
-    'autocog',
     'sphinx.ext.autodoc',
     'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
     'sphinx.ext.coverage',
     'sphinx.ext.viewcode',
     'recommonmark'
+    'autocog',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
