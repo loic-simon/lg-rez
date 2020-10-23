@@ -17,13 +17,14 @@ Commandes spéciales
 .. autoclass:: lgrez.bot.Special
     :members:
 
-    Cette classe est un **Cog**, *i.e.* un rassemblements de commandes.
+    ..note::
+        Cette classe est un **Cog**, *i.e.* un rassemblements de commandes.
 
-    L'ensemble des commandes qu'elle contient, créées par le décorateur :py:func:`@discord.ext.commands.command`, sont des objets :py:class:`discord.ext.commmands.Command` accessibles comme ``cog.cmd_name``.
+        L'ensemble des commandes qu'elle contient, créées par le décorateur :py:decorator:`discord.ext.commands.command`, sont des objets :py:class:`discord.ext.commands.Command` accessibles comme ``cog.cmd_name``.
 
-    Pour plus de lisiblité, seules les fonctions appellées lors de l'invoquation des commandes (:py:meth:~`discord.ext.commmands.Command.callback`) sont décrites ci-après, mais toutes les méthodes de :py:class:~`discord.ext.commmands.Command` sont évidemment accessibles.
+        Pour plus de lisiblité, seules les fonctions appellées lors de l'invoquation des commandes (:py:meth:`Command.callback <discord.ext.commands.Command.callback>`) sont décrites ci-après, mais toutes les méthodes de :py:class:`~discord.ext.commands.Command` sont évidemment accessibles.
 
-    Ces *callbacks* prennent toutes comme premier argument ``ctx`` (:py:class:`discord.ext.commmands.Context`), le **contexte d'invocation** de la commande. Cet argument est construit automatiquement par ``discord.py`` à l'appel de :py:meth:~`discord.ext.commmands.Bot.invoke_commands` puis passé au callback suivi des arguments entrés par l'utilisateur (à la manière d'une utilisation en ligne de commande).
+        Ces *callbacks* prennent toutes comme premier argument ``ctx`` (:py:class:`discord.ext.commands.Context`), le **contexte d'invocation** de la commande. Cet argument est construit automatiquement par ``discord.py`` à l'appel de :py:meth:`Bot.process_commands <discord.ext.commands.Bot.process_commands>` ou :py:meth:`Bot.get_context <discord.ext.commands.Bot.get_context>` puis passé au callback suivi des arguments entrés par l'utilisateur (à la manière d'une utilisation en ligne de commande).
 
     .. automethod:: lgrez.bot.Special.do.callback
     .. automethod:: lgrez.bot.Special.shell.callback
