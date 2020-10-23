@@ -4,7 +4,7 @@ from discord.ext.commands import Cog  # the class that needs modified documentat
 
 
 class CogDocumenter(ClassDocumenter):
-    # directivetype = 'autoclass'
+    directivetype = 'autocog'
     objtype = 'class'
     priority = 20  # higher priority than ClassDocumenter
 
@@ -17,7 +17,7 @@ class CogDocumenter(ClassDocumenter):
         # do something to modify the output documentation
         doc[0].insert(0, "I AM A COG AND I LIKE IT")
         doc[0].append(str(doc))
-        print("YOUHOUHOUHOUOHU")
+        print("YOUHOUHOUHOUOHU" + str(doc)
         return doc
 
 def setup(app):
