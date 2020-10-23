@@ -17,7 +17,7 @@ Commandes spéciales
 .. autoclass:: lgrez.bot.Special
     :members:
 
-    |cog|
+    ..include:: cognote.rst
 
     .. automethod:: lgrez.bot.Special.do.callback
     .. automethod:: lgrez.bot.Special.shell.callback
