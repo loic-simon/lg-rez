@@ -16,8 +16,9 @@ class MyClassDocumenter(ClassDocumenter):
         doc = super().get_doc(encoding, ignore)
         # do something to modify the output documentation
         doc[0].insert(0, "I AM A COG AND I LIKE IT")
+        doc[0].append(doc)
         return doc
 
 def setup(app):
     app.add_autodocumenter(MyClassDocumenter)
-    app.add_directive_to_domain("py", "autocog", MyClassDocumenter)
+    app.add_directive_to_domain("py", "autocog", MyClassDocumenter.directive)
