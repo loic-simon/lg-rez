@@ -31,7 +31,7 @@ class CogDocumenter(ClassDocumenter):
         if getattr(self, "_signature_method_name", None) != "__new__":     # Premier passage
             doc[0].append(cognote)
 
-            for command in self.object.get_commands():
+            for command in self.object.get_commands(self.object):
                 doc[0].append(f".. automethod:: {self.fullname}.{command.callback.__name__}.callback")
 
         print("YOUHOUHOUHOUOHU", doc, self, self.__dict__)
