@@ -21,4 +21,4 @@ class MyClassDocumenter(ClassDocumenter):
 
 def setup(app):
     app.add_autodocumenter(MyClassDocumenter)
-    app.add_directive_to_domain("py", "autocog", MyClassDocumenter.directive)
+    # app.add_directive_to_domain("py", "autocog", MyClassDocumenter.directive)
