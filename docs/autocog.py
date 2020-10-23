@@ -4,7 +4,7 @@ from discord.ext.commands import Cog  # the class that needs modified documentat
 
 
 class CogDocumenter(ClassDocumenter):
-    directivetype = 'autocog'
+    directivetype = 'py:autocog'
     objtype = 'class'
     priority = 20  # higher priority than ClassDocumenter
 
