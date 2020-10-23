@@ -17,7 +17,7 @@ class CogDocumenter(ClassDocumenter):
         # do something to modify the output documentation
         doc[0].insert(0, "I AM A COG AND I LIKE IT")
         doc[0].append(str(doc))
-        print("YOUHOUHOUHOUOHU" + str(doc)
+        print("YOUHOUHOUHOUOHU" + str(doc))
         return doc
 
 def setup(app):
