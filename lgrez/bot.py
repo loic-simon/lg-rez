@@ -328,7 +328,7 @@ class Special(commands.Cog):
 
         Ne pas utiliser cette commande sauf en cas de force majeure où plus rien ne marche, et sur demande d'un MJ (après c'est pas dit que ça marche mieux après l'avoir utilisé)
         """
-        if ctx.channel.id in bot.in_command:
+        if ctx.channel.id in ctx.bot.in_command:
             ctx.bot.in_command.remove(ctx.channel.id)
         ctx.send("Te voilà libre, camarade !")
 
@@ -496,14 +496,20 @@ class LGBot(commands.Bot):
 
     Méthodes propres à cette classe :
     """
-    def __init__(self, command_prefix="!", description=None, case_insensitive=True, **kwargs):
+    def __init__(self, command_prefix="!", description=None, case_insensitive=True,
+                 intents=discord.Intents.all(), member_cache_flags=discord.MemberCacheFlags.all(), **kwargs):
         """Initialize self"""
         if not description:
             description = "LG-bot – Plateforme pour parties endiablées de Loup-Garou"
 
-        super().__init__(command_prefix=command_prefix,
-                         description=description,
-                         case_insensitive=case_insensitive, **kwargs)
+        super().__init__(
+            command_prefix=command_prefix,
+            description=description,
+            case_insensitive=case_insensitive,
+            intents=intents,
+            member_cache_flags=member_cache_flags,
+            **kwargs
+        )
 
         self.GUILD_ID = None
 

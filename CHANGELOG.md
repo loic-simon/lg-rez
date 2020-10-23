@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## Unreleased
+
+### Fixed
+
+- Issue with bot intents: proprer access to member list
+- Critical bug with `!stop`
+- Configuration Assistant Tool: escape `\n`s in `LGREZ_GCP_CREDENTIALS`
+
+
 ## 1.0.3 - 2020-10-22
 ### Added
 

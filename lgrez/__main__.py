@@ -16,9 +16,9 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 
 def export(varname):
-    """Returns "export varname={formated value}\n" """
+    """Returns "export varname={formated value}\\n" """
     var = str(globals()[varname])
-    formated_var = var.strip("'\"").replace("\"", "\\\"")
+    formated_var = var.strip("'\"").replace("\"", "\\\"").replace(r"\n", r"\\n")
     return f"export {varname}=\"{formated_var}\"\n"
 
 def report_error(exc):
