@@ -28,7 +28,7 @@ class CogDocumenter(ClassDocumenter):
     def get_doc(self, encoding=None, ignore=1):
         doc = super().get_doc(encoding, ignore)
         # do something to modify the output documentation
-        if _signature_method_name != "__new__":     # Premier passage
+        if self.get(_signature_method_name) != "__new__":     # Premier passage
             doc[0].append(cognote)
 
             for command in self.object.get_commands():
