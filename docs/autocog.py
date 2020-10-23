@@ -3,10 +3,10 @@ from sphinx.ext.autodoc import ClassDocumenter
 from discord.ext.commands import Cog  # the class that needs modified documentation
 
 
-class MyClassDocumenter(ClassDocumenter):
-    directivetype = 'autoclass'
-    objtype = 'autoclass'
-    priority = 20  # higher priority than ClassDocumenter
+class CogDocumenter(ClassDocumenter):
+    # directivetype = 'autoclass'
+    objtype = 'cog'
+    priority = 10  # higher priority than ClassDocumenter
 
     @classmethod
     def can_document_member(cls, member, membername, isattr, parent):
@@ -20,5 +20,6 @@ class MyClassDocumenter(ClassDocumenter):
         return doc
 
 def setup(app):
-    app.add_autodocumenter(MyClassDocumenter)
+    app.add_autodocumenter(CogDocumenter)
     # app.add_directive_to_domain("py", "autocog", MyClassDocumenter.directive)
+    return {'version': sphinx.__display_version__, 'parallel_read_safe': True}
