@@ -29,10 +29,10 @@ class CogDocumenter(ClassDocumenter):
         doc = super().get_doc(encoding, ignore)
         # do something to modify the output documentation
         if getattr(self, "_signature_method_name", None) != "__new__":     # Premier passage
-            doc[0].append(cognote)
+            doc.append(cognote)
 
             for command in self.object.get_commands(self.object):
-                doc[0].append(f"\n    .. automethod:: {self.fullname}.{command.callback.__name__}.callback")
+                doc.append(f"\n    .. automethod:: {self.fullname}.{command.callback.__name__}.callback")
 
         print("YOUHOUHOUHOUOHU", doc, self, self.__dict__)
         return doc
