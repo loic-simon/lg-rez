@@ -10,7 +10,7 @@ class MyClassDocumenter(ClassDocumenter):
 
     @classmethod
     def can_document_member(cls, member, membername, isattr, parent):
-        return issubclass(member, Cog)
+        return isinstance(member, type) and issubclass(member, Cog)
 
     def get_doc(self, encoding=None, ignore=1):
         doc = super().get_doc(encoding, ignore)
