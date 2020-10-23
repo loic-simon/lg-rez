@@ -14,7 +14,7 @@ LGBot
 Commandes spéciales
 ~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: lgrez.bot.Special
+.. autocog:: lgrez.bot.Special
     :members:
 
     .. include:: cognote.rst

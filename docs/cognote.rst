@@ -1,7 +1,8 @@
 .. note::
     Cette classe est un **Cog**, *i.e.* un rassemblements de commandes.
 
-    L'ensemble des commandes qu'elle contient, créées par le décorateur :py:function:`discord.ext.commands.command`, sont des objets :py:class:`discord.ext.commands.Command` accessibles comme ``cog.cmd_name``.
+    L'ensemble des commandes qu'elle contient, créées par le décorateur :py:func:`@discord.ext.commands.command <discord.ext.commands.command>`, sont des objets 
+    :py:class:`discord.ext.commands.Command` accessibles comme ``cog.cmd_name``.
 
     Pour plus de lisiblité, seules les fonctions appellées lors de l'invoquation des commandes (:py:attr:`Command.callback <discord.ext.commands.Command.callback>`) sont décrites ci-après, mais toutes les méthodes de :py:class:`~discord.ext.commands.Command` sont évidemment accessibles.
 
