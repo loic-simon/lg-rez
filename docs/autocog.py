@@ -5,7 +5,7 @@ from discord.ext.commands import Cog  # the class that needs modified documentat
 
 class CogDocumenter(ClassDocumenter):
     # directivetype = 'autoclass'
-    objtype = 'cog'
+    objtype = 'class'
     priority = 10  # higher priority than ClassDocumenter
 
     @classmethod
