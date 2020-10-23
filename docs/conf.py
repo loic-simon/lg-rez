@@ -53,7 +53,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.coverage',
     'sphinx.ext.viewcode',
-    'recommonmark'
+    'recommonmark',
     'autocog',
 ]
 
