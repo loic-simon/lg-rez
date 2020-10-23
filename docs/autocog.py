@@ -1,5 +1,5 @@
 import sphinx
-from sphinx.ext.autodoc import ClassDocumenter
+from sphinx.ext.autodoc import ClassDocumenter, MethodDocumenter
 from discord.ext.commands import Cog  # the class that needs modified documentation
 
 
@@ -33,7 +33,7 @@ class CogDocumenter(ClassDocumenter):
 
             for command in self.object.get_commands(self.object):
                 # txt += f"\n    .. automethod:: {self.fullname}.{command.callback.__name__}.callback"
-                txt += MethodDocumenter(self.directive, f"{self.fullname}.{command.callback.__name__}.callback").get_doc()[0]
+                txt += "\n".join(MethodDocumenter(self.directive, f"{self.fullname}.{command.callback.__name__}.callback").get_doc()[0])
 
             print(f"GENERATED doc: \n\n{txt}\n\n")
             doc[0].append(txt)
