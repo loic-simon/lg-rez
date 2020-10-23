@@ -16,7 +16,7 @@ class CogDocumenter(ClassDocumenter):
         doc = super().get_doc(encoding, ignore)
         # do something to modify the output documentation
         doc[0].append("COGNOTE")
-        print("YOUHOUHOUHOUOHU" + str(doc))
+        print("YOUHOUHOUHOUOHU", doc, self, self.__dict__)
         return doc
 
 def setup(app):
