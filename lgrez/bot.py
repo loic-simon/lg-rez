@@ -572,7 +572,7 @@ class LGBot(commands.Bot):
         Récupère les informations de connection, établit la connection à la base de données puis lance le bot.
 
         Args:
-            *args, **kwargs: Arguments passés à :py:meth:`discord.ext.commands.Bot.run`.
+            *args, **kwargs: Passés à :py:meth:`discord.ext.commands.Bot.run`.
         """
         # Récupération du token du bot et de l'ID du serveur
         LGREZ_DISCORD_TOKEN = env.load("LGREZ_DISCORD_TOKEN")

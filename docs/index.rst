@@ -12,16 +12,19 @@ Note
 
 Cette documentation est encore en bêta, et n'est disponible que pour la classe principale proposée par ce package, :py:class:`lgrez.LGBot`.
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
 
-
-Référence
+Contenu
 ---------------
 
-.. autoclass:: lgrez.LGBot
-    :members:
+.. toctree::
+   :maxdepth: 2
+
+   api
+
+
+.. Référence
+.. ---------------
+
 
 
 Index
