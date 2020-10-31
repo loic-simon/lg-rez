@@ -1,3 +1,12 @@
+"""lg-rez / blocs / Émulation de pseudo-terminaux (avancé)
+
+Ce module n'a pas grand chose à voir avec le projet dans son ensemble, et était plus une expérimentation personnelle qu'autre chose. Il est néanmoins implémenté par la commande :meth:`\!shell <.bot.Special.Special.shell.callback>`.
+
+Globalement, il s'agit d'une version (très incomplète) du module :mod:`code` de Python, ajoutant un fonctionnement dans un environnement asynchrone. Il y aurait moyen de le réécrire beaucoup plus simplement (et beaucoup plus puissamment) en enveloppant le code à exécuter dans une fonction *async*, en l'envoyant dans un :class:`~code.InteractiveInterpreter` et en *awaitant* le résultat.
+
+Par conséquent, ce module n'est pas considéré comme part de l'API publique ``lgrez`` et non documenté ici. Les plus curieux iront voir le code source !
+"""
+
 import sys
 import re
 import traceback

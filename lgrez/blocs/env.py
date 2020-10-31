@@ -1,3 +1,7 @@
+"""lg-rez / blocs / Lecture des variables d'environnement
+
+"""
+
 import sys
 import os
 
@@ -14,7 +18,16 @@ load_dotenv(path)
 
 
 def load(VAR_NAME):
-    """Récupère la variable <VAR_NAME> depuis le .env demandé à l'appel de bot.py (.env par défaut)"""
+    """Lit une variable depuis les variables d'environnement / le ``.env`` demandé à l'appel de bot.py (``.env`` par défaut)
+
+    Équivaut globalement à :func:`os.getenv` suivi d'une assertion vérifiant que la variable existe.
+
+    Args:
+        VAR_NAME (:class:`str`): nom de la variable à charger (``LGREZ_...``)
+
+    Returns:
+        :class:`str`
+    """
     VAR = os.getenv(VAR_NAME)
     assert VAR, f"Variable d'environnement {VAR_NAME} manquante"
     return VAR

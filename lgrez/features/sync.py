@@ -1,3 +1,9 @@
+"""lg-rez / features / Synchronisation TDB
+
+Récupération et application des modifications décidées via le Tableau de bord
+
+"""
+
 import traceback
 
 from discord.ext import commands
@@ -8,9 +14,17 @@ from lgrez.features import gestion_actions
 
 
 async def get_sync():
-    """Récupère les modifications en attente sur le TDB"""
+    """Récupère les modifications en attente sur le TDB
 
-    cols = [col for col in bdd_tools.get_cols(Joueurs) if not col.startswith('_')]    # On élimine les colonnes locales
+    Charge les données du Tableau de bord (variable d'environment ``LGREZ_TDB_SHEET_ID``), compare les informations qui y figurent avec celles de la base de données (:class:`.bdd.Joueurs`)
+
+    Pour les informations différant, met à jour le Tableau de bord (ligne plus en rouge)
+
+    Returns:
+        :class:`dict`\[:attr:`.bdd.Joueurs.id`, :class:`dict`\[:class:`str`, :class:`object`\]\]: Le dictionnaire des modifications pour chaque joueur (repéré par son ID Discord)
+    """
+
+    cols = [col for col in bdd_tools.get_cols(Joueurs) if not col.endswith('_')]    # On élimine les colonnes locales
     cols_SQL_types = bdd_tools.get_SQL_types(Joueurs)
     cols_SQL_nullable = bdd_tools.get_SQL_nullable(Joueurs)
 
@@ -88,10 +102,15 @@ async def get_sync():
 
 
 
-async def modif_joueur(ctx, joueur_id, modifs, silent):
+async def modif_joueur(ctx, joueur_id, modifs, silent=False):
     """Attribue les modifications demandées au joueur
 
-    modifs : dictionnaire {colonne BDD: nouvelle valeur}
+    Args:
+        ctx (:class:`~discord.ext.commands.Context`): contexte quelconque du bot
+        modifs (:class:`dict`\[:class:`str`, :class:`object`\]\]): dictionnaire {colonne BDD: nouvelle valeur}
+        silent (:class:`bool`): si ``True``, no notifie pas le joueur des modifications
+
+    Pour chaque modifications de ``modif``, applique les conséquences adéquates (rôles, nouvelles actions, tâches planifiées...) et informe le joueur si ``silent`` vaut ``False``.
     """
     joueur = Joueurs.query.get(int(joueur_id))
     assert joueur, f"!sync : joueur d'ID {joueur_id} introuvable"
@@ -99,7 +118,7 @@ async def modif_joueur(ctx, joueur_id, modifs, silent):
     member = ctx.guild.get_member(joueur.discord_id)
     assert member, f"!sync : member {joueur} introuvable"
 
-    chan = ctx.guild.get_channel(joueur._chan_id)
+    chan = ctx.guild.get_channel(joueur.chan_id_)
     assert chan, f"!sync : chan privé de {member} introuvable"
 
     changelog = f"\n- {member.display_name} (@{member.name}#{member.discriminator}) :\n"
@@ -130,7 +149,7 @@ async def modif_joueur(ctx, joueur_id, modifs, silent):
                 if not silent:
                     notif += f":arrow_forward: Tu es malheureusement décédé(e) :cry:\nÇa arrive même aux meilleurs, en espérant que ta mort ait été belle !\n"
                 # Actions à la mort
-                for action in Joueurs.query.filter_by(player_id=joueur.discord_id, trigger_debut="mort"):
+                for action in Actions.query.filter_by(player_id=joueur.discord_id, trigger_debut="mort"):
                     await gestion_actions.open_action(ctx, action, chan)
 
             elif val == "MV":                       # Statut = MV
@@ -191,7 +210,7 @@ async def modif_joueur(ctx, joueur_id, modifs, silent):
         bdd_tools.modif(joueur, col, val)           # Dans tous les cas, on modifie en base (après, pour pouvoir accéder aux vieux attribus plus haut)
 
     if not silent:
-        await chan.send(":zap: Une action divine vient de modifier ton existence ! :zap:\n"
+        await chan.send(f":zap: {member.mention} Une action divine vient de modifier ton existence ! :zap:\n"
                         + f"\n{notif}\n"
                         + tools.ital(":warning: Si tu penses qu'il y a erreur, appelle un MJ au plus vite !"))
 
@@ -206,9 +225,8 @@ class Sync(commands.Cog):
     async def sync(self, ctx, silent=False):
         """Applique les modifications lors d'un appel du Tableau de bord (COMMANDE MJ)
 
-        <silent> peut valoir
-            False / 0       les joueurs sont notifiés si leur statut est modifié (défaut)
-            True  / 1       les joueurs ne sont pas notifiés
+        Args:
+            silent: si spécifié (quelque soit sa valeur), les joueurs ne sont pas notifiés des modifications.
 
         Cette commande va récupérer les modifications en attente sur le Tableau de bord (lignes en rouge), modifer la BDD Joueurs, et appliquer les modificatons dans Discord le cas échéant : renommage des utilisateurs, modification des rôles...
         """
@@ -216,7 +234,7 @@ class Sync(commands.Cog):
             await ctx.send("Récupération des modifications...")
             async with ctx.typing():
                 dic = await get_sync()                  # Récupération du dictionnaire {joueur_id: modified_attrs}
-                silent = (silent == "True")
+                silent = bool(silent)
                 changelog = f"Synchronisation TDB (silencieux = {silent}) :"
 
             if dic:

@@ -1,3 +1,10 @@
+"""lg-rez / features / Actions publiques
+
+Gestion des haros, candidatures à la mairie, résultats des votes
+
+"""
+
+import os
 import datetime
 import traceback
 from collections import Counter
@@ -22,7 +29,8 @@ class ActionsPubliques(commands.Cog):
     async def haro(self, ctx, cible=None):
         """Lance publiquement un haro contre un autre joueur
 
-        [cible]     joueur à accuser
+        Args:
+            cible: nom du joueur à accuser
 
         Cette commande n'est utilisable que lorsqu'un vote pour le condamné est en cours.
         """
@@ -31,7 +39,7 @@ class ActionsPubliques(commands.Cog):
         joueur = Joueurs.query.get(auteur.id)
         assert joueur, f"Joueur {auteur.display_name} introuvable"
 
-        if joueur._vote_condamne is None:
+        if joueur.vote_condamne_ is None:
             await ctx.send("Pas de vote pour le condamné de jour en cours !")
             return
 
@@ -90,7 +98,7 @@ class ActionsPubliques(commands.Cog):
         joueur = Joueurs.query.get(ctx.author.id)
         assert joueur, f"Joueur {auteur.display_name} introuvable"
 
-        if joueur._vote_maire is None:
+        if joueur.vote_maire_ is None:
             await ctx.send("Pas de vote pour le nouveau maire en cours !")
             return
 
@@ -126,9 +134,11 @@ class ActionsPubliques(commands.Cog):
     async def wipe(self, ctx, quoi):
         """Efface les haros / candidatures du jour (COMMANDE MJ)
 
-        <quoi> peut être
-            haros       Supprimer les haros
-            candids     Supprimer les candicatures
+        Args:
+            quoi (str): peut être
+
+                - ``haros`` : Supprimer les haros
+                - ``candids`` : Supprimer les candicatures
         """
         if quoi == "haros":
             items = CandidHaro.query.filter_by(type="haro").all()
@@ -154,12 +164,15 @@ class ActionsPubliques(commands.Cog):
     async def plot(self, ctx, type):
         """Trace le résultat du vote et l'envoie sur #annonces (COMMANDE MJ)
 
-        <type> peut être
-            cond    Pour le vote poour le condamné
-            maire   Pour l'élection à la Mairie
+        Args:
+            type: peut être
 
-        Trace les votes sous forme d'histogramme à partir du Tableau de bord, en fait un embed en présisant les résultats détaillés et l'envoie sur le chan #annonces.
-        Si <type> == "cond", déclenche aussi les actions liées au mot des MJs.
+                - ``cond``   pour le vote pour le condamné
+                - ``maire``  pour l'élection à la Mairie
+
+        Trace les votes sous forme d'histogramme à partir du Tableau de bord, en fait un embed en présisant les résultats détaillés et l'envoie sur le chan ``#annonces``.
+
+        Si ``type == "cond"``, déclenche aussi les actions liées au mot des MJs.
         """
         class Cible():
             def __init__(self, nom, votes=0):
@@ -291,6 +304,9 @@ class ActionsPubliques(commands.Cog):
             )
             plt.grid(axis="y")
 
+            if not os.path.isdir("figures"):
+                os.mkdir("figures")
+
             image_path=f"figures/hist_{datetime.datetime.now().strftime('%Y-%m-%d')}_{type}.png"
             plt.savefig(image_path, bbox_inches="tight")
 
@@ -343,6 +359,7 @@ class ActionsPubliques(commands.Cog):
             for joueur in haroted:
                 mess += f"- {Joueurs.query.filter_by(discord_id = joueur.player_id).first().nom} \n"
         await tools.send_code_blocs(ctx, mess)
+
 
     @commands.command(enabled=False)
     async def listcandid(self, ctx):

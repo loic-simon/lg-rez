@@ -1,3 +1,9 @@
+"""lg-rez / features / Remplissage BDD
+
+Pas grand chose ici, principalement le remplissage de ``#roles``
+
+"""
+
 import traceback
 import time
 
@@ -12,17 +18,21 @@ from lgrez.features import informations
 class RemplissageBDD(commands.Cog):
     """ RemplissageBDD - Commandes pour remplir la base de données du bot à partir des GSheets"""
 
-    @commands.command(disabled=True)
+    @commands.command(enabled=False)
     @tools.mjs_only
     async def droptable(self, ctx, *, table):
         """Supprime sans ménagement une table de données (COMMANDE MJ)
 
-        <table> table à supprimer (doit exister)
+        Args:
+            table: nom de la table à supprimer (doit exister)
 
         ATTENTION À SAUVEGARDER AVANT !
         CECI N'EST PAS UN EXERCICE, LA TABLE SERA SUPPRIMÉE DÉFINITIVEMENT !!!
 
         Cette commande ne devrait certainement pas exister, mais bon...
+
+        Warning:
+            Dans certaines circonstances mal identifiées, cette commande peut faire planter très violemment la base de données, obligeant à kill divers process pour que tout remarche... bref, NE PAS L'UTILISER en fait
         """
 
         if table in Tables:
@@ -43,8 +53,8 @@ class RemplissageBDD(commands.Cog):
     async def fillroles(self, ctx):
         """Remplit les tables des rôles / actions et #roles depuis le GSheet ad hoc (COMMANDE MJ)
 
-        - Remplit les tables Roles, BaseActions et BaseActionsRoles avec les informations du Google Sheets "Rôles et actions" (https://docs.google.com/spreadsheets/d/1Mfs22B_HtqSejaN0lX_Q555JW4KTYW5Pj-D-1ywoEIg) ;
-        - Vide le chan #roles puis le remplit avec les descriptifs de chaque rôle.
+        - Remplit les tables :class:`.bdd.Roles`, :class:`.bdd.BaseActions` et :class:`.bdd.BaseActionsRoles` avec les informations du Google Sheets "Rôles et actions" (variable d'environnement ``LGREZ_ROLES_SHEET_ID``) ;
+        - Vide le chan ``#roles`` puis le remplit avec les descriptifs de chaque rôle.
 
         Utile à chaque début de saison / changement dans les rôles/actions. Écrase toutes les entrées déjà en base, mais ne supprime pas celles obsolètes.
         """

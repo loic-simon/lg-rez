@@ -1,3 +1,9 @@
+"""lg-rez / features / Gestion des votes et actions
+
+Ouverture / fermeture / rappels des votes et actions (+ refill)
+
+"""
+
 import datetime
 
 from discord.ext import commands
@@ -11,26 +17,36 @@ from lgrez.blocs.bdd import Joueurs, Actions, BaseActions, BaseActionsRoles
 async def recup_joueurs(quoi, qui, heure=None):
     """Renvoie les joueurs concernés par la tâche !quoi <qui> [heure]
 
-    Ex : !open cond -> joueurs avec droit de vote, !close action 17h -> joueurs dont l'action se termine à 17h
+    Args:
+        quoi (:class:`str`): évènement, ``"open" / "close" / "remind"``
+        qui (:class:`str`): cible, ``"cond" / "maire" / "loups" / "action"``
+        heure (:class:`str`): si ``qui == "action"``, heure associée (au format ``HHhMM``)
+
+    Returns:
+        :class:`list`\[:class:`.bdd.Joueurs`\]
+
+    Examples:
+        ``!open cond`` -> joueurs avec droit de vote
+        ``!close action 17h`` -> joueurs dont l'action se termine à 17h
     """
     criteres = {
         "cond": {
             "open": and_(Joueurs.votant_village == True,        # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
-                         Joueurs._vote_condamne == None),
-            "close": Joueurs._vote_condamne != None,
-            "remind": Joueurs._vote_condamne == "non défini",
+                         Joueurs.vote_condamne_ == None),
+            "close": Joueurs.vote_condamne_ != None,
+            "remind": Joueurs.vote_condamne_ == "non défini",
             },
         "maire": {
             "open": and_(Joueurs.votant_village == True,        # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
-                         Joueurs._vote_maire == None),
-            "close": Joueurs._vote_maire != None,
-            "remind": Joueurs._vote_maire == "non défini",
+                         Joueurs.vote_maire_ == None),
+            "close": Joueurs.vote_maire_ != None,
+            "remind": Joueurs.vote_maire_ == "non défini",
             },
         "loups": {
             "open": and_(Joueurs.votant_loups == True,          # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
-                         Joueurs._vote_loups == None),
-            "close": Joueurs._vote_loups != None,
-            "remind": Joueurs._vote_loups == "non défini",
+                         Joueurs.vote_loups_ == None),
+            "close": Joueurs.vote_loups_ != None,
+            "remind": Joueurs.vote_loups_ == "non défini",
             },
         }
 
@@ -61,9 +77,9 @@ async def recup_joueurs(quoi, qui, heure=None):
         #{joueur.player_id:[action for action in actions if action.player_id == joueur.player_id] for joueur in [Joueurs.query.get(action.player_id) for action in actions]}
 
     elif qui.isdigit() and (action := Actions.query.get(int(qui))):     # Appel direct action par son numéro
-        if ((quoi == "open" and not action._decision)       # Sécurité : ne pas lancer une action déjà lancer,
-            or (quoi == "close" and action._decision)       #   ni fermer une déjà fermée
-            or (quoi == "remind" and action._decision == "rien")):
+        if ((quoi == "open" and not action.decision_)       # Sécurité : ne pas lancer une action déjà lancer,
+            or (quoi == "close" and action.decision_)       #   ni fermer une déjà fermée
+            or (quoi == "remind" and action.decision_ == "rien")):
 
             return {Joueurs.query.get(action.player_id):[action]}
         else:
@@ -82,31 +98,38 @@ class OpenClose(commands.Cog):
     async def open(self, ctx, qui, heure=None, heure_chain=None):
         """Lance un vote / des actions de rôle (COMMANDE BOT / MJ)
 
-        <qui> prend les valeurs :
-            cond        pour le vote du condamné
-            maire       pour le vote du maire
-            loups       pour le vote des loups
-            action      pour les actions commençant à [heure]
-            {id}        pour une action spécifique (paramètre Actions.id)
+        Args:
+            qui:
+                ===========     ===========
+                ``cond``        pour le vote du condamné
+                ``maire``       pour le vote du maire
+                ``loups``       pour le vote des loups
+                ``action``      pour les actions commençant à ``heure``
+                ``{id}``        pour une action spécifique (paramètre :attr:`.bdd.Actions.id`)
+                ===========     ===========
 
-        [heure] a deux rôles différents :
-            - si <qui> == "cond", "maire" ou "loup", programme en plus la fermeture à [heure] (et un rappel 10 minutes avant) ;
-            - si <qui> == "action", il est obligatoire : heure des actions à lancer (cf plus haut). Pour les actions, la fermeture est de toute façon programmée le cas échéant (trigger_fin temporel ou delta).
-        Dans tous les cas, format HHh ou HHhMM.
+            heure:
+                - si ``qui == "cond"``, ``"maire"`` ou ``"loup"``, programme en plus la fermeture à ``heure`` (et un rappel 10 minutes avant) ;
+                - si ``qui == "action"``, il est obligatoire : heure des actions à lancer (cf plus haut). Pour les actions, la fermeture est de toute façon programmée le cas échéant (``trigger_fin`` ``temporel`` ou ``delta``).
 
-        [heure_chain] permet de chaîner des votes : lance le vote immédiatement et programme sa fermeture à [heure], en appellant !close de sorte à programmer une nouvelle ouverture le lendemain à [heure_chain], et ainsi de suite
-        Format HHh ou HHhMM.
+                Dans tous les cas, format ``HHh`` ou ``HHhMM``.
+
+            heure_chain:
+                permet de chaîner des votes : lance le vote immédiatement et programme sa fermeture à ``heure``, en appellant ``!close`` de sorte à programmer une nouvelle ouverture le lendemain à ``heure_chain``, et ainsi de suite.
+                Format ``HHh`` ou ``HHhMM``.
 
         Une sécurité empêche de lancer un vote ou une action déjà en cours.
 
         Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
         Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi (penser à envoyer / planifier la fermeture des votes, par exemple).
 
-        Ex. !open maire             lance un vote condamné maintenant
-            !open cond 19h          lance un vote condamné maintenant et programme sa fermeture à 19h00 (ex. Juge Bègue)
-            !open cond 18h 10h      lance un vote condamné maintenant, programme sa fermeture à 18h00, et une prochaine ouverture à 10h, etc
-            !open action 19h        lance toutes les actions commençant à 19h00
-            !open 122               lance l'action d'ID 122
+        Examples:
+            - ``!open maire``             lance un vote condamné maintenant
+            - ``!open cond 19h``          lance un vote condamné maintenant et programme sa fermeture à 19h00 (ex. Juge Bègue)
+            - ``!open cond 18h 10h``      lance un vote condamné maintenant, programme sa fermeture à 18h00, et une prochaine ouverture à 10h, etc
+            - ``!open action 19h``        lance toutes les actions commençant à 19h00
+            - ``!open 122``               lance l'action d'ID 122
+
         """
         joueurs = await recup_joueurs("open", qui, heure)        # Liste de joueurs (votes) ou dictionnaire joueur : action
 
@@ -114,11 +137,11 @@ class OpenClose(commands.Cog):
         await tools.send_code_blocs(ctx, f"Utilisateur(s) répondant aux critères ({len(joueurs)}) : \n - {str_joueurs}")
 
         for joueur in joueurs:
-            chan = ctx.guild.get_channel(joueur._chan_id)
+            chan = ctx.guild.get_channel(joueur.chan_id_)
             assert chan, f"!open : chan privé de {joueur} introuvable"
 
             if qui == "cond":
-                bdd_tools.modif(joueur, "_vote_condamne", "non défini")
+                bdd_tools.modif(joueur, "vote_condamne_", "non défini")
                 message = await chan.send(
                     f"""{tools.montre()}  Le vote pour le condamné du jour est ouvert !  {tools.emoji(ctx, "bucher")} \n"""
                     + (f"""Tu as jusqu'à {heure} pour voter. \n""" if heure else "")
@@ -126,7 +149,7 @@ class OpenClose(commands.Cog):
                 await message.add_reaction(tools.emoji(ctx, "bucher"))
 
             elif qui == "maire":
-                bdd_tools.modif(joueur, "_vote_maire", "non défini")
+                bdd_tools.modif(joueur, "vote_maire_", "non défini")
                 message = await chan.send(
                     f"""{tools.montre()}  Le vote pour l'élection du maire est ouvert !  {tools.emoji(ctx, "maire")} \n"""
                     + (f"""Tu as jusqu'à {heure} pour voter. \n""" if heure else "")
@@ -134,7 +157,7 @@ class OpenClose(commands.Cog):
                 await message.add_reaction(tools.emoji(ctx, "maire"))
 
             elif qui == "loups":
-                bdd_tools.modif(joueur, "_vote_loups", "non défini")
+                bdd_tools.modif(joueur, "vote_loups_", "non défini")
                 message = await chan.send(
                     f"""{tools.montre()}  Le vote pour la victime de cette nuit est ouvert !  {tools.emoji(ctx, "lune")} \n"""
                     + (f"""Tu as jusqu'à {heure} pour voter. \n""" if heure else "")
@@ -168,31 +191,37 @@ class OpenClose(commands.Cog):
     async def close(self, ctx, qui, heure=None, heure_chain=None):
         """Ferme un vote / des actions de rôle (COMMANDE BOT / MJ)
 
-        <qui> prend les valeurs :
-            cond        pour le vote du condamné
-            maire       pour le vote du maire
-            loups       pour le vote des loups
-            action      pour les actions se terminant à [heure]
-            {id}        pour une action spécifique (paramètre Actions.id)
+        Args:
+            qui:
+                ===========     ===========
+                ``cond``        pour le vote du condamné
+                ``maire``       pour le vote du maire
+                ``loups``       pour le vote des loups
+                ``action``      pour les actions se terminant à ``heure``
+                ``{id}``        pour une action spécifique (paramètre :attr:`.bdd.Actions.id`)
+                ===========     ===========
 
-        [heure] a deux rôles différents :
-            - si <qui> == "cond", "maire" ou "loup", programme en plus une prochaine ouverture à [heure] ;
-            - si <qui> == "action", il est obligatoire : heure des actions à lancer (cf plus haut). Pour les actions, la prochaine est de toute façon programmée le cas échéant (cooldown à 0 et reste des charges).
-        Dans tous les cas, format HHh ou HHhMM.
+            heure:
+                - si ``qui == "cond"``, ``"maire"`` ou ``"loup"``, programme en plus une prochaine ouverture à ``heure`` (et un rappel 10 minutes avant) ;
+                - si ``qui == "action"``, il est obligatoire : heure des actions à lancer (cf plus haut). Pour les actions, la prochaine est de toute façon programmée le cas échéant (cooldown à 0 et reste des charges).
 
-        [heure_chain] permet de chaîner des votes : ferme le vote immédiatement et programme une prochaine ouverture à [heure], en appellant !open de sorte à programmer une nouvelle fermeture le lendemain à [heure_chain], et ainsi de suite.
-        Format HHh ou HHhMM.
+                Dans tous les cas, format ``HHh`` ou ``HHhMM``.
+
+            heure_chain:
+                permet de chaîner des votes : ferme le vote immédiatement et programme une prochaine ouverture à ``heure``, en appellant ``!close`` de sorte à programmer une nouvelle fermeture le lendemain à ``heure_chain``, et ainsi de suite.
+                Format ``HHh`` ou ``HHhMM``.
 
         Une sécurité empêche de fermer un vote ou une action qui n'est pas en cours.
 
         Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
         Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi (penser à envoyer / planifier la fermeture des votes, par exemple).
 
-        Ex. !close maire            ferme le vote condamné maintenant
-            !close cond 10h         ferme le vote condamné maintenant et programme une prochaine ouverture à 10h00
-            !close cond 10h 18h     ferme le vote condamné maintenant, programme une prochaine ouverture à 10h00, qui sera fermé à 18h, etc
-            !close action 22h       ferme toutes les actions se terminant à 22h00
-            !close 122              ferme l'action d'ID 122
+        Examples:
+            - ``!close maire``            ferme le vote condamné maintenant
+            - ``!close cond 10h``         ferme le vote condamné maintenant et programme une prochaine ouverture à 10h00
+            - ``!close cond 10h 18h``     ferme le vote condamné maintenant, programme une prochaine ouverture à 10h00, qui sera fermé à 18h, etc
+            - ``!close action 22h``       ferme toutes les actions se terminant à 22h00
+            - ``!close 122``              ferme l'action d'ID 122
         """
 
         joueurs = await recup_joueurs("close", qui, heure)
@@ -201,29 +230,29 @@ class OpenClose(commands.Cog):
         await ctx.send(tools.code_bloc(f"Utilisateur(s) répondant aux critères ({len(joueurs)}) : \n{str_joueurs}"))
 
         for joueur in joueurs:
-            chan = ctx.guild.get_channel(joueur._chan_id)
+            chan = ctx.guild.get_channel(joueur.chan_id_)
             assert chan, f"!close : chan privé de {joueur} introuvable"
 
             if qui == "cond":
                 await chan.send(f"""{tools.montre()}  Fin du vote pour le condamné du jour ! \n"""
-                                f"""Vote définitif : {joueur._vote_condamne}\n"""
+                                f"""Vote définitif : {joueur.vote_condamne_}\n"""
                                 f"""Les résultats arrivent dans l'heure !\n""")
-                bdd_tools.modif(joueur, "_vote_condamne", None)
+                bdd_tools.modif(joueur, "vote_condamne_", None)
 
             elif qui == "maire":
                 await chan.send(f"""{tools.montre()}  Fin du vote pour le maire ! \n"""
-                                f"""Vote définitif : {joueur._vote_maire}""")
-                bdd_tools.modif(joueur, "_vote_maire", None)
+                                f"""Vote définitif : {joueur.vote_maire_}""")
+                bdd_tools.modif(joueur, "vote_maire_", None)
 
             elif qui == "loups":
                 await chan.send(f"""{tools.montre()}  Fin du vote pour la victime du soir ! \n"""
-                                f"""Vote définitif : {joueur._vote_loups}""")
-                bdd_tools.modif(joueur, "_vote_loups", None)
+                                f"""Vote définitif : {joueur.vote_loups_}""")
+                bdd_tools.modif(joueur, "vote_loups_", None)
 
             else:       # Action
                 for action in joueurs[joueur]:
                     await chan.send(f"""{tools.montre()}  Fin de la possiblité d'utiliser ton action {tools.code(action.action)} ! \n"""
-                                    f"""Action définitive : {action._decision}""")
+                                    f"""Action définitive : {action.decision_}""")
                     await gestion_actions.close_action(ctx, action, chan)
 
         bdd.session.commit()
@@ -247,24 +276,28 @@ class OpenClose(commands.Cog):
     async def remind(self, ctx, qui, heure=None):
         """Envoi un rappel de vote / actions de rôle (COMMANDE BOT / MJ)
 
-        <qui> prend les valeurs :
-            cond        pour le vote du condamné
-            maire       pour le vote du maire
-            loups       pour le vote des loups
-            action      pour les actions se terminant à [heure]
-            {id}        pour une action spécifique (paramètre Actions.id)
+        Args:
+            qui:
+                ===========     ===========
+                ``cond``        pour le vote du condamné
+                ``maire``       pour le vote du maire
+                ``loups``       pour le vote des loups
+                ``action``      pour les actions se terminant à ``heure``
+                ``{id}``        pour une action spécifique (paramètre :attr:`.bdd.Actions.id`)
+                ===========     ===========
 
-        [heure] ne sert que dans le cas où <qui> == "action" (il est alors obligatoire), contrairement à !open et !close.
-        Format HHh ou HHhMM.
+            heure: ne sert que dans le cas où <qui> == "action" (il est alors obligatoire), contrairement à !open et !close.
+                Format HHh ou HHhMM.
 
         Le bot n'envoie un message qu'aux joueurs n'ayant pas encore voté / agi, si le vote ou l'action est bien en cours.
 
         Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
         Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi !.
 
-        Ex. !remind maire           rappelle le vote condamné maintenant
-            !remind action 22h      rappelle toutes les actions se terminant à 22h00
-            !remind 122             rappelle l'action d'ID 122
+        Examples:
+            - ``!remind maire``           rappelle le vote condamné maintenant
+            - ``!remind action 22h``      rappelle toutes les actions se terminant à 22h00
+            - ``!remind 122``             rappelle l'action d'ID 122
         """
 
         joueurs = await recup_joueurs("remind", qui, heure)
@@ -273,7 +306,7 @@ class OpenClose(commands.Cog):
         await ctx.send(tools.code_bloc(f"Utilisateur(s) répondant aux critères ({len(joueurs)}) : \n{str_joueurs}"))
 
         for joueur in joueurs:
-            chan = ctx.guild.get_channel(joueur._chan_id)
+            chan = ctx.guild.get_channel(joueur.chan_id_)
             assert chan, f"!remind : chan privé de {joueur} introuvable"
             member = ctx.guild.get_member(joueur.discord_id)
             assert member, f"!remind : member {joueur} introuvable"
@@ -299,11 +332,12 @@ class OpenClose(commands.Cog):
 
     @commands.command()
     @tools.mjs_only
-    async def refill(self, ctx, motif, cible = None):
+    async def refill(self, ctx, motif, cible=None):
         """Permet de recharger le/les pouvoirs rechargeables (COMMANDE BOT / MJ)
 
-        <motif> doit être "weekends", "forgeron", "rebouteux" ou "divin" (forcer le refill car les MJs tout-puissants l'ont décidé)
-        [cible] peut être 'all', sinon il faudra spécifier un joueur
+        Args:
+            motif: ``"weekends"``, ``"forgeron"``, ``"rebouteux"`` ou ``"divin"`` (forcer le refill car les MJs tout-puissants l'ont décidé)
+            cible: ``"all"`` ou le nom d'un joueur
         """
         if motif not in ["weekends", "forgeron", "rebouteux", "divin"]:
             await ctx.send(f"{motif} n'est pas un <motif> valide")

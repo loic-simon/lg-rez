@@ -7,6 +7,7 @@ import datetime
 import discord
 from discord.ext import commands
 
+from lgrez import __version__
 from lgrez.blocs import tools, bdd, env, bdd_tools, gsheets, webhook, pseudoshell
 from lgrez.blocs.bdd import Tables, Joueurs, Actions, Roles
 from lgrez.features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques
@@ -17,11 +18,22 @@ logging.basicConfig(level=logging.WARNING)
 
 
 ### Checks et système de blocage
+
 class AlreadyInCommand(commands.CheckFailure):
+    """Exception levée lorsq'un member veut lancer une commande dans un salon déjà occupé.
+
+    Classe fille de :exc:`discord.ext.commands.CheckFailure`.
+    """
     pass
 
 async def already_in_command(ctx):
-    """Décorateur : vérifie si le joueur est actuellement dans une commande"""
+    """Check (:class:`discord.ext.commands.Check`) : vérifie si le joueur est actuellement dans une commande.
+
+    Si non, raise une exception :exc:`AlreadyInCommand`.
+
+    Args:
+        ctx (:class:`discord.ext.commands.Context`): contexte d'invocation de la commande.
+    """
     if ctx.channel.id in ctx.bot.in_command and ctx.command.name != "stop":    # Cas particulier : !stop
         raise AlreadyInCommand()
     else:
@@ -29,20 +41,26 @@ async def already_in_command(ctx):
 
 # @bot.before_invoke
 async def add_to_in_command(ctx):
-    """Ajoute le channel de `ctx` à la liste des channels dans une commande
+    """Ajoute le channel de ``ctx`` à la liste des channels dans une commande.
 
     Cette fonction est appellée avant chaque appel de fonction.
-    Elle est appellée seulement si les checks sont OK, donc pas si le salon est déjà dans bot.in_command.
+    Elle est appellée seulement si les checks sont OK, donc pas si le salon est déjà dans :attr:`ctx.bot.in_command <.LGBot.in_command>`.
+
+    Args:
+        ctx (:class:`discord.ext.commands.Context`): contexte d'invocation de la commande.
     """
     if ctx.command.name != "stop" and not ctx.message.webhook_id:
         ctx.bot.in_command.append(ctx.channel.id)
 
 # @bot.after_invoke
 async def remove_from_in_command(ctx):
-    """Retire le channel de `ctx` de la liste des channels dans une commande
+    """Retire le channel de ``ctx`` de la liste des channels dans une commande.
 
     Cette fonction est appellée après chaque appel de fonction.
-    Elle attend 0.5 secondes avant d'enlever le joueur afin d'éviter que le bot réagisse « nativement » (IA) à un message déjà traité par un tools.wait_for_message ayant mené à la fin de la commande.
+    Elle attend 0.5 secondes avant d'enlever le joueur afin d'éviter que le bot réagisse « nativement » (IA) à un message déjà traité par un :func:`.tools.wait_for_message` ayant mené à la fin de la commande.
+
+    Args:
+        ctx (:class:`discord.ext.commands.Context`): contexte d'invocation de la commande.
     """
     await asyncio.sleep(0.5)        # On attend un peu
     if ctx.channel.id in ctx.bot.in_command:
@@ -89,10 +107,10 @@ async def _on_member_join(bot, member):
 
     Log et lance le processus d'inscription.
 
-    Ne fait rien si l'arrivée n'est pas sur le serveur :py:attr:`GUILD_ID`.
+    Ne fait rien si l'arrivée n'est pas sur le serveur :attr:`GUILD_ID`.
 
     Args:
-        member (:py:class:`discord.Member`): Le joueur qui vient d'arriver.
+        member (:class:`discord.Member`): Le joueur qui vient d'arriver.
     """
     if member.guild.id != bot.GUILD_ID:            # Bon serveur
         return
@@ -107,10 +125,10 @@ async def _on_member_remove(bot, member):
 
     Log en mentionnant les MJs.
 
-    Ne fait rien si le départ n'est pas du serveur :py:attr:`GUILD_ID`.
+    Ne fait rien si le départ n'est pas du serveur :attr:`GUILD_ID`.
 
     Args:
-        member (:py:class:`discord.Member`): Le joueur qui vient de partir.
+        member (:class:`discord.Member`): Le joueur qui vient de partir.
     """
     if member.guild.id != bot.GUILD_ID:            # Bon serveur
         return
@@ -128,10 +146,10 @@ async def _on_message(bot, message):
         - Il n'y a pas déjà de commande en cours dans ce channel
         - Le channel n'est pas en mode STFU
 
-    Ne fait rien si le message n'est pas sur le serveur :py:attr:`GUILD_ID` ou qu'il est envoyé par le bot lui-même ou par un membre sans aucun rôle affecté.
+    Ne fait rien si le message n'est pas sur le serveur :attr:`GUILD_ID` ou qu'il est envoyé par le bot lui-même ou par un membre sans aucun rôle affecté.
 
     Args:
-        member (:py:class:`discord.Member`): Le joueur qui vient d'arriver.
+        member (:class:`discord.Member`): Le joueur qui vient d'arriver.
     """
 
     if message.author == bot.user:              # Sécurité pour éviter les boucles infinies
@@ -165,14 +183,14 @@ async def _on_raw_reaction_add(bot, payload):
 
     Appelle la fonction adéquate si le joueur est en base et a cliqué sur ":bucher:", ":maire:", ":lune:" ou ":action:".
 
-    Ne fait rien si la réaction n'est pas sur le serveur :py:attr:`GUILD_ID`.
+    Ne fait rien si la réaction n'est pas sur le serveur :attr:`GUILD_ID`.
 
     Args:
-        payload (:py:class:`discord.RawReactionActionEvent`): Paramètre "statique" (car le message n'est pas forcément dans le cache du bot, par exemple si il a été reboot depuis).
+        payload (:class:`discord.RawReactionActionEvent`): Paramètre "statique" (car le message n'est pas forcément dans le cache du bot, par exemple si il a été reboot depuis).
 
     Quelques attributs utiles :
-        - ``payload.member`` (:py:class:`discord.Member`) : Membre ayant posé la réaction
-        - ``payload.emoji`` (:py:class:`discord.PartialEmoji`) : PartialEmoji envoyé
+        - ``payload.member`` (:class:`discord.Member`) : Membre ayant posé la réaction
+        - ``payload.emoji`` (:class:`discord.PartialEmoji`) : PartialEmoji envoyé
         - ``payload.message_id`` (int) : ID du message réacté
     """
     if payload.guild_id != bot.GUILD_ID:            # Mauvais serveur
@@ -186,224 +204,37 @@ async def _on_raw_reaction_add(bot, payload):
         await reactor.guild.get_channel(payload.channel_id).send(f"{reactor.mention}, GET VOLATRONED !!!")
 
     elif payload.emoji == tools.emoji(reactor, "bucher"):
-        ctx = await tools.create_context(bot, payload.message_id, reactor, "!vote")
+        ctx = await tools.create_context(bot, reactor, "!vote")
         await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le condamné du jour :")}""")
         await bot.invoke(ctx)       # On trigger !vote
 
     elif payload.emoji == tools.emoji(reactor, "maire"):
-        ctx = await tools.create_context(bot, payload.message_id, reactor, "!votemaire")
+        ctx = await tools.create_context(bot, reactor, "!votemaire")
         await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le nouveau maire :")}""")
         await bot.invoke(ctx)       # On trigger !votemaire
 
     elif payload.emoji == tools.emoji(reactor, "lune"):
-        ctx = await tools.create_context(bot, payload.message_id, reactor, "!voteloups")
+        ctx = await tools.create_context(bot, reactor, "!voteloups")
         await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour la victime des loups :")}""")
         await bot.invoke(ctx)       # On trigger !voteloups
 
     elif payload.emoji == tools.emoji(reactor, "action"):
-        ctx = await tools.create_context(bot, payload.message_id, reactor, "!action")
+        ctx = await tools.create_context(bot, reactor, "!action")
         await ctx.send(f"""{payload.emoji} > {tools.bold("Action :")}""")
         await bot.invoke(ctx)       # On trigger !voteloups
 
 
-
-### Commandes spéciales
-class Special(commands.Cog):
-    """Special - Commandes spéciales (méta-commandes, imitant ou impactant le déroulement des autres)"""
-
-    @commands.command()
-    @tools.mjs_only
-    async def do(self, ctx, *, code):
-        """Exécute du code Python et affiche le résultat (COMMANDE MJ)
-
-        <code> doit être du code valide dans le contexte du fichier bot.py (utilisables notemment : ctx, bdd.session, Tables...)
-        Si <code> est une coroutine, elle sera awaited (ne pas inclure "await" dans <code>).
-
-        Aussi connue sous le nom de « faille de sécurité », cette commande permet de faire environ tout ce qu'on veut sur le bot (y compris le crasher, importer des modules, exécuter des fichiers .py... même si c'est un peu compliqué) voire d'impacter le serveur sur lequel le bot tourne si on est motivé.
-
-        À utiliser avec parcimonie donc, et QUE pour du développement/debug !
-        """
-        class Answer():
-            def __init__(self):
-                self.rep = ""
-        a = Answer()
-        exec(f"a.rep = {code}")
-        if asyncio.iscoroutine(a.rep):
-            a.rep = await a.rep
-        await ctx.send(f"Entrée : {tools.code(code)}\nSortie :\n{a.rep}")
-
-
-    @commands.command()
-    @tools.mjs_only
-    async def shell(self, ctx):
-        """Lance un pseudo-terminal Python (COMMANDE MJ)
-
-        Envoyer "help" dans le pseudo-terminal pour plus d'informations sur son fonctionnement.
-
-        Évidemment, les avertissements dans !help do s'appliquent ici : ne pas faire n'imp avec cette commande !! (même si ça peut être très utile, genre pour ajouter des gens en masse à un channel)
-        """
-        async def in_func():
-            mess = await tools.wait_for_message_here(ctx)
-            return mess.content
-
-        async def out_func(text, color=False):
-            await tools.send_code_blocs(ctx, text, langage="py" if color else "")
-
-        ps = pseudoshell.Shell(
-            globals(), locals(), in_func, out_func, shut_keywords=["stop"],
-            welcome_text="""Variables accessibles : "ctx", "Tables" (dictionnaire {nom: Table}), modules usuels."""
-        )
-        try:
-            await ps.run()
-        except pseudoshell.PseudoShellExit as exc:
-            raise tools.CommandExit(str(exc) or "!shell: Pseudo-shell forced to end.")
-
-
-    @commands.command()
-    @tools.mjs_only
-    async def co(self, ctx, cible=None):
-        """Lance la procédure d'inscription comme si on se connectait au serveur pour la première fois (COMMANDE MJ)
-
-        [cible] la MENTION (@joueur) du joueur à inscrire, par défaut le lançeur de la commande.
-        Cette commande est principalement destinée aux tests de développement, mais peut être utile si un joueur chibre son inscription (à utiliser dans son channel, ou #bienvenue (avec !autodestruct) si même le début a chibré).
-        """
-        if cible:
-            id = ''.join([c for c in cible if c.isdigit()])         # Si la chaîne contient un nombre, on l'extrait
-            if id and (member := ctx.guild.get_member(int(id))):          # Si c'est un ID d'un membre du serveur
-                pass
-            else:
-                await ctx.send("Cible introuvable.")
-                return
-        else:
-            member = ctx.author
-
-        await inscription.main(ctx.bot, member)
-
-
-    @commands.command()
-    @tools.mjs_only
-    async def doas(self, ctx, *, qui_quoi):
-        """Exécute une commande en tant qu'un autre joueur (COMMANDE MJ)
-
-        <qui_quoi> doit être le nom de la cible (nom ou mention d'un joueur INSCRIT) suivi de la commande à exécuter (commençant par un !).
-
-        Ex. !doas Vincent Croquette !vote Annie Colin
-        """
-        qui, quoi = qui_quoi.split(" " + ctx.bot.command_prefix, maxsplit=1)       # !doas <@!id> !vote R ==> qui = "<@!id>", quoi = "vote R"
-        joueur = await tools.boucle_query_joueur(ctx, qui.strip() or None, Tables["Joueurs"])
-        member = ctx.guild.get_member(joueur.discord_id)
-        assert member, f"!doas : Member {joueur} introuvable"
-
-        ctx.message.content = ctx.bot.command_prefix + quoi
-        ctx.message.author = member
-
-        await ctx.send(f":robot: Exécution en tant que {joueur.nom} :")
-        await remove_from_in_command(ctx)       # Bypass la limitation de 1 commande à la fois
-        await ctx.bot.process_commands(ctx.message)
-        await add_to_in_command(ctx)
-
-
-    @commands.command(aliases=["autodestruct", "ad"])
-    @tools.mjs_only
-    async def secret(self, ctx, *, quoi):
-        """Supprime le message puis exécute la commande (COMMANDE MJ)
-
-        <quoi> commande à exécuter, commençant par un !
-
-        Utile notemment pour faire des commandes dans un channel public, pour que la commande (moche) soit immédiatement supprimée.
-        """
-        await ctx.message.delete()
-
-        ctx.message.content = quoi
-
-        await remove_from_in_command(ctx)       # Bypass la limitation de 1 commande à la fois
-        await ctx.bot.process_commands(ctx.message)
-        await add_to_in_command(ctx)
-
-
-    @commands.command()
-    @tools.private
-    async def stop(self, ctx):
-        """Peut débloquer des situations compliquées (beta)
-
-        Ne pas utiliser cette commande sauf en cas de force majeure où plus rien ne marche, et sur demande d'un MJ (après c'est pas dit que ça marche mieux après l'avoir utilisé)
-        """
-        if ctx.channel.id in ctx.bot.in_command:
-            ctx.bot.in_command.remove(ctx.channel.id)
-        ctx.send("Te voilà libre, camarade !")
-
-
-    ### 6 bis - Gestion de l'aide
-
-    @commands.command(aliases=["aide", "aled", "oskour"])
-    async def help(self, ctx, *, command=None):
-        """Affiche la liste des commandes utilisables et leur utilisation
-
-        [command] : nom exact d'une commande à expliquer (ou un de ses alias)
-        Si [command] n'est pas précisé, liste l'ensemble des commandes accessibles à l'utilisateur.
-        """
-
-        pref = ctx.bot.command_prefix
-        cogs = ctx.bot.cogs                                                                 # Dictionnaire nom: cog
-        commandes = {cmd.name: cmd for cmd in ctx.bot.commands}                             # Dictionnaire nom: commande
-        aliases = {alias: nom for nom, cmd in commandes.items() for alias in cmd.aliases}   # Dictionnaire alias: nom de la commande
-
-        n_max = max([len(cmd) for cmd in commandes])
-
-        if not command:
-            ctx.bot.in_command.remove(ctx.channel.id)
-            async def runnable_commands(cog):       # obligé parce que can_run doit être await, donc c'est compliqué
-                L = []
-                for cmd in cog.get_commands():
-                    try:
-                        runnable = await cmd.can_run(ctx)
-                    except Exception:
-                        runnable = False
-                    if runnable:
-                        L.append(cmd)
-                return L
-
-            r = f"""{ctx.bot.description}\n\n"""
-            r += "\n\n".join([f"{cog.description} : \n  - " + "\n  - ".join(
-                    [pref + cmd.name.ljust(n_max+2) + cmd.short_doc for cmd in runnables]           # pour chaque commande runnable
-                ) for cog in cogs.values() if (runnables := await runnable_commands(cog))])         # pour chaque cog contenant des runnables
-            r += f"\n\nUtilise <{pref}help command> pour plus d'information sur une commande."
-            ctx.bot.in_command.append(ctx.channel.id)
-
-        else:
-            if command.startswith(pref):        # Si le joueur fait !help !command
-                command = command.lstrip(pref)
-
-            if command in aliases:              # Si !help d'un alias
-                command = aliases[command]      # On remplace l'alias par sa commande
-
-            if command in commandes:             # Si commande existante
-                cmd = commandes[command]
-
-                r = f"{pref}{command} {cmd.signature} – {cmd.help}\n"
-                # r += f"\n\nUtilise <{pref}help> pour la liste des commandes ou <{pref}help command> pour plus d'information sur une commande."
-                if cmd_aliases := [alias for alias,cmd in aliases.items() if cmd == command]:       # Si la commande a des alias
-                    r += f"\nAlias : {pref}" + f", {pref}".join(cmd_aliases)
-
-            else:
-                r = f"Commande <{command}> non trouvée.\nUtilise <{pref}help> pour la liste des commandes."
-
-        r += "\nSi besoin, n'hésite pas à appeler un MJ en les mentionnant (@MJ)."
-        await tools.send_code_blocs(ctx, r, sep="\n\n")     # On envoie, en séparant en blocs de 2000 caractères max
-
-
-
-### Gestion des erreurs
+# Gestion des erreurs dans les commandes
 async def _on_command_error(bot, ctx, exc):
     """Méthode appellée par Discord à chaque exception levée dans une commande.
 
     Analyse l'erreur survenue et informe le joueur de manière adéquate en fonction, en mentionnant les MJs si besoin.
 
-    Ne fait rien si l'exception n'a pas eu lieu sur le serveur :py:attr:`GUILD_ID`.
+    Ne fait rien si l'exception n'a pas eu lieu sur le serveur :attr:`GUILD_ID`.
 
     Args:
-        ctx (:py:class:`discord.ext.commands.Context`): Contexte dans lequel l'exception a été levée
-        exc (:py:class:`discord.ext.commands.CommandError`): Exception levée
+        ctx (:class:`discord.ext.commands.Context`): Contexte dans lequel l'exception a été levée
+        exc (:class:`discord.ext.commands.CommandError`): Exception levée
     """
     if ctx.guild.id != bot.GUILD_ID:            # Mauvais serveur
         return
@@ -463,7 +294,7 @@ async def _on_error(bot, event, *args, **kwargs):
 
     Args:
         event (str): Nom de l'évènement ayant généré une erreur (``"member_join"``, ``"message"``...)
-        *args, **kwargs: Arguments passés à la fonction traitant l'évènement : ``member``, ``message``...
+        *args, \**kwargs: Arguments passés à la fonction traitant l'évènement : ``member``, ``message``...
     """
     if bdd.session:
         bdd.bdd.session.rollback()       # Dans le doute, on vide la session SQL
@@ -478,23 +309,208 @@ async def _on_error(bot, event, *args, **kwargs):
 
 
 
+### Commandes spéciales
+
+class Special(commands.Cog):
+    """Special - Commandes spéciales (méta-commandes, imitant ou impactant le déroulement des autres)"""
+
+    @commands.command()
+    @tools.mjs_only
+    async def do(self, ctx, *, code):
+        """Exécute du code Python et affiche le résultat (COMMANDE MJ)
+
+        Args:
+            code: instructions valides dans le contexte du fichier ``bot.py`` (utilisables notemment : ``ctx``, ``bdd.session``, ``Tables``...)
+
+        Si ``code`` est une coroutine, elle sera awaited (ne pas inclure ``await`` dans ``code``).
+
+        Aussi connue sous le nom de « faille de sécurité », cette commande permet de faire environ tout ce qu'on veut sur le bot (y compris le crasher, importer des modules, exécuter des fichiers .py... même si c'est un peu compliqué) voire d'impacter le serveur sur lequel le bot tourne si on est motivé.
+
+        À utiliser avec parcimonie donc, et QUE pour du développement/debug !
+        """
+        class Answer():
+            def __init__(self):
+                self.rep = ""
+        a = Answer()
+        exec(f"a.rep = {code}")
+        if asyncio.iscoroutine(a.rep):
+            a.rep = await a.rep
+        await ctx.send(f"Entrée : {tools.code(code)}\nSortie :\n{a.rep}")
+
+
+    @commands.command()
+    @tools.mjs_only
+    async def shell(self, ctx):
+        """Lance un pseudo-terminal Python (COMMANDE MJ)
+
+        Envoyer ``help`` dans le pseudo-terminal pour plus d'informations sur son fonctionnement.
+
+        Évidemment, les avertissements dans ``!do`` s'appliquent ici : ne pas faire n'imp avec cette commande !! (même si ça peut être très utile, genre pour ajouter des gens en masse à un channel)
+        """
+        async def in_func():
+            mess = await tools.wait_for_message_here(ctx)
+            return mess.content
+
+        async def out_func(text, color=False):
+            await tools.send_code_blocs(ctx, text, langage="py" if color else "")
+
+        ps = pseudoshell.Shell(
+            globals(), locals(), in_func, out_func, shut_keywords=["stop"],
+            welcome_text="""Variables accessibles : "ctx", "Tables" (dictionnaire {nom: Table}), modules usuels."""
+        )
+        try:
+            await ps.run()
+        except pseudoshell.PseudoShellExit as exc:
+            raise tools.CommandExit(str(exc) or "!shell: Pseudo-shell forced to end.")
+
+
+    @commands.command()
+    @tools.mjs_only
+    async def co(self, ctx, cible=None):
+        """Lance la procédure d'inscription comme si on se connectait au serveur pour la première fois (COMMANDE MJ)
+
+        Args:
+            cible: la MENTION (``@joueur``) du joueur à inscrire, par défaut le lançeur de la commande.
+
+        Cette commande est principalement destinée aux tests de développement, mais peut être utile si un joueur chibre son inscription (à utiliser dans son channel, ou ``#bienvenue`` (avec ``!autodestruct``) si même le début a chibré).
+        """
+        if cible:
+            id = ''.join([c for c in cible if c.isdigit()])         # Si la chaîne contient un nombre, on l'extrait
+            if id and (member := ctx.guild.get_member(int(id))):          # Si c'est un ID d'un membre du serveur
+                pass
+            else:
+                await ctx.send("Cible introuvable.")
+                return
+        else:
+            member = ctx.author
+
+        await inscription.main(ctx.bot, member)
+
+
+    @commands.command()
+    @tools.mjs_only
+    async def doas(self, ctx, *, qui_quoi):
+        """Exécute une commande en tant qu'un autre joueur (COMMANDE MJ)
+
+        Args:
+            qui_quoi: nom de la cible (nom ou mention d'un joueur INSCRIT) suivi de la commande à exécuter (commençant par un ``!``).
+
+        Example:
+            ``!doas Vincent Croquette !vote Annie Colin``
+        """
+        qui, quoi = qui_quoi.split(" " + ctx.bot.command_prefix, maxsplit=1)       # !doas <@!id> !vote R ==> qui = "<@!id>", quoi = "vote R"
+        joueur = await tools.boucle_query_joueur(ctx, qui.strip() or None, Tables["Joueurs"])
+        member = ctx.guild.get_member(joueur.discord_id)
+        assert member, f"!doas : Member {joueur} introuvable"
+
+        ctx.message.content = ctx.bot.command_prefix + quoi
+        ctx.message.author = member
+
+        await ctx.send(f":robot: Exécution en tant que {joueur.nom} :")
+        await remove_from_in_command(ctx)       # Bypass la limitation de 1 commande à la fois
+        await ctx.bot.process_commands(ctx.message)
+        await add_to_in_command(ctx)
+
+
+    @commands.command(aliases=["autodestruct", "ad"])
+    @tools.mjs_only
+    async def secret(self, ctx, *, quoi):
+        """Supprime le message puis exécute la commande (COMMANDE MJ)
+
+        Args:
+            quoi: commande à exécuter, commençant par un ``!``
+
+        Utile notemment pour faire des commandes dans un channel public, pour que la commande (moche) soit immédiatement supprimée.
+        """
+        await ctx.message.delete()
+
+        ctx.message.content = quoi
+
+        await remove_from_in_command(ctx)       # Bypass la limitation de 1 commande à la fois
+        await ctx.bot.process_commands(ctx.message)
+        await add_to_in_command(ctx)
+
+
+    @commands.command()
+    @tools.private
+    async def stop(self, ctx):
+        """Peut débloquer des situations compliquées (beta)
+
+        Ne pas utiliser cette commande sauf en cas de force majeure où plus rien ne marche, et sur demande d'un MJ (après c'est pas dit que ça marche mieux après l'avoir utilisée)
+        """
+        if ctx.channel.id in ctx.bot.in_command:
+            ctx.bot.in_command.remove(ctx.channel.id)
+        ctx.send("Te voilà libre, camarade !")
+
+
+    ### 6 bis - Gestion de l'aide
+
+    @commands.command(aliases=["aide", "aled", "oskour"])
+    async def help(self, ctx, *, command=None):
+        """Affiche la liste des commandes utilisables et leur utilisation
+
+        Args:
+            command (optionnel): nom exact d'une commande à expliquer (ou un de ses alias)
+
+        Si ``command`` n'est pas précisée, liste l'ensemble des commandes accessibles à l'utilisateur.
+        """
+
+        pref = ctx.bot.command_prefix
+        cogs = ctx.bot.cogs                                                                 # Dictionnaire nom: cog
+        commandes = {cmd.name: cmd for cmd in ctx.bot.commands}                             # Dictionnaire nom: commande
+        aliases = {alias: nom for nom, cmd in commandes.items() for alias in cmd.aliases}   # Dictionnaire alias: nom de la commande
+
+        n_max = max([len(cmd) for cmd in commandes])
+
+        if not command:
+            ctx.bot.in_command.remove(ctx.channel.id)
+            async def runnable_commands(cog):       # obligé parce que can_run doit être await, donc c'est compliqué
+                L = []
+                for cmd in cog.get_commands():
+                    try:
+                        runnable = await cmd.can_run(ctx)
+                    except Exception:
+                        runnable = False
+                    if runnable:
+                        L.append(cmd)
+                return L
+
+            r = f"""{ctx.bot.description} (v{__version__})\n\n"""
+            r += "\n\n".join([f"{cog.description} : \n  - " + "\n  - ".join(
+                    [pref + cmd.name.ljust(n_max+2) + cmd.short_doc for cmd in runnables]           # pour chaque commande runnable
+                ) for cog in cogs.values() if (runnables := await runnable_commands(cog))])         # pour chaque cog contenant des runnables
+            r += f"\n\nUtilise <{pref}help command> pour plus d'information sur une commande."
+            ctx.bot.in_command.append(ctx.channel.id)
+
+        else:
+            if command.startswith(pref):        # Si le joueur fait !help !command
+                command = command.lstrip(pref)
+
+            if command in aliases:              # Si !help d'un alias
+                command = aliases[command]      # On remplace l'alias par sa commande
+
+            if command in commandes:             # Si commande existante
+                cmd = commandes[command]
+
+                r = f"{pref}{command} {cmd.signature} – {cmd.help}\n"
+                # r += f"\n\nUtilise <{pref}help> pour la liste des commandes ou <{pref}help command> pour plus d'information sur une commande."
+                if cmd_aliases := [alias for alias,cmd in aliases.items() if cmd == command]:       # Si la commande a des alias
+                    r += f"\nAlias : {pref}" + f", {pref}".join(cmd_aliases)
+
+            else:
+                r = f"Commande <{command}> non trouvée.\nUtilise <{pref}help> pour la liste des commandes."
+
+        r += "\nSi besoin, n'hésite pas à appeler un MJ en les mentionnant (@MJ)."
+        await tools.send_code_blocs(ctx, r, sep="\n\n")     # On envoie, en séparant en blocs de 2000 caractères max
+
+
+
 # Définition classe principale
 
 class LGBot(commands.Bot):
     """Bot Discord pour parties de Loup-Garou à la PCéenne.
 
-    Classe fille de :py:class:`discord.ext.commands.Bot`, utilisable exactement de la même manière.
-
-    Attributs propres à cette classe :
-
-    Attributes:
-        GUILD_ID (id, optionnal): l'ID du serveur sur lequel tourne le bot. Vaut ``None`` avant l'appel à :meth:`run`, puis la valeur de la variable d'environnement ``LGREZ_SERVER_ID``.
-        in_command (list[int]): IDs des salons où une commande est actuellement exécutée.
-        in_stfu (list[int]): IDs des salons en mode STFU.
-        in_fals (list[int]): IDs des salons en mode Foire à la saucisse.
-        tasks (dict[int, :py:class:`asyncio.TimerHandle`]): Tâches planifiées actuellement en attente.
-
-    Méthodes propres à cette classe :
+    Classe fille de :class:`discord.ext.commands.Bot`, utilisable exactement de la même manière.
     """
     def __init__(self, command_prefix="!", description=None, case_insensitive=True,
                  intents=discord.Intents.all(), member_cache_flags=discord.MemberCacheFlags.all(), **kwargs):
@@ -511,12 +527,18 @@ class LGBot(commands.Bot):
             **kwargs
         )
 
+        #: :class:`int`: l'ID du serveur sur lequel tourne le bot.
+        #: Vaut ``None`` avant l'appel à :meth:`run`, puis la valeur de la variable d'environnement ``LGREZ_SERVER_ID``.
         self.GUILD_ID = None
 
-        self.in_command = []        # IDs des salons dans une commande
-        self.in_stfu = []           # IDs des salons en mode STFU (IA off)
-        self.in_fals = []           # IDs des salons en mode Foire à la saucisse
-        self.tasks = {}             # Dictionnaire des tâches en attente (id: TimerHandle)
+        #: :class:`list`\[:class:`int`\]: IDs des salons dans lequels une commande est en cours d'exécution.
+        self.in_command = []
+        #: :class:`list`\[:class:`int`\]: IDs des salons en mode STFU.
+        self.in_stfu = []
+        #: :class:`list`\[:class:`int`\]: IDs des salons en mode Foire à la saucisse.
+        self.in_fals = []
+        #: :class:`dict`\[:class:`int` (:attr:`.bdd.Taches.id`), :class:`asyncio.TimerHandle`]): Tâches planifiées actuellement en attente.
+        self.tasks = {}
 
         # Checks et système de blocage
         self.add_check(already_in_command)
@@ -578,7 +600,7 @@ class LGBot(commands.Bot):
         Récupère les informations de connection, établit la connection à la base de données puis lance le bot.
 
         Args:
-            *args, **kwargs: Arguments passés à :py:meth:`discord.ext.commands.Bot.run`.
+            *args, \**kwargs: Passés à :meth:`discord.ext.commands.Bot.run`.
         """
         # Récupération du token du bot et de l'ID du serveur
         LGREZ_DISCORD_TOKEN = env.load("LGREZ_DISCORD_TOKEN")
