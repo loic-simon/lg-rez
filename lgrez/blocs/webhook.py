@@ -1,3 +1,9 @@
+"""lg-rez / blocs / Envoi de webhooks
+
+(Implémentation de https://pypi.org/project/discord-webhook)
+
+"""
+
 from discord_webhook import DiscordWebhook
 
 def send(message, url):

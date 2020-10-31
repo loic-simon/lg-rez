@@ -7,17 +7,24 @@
 Documentation de lg-rez
 ==================================
 
+.. warning::
+
+	To international readers: please note that this documentation is only available in French for now. The source is commented in French too and the bot itself only uses French language, with no internationalization possible.
+
+
 Note
 ---------------
 
-Cette documentation est encore en bêta, et n'est disponible que pour la classe principale proposée par ce package, :py:class:`lgrez.LGBot`.
+Cette documentation se limite pour l'instant à la référence des classes et fonctions publiques proposées par ce module.
+
+Pour plus d'informations et d'explications sur les bots Discord en général, voir la documentation de ``discord.py`` : https://discordpy.readthedocs.io
 
 
 Contenu
 ---------------
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
    api
 

@@ -1,7 +1,6 @@
 """lg-rez / blocs / Interfaçage Google Sheets
 
-Modification, récupération d'informations sur la structure de la table...
-
+Connection, récupération de classeurs, modifications (implémentation de https://pypi.org/project/gspread)
 """
 
 import json

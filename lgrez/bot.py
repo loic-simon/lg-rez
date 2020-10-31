@@ -511,15 +511,6 @@ class LGBot(commands.Bot):
     """Bot Discord pour parties de Loup-Garou à la PCéenne.
 
     Classe fille de :class:`discord.ext.commands.Bot`, utilisable exactement de la même manière.
-
-    Attributs propres à cette classe :
-
-    Attributes:
-        GUILD_ID (id, optionnal): l'ID du serveur sur lequel tourne le bot. Vaut ``None`` avant l'appel à :meth:`run`, puis la valeur de la variable d'environnement ``LGREZ_SERVER_ID``.
-        in_command (list[int]): IDs des salons où une commande est actuellement exécutée.
-        in_stfu (list[int]): IDs des salons en mode STFU.
-        in_fals (list[int]): IDs des salons en mode Foire à la saucisse.
-        tasks (:class:`dict`\[:class:`int` (:attr:`bdd.Taches.id`), :class:`asyncio.TimerHandle`]): Tâches planifiées actuellement en attente.
     """
     def __init__(self, command_prefix="!", description=None, case_insensitive=True,
                  intents=discord.Intents.all(), member_cache_flags=discord.MemberCacheFlags.all(), **kwargs):
@@ -536,12 +527,18 @@ class LGBot(commands.Bot):
             **kwargs
         )
 
+        #: :class:`int`: l'ID du serveur sur lequel tourne le bot.
+        #: Vaut ``None`` avant l'appel à :meth:`run`, puis la valeur de la variable d'environnement ``LGREZ_SERVER_ID``.
         self.GUILD_ID = None
 
-        self.in_command = []        # IDs des salons dans une commande
-        self.in_stfu = []           # IDs des salons en mode STFU (IA off)
-        self.in_fals = []           # IDs des salons en mode Foire à la saucisse
-        self.tasks = {}             # Dictionnaire des tâches en attente (id: TimerHandle)
+        #: :class:`list`\[:class:`int`\]: IDs des salons dans lequels une commande est en cours d'exécution.
+        self.in_command = []
+        #: :class:`list`\[:class:`int`\]: IDs des salons en mode STFU.
+        self.in_stfu = []
+        #: :class:`list`\[:class:`int`\]: IDs des salons en mode Foire à la saucisse.
+        self.in_fals = []
+        #: :class:`dict`\[:class:`int` (:attr:`.bdd.Taches.id`), :class:`asyncio.TimerHandle`]): Tâches planifiées actuellement en attente.
+        self.tasks = {}
 
         # Checks et système de blocage
         self.add_check(already_in_command)
