@@ -1,3 +1,9 @@
+"""lg-rez / features / Process d'inscription
+
+Étapes préliminaires pour les joueurs avant le début de saison
+
+"""
+
 from discord.ext import commands
 
 from lgrez.blocs.bdd import Joueurs
@@ -6,8 +12,16 @@ from lgrez.blocs import tools, bdd, env, gsheets, bdd_tools
 
 # Routine d'inscription (fonction appellée par la commande !co)
 async def main(bot, member):
-    """Processus d'inscription pour <member>"""
+    """Exécute le processus d'inscription d'un joueur
 
+    Args:
+        bot (:class:`.LGBot`): bot connecté au serveur
+        member (:class:`~discord.Member`): joueur à inscrire
+
+    Crée et paramètre le salon privé du joueur, lui pose des questions et l'inscrit en base.
+
+    Commande appellée à l'arrivée sur le serveur, utiliser ``!co`` pour trigger cette commande depuis Discord.
+    """
     if Joueurs.query.get(member.id):                                            # Joueur dans la bdd = déjà inscrit
         await tools.private_chan(member).set_permissions(member, read_messages=True, send_messages=True)
         await tools.private_chan(member).send(f"Saloww ! {member.mention} tu es déjà inscrit, viens un peu ici enculé !")
@@ -86,7 +100,7 @@ async def main(bot, member):
     async with chan.typing():     # Envoi indicateur d'écriture pour informer le joueur que le bot fait des trucs
         # Ajout à la BDD
 
-        joueur = Joueurs(discord_id=member.id, _chan_id=chan.id, nom=member.display_name,
+        joueur = Joueurs(discord_id=member.id, chan_id_=chan.id, nom=member.display_name,
                          chambre=chambre, statut="vivant", role="nonattr", camp="Non attribué",
                          votant_village=True, votant_loups=False, role_actif=False)
         bdd.session.add(joueur)
@@ -94,7 +108,7 @@ async def main(bot, member):
 
         # Ajout au TDB
 
-        cols = [col for col in bdd_tools.get_cols(Joueurs) if not col.startswith('_')]    # On élimine les colonnes locales
+        cols = [col for col in bdd_tools.get_cols(Joueurs) if not col.endswith('_')]    # On élimine les colonnes locales
 
         SHEET_ID = env.load("LGREZ_TDB_SHEET_ID")
 
@@ -112,8 +126,8 @@ async def main(bot, member):
             if values[l][TDB_index["discord_id"]].isdigit():    # Si il y a un vrai ID dans la colonne ID, ligne l
                 plv = l + 1
 
-        Modifs = [(plv, TDB_index[col], getattr(joueur, col)) for col in TDB_index] + [(plv, TDB_tampon_index[col], getattr(joueur, col)) for col in TDB_tampon_index]   # Modifs : toutes les colonnes de la partie principale + du cache
-        gsheets.update(sheet, Modifs)
+        modifs = [(plv, TDB_index[col], getattr(joueur, col)) for col in TDB_index] + [(plv, TDB_tampon_index[col], getattr(joueur, col)) for col in TDB_tampon_index]   # modifs : toutes les colonnes de la partie principale + du cache
+        gsheets.update(sheet, modifs)
 
 
         # Grant accès aux channels joueurs et information

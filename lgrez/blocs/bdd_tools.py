@@ -1,3 +1,9 @@
+"""lg-rez / blocs / Outils pour tables de données
+
+Modification, récupération d'informations sur la structure de la table...
+
+"""
+
 import datetime
 import re
 
@@ -5,28 +11,40 @@ import difflib
 import unidecode
 from sqlalchemy.orm.attributes import flag_modified     # Permet de "signaler" les entrées modifiées, à commit en base
 
-def remove_accents(s):
-    """Renvoie la chaîne non accentuée, mais conserve les caractères spéciaux (emojis...)"""
+def _remove_accents(s):
+    """Renvoie la chaîne non accentuée, mais conserve les caractères spéciaux (emojis...)
+    """
     p = re.compile("([À-ʲΆ-ת])")      # Abracadabrax, c'est moche mais ça marche
     return p.sub(lambda c: unidecode.unidecode(c.group()), s)
 
 
 def modif(item, col, value):
-    """Utilitaire : fait <item>.<col> = <value> et le marque (flag_modified) pour le commit"""
+    """Utilitaire : fait ``<item>.<col> = <value>`` et le marque (:func:`~sqlalchemy.orm.attributes.flag_modified`) pour le commit
+
+    Args:
+        item (:class:`.bdd.Base`): entrée de BDD à modifier
+        col (:class:`str`): colonne à modifier (doit être un attribut valide de la table)
+        value (``type(`item`.`col`)``): nouvelle valeur
+    """
     setattr(item, col, value)
     flag_modified(item, col)
 
 
 def transtype(value, col, SQL_type, nullable):
-    """Utilitaire : type un input brut (BDD, POST, GET...) selon le type de sa colonne
+    """Utilitaire : type un input brut selon le type de sa colonne
 
-    <value>         valeur à transtyper (tous)
-    <col>           nom de la colonne associée
-    <SQL_type>      type SQL associé. Types pris en compte : "String", "Integer", "BigInteger", "Boolean", "Time", "DateTime"
-    <nullable>      True si la value peut être None, False sinon
+    Args:
+        value (:class:`object`):        valeur à transtyper
+        col (:class:`str`):             nom de la colonne associée
+        SQL_type (:class:`str`):        type SQL associé, (tel que retourné par :func:`.get_SQL_types` avec ``detail=False``). Types pris en charge : ``"String"``, ``"Integer"``, ``"BigInteger"``, ``"Boolean"``, ``"Time"``, ``"DateTime"``
+        nullable (:class:`bool`):       ``True`` si la value peut être ``None`` (cf :func:`.get_SQL_nullable`), ``False`` sinon
 
-    Renvoie l'objet Python correspondant au type de la colonne (str, int, bool, datetime.time, datetime.datetime) ou None si autorisé
-    Raise ValueError si la conversion n'est pas possible (ou si None et nullable is False), KeyError pour un type de colonne non pris en compte
+    Returns:
+        L'objet Python correspondant au type de la colonne (:class:`str`, :class:`int`, :class:`bool`, :class:`datetime.time`, :class:`datetime.datetime`) ou ``None`` (si autorisé)
+
+    Raises:
+        ``ValueError``: si la conversion n'est pas possible (ou si ``value`` vaut ``None`` et ``nullable`` est ``False``)
+        ``KeyError``: pour un type de colonne non pris en compte
     """
     try:
         if value in (None, '', 'None', 'none', 'Null', 'null', 'not set', 'non défini'):
@@ -63,43 +81,85 @@ def transtype(value, col, SQL_type, nullable):
 
 
 def get_cols(table):
-    """Renvoie la liste des colonnes de <table>"""
+    """Renvoie la liste des noms des colonnes d'une table
+
+    Args:
+        table (:class:`.bdd.Base` subclass): table de données
+
+    Returns:
+        :class:`list`\[:class:`str`\]
+    """
     raw_cols = table.__table__.columns
     return [col.key for col in raw_cols]
 
 
 def get_primary_col(table):
-    """Renvoie le nom de la colonne clé primaire de <table>"""
+    """Renvoie le nom de la colonne clé primaire de <table>
+
+    Args:
+        table (:class:`.bdd.Base` subclass): table de données
+
+    Returns:
+        :class:`str`
+    """
     raw_cols = table.__table__.columns
     return [col.key for col in raw_cols if col.primary_key][0]
 
 
 def get_SQL_types(table, detail=False):
-    """Renvoie un dictionnaire {colonne (str): type SQL (str)} pour <table>"""
+    """Renvoie un dictionnaire {colonne: type SQL}
+
+    Args:
+        table (:class:`.bdd.Base` subclass): table de données
+        detail (:class:`bool`):
+
+            - Si ``True``, renvoie l'objet type SQL (``col.type``, :class:`sqlalchemy.sql.sqltypes`) : ``String(length=32)``, ``BigInteger``...
+            - Si ``False``, renvoie le nom du type (``col.type.__name__``) : ``"String"``, ``"BigInteger"``...
+
+    Returns:
+        - :class:`dict`\[:class:`str`, :class:`str`\] (``detail`` ``False``)
+
+    Returns:
+        - :class:`dict`\[:class:`str`, :class:`type`\] (``detail`` ``True``)
+    """
     raw_cols = table.__table__.columns
-    if detail:                              # detail = True ==> types "VARCHAR(N)", "INTEGER"...
+    if detail:
         return {col.key: col.type for col in raw_cols}
-    else:                                   # detail = False ==> types "String", "Integer"...
+    else:
         return {col.key: type(col.type).__name__ for col in raw_cols}
 
 
 def get_SQL_nullable(table):
-    """Renvoie un dictionnaire {colonne (str): accepte les NULL ? (bool)} pour <table>"""
+    """Renvoie un dictionnaire {colonne: accepte les NULL ?}
+
+    Args:
+        table (:class:`.bdd.Base` subclass): table de données
+
+    Returns:
+        - :class:`dict`\[:class:`str`, :class:`bool`\]
+    """
     raw_cols = table.__table__.columns
     return {col.key: col.nullable for col in raw_cols}
 
 
-async def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_si_parfait=True):
+def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_si_parfait=True):
     """Recherche le(s) plus proche résultat(s) dans une table
 
-    Renvoie le/les éléments de <table> correspondant le mieux à <chaine> (selon la colonne <carac>, défaut : colonne primaire de la table), répondant à <filtre> (défaut : tous) sous forme de liste de tuples (element, score*) triés par score* décroissant, en se limitant aux scores* supérieurs à <sensi>.
+    Args:
+        chaine (:class:`str`): motif à rechercher
+        table (:class:`.bdd.Base` subclass): table de données dans laquelle rechercher
+        sensi (:class:`float`): ratio minimal pour retenir une entrée
+        filtre (:class:`sqlalchemy.sql.elements.BinaryExpression`): argument de :meth:`~sqlalchemy.orm.query.Query.filter` (``Table.colonne == valeur``)
+        carac (:class:`str`): colonne selon laquelle rechercher (défaut : colonne primaire de la table)
+        solo_si_parfait (:class:`bool`): si ``True``, renvoie uniquement le premier élément de score ``1`` trouvé s'il existe (ignore les autres éléments, même si ``>= sensi``)
 
-    Si <solo_si_parfait> (défaut), renvoie uniquement le premier élément de score 1 trouvé s'il existe (ignore les autres éléments, même si >= sensi)
+    Returns:
+        :class:`list`\[\(:class:`.bdd.Base`, :class:`float`\)\]: La/les entrée(s) correspondant le mieux à ``chaine``, sous forme de liste de tuples ``(element, score*)`` triés par score\* décroissant
 
-    *Score = ratio de difflib.SequenceMatcher, i.e. proportion de caractères communs aux deux chaînes
+    \*Score = ratio de :class:`difflib.SequenceMatcher`, i.e. proportion de caractères communs aux deux chaînes
     """
     SM = difflib.SequenceMatcher()                      # Création du comparateur de chaînes
-    slug1 = remove_accents(chaine).lower()              # Cible en minuscule et sans accents
+    slug1 = _remove_accents(chaine).lower()             # Cible en minuscule et sans accents
     SM.set_seq1(slug1)                                  # Première chaîne à comparer : cible demandée
 
     if not filtre:
@@ -112,7 +172,7 @@ async def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_
         carac = get_primary_col(table)
 
     for entry in query:
-        slug2 = remove_accents(getattr(entry, carac)).lower()
+        slug2 = _remove_accents(getattr(entry, carac)).lower()
 
         SM.set_seq2(slug2)                              # Pour chaque élément, on compare la cible à son nom (en non accentué)
         score = SM.ratio()                              # On calcule la ressemblance

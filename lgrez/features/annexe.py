@@ -1,3 +1,9 @@
+"""lg-rez / features / Commandes annexes
+
+Commandes diverses qu'on ne savait pas où ranger
+
+"""
+
 import random
 import traceback
 import datetime
@@ -19,11 +25,13 @@ class Annexe(commands.Cog):
     async def roll(self, ctx, *, XdY):
         """Lance un ou plusieurs dés
 
-        <XdY> dés à lancer + modifieurs, au format {XdY + XdY + ... + Z - Z ... } avec X le nombre de dés, Y le nombre de faces et Z les modifieurs (constants).
+        Args:
+            XdY: dés à lancer + modifieurs, au format {XdY + XdY + ... + Z - Z ... } avec X le nombre de dés, Y le nombre de faces et Z les modifieurs (constants).
 
-        Ex. !roll 1d6           -> lance un dé à 6 faces
-            !roll 1d20 +3       -> lance un dé à 20 faces, ajoute 3 au résultat
-            !roll 1d20 + 2d6 -8 -> lance un dé 20 plus deux dés 6, enlève 8 au résultat
+        Examples:
+            - ``!roll 1d6``           -> lance un dé à 6 faces
+            - ``!roll 1d20 +3``       -> lance un dé à 20 faces, ajoute 3 au résultat
+            - ``!roll 1d20 + 2d6 -8`` -> lance un dé 20 plus deux dés 6, enlève 8 au résultat
         """
         dices = XdY.replace(' ', '').replace('-', '+-').split('+')        # "1d6 + 5 - 2" -> ["1d6", "5", "-2"]
         r = ""
@@ -88,8 +96,10 @@ class Annexe(commands.Cog):
     async def addhere(self, ctx, *joueurs):
         """Ajoute les membres au chan courant
 
-        *[joueurs] membres à ajouter
-        Si *[joueurs] est un seul élément, il peut être de la forme <crit>=<filtre> tel que décrit dans l'aide de !send.
+        Args:
+            *joueurs: membres à ajouter
+
+        Si ``*joueurs`` est un seul élément, il peut être de la forme ``<crit>=<filtre>`` tel que décrit dans l'aide de ``!send``.
         """
         ts_debut = ctx.message.created_at
 
@@ -119,7 +129,8 @@ class Annexe(commands.Cog):
     async def purge(self, ctx, N=None):
         """Supprime tous les messages de ce chan
 
-        [N] nombre de messages à supprimer (défaut : tous)
+        Args:
+            N: nombre de messages à supprimer (défaut : tous)
         """
         if N:
             mess = await ctx.send(f"Supprimer les {N} messages les plus récents de ce chan ? (celui-ci inclus)")
@@ -169,29 +180,34 @@ class Annexe(commands.Cog):
     async def send(self, ctx, cible, *, message):
         """Envoie un message à tous ou certains joueurs (COMMANDE MJ)
 
-        <cible> peut être :
-            all                 Tous les joueurs inscrits, vivants et morts
-            vivants             Les joueurs en vie
-            morts               Les joueurs morts
-            <crit>=<filtre>     Les joueurs répondant au critère Joueurs.<crit> == <filtre> :
-                                    <crit> peut être nom, chambre, statut, role, camp...
-                                    L'ensemble doit être entouré de guillements si <filtre> contient un espace.
+        Args:
+            cible: destinataires
+            message: message, éventuellement formaté
 
-        <message> peut contenir un ou plusieurs bouts de code Python à évaluer, entourés d'accolades.
+        ``cible`` peut être :
+            - ``all`` :                 Tous les joueurs inscrits, vivants et morts
+            - ``vivants`` :             Les joueurs en vie
+            - ``morts`` :               Les joueurs morts
+            - ``<crit>=<filtre>`` :     Les joueurs répondant au critère ``Joueurs.<crit> == <filtre>``. ``crit`` peut être ``"nom"``, ``"chambre"``, ``"statut"``, ``"role"``, ``"camp"``... L'ensemble doit être entouré de guillements si ``filtre`` contient un espace.
+
+        ``message`` peut contenir un ou plusieurs bouts de code Python à évaluer, entourés d'accolades.
+
         L'évaluation est faite séparément pour chaque joueur, ce qui permet de personnaliser le message grâce aux variables particulières dépendant du joueur :
-            joueur          objet BDD du joueur recevant le message  ==> joueur.nom, joueur.role...
-            member          objet discord.Member associé             ==> member.mention
-            chan            objet discord.TextChannel du chan privé du joueur
+            - ``joueur`` :          objet BDD du joueur recevant le message  ==> ``joueur.nom``, ``joueur.role``...
+            - ``member`` :          objet discord.Member associé             ==> ``member.mention``
+            - ``chan`` :            objet :class:`discord.TextChannel` du chan privé du joueur
 
         Attention :
-            ctx             objet discord.ext.commands.Context de !send  ==> ctx.author = lanceur de la commande !!!
+            - ``ctx`` :             objet :class:`discord.ext.commands.Context` de ``!send``  ==> ``ctx.author`` = lanceur de la commande !!!
 
-        Les différentes tables de données sont accessibles sous leur nom (Joueurs, Roles...)
+        Les différentes tables de données sont accessibles sous leur nom (``Joueurs``, ``Roles``...)
+
         Il est impossible d'appeller des coroutines (await) dans le code à évaluer.
 
-        Ex. !send all Bonsoir à tous c'est Fanta
-            !send vivants Attention {member.mention}, derrière toi c'est affreux !
-            !send "role=Servante Dévouée" Çreponse va vous ? Vous êtes bien {joueur.role} ?
+        Examples:
+            - ``!send all Bonsoir à tous c'est Fanta``
+            - ``!send vivants Attention {member.mention}, derrière toi c'est affreux !``
+            - ``!send "role=Servante Dévouée" Ça va vous ? Vous êtes bien {joueur.role} ?``
         """
         if cible == "all":
             joueurs = Joueurs.query.all()
@@ -217,7 +233,7 @@ class Annexe(commands.Cog):
         await ctx.send(f"{len(joueurs)} trouvé(s), envoi...")
         for joueur in joueurs:
             member = ctx.guild.get_member(joueur.discord_id)
-            chan = ctx.guild.get_channel(joueur._chan_id)
+            chan = ctx.guild.get_channel(joueur.chan_id_)
 
             assert member, f"!send : Member associé à {joueur} introuvable"
             assert chan, f"!sed : Chan privé de {joueur} introuvable"
@@ -236,46 +252,48 @@ class Annexe(commands.Cog):
     async def embed(self, ctx, key=None, *, val=None):
         """Prépare un embed (message riche) et l'envoie (COMMANDE MJ)
 
-        [key] sous-commande (voir ci-dessous). Si omis, prévisualise le brouillon d'embed actuellement en préparation ;
-        [val] valeur associée. Pour les sous-commandes de construction d'élement, supprime ledit élément si omis.
+        Args:
+            key: sous-commande (voir ci-dessous). Si omis, prévisualise le brouillon d'embed actuellement en préparation ;
+            val: valeur associée. Pour les sous-commandes de construction d'élement, supprime ledit élément si omis.
 
         - Sous-commandes générales :
-            !embed create <titre>           Créer un nouveau brouillon d'embed (un seul brouillon en parallèle, pour tous les utilisateurs)
-            !embed delete                   Supprimer le brouillon d'embed
-            !embed preview                  Voir l'embed sans les rappels de commande
-            !embed post [#channel]          Envoyer l'embed sur #channel (chan courant si omis)
+            - ``!embed create <titre>`` :          Créer un nouveau brouillon d'embed (un seul brouillon en parallèle, pour tous les utilisateurs)
+            - ``!embed delete`` :                  Supprimer le brouillon d'embed
+            - ``!embed preview``  :                Voir l'embed sans les rappels de commande
+            - ``!embed post [#channel]`` :         Envoyer l'embed sur ``#channel`` (chan courant si omis)
 
         - Sous-commandes de construction d'éléments :
             - Éléments généraux :
-                !embed title [titre]
-                !embed description [texte]
-                !embed url [url*]
-                !embed color [#ffffff]      (barre de gauche, code hexadécimal)
+                - ``!embed title [titre]``
+                - ``!embed description [texte]``
+                - ``!embed url [url*]``
+                - ``!embed color [#ffffff]``      (barre de gauche, code hexadécimal)
 
             - Auteur :
-                !embed author [nom]
-                !embed author_url [url*]
-                !embed author_icon [url**]
+                - ``!embed author [nom]``
+                - ``!embed author_url [url*]``
+                - ``!embed author_icon [url**]``
 
             - Talon :
-                !embed footer [texte]
-                !embed footer_icon [url**]
+                - ``!embed footer [texte]``
+                - ``!embed footer_icon [url**]``
 
             - Images :
-                !embed image [url**]        (grande image)
-                !embed thumb [url**]        (en haut à droite)
+                - ``!embed image [url**]``        (grande image)
+                - ``!embed thumb [url**]``        (en haut à droite)
 
             - Champs : syntaxe spéciale
-                !embed field <i> <skey> [val]
-                    <i>             Numéro du champ (commençant à 0). Si premier champ non existant, le crée.
-                    <skey> =
-                        name        Nom du champ
-                        value       Valeur du champ
-                        delete      Supprime le champ
+                - ``!embed field <i> <skey> [val]``
+                    - ``i`` :            Numéro du champ (commençant à 0). Si premier champ non existant, le crée.
+                    - ``skey`` :
+                        - ``name`` :       Nom du champ
+                        - ``value`` :      Valeur du champ
+                        - ``delete`` :     Supprime le champ
 
                 Les champs sont (pour l'instant) forcément de type inline (côte à côte).
 
-        * Les URL doivent commencer par http(s):// pour être reconnues comme telles.
+        \* Les URL doivent commencer par http(s):// pour être reconnues comme telles.
+
         ** Ces URL doivent correspondre à une image.
         """
 

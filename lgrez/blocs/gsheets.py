@@ -1,3 +1,9 @@
+"""lg-rez / blocs / Interfaçage Google Sheets
+
+Modification, récupération d'informations sur la structure de la table...
+
+"""
+
 import json
 
 from lgrez.blocs import env
@@ -6,7 +12,14 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 
 def connect(key):
-    """Charge les credentials GSheets et renvoie le classeur d'ID <key>"""
+    """Charge les credentials GSheets (variable d'environment ``LGREZ_GCP_CREDENTIALS``) et renvoie le classeur demandé
+
+    Args:
+        key (str): ID du classeur à charger (25 caractères)
+
+    Returns:
+        :class:`gspread.models.Spreadsheet`
+    """
     # use creds to create a client to interact with the Google Drive API
     LGREZ_GCP_CREDENTIALS = env.load("LGREZ_GCP_CREDENTIALS")
 
@@ -20,20 +33,25 @@ def connect(key):
     return workbook
 
 
-def update(sheet, Modifs):
-    """Met à jour la feuille <sheet> avec les modifications indiquées dans <Modifs>.
+def update(sheet, modifs):
+    """Met à jour une feuille GSheets avec les modifications demandées
 
-    <Modifs> doit être une liste de tuples (ligne (id), colonne (id), valeur)
-    Les IDs sont indexés à partir de 0 (A1 en (0, 0, valeur)).
+    Args:
+        sheet (:class:`gspread.models.Worksheet`): la feuille à modifier
+        modifs (:class:`list`\[\(:class:`int`, :class:`int`, :class:`object`\)\]): liste de tuples ``(ligne, colonne, valeur)``
+
+    Les IDs sont indexés à partir de ``0`` (cellule ``A1`` en ``(0, 0)``.
+
+    Le type de la nouvelle valeur sera interpreté par ``gspread`` pour donner le type GSheets adéquat à la cellule (texte, numérique, temporel...)
     """
-    lm = max([l for (l, c, v) in Modifs])       # ligne max de la zone à modifier
-    cm = max([c for (l, c, v) in Modifs])       # colonne max de la zone à modifier
+    lm = max([l for (l, c, v) in modifs])       # ligne max de la zone à modifier
+    cm = max([c for (l, c, v) in modifs])       # colonne max de la zone à modifier
 
     # Récupère toutes les valeurs sous forme de cellules gspread
     cells = sheet.range(1, 1, lm+1, cm+1)   # gspread indexe à partir de 1 (comme les gsheets)
 
     cells_to_update = []
-    for (l, c, v) in Modifs:
+    for (l, c, v) in modifs:
         cell = [cell for cell in cells if cell.col == c+1 and cell.row == l+1][0]    # on récup l'objet Cell correspondant aux coords à modifier
         if isinstance(v, int) and v > 10**14:
             cell.value = str(v)

@@ -1,3 +1,9 @@
+"""lg-rez / features / Commandes informatives
+
+Commandes donnant aux joueurs des informations sur le jeu, leurs actions, les joueurs en vie et morts...
+
+"""
+
 import traceback
 import unidecode
 
@@ -8,9 +14,11 @@ from lgrez.blocs.bdd import session, Joueurs, Roles, Actions, BaseActions
 
 
 def emoji_camp(arg, camp):
-    """Renvoie l'emoji associé à <camp>
+    """Renvoie l'emoji associé à un camp donné.
 
-    <arg> peut être de type Context, Guild, User/Member, Channel
+    Args:
+        arg (:class:`~discord.ext.commands.Context` | :class:`~discord.Guild` | :class:`~discord.Member` | :class:`~discord.abc.GuildChannel`): argument "connecté" au serveur, permettant de remonter aux emojis
+        camp (str): parmis ``"village"``, ``"loups"``, ``"nécro"``, ``"solitaire"``, ``"autre"``
     """
     d = {"village": "village",
          "loups": "lune",
@@ -30,10 +38,13 @@ class Informations(commands.Cog):
     async def roles(self, ctx, *, filtre=None):
         """Affiche la liste des rôles / des informations sur un rôle
 
-        [filtre] peut être
-            - Villageois, Loups, Nécros, Autres pour les rôles d'un camp ;
-            - Un nom de rôle pour les informations sur ce rôle.
-        Si [filtre] n'est pas précisé, liste tous les rôles existants.
+        Args:
+            filtre: peut être
+
+                - Villageois, Loups, Nécros, Autres pour les rôles d'un camp ;
+                - Un nom de rôle pour les informations sur ce rôle.
+
+        Si ``filtre`` n'est pas précisé, liste tous les rôles existants.
         """
         if filtre:
             filtre = tools.remove_accents(filtre.lower())
@@ -83,23 +94,23 @@ class Informations(commands.Cog):
         reacts = []
         r = "––– MENU –––\n\n"
 
-        if joueur._vote_condamne:
-            r += f" - {tools.emoji(ctx, 'bucher')}  Vote pour le bûcher en cours – vote actuel : {tools.code(joueur._vote_condamne)}\n"
+        if joueur.vote_condamne_:
+            r += f" - {tools.emoji(ctx, 'bucher')}  Vote pour le bûcher en cours – vote actuel : {tools.code(joueur.vote_condamne_)}\n"
             reacts.append(tools.emoji(ctx, 'bucher'))
-        if joueur._vote_maire:
-            r += f" - {tools.emoji(ctx, 'maire')}  Vote pour le maire en cours – vote actuel : {tools.code(joueur._vote_maire)}\n"
+        if joueur.vote_maire_:
+            r += f" - {tools.emoji(ctx, 'maire')}  Vote pour le maire en cours – vote actuel : {tools.code(joueur.vote_maire_)}\n"
             reacts.append(tools.emoji(ctx, 'maire'))
-        if joueur._vote_loups:
-            r += f" - {tools.emoji(ctx, 'lune')}  Vote des loups en cours – vote actuel : {tools.code(joueur._vote_loups)}\n"
+        if joueur.vote_loups_:
+            r += f" - {tools.emoji(ctx, 'lune')}  Vote des loups en cours – vote actuel : {tools.code(joueur.vote_loups_)}\n"
             reacts.append(tools.emoji(ctx, 'lune'))
 
         if not reacts:
             r += "Aucun vote en cours.\n"
 
-        actions = Actions.query.filter_by(player_id=member.id).filter(Actions._decision != None).all()
+        actions = Actions.query.filter_by(player_id=member.id).filter(Actions.decision_ != None).all()
         if actions:
             for action in actions:
-                r += f" - {tools.emoji(ctx, 'action')}  Action en cours : {tools.code(action.action)} (id {action.id}) – décision : {tools.code(action._decision)}\n"
+                r += f" - {tools.emoji(ctx, 'action')}  Action en cours : {tools.code(action.action)} (id {action.id}) – décision : {tools.code(action.decision_)}\n"
             reacts.append(tools.emoji(ctx, 'action'))
         else:
             r += "Aucune action en cours.\n"

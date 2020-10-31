@@ -1,8 +1,7 @@
-"""transversal building blocs for lg-rez
+"""lg-rez / Blocs transversaux
 
-Each file in this module serves a specific purpose unrelated to Discord
-commands: database connection, Google Sheets operations, environement variables
-management, utility tools...
+Chaque module de ``lgrez.blocs`` réalise une tâche non liée à une fonctionnalité spécifique du bot : connection à un service, outils divers...
+
 """
 
 __all__ = ["bdd_tools", "bdd", "env", "gsheets", "pseudoshell", "tools", "webhook"]

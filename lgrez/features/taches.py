@@ -1,3 +1,9 @@
+"""lg-rez / features / Tâches planifiées
+
+Planification, liste, annulation, exécution de tâches planifiées
+
+"""
+
 import datetime
 
 from discord.ext import commands
@@ -8,7 +14,13 @@ from lgrez.blocs.bdd import Taches, Actions, Joueurs
 
 
 def execute(tache):
-    """Exécute la tâche <tache> (objet BDD Taches) : appelle le webhook et nettoie"""
+    """Exécute une tâche planifiée
+
+    Args:
+        tache (:class:`.bdd.Taches`): tâche planifiée arrivée à exécution
+
+    Envoie un webhook (variable d'environnement ``LGREZ_WEBHOOK_URL``) avec la commande (:attr:`.bdd.Taches.commande`) et nettoie
+    """
     LGREZ_WEBHOOK_URL = env.load("LGREZ_WEBHOOK_URL")
     webhook.send(tache.commande, url=LGREZ_WEBHOOK_URL)
     bdd.session.delete(tache)
@@ -16,7 +28,16 @@ def execute(tache):
 
 
 def add_task(bot, timestamp, commande, action=None):
-    """Ajoute une tâche sur le bot + en base (fonction pour usage ici et dans d'autres features)"""
+    """Crée une nouvelle tâche planifiée sur le bot + en base
+
+    Args:
+        bot (:class:`.LGBot`): bot connecté
+        timestamp (:class:`datetime.datetime`): timestamp de la tâche à ajouter
+        commande (:class:`str`): commande à exécuter à ``timestamp``
+        action (:class:`int`): si tâche planifiée liée à une commande, son ID (:attr:`.bdd.Actions.id`)
+
+    (fonction pour usage ici et dans d'autres features)
+    """
     now = datetime.datetime.now()
     tache = Taches(timestamp=timestamp, commande=commande, action=action)
 
@@ -28,7 +49,12 @@ def add_task(bot, timestamp, commande, action=None):
 
 
 def cancel_task(bot, tache):
-    """Supprime (annule) une tâche (fonction pour usage ici et dans d'autres features)"""
+    """Supprime (annule) une tâche (fonction pour usage ici et dans d'autres features)
+
+    Args:
+        bot (:class:`.LGBot`): bot connecté
+        tache (:class:`.bdd.Taches`): tâche à annuler
+    """
     bot.tasks[tache.id].cancel()        # Annulation (objet TaskHandler)
     bdd.session.delete(tache)            # Suppression en base
     bdd.session.commit()
@@ -43,10 +69,9 @@ class GestionTaches(commands.Cog):
     async def taches(self, ctx):
         """Liste les tâches en attente (COMMANDE MJ)
 
-        Affiche les commandes en attente d'exécution (dans la table Taches) et le timestamp d'exécution associé.
+        Affiche les commandes en attente d'exécution (dans la table :class:`.bdd.Taches`) et le timestamp d'exécution associé.
         Lorsque la tâche est liée à une action, affiche le nom de l'action et du joueur concerné.
         """
-
         taches = Taches.query.order_by(Taches.timestamp).all()
         LT = ""
         for tache in taches:
@@ -68,19 +93,22 @@ class GestionTaches(commands.Cog):
     async def planif(self, ctx, quand, *, commande):
         """Planifie une tâche au moment voulu (COMMANDE MJ)
 
-        - <quand> : format [<J>/<M>[/<AAAA>]-]<H>:<M>[:<S>], avec <J> (jours), <M> (mois), <AAAA> (année sur 4 chiffres), <H> (heures) et <M> (minutes) des entiers et <S> (secondes) un entier ou un flottant, optionnel (défaut : 0).
-        La date est optionnelle (défaut : date du jour). Si elle est précisée, elle doit être séparée de l'heure par un tiret et l'année peut être omise (défaut : année actuelle) ;
+        Args:
+            quand: format ``[<J>/<M>[/<AAAA>]-]<H>:<M>[:<S>]``, avec ``<J>`` (jours), ``<M>`` (mois), ``<AAAA>`` (année sur 4 chiffres), ``<H>`` (heures) et ``<M>`` (minutes) des entiers et ``<S>`` (secondes) un entier ou un flottant, optionnel (défaut : ``0``)
+                La date est optionnelle (défaut : date du jour). Si elle est précisée, elle doit être **séparée de l'heure par un tiret** et l'année peut être omise (défaut : année actuelle) ;
+            commande: commande à exécuter (commençant par un ``!``). La commande sera exécutée PAR UN WEBHOOK dans LE CHAN ``#logs`` : toutes les commandes qui sont liées au joueur ou réservées au chan privé sont à proscrire (ou doivent a minima être précédées de ``!doas cible``)
 
-        - <commande> : commande à exécuter (commençant par un !). La commande sera exécutée PAR UN WEBHOOK et DANS LE CHAN #logs : toutes les commandes qui sont liées au joueur ou réservées au chan privé sont à proscrire (ou doivent a minima être précédées de !doas <cible>)
+        Cette commande repose sur l'architecture en base de données, ce qui garantit l'exécution de la tâche même si le bot plante entre temps.
 
-        Cette commande repose sur l'architecture en base de données, ce qui garantit l'exécution de la commande même si le bot plante entre temps.
         Si le bot est down à l'heure d'exécution prévue, la commande sera exécutée dès le bot de retour en ligne.
+
         Si la date est dans le passé, la commande est exécutée immédiatement.
 
-        Ex. : - !planif 18:00 !close maire
-              - !planif 13/06-10:00 !open maire
-              - !planif 13/06/2020-10:00 !open maire
-              - !planif 23:25:12 !close maire
+        Examples:
+            - ``!planif 18:00 !close maire``
+            - ``!planif 13/06-10:00 !open maire``
+            - ``!planif 13/06/2020-10:00 !open maire``
+            - ``!planif 23:25:12 !close maire``
         """
         now = datetime.datetime.now()
 
@@ -135,14 +163,17 @@ class GestionTaches(commands.Cog):
     async def delay(self, ctx, duree, *, commande):
         """Exécute une commande après XhYmZs (COMMANDE MJ)
 
-        - <duree> : format [<X>h][<Y>m][<Z>s], avec <X> (heures) et <Y> (minutes) des entiers et <Z> (secondes) un entier ou un flottant. Chacune des trois composantes est optionnelle, mais au moins une d'entre elle doit être présente ;
-        - <commande> : commande à exécuter (commençant par un !). La commande sera exécutée PAR UN WEBHOOK et DANS LE CHAN #logs : toutes les commandes qui sont liées au joueur ou réservées au chan privé sont à proscrire (ou doivent a minima être précédées de !doas <cible>)
+        Args:
+            quand: format ``[<X>h][<Y>m][<Z>s]``, avec ``<X>`` (heures) et ``<Y>`` (minutes) des entiers et ``<Z>`` (secondes) un entier ou un flottant. Chacune des trois composantes est optionnelle, mais au moins une d'entre elle doit être présente ;
+            commande: commande à exécuter (commençant par un ``!``). La commande sera exécutée PAR UN WEBHOOK dans LE CHAN ``#logs`` : toutes les commandes qui sont liées au joueur ou réservées au chan privé sont à proscrire (ou doivent a minima être précédées d'un ``!doas <cible>``)
 
         Cette commande repose sur l'architecture en base de données, ce qui garantit l'exécution de la commande même si le bot plante entre temps.
+
         Si le bot est down à l'heure d'exécution prévue, la commande sera exécutée dès le bot de retour en ligne.
 
-        Ex. : - !delay 2h !close maire
-              - !delay 1h30m !doas @moi !vote Yacine Oussar
+        Examples:
+            - ``!delay 2h !close maire``
+            - ``!delay 1h30m !doas @moi !vote Yacine Oussar``
         """
         secondes = 0
         try:
@@ -180,8 +211,10 @@ class GestionTaches(commands.Cog):
     async def cancel(self, ctx, *ids):
         """Annule une ou plusieurs tâche(s) planifiée(s) (COMMANDE MJ)
 
-        [ids...] IDs des tâches à annuler, séparées par des espaces.
-        Utiliser !taches pour voir la liste des IDs.
+        Args:
+            *ids: IDs des tâches à annuler, séparées par des espaces.
+
+        Utiliser ``!taches`` pour voir la liste des IDs.
         """
         taches = [tache for id in ids if id.isdigit() and (tache := Taches.query.get(int(id)))]
         if taches:

@@ -1,12 +1,10 @@
-"""lg-rez bot features
+"""lg-rez / Commandes et autres fonctionnalités
 
-Each file in this module implements a specific feature of LGBot bots.
-Most of them implement a discord.py cog (discord.ext.commands.Cog) containing
-one or more Discord commands, but may also define functions for internal or
-external use.
+Chaque module de ``lgrez.features`` implémente une fonctionnalité spécifique des LGBots. La majorité implémentent un *Cog* (:class:`discord.ext.commands.Cog`) contenant une ou plusieurs commandes Discord, mais peuvent aussi définir des fonctions pour un usage public.
 
-Note: you can see cogs names and the commands they contain by sending "!help"
-to a functionnal LGBot after granting yourself "MJ" and "Joueur en vie" roles.
+..note ::
+    Les Cogs et leurs commanes peuvent être vus en envoyant ``!help`` à un LGBot fonctionnel (en possédant les rôles ``MJ`` et ``Joueur en vie``)
+
 """
 
 __all__ = ["actions_publiques", "annexe", "gestion_actions", "IA", "informations", "inscription", "open_close", "remplissage_bdd", "sync", "taches", "voter_agir"]

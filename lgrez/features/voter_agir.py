@@ -1,3 +1,9 @@
+"""lg-rez / features / Tâches planifiées
+
+Planification, liste, annulation, exécution de tâches planifiées
+
+"""
+
 import datetime
 
 from discord.ext import commands
@@ -18,10 +24,13 @@ class VoterAgir(commands.Cog):
     async def vote(self, ctx, *, cible=None):
         """Vote pour le condamné du jour
 
-        [cible] joueur contre qui tu veux diriger ton vote.
+        Args:
+            cible: nom du joueur contre qui tu veux diriger ton vote.
 
         Cette commande n'est utilisable que lorsqu'un vote pour le condamné est en cours, pour les joueurs ayant le droit de voter.
+
         Le bot t'enverra un message à l'ouverture de chaque vote.
+
         La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
         """
         joueur = Joueurs.query.get(ctx.author.id)
@@ -31,13 +40,13 @@ class VoterAgir(commands.Cog):
         if not joueur.votant_village:
             await ctx.send("Tu n'es pas autorisé à participer à ce vote.")
             return
-        elif joueur._vote_condamne is None:
+        elif joueur.vote_condamne_ is None:
             await ctx.send("Pas de vote pour le condamné de jour en cours !")
             return
 
         # Choix de la cible
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
-                                                message=f"Contre qui veux-tu voter ? (vote actuel : {tools.code(joueur._vote_condamne)})")
+                                                message=f"Contre qui veux-tu voter ? (vote actuel : {tools.code(joueur.vote_condamne_)})")
 
         #Test si la cible est sous le coup d'un haros
         cible_ds_haro = CandidHaro.query.filter_by(player_id=cible.discord_id, type='haro').all()
@@ -47,19 +56,19 @@ class VoterAgir(commands.Cog):
                 await ctx.send("Compris, mission aborted.")
                 return
 
-        if joueur._vote_condamne is None:      # On revérifie, si ça a fermé entre temps !!
+        if joueur.vote_condamne_ is None:      # On revérifie, si ça a fermé entre temps !!
             await ctx.send("Le vote pour le condamné du jour a fermé entre temps, pas de chance !")
             return
 
         async with ctx.typing():
             # Modification en base
-            bdd_tools.modif(joueur, "_vote_condamne", cible.nom)
+            bdd_tools.modif(joueur, "vote_condamne_", cible.nom)
             bdd.session.commit()
 
             # Écriture dans sheet Données brutes
-            DONNES_SHEET_ID = env.load("DONNES_SHEET_ID")
-            sheet = gsheets.connect(DONNES_SHEET_ID).worksheet("votecond_brut")
-            sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur._vote_condamne], value_input_option="USER_ENTERED")
+            LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
+            sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet("votecond_brut")
+            sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.vote_condamne_], value_input_option="USER_ENTERED")
 
         await ctx.send(f"Votre contre {tools.code(cible.nom)} bien pris en compte.\n"
                        + tools.ital("Tu peux modifier ton vote autant que nécessaire avant sa fermeture."))
@@ -71,10 +80,13 @@ class VoterAgir(commands.Cog):
     async def votemaire(self, ctx, *, cible=None):
         """Vote pour le nouveau maire
 
-        [cible] joueur pour lequel tu souhaites voter.
+        Args:
+            cible: nom du joueur pour lequel tu souhaites voter.
 
         Cette commande n'est utilisable que lorsqu'une élection pour le maire est en cours, pour les joueurs ayant le droit de voter.
+
         Le bot t'enverra un message à l'ouverture de chaque vote.
+
         La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
         """
         joueur = Joueurs.query.get(ctx.author.id)
@@ -84,13 +96,13 @@ class VoterAgir(commands.Cog):
         if not joueur.votant_village:
             await ctx.send("Tu n'es pas autorisé à participer à ce vote.")
             return
-        elif joueur._vote_maire is None:
+        elif joueur.vote_maire_ is None:
             await ctx.send("Pas de vote pour le nouveau maire en cours !")
             return
 
         # Choix de la cible
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
-                                                message=f"Pour qui veux-tu voter ? (vote actuel : {tools.code(joueur._vote_maire)})")
+                                                message=f"Pour qui veux-tu voter ? (vote actuel : {tools.code(joueur.vote_maire_)})")
 
         cible_ds_candid = CandidHaro.query.filter_by(player_id=cible.discord_id, type='candidature').all()
         if not cible_ds_candid:
@@ -99,19 +111,19 @@ class VoterAgir(commands.Cog):
                 await ctx.send("Compris, mission aborted.")
                 return
 
-        if joueur._vote_maire is None:          # On revérifie, si ça a fermé entre temps !!
+        if joueur.vote_maire_ is None:          # On revérifie, si ça a fermé entre temps !!
             await ctx.send("Le vote pour le nouveau maire a fermé entre temps, pas de chance !")
             return
 
         async with ctx.typing():
             # Modification en base
-            bdd_tools.modif(joueur, "_vote_maire", cible.nom)
+            bdd_tools.modif(joueur, "vote_maire_", cible.nom)
             bdd.session.commit()
 
             # Écriture dans sheet Données brutes
-            DONNES_SHEET_ID = env.load("DONNES_SHEET_ID")
-            sheet = gsheets.connect(DONNES_SHEET_ID).worksheet("votemaire_brut")
-            sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur._vote_maire], value_input_option="USER_ENTERED")
+            LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
+            sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet("votemaire_brut")
+            sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.vote_maire_], value_input_option="USER_ENTERED")
 
         await ctx.send(f"Votre pour {tools.code(cible.nom)} bien pris en compte.\n"
                        + tools.ital("Tu peux modifier ton vote autant que nécessaire avant sa fermeture."))
@@ -123,10 +135,13 @@ class VoterAgir(commands.Cog):
     async def voteloups(self, ctx, *, cible=None):
         """Vote pour la victime de l'attaque des loups
 
-        [cible] joueur que tu souhaites éliminer.
+        Args:
+            cible: nom du joueur que tu souhaites éliminer.
 
         Cette commande n'est utilisable que lorsqu'une vote pour la victime du soir est en cours, pour les joueurs concernés.
+
         Le bot t'enverra un message à l'ouverture de chaque vote.
+
         La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
         """
         joueur = Joueurs.query.get(ctx.author.id)
@@ -136,27 +151,27 @@ class VoterAgir(commands.Cog):
         if not joueur.votant_loups:
             await ctx.send("Tu n'es pas autorisé à participer à ce vote.")
             return
-        elif joueur._vote_loups is None:
+        elif joueur.vote_loups_ is None:
             await ctx.send("Pas de vote pour la victime des loups en cours !")
             return
 
         # Choix de la cible
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
-                                                message=f"Qui veux-tu manger ? (vote actuel : {tools.code(joueur._vote_loups)})")
+                                                message=f"Qui veux-tu manger ? (vote actuel : {tools.code(joueur.vote_loups_)})")
 
-        if joueur._vote_loups is None:          # On revérifie, si ça a fermé entre temps !!
+        if joueur.vote_loups_ is None:          # On revérifie, si ça a fermé entre temps !!
             await ctx.send("Le vote pour la victime des loups a fermé entre temps, pas de chance !")
             return
 
         async with ctx.typing():
             # Modification en base
-            bdd_tools.modif(joueur, "_vote_loups", cible.nom)
+            bdd_tools.modif(joueur, "vote_loups_", cible.nom)
             bdd.session.commit()
 
             # Écriture dans sheet Données brutes
-            DONNES_SHEET_ID = env.load("DONNES_SHEET_ID")
-            sheet = gsheets.connect(DONNES_SHEET_ID).worksheet("voteloups_brut")
-            sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.camp, joueur._vote_loups], value_input_option="USER_ENTERED")
+            LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
+            sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet("voteloups_brut")
+            sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.camp, joueur.vote_loups_], value_input_option="USER_ENTERED")
 
         await ctx.send(f"Votre contre {tools.code(cible.nom)} bien pris en compte.")
 
@@ -167,8 +182,10 @@ class VoterAgir(commands.Cog):
     async def action(self, ctx, *, decision=None):
         """Utilise l'action de ton rôle / une des actions associées
 
-        [decision] ce que tu souhaites faire.
-        Dans le cas où tu as plusieurs actions disponibles, ce paramètre n'est pas pris en compte pour éviter toute ambiguïté.
+        Args:
+            decision: ce que tu souhaites faire.
+
+                Dans le cas où tu as plusieurs actions disponibles, ce paramètre n'est pas pris en compte pour éviter toute ambiguïté.
 
         Cette commande n'est utilisable que si tu as au moins une action ouverte. Action = pouvoir associé à ton rôle, mais aussi pouvoirs ponctuels (Lame Vorpale, Chat d'argent...)
         Le bot t'enverra un message à l'ouverture de chaque action.
@@ -179,7 +196,7 @@ class VoterAgir(commands.Cog):
         assert joueur, f"!vote : joueur {ctx.author} introuvable"
 
         # Détermine la/les actions en cours pour le joueur
-        actions = Actions.query.filter(Actions.player_id == joueur.discord_id, Actions._decision != None).all()
+        actions = Actions.query.filter(Actions.player_id == joueur.discord_id, Actions.decision_ != None).all()
         if not actions:
             await ctx.send("Aucune action en cours pour toi.")
             return
@@ -196,11 +213,11 @@ class VoterAgir(commands.Cog):
 
         # Choix de la décision : très simple pour l'instant, car pas de résolution auto
         if not decision:                    # Si décision pas précisée à l'appel de la commande
-            await ctx.send(f"Que veux-tu faire pour l'action {tools.code(action.action)} ? (action actuelle : {tools.code(action._decision)})")
+            await ctx.send(f"Que veux-tu faire pour l'action {tools.code(action.action)} ? (action actuelle : {tools.code(action.decision_)})")
             message = await tools.wait_for_message_here(ctx)
             decision = message.content
 
-        if action._decision is None:        # On revérifie, si ça a fermé entre temps !!
+        if action.decision_ is None:        # On revérifie, si ça a fermé entre temps !!
             await ctx.send("L'action a fermé entre temps, pas de chance !")
             return
 
@@ -215,13 +232,13 @@ class VoterAgir(commands.Cog):
 
         async with ctx.typing():
             # Modification en base
-            bdd_tools.modif(action, "_decision", decision)
+            bdd_tools.modif(action, "decision_", decision)
 
             # Écriture dans sheet Données brutes
-            DONNES_SHEET_ID = env.load("DONNES_SHEET_ID")
-            sheet = gsheets.connect(DONNES_SHEET_ID).worksheet("actions_brut")
+            LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
+            sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet("actions_brut")
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.role, joueur.camp,
-                              "\n+\n".join([f"{action.action} : {action._decision}" for action in actions])],
+                              "\n+\n".join([f"{action.action} : {action.decision_}" for action in actions])],
                              value_input_option="USER_ENTERED")
 
         # Conséquences si action instantanée
@@ -236,12 +253,12 @@ class VoterAgir(commands.Cog):
                         bdd.session.delete(action)
                         deleted = True
                 if not deleted:
-                    bdd_tools.modif(action, "_decision", None)
+                    bdd_tools.modif(action, "decision_", None)
 
             await ctx.send(tools.ital(f"[Allo {tools.role(ctx, 'MJ').mention}, conséquence instantanée ici !]"))
 
         else:
-            await ctx.send(f"Action « {tools.code(action._decision)} » bien prise en compte pour {tools.code(action.action)}.\n"
+            await ctx.send(f"Action « {tools.code(action.decision_)} » bien prise en compte pour {tools.code(action.action)}.\n"
                            + tools.ital("Tu peux modifier ta décision autant que nécessaire avant la fin du créneau."))
 
         bdd.session.commit()
