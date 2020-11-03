@@ -83,7 +83,6 @@ class GestionIA(commands.Cog):
 
 
     @commands.command(aliases=["cancer", "214"])
-    @tools.private
     async def fals(self, ctx, force=None):
         """Active/désactive le mode « foire à la saucisse »
 
@@ -174,7 +173,7 @@ class GestionIA(commands.Cog):
         """
         async with ctx.typing():
             if trigger:
-                trigs = await bdd_tools.find_nearest(trigger, table=Triggers, carac="trigger", sensi=sensi, solo_si_parfait=False)
+                trigs = bdd_tools.find_nearest(trigger, table=Triggers, carac="trigger", sensi=sensi, solo_si_parfait=False)
                 if not trigs:
                     await ctx.send(f"Rien trouvé, pas de chance (sensi = {sensi})")
                     return
@@ -217,7 +216,7 @@ class GestionIA(commands.Cog):
             mess = await tools.wait_for_message_here(ctx)
             trigger = mess.content
 
-        trigs = await bdd_tools.find_nearest(trigger, Triggers, carac="trigger")
+        trigs = bdd_tools.find_nearest(trigger, Triggers, carac="trigger")
         if not trigs:
             await ctx.send("Rien trouvé.")
             return
@@ -314,7 +313,7 @@ async def trigger_roles(message, sensi=0.75):
     Returns:
         ``True`` si un rôle a été trouvé (sensibilité ``> sensi``) et qu'une réponse a été envoyée, ``False`` sinon
     """
-    roles = await bdd_tools.find_nearest(message.content, Roles, carac="nom", sensi=sensi)
+    roles = bdd_tools.find_nearest(message.content, Roles, carac="nom", sensi=sensi)
 
     if roles:       # Au moins un trigger trouvé à cette sensi
         role = roles[0][0]                                  # Meilleur trigger (score max)
@@ -341,7 +340,7 @@ async def trigger_reactions(bot, message, chain=None, sensi=0.7, debug=False):
     """
     if not chain:                   # Si pas précisé,
         chain = message.content         # contenu de message
-    trigs = await bdd_tools.find_nearest(chain, Triggers, carac="trigger", sensi=sensi)
+    trigs = bdd_tools.find_nearest(chain, Triggers, carac="trigger", sensi=sensi)
 
     if trigs:       # Au moins un trigger trouvé à cette sensi
         trig = trigs[0][0]                                  # Meilleur trigger (score max)
@@ -471,7 +470,7 @@ async def default(message):
     Returns:
         ``True`` (réponse par défaut envoyée)
     """
-    mess = "Désolé, je n'ai pas compris 🤷‍♂️"
+    mess = "Désolé, je n'ai pas compris :person_shrugging:"
     if random.random() < 0.05:
         mess += "\n(et toi, tu as perdu)"
     await message.channel.send(mess)                    # On envoie le texte par défaut

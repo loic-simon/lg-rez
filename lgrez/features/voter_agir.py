@@ -45,13 +45,17 @@ class VoterAgir(commands.Cog):
             return
 
         # Choix de la cible
+        haros = CandidHaro.query.filter_by(type="haro").all()
+        harotes = [Joueurs.query.get(haro.player_id).nom for haro in haros]
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
-                                                message=f"Contre qui veux-tu voter ? (vote actuel : {tools.code(joueur.vote_condamne_)})")
+            message=f"Contre qui veux-tu voter ? (vote actuel : {tools.code(joueur.vote_condamne_)})"
+                    f"\n(harotés : {', '.join(harotes) or 'aucun :pensive:'})"
+        )
 
-        #Test si la cible est sous le coup d'un haros
+        # Test si la cible est sous le coup d'un haro
         cible_ds_haro = CandidHaro.query.filter_by(player_id=cible.discord_id, type='haro').all()
         if not cible_ds_haro:
-            mess = await ctx.send(f"{cible.nom} n'a pas (encore) subi de haro ! Si c'est toujours le cas à la fin du vote, ton vote sera compté comme blanc... \n Veux-tu continuer ?")
+            mess = await ctx.send(f"{cible.nom} n'a pas (encore) subi ou posté de haro ! Si c'est toujours le cas à la fin du vote, ton vote sera compté comme blanc... \n Veux-tu continuer ?")
             if not await tools.yes_no(ctx.bot, mess):
                 await ctx.send("Compris, mission aborted.")
                 return
@@ -100,10 +104,16 @@ class VoterAgir(commands.Cog):
             await ctx.send("Pas de vote pour le nouveau maire en cours !")
             return
 
-        # Choix de la cible
-        cible = await tools.boucle_query_joueur(ctx, cible=cible,
-                                                message=f"Pour qui veux-tu voter ? (vote actuel : {tools.code(joueur.vote_maire_)})")
 
+        # Choix de la cible
+        candids = CandidHaro.query.filter_by(type="candidature").all()
+        candidats = [Joueurs.query.get(candid.player_id).nom for candid in candids]
+        cible = await tools.boucle_query_joueur(ctx, cible=cible,
+            message=f"Pour qui veux-tu voter ? (vote actuel : {tools.code(joueur.vote_maire_)})"
+                    f"\n(candidats : {', '.join(candidats) or 'aucun :pensive:'})"
+        )
+
+        # Test si la cible s'est présentée
         cible_ds_candid = CandidHaro.query.filter_by(player_id=cible.discord_id, type='candidature').all()
         if not cible_ds_candid:
             mess = await ctx.send(f"{cible.nom} ne s'est pas (encore) présenté(e) ! Si c'est toujours le cas à la fin de l'élection, ton vote sera compté comme blanc... \n Veux-tu continuer ?")
@@ -250,7 +260,7 @@ class VoterAgir(commands.Cog):
                     pcs = " pour cette semaine" if "weekends" in action.refill else ""
                     await ctx.send(f"Il te reste {action.charges} charge(s){pcs}.")
                     if action.charges == 0 and not action.refill:
-                        bdd.session.delete(action)
+                        gestion_actions.delete_action(ctx, action)
                         deleted = True
                 if not deleted:
                     bdd_tools.modif(action, "decision_", None)
@@ -260,5 +270,3 @@ class VoterAgir(commands.Cog):
         else:
             await ctx.send(f"Action « {tools.code(action.decision_)} » bien prise en compte pour {tools.code(action.action)}.\n"
                            + tools.ital("Tu peux modifier ta décision autant que nécessaire avant la fin du créneau."))
-
-        bdd.session.commit()

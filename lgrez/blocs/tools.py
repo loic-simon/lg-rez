@@ -322,7 +322,7 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
             if joueur := Joueurs.query.get(int(id)):                # Si cet ID correspond à un utilisateur, on le récupère
                 return joueur                                       # On a trouvé l'utilisateur !
 
-        nearest = await bdd_tools.find_nearest(rep, Joueurs, carac="nom", sensi=sensi)     # Sinon, recherche au plus proche
+        nearest = bdd_tools.find_nearest(rep, Joueurs, carac="nom", sensi=sensi)     # Sinon, recherche au plus proche
 
         if not nearest:
             await ctx.send("Aucune entrée trouvée, merci de réessayer :")
@@ -383,7 +383,7 @@ async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
         for emoji in emojis:                    # On ajoute les emojis
             await message.add_reaction(emoji)
 
-        emojis_names = [emoji.name if hasattr(emoji, "name") else emoji for emoji in emojis]
+        emojis_names = {emoji.name if hasattr(emoji, "name") else emoji: emoji for emoji in emojis}
         def react_check(react):                     # Check REACT : bon message, pas un autre emoji, et pas react du bot
             return (react.message_id == message.id
                     and react.user_id != bot.user.id
@@ -411,7 +411,7 @@ async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
             if trigger_all_reacts and emoji.name not in emojis_names:
                 ret = emoji
             else:
-                ret = emojis[emoji.name]                            # Si clic sur react, done.result = react
+                ret = emojis.get(emoji) or emojis.get(emojis_names.get(emoji.name))     # Si clic sur react, done.result = react
 
             for emoji in emojis:
                 await message.remove_reaction(emoji, bot.user)      # On finit par supprimer les emojis mis par le bot
@@ -482,7 +482,7 @@ async def sleep(chan, x):
     Permat d'afficher plusieurs messages d'affillée en laissant le temps de lire, tout en indiquant que le bot n'a pas fini d'écrire
 
     Args:
-        chan (:class:`discord.TextChannel`): salon sur lequel attendre
+        chan (:class:`discord.abc.Messageable`): salon / contexte /... sur lequel attendre
         x (:class:`float`): temps à attendre, en secondes
     """
     async with chan.typing():
@@ -493,6 +493,27 @@ async def sleep(chan, x):
 ### ---------------------------------------------------------------------------
 ### Utilitaires d'emojis
 ### ---------------------------------------------------------------------------
+
+def emoji_camp(arg, camp):
+    """Renvoie l'emoji associé à un camp donné.
+
+    Args:
+        arg (:class:`~discord.ext.commands.Context` | :class:`~discord.Guild` | :class:`~discord.Member` | :class:`~discord.abc.GuildChannel`): argument "connecté" au serveur, permettant de remonter aux emojis
+        camp (str): parmis ``"village"``, ``"loups"``, ``"nécro"``, ``"solitaire"``, ``"autre"``
+
+    Returns:
+        :class:`discord.Emoji` or `""`
+    """
+    d = {"village": "village",
+         "loups": "lune",
+         "nécro": "necro",
+         "solitaire": "pion",
+         "autre": "pion"}
+    if camp in d:
+        return emoji(arg, d[camp])
+    else:
+        return ""
+
 
 def montre(heure=None):
     """Renvoie l'emoji horloge (🕧, 🕓, 🕝...) le plus proche d'une heure donnée

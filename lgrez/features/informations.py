@@ -13,24 +13,6 @@ from lgrez.blocs import bdd_tools, tools
 from lgrez.blocs.bdd import session, Joueurs, Roles, Actions, BaseActions
 
 
-def emoji_camp(arg, camp):
-    """Renvoie l'emoji associé à un camp donné.
-
-    Args:
-        arg (:class:`~discord.ext.commands.Context` | :class:`~discord.Guild` | :class:`~discord.Member` | :class:`~discord.abc.GuildChannel`): argument "connecté" au serveur, permettant de remonter aux emojis
-        camp (str): parmis ``"village"``, ``"loups"``, ``"nécro"``, ``"solitaire"``, ``"autre"``
-    """
-    d = {"village": "village",
-         "loups": "lune",
-         "nécro": "necro",
-         "solitaire": "pion",
-         "autre": "pion"}
-    if camp in d:
-        return tools.emoji(arg, d[camp])
-    else:
-        return ""
-
-
 class Informations(commands.Cog):
     """Informations - Commandes disponibles pour en savoir plus sur soi et les autres"""
 
@@ -63,7 +45,7 @@ class Informations(commands.Cog):
             if role := Roles.query.get(filtre):     # Slug du rôle trouvé direct
                 pass
             else:                                   # Sinon, on cherche en base
-                roles = await bdd_tools.find_nearest(filtre, Roles, carac="nom")
+                roles = bdd_tools.find_nearest(filtre, Roles, carac="nom")
                 if roles:
                     role = roles[0][0]
                 else:
@@ -74,7 +56,7 @@ class Informations(commands.Cog):
 
         await tools.send_blocs(ctx,
             f"Rôles trouvés :\n"
-            + "\n".join([str(emoji_camp(ctx, role.camp)) + tools.code(f"{role.nom.ljust(25)} {role.description_courte}") for role in roles if not role.nom.startswith("(")])
+            + "\n".join([str(tools.emoji_camp(ctx, role.camp)) + tools.code(f"{role.nom.ljust(25)} {role.description_courte}") for role in roles if not role.nom.startswith("(")])
             + "\n" + tools.ital(f"({tools.code('!roles <role>')} pour plus d'informations sur un rôle.)")
         )
 
@@ -194,8 +176,14 @@ class Informations(commands.Cog):
         """
         mess = "Les joueurs vivants sont : \n"
         joueurs = [joueur for joueur in Joueurs.query.filter(Joueurs.statut != "mort").order_by(Joueurs.nom)]
-        for joueur in joueurs:
-            mess += f" - {joueur.nom.ljust(15)} en chambre {joueur.chambre}\n"
+
+        if ctx.bot.config.get("demande_chambre", True):
+            for joueur in joueurs:
+                mess += f" - {joueur.nom.ljust(15)} en chambre {joueur.chambre}\n"
+        else:
+            for joueur in joueurs:
+                mess += f" - {joueur.nom}\n"
+
         await tools.send_code_blocs(ctx, mess)
 
 

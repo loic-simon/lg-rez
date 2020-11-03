@@ -5,23 +5,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Unreleased
+## 1.1.0 - 2020-11-03
 ### Added
-- Documentation now covers every public classes and functions
-- ``!help`` now shows bot version
+
+- New command ``!annoncemort`` (in new module ``features.communication``).
+- Added ``LGBot.config`` to permit easier bot customization.
+    - Customize inscription with ``LGBot.config["demande_chambre"]`` and ``["debut_saison"]``.
+- ``!help`` now shows bot version and commands outside of cogs.
+- ``!open cond/maire`` now wipes CandidHaros.
+- ``!refill`` now opens back permanent actions with new charges.
+- Documentation now covers every public classes, functions and commands.
 
 ### Changed
-- Made some functions private (leading _)
-- Changed data attributes with leading underscores (like ``Joueurs._chan_id``) with trailing underscores (``Joueurs.chan_id_``)
-- Removed useless parameter in blocs.tools.create_context
-- Disabled ``!droptable``
+
+- Made some functions private (leading ``_``).
+- Changed data attributes with leading underscores (like ``Joueurs._chan_id``) with trailing underscores (``Joueurs.chan_id_``).
+- Data column ``Joueurs.chambre`` is now nullable.
+- ``!fals`` can now be used in non-private channels.
+- ``blocs.bdd_tools.find_nearest`` is no longer a coroutine.
+- Some refactoring:
+    - ``features.informations.emoji_camp`` deplaced to ``tools.emoji_camp``.
+    - ``!plot`` deplaced from ``features.actions_publiques`` to ``features.communication``.
+    - ``!send`` and ``!embed`` deplaced from ``features.annexe`` to ``features.communication``.
+    - ``!fillroles`` deplaced from ``features.remplissage_bdd`` (deleted) to ``features.communication``.
+
+### Removed
+
+- Deleted command ``!droptable``.
+- Deleted module ``features.remplissage_bdd``.
 
 ### Fixed
 
-- Issue with bot intents: proprer access to member list
-- Critical bug with ``!stop`` and voting commands
-- Configuration Assistant Tool: escape ``\n``s in ``LGREZ_GCP_CREDENTIALS``
-- ``!plot`` now creates ``./features`` folder if not existing
+- Issue with bot intents: proprer access to member list.
+- Improved handling of BDD disconnections.
+- Critical bug with ``!stop`` and voting commands.
+- ``!plot`` now creates ``./features`` folder if not existing.
+- ``blocs.tools.wait_for_react_clic`` now handles correctly custom emojis.
+- Configuration Assistant Tool: escape ``\n``s in ``LGREZ_GCP_CREDENTIALS``.
+- Other minor bug fixes and improvements.
 
 
 ## 1.0.3 - 2020-10-22

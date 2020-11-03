@@ -20,7 +20,11 @@ async def main(bot, member):
 
     Crée et paramètre le salon privé du joueur, lui pose des questions et l'inscrit en base.
 
-    Commande appellée à l'arrivée sur le serveur, utiliser ``!co`` pour trigger cette commande depuis Discord.
+    Personalisation :
+        - Si :attr:`bot.config <.LGBot.config>` ``["demande_chambre"]`` vaut ``False``, ne demande pas la chambre
+        - :attr:`bot.config <.LGBot.config>` ``["debut_saison"]`` permet de personnaliser la date de début de saison indiquée à la fin du processus
+
+    Commande appellée à l'arrivée sur le serveur, utiliser :meth:`\!co <.bot.Special.Special.co.callback>` pour trigger cette commande depuis Discord.
     """
     if Joueurs.query.get(member.id):                                            # Joueur dans la bdd = déjà inscrit
         await tools.private_chan(member).set_permissions(member, read_messages=True, send_messages=True)
@@ -83,19 +87,24 @@ async def main(bot, member):
 
     await chan.send("Parfait ! Je t'ai renommé(e) pour que tout le monde te reconnaisse, et j'ai renommé cette conversation.")
 
-    await tools.sleep(chan, 5)
 
-    a_la_rez = await tools.yes_no(bot, await chan.send("Bien, dernière chose : habites-tu à la Rez ?"))
+    if bot.config.get("demande_chambre", True):
+        await tools.sleep(chan, 5)
+        a_la_rez = await tools.yes_no(bot, await chan.send("Bien, dernière chose : habites-tu à la Rez ?"))
 
+        if a_la_rez:
+            def sortie_num_rez(m):
+                return len(m.content) < 200     # Longueur de chambre de rez maximale
+            chambre = (await tools.boucle_message(bot, chan, "Alors, quelle est ta chambre ?", sortie_num_rez, rep_message="Désolé, ce n'est pas un numéro de chambre valide, réessaie...")).content
+        else:
+            chambre = "XXX (chambre MJ)"
 
-    if a_la_rez:
-        def sortie_num_rez(m):
-            return len(m.content) < 200     # Longueur de chambre de rez maximale
-        chambre = (await tools.boucle_message(bot, chan, "Alors, quelle est ta chambre ?", sortie_num_rez, rep_message="Désolé, ce n'est pas un numéro de chambre valide, réessaie...")).content
+        await chan.send(f"{nom}, en chambre {chambre}... Je t'inscris en base !")
+
     else:
-        chambre = "XXX (chambre MJ)"
+        chambre = None
+        await chan.send(f"{nom}... Je t'inscris en base !")
 
-    await chan.send(f"{nom}, en chambre {chambre}... Je t'inscris en base !")
 
     async with chan.typing():     # Envoi indicateur d'écriture pour informer le joueur que le bot fait des trucs
         # Ajout à la BDD
@@ -141,7 +150,8 @@ async def main(bot, member):
     await chan.send(f"Juste quelques dernières choses :\n - Plein de commandes te sont d'ores et déjà accessibles ! Découvre les toutes en tapant {tools.code('!help')} ;\n - Si tu as besoin d'aide, plus de bouton MJ ALED : mentionne simplement les MJs ({tools.code('@MJ')}) et on viendra voir ce qui se passe !\n - Si ce n'est pas le cas, je te conseille fortement d'installer Discord sur ton téléphone, et d'{tools.bold('activer toutes les notifications')} pour ce channel ! Promis, pas de spam :innocent:\nPour le reste du serveur, tu peux le mettre en \"mentions only\", en activant le {tools.code('@everyone')} – il est limité ;\n\nEnfin, n'hésite pas à me parler, j'ai toujours quelques réponses en stock...")
 
     await tools.sleep(chan, 5)
-    await chan.send("Voilà, c'est tout bon ! Installe toi bien confortablement, la partie commence le 32 plopembre.")
+    debut_saison = bot.config.get("debut_saison", "32 plopembre")
+    await chan.send(f"Voilà, c'est tout bon ! Installe toi bien confortablement, la partie commence le {debut_saison}.")
 
     # Log
     await tools.log(member, f"Inscription de {member.name}#{member.discriminator} réussie\n - Nom : {nom}\n - Chambre : {chambre}\n - Channel créé : {chan.mention}")

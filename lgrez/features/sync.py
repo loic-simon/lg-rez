@@ -1,15 +1,17 @@
-"""lg-rez / features / Synchronisation TDB
+"""lg-rez / features / Synchronisation GSheets
 
-Récupération et application des modifications décidées via le Tableau de bord
+Récupération et application des données des GSheets : modifications décidées via le Tableau de bord et rôles
 
 """
 
 import traceback
+import time
 
+from discord import Embed
 from discord.ext import commands
 
 from lgrez.blocs import tools, bdd, bdd_tools, env, gsheets
-from lgrez.blocs.bdd import Joueurs, Actions, BaseActions, BaseActionsRoles, Taches
+from lgrez.blocs.bdd import engine, Tables, Joueurs, Actions, BaseActions, BaseActionsRoles, Roles, Taches
 from lgrez.features import gestion_actions
 
 
@@ -223,7 +225,7 @@ class Sync(commands.Cog):
     @commands.command()
     @tools.mjs_only
     async def sync(self, ctx, silent=False):
-        """Applique les modifications lors d'un appel du Tableau de bord (COMMANDE MJ)
+        """Récupère et applique les modifications du Tableau de bord (COMMANDE MJ)
 
         Args:
             silent: si spécifié (quelque soit sa valeur), les joueurs ne sont pas notifiés des modifications.
@@ -259,3 +261,71 @@ class Sync(commands.Cog):
 
         except Exception:
             await tools.log(ctx, traceback.format_exc(), code=True)
+
+
+    @commands.command()
+    @tools.mjs_only
+    async def fillroles(self, ctx):
+        """Remplit les tables des rôles / actions et #roles depuis le GSheet ad hoc (COMMANDE MJ)
+
+        - Remplit les tables :class:`.bdd.Roles`, :class:`.bdd.BaseActions` et :class:`.bdd.BaseActionsRoles` avec les informations du Google Sheets "Rôles et actions" (variable d'environnement ``LGREZ_ROLES_SHEET_ID``) ;
+        - Vide le chan ``#roles`` puis le remplit avec les descriptifs de chaque rôle.
+
+        Utile à chaque début de saison / changement dans les rôles/actions. Écrase toutes les entrées déjà en base, mais ne supprime pas celles obsolètes.
+        """
+
+        SHEET_ID = env.load("LGREZ_ROLES_SHEET_ID")
+        workbook = gsheets.connect(SHEET_ID)    # Tableau de bord
+
+        for table_name in ["Roles", "BaseActions", "BaseActionsRoles"]:
+            await ctx.send(f"Remplissage de la table {tools.code(table_name)}...")
+            async with ctx.typing():
+
+                sheet = workbook.worksheet(table_name)
+                values = sheet.get_all_values()         # Liste de liste des valeurs des cellules
+
+                table = Tables[table_name]
+                cols = bdd_tools.get_cols(table)
+                SQL_types = bdd_tools.get_SQL_types(table)
+                SQL_nullable = bdd_tools.get_SQL_nullable(table)
+                primary_col = bdd_tools.get_primary_col(table)
+
+                cols_index = {col: values[0].index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
+
+                existants = {getattr(item, primary_col):item for item in table.query.all()}
+
+                for L in values[1:]:
+                    args = {col: bdd_tools.transtype(L[cols_index[col]], col, SQL_types[col], SQL_nullable[col]) for col in cols}
+                    id = args[primary_col]
+                    if id in existants:
+                        for col in cols:
+                            if getattr(existants[id], col) != args[col]:
+                                bdd_tools.modif(existants[id], col, args[col])
+                    else:
+                        bdd.session.add(table(**args))
+
+                bdd.session.commit()
+
+            await ctx.send(f"Table {tools.code(table_name)} remplie !")
+            await tools.log(ctx, f"Table {tools.code(table_name)} remplie !")
+
+        chan_roles = tools.channel(ctx, "rôles")
+
+        await ctx.send(f"Vidage de {chan_roles.mention}...")
+        async with ctx.typing():
+            await chan_roles.purge(limit=1000)
+
+        roles = {camp: Roles.query.filter_by(camp=camp).all() for camp in ["village", "loups", "nécro", "solitaire", "autre"]}
+        await ctx.send(f"Remplissage... (temps estimé : {sum([len(v) + 2 for v in roles.values()]) + 1} secondes)")
+
+        t0 = time.time()
+        await chan_roles.send(f"Voici la liste des rôles : (accessible en faisant {tools.code('!roles')}, mais on l'a mis là parce que pourquoi pas)\n\n——————————————————————————")
+        async with ctx.typing():
+            for camp, roles_camp in roles.items():
+                if roles_camp:
+                    await chan_roles.send(embed=Embed(title=f"Camp : {camp}").set_image(url=tools.emoji_camp(ctx, camp).url))
+                    await chan_roles.send(f"——————————————————————————")
+                    for role in roles_camp:
+                        await chan_roles.send(f"{tools.emoji_camp(ctx, role.camp)} {tools.bold(role.prefixe + role.nom)} – {role.description_courte} (camp : {role.camp})\n\n{role.description_longue}\n\n——————————————————————————")
+
+        await ctx.send(f"{chan_roles.mention} rempli ! (en {(time.time() - t0):.4} secondes)")

@@ -1,4 +1,4 @@
-"""lg-rez / blocs / Définition et connection base de données
+"""lg-rez / blocs / Gestion des données
 
 Déclaration de toutes les tables et leurs colonnes, et connection à la BDD
 
@@ -7,11 +7,19 @@ Déclaration de toutes les tables et leurs colonnes, et connection à la BDD
 import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+import psycopg2
 
-from lgrez.blocs import env, bdd
+from lgrez.blocs import env
 
 
-#: plz document this
+#: Alias de :exc:`sqlalchemy.exc.SQLAlchemyError` : exception de BDD générale
+SQLAlchemyError = sqlalchemy.exc.SQLAlchemyError
+
+#: Alias de :exc:`psycopg2.SQLAlchemyError` : erreur levée en cas de perte de connection avec la BDD
+#: Seul PostreSQL géré nativement, override DriverOperationalError avec l'équivalent pour un autre driver
+DriverOperationalError = psycopg2.OperationalError
+
+
 Base = declarative_base()
 Base.__doc__ = "Classe de base des tables de données, renvoyée par :func:`sqlalchemy.ext.declarative.declarative_base`"
 #: :class:`dict`\[:class:`str`, :class:`.Base`\]: Dictionnaire {nom de la base -> table}
@@ -40,11 +48,11 @@ class _MyTable(object):
         super().__init_subclass__(**kwargs)
         cls.__tablename__ = cls.__name__.lower()
         Tables[cls.__name__] = cls
-        cls.__doc__ += f"\n\nClasse de données (sous-classe de :class:`.Base`) représentant la table ``{cls.__tablename__}`` Tous les attributs ci-dessous sont du type indiqué pour les instances (entrées de BDD), mais de type :class:`sqlalchemy.orm.attributes.InstrumentedAttribute` pour la classe elle-même."       # On adore la doc vraiment
+        cls.__doc__ += f"\n\nClasse de données (sous-classe de :class:`.Base`) représentant la table ``{cls.__tablename__}``.\n\nTous les attributs ci-dessous sont du type indiqué pour les instances (entrées de BDD), mais de type :class:`sqlalchemy.orm.attributes.InstrumentedAttribute` pour la classe elle-même."       # On adore la doc vraiment
 
     @classmethod
     def get_query(cls):
-        return bdd.session.query(cls)
+        return session.query(cls)
 
     query = _ClassProperty(get_query)        # Permet d'utiliser Table.query.<...> au lieu de bdd.session.query(Table).<...>
 
@@ -65,8 +73,8 @@ class Joueurs(_MyTable, Base): #, tablename="joueurs"
 
     #: :class:`str`: nom du joueur (demandé à l'inscription) (NOT NULL, ``len <= 32``)
     nom = sqlalchemy.Column(sqlalchemy.String(32), nullable=False)
-    #: :class:`str`: emplacement du joueur (demandé à l'inscription) (NOT NULL, ``len <= 200``)
-    chambre = sqlalchemy.Column(sqlalchemy.String(200), nullable=False)
+    #: :class:`str`: emplacement du joueur (demandé à l'inscription) (``len <= 200``)
+    chambre = sqlalchemy.Column(sqlalchemy.String(200), nullable=True)
     #: :class:`str`: statut RP (généralement "vivant", "mort" ou "MV") (NOT NULL, ``len <= 32``)
     statut = sqlalchemy.Column(sqlalchemy.String(32), nullable=False)
 
@@ -101,7 +109,7 @@ class Joueurs(_MyTable, Base): #, tablename="joueurs"
 class Roles(_MyTable, Base): #, tablename="roles"
     """Table de données des rôles
 
-    Cette table est remplie automatiquement à partir du Google Sheet "Rôles et actions" par la commande :meth:`\!fillroles <.remplissage_bdd.RemplissageBDD.RemplissageBDD.fillroles.callback>`.
+    Cette table est remplie automatiquement à partir du Google Sheet "Rôles et actions" par la commande :meth:`\!fillroles <.sync.Sync.Sync.fillroles.callback>`.
     """
 
     #: :class:`str`: identifiant unique du rôle (clé primaire, ``len <= 32``)
@@ -297,7 +305,7 @@ class CandidHaro(_MyTable, Base): #, tablename="candid_haro"
     id = sqlalchemy.Column(sqlalchemy.Integer(), primary_key = True)
     #: :class:`int`: joueur associé, clé étrangère de :attr:`.Joueurs.discord_id` (NOT NULL)
     player_id = sqlalchemy.Column(sqlalchemy.BigInteger(), nullable=False)
-    #: :class:`str`: ``"haro"`` ou ``"candid"`` (flemme de ``enum`` mais faudrait, vraiment) (NOT NULL, ``len <= 11``)
+    #: :class:`str`: ``"haro"`` ou ``"candidature"`` (flemme de ``enum`` mais faudrait, vraiment) (NOT NULL, ``len <= 11``)
     type = sqlalchemy.Column(sqlalchemy.String(11), nullable=False)
 
     def __repr__(self):
@@ -311,7 +319,7 @@ def connect():
     global engine, session
 
     LGREZ_DATABASE_URI = env.load("LGREZ_DATABASE_URI")
-    engine = sqlalchemy.create_engine(LGREZ_DATABASE_URI)           # Moteur SQL : connexion avec le serveur
+    engine = sqlalchemy.create_engine(LGREZ_DATABASE_URI, pool_pre_ping=True)           # Moteur SQL : connexion avec le serveur
 
     # Création des tables si elles n'existent pas déjà
     Base.metadata.create_all(engine)

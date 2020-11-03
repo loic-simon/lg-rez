@@ -1,8 +1,10 @@
+import sys
 import os
 import asyncio
 import logging
 import traceback
 import datetime
+import re
 
 import discord
 from discord.ext import commands
@@ -10,7 +12,7 @@ from discord.ext import commands
 from lgrez import __version__
 from lgrez.blocs import tools, bdd, env, bdd_tools, gsheets, webhook, pseudoshell
 from lgrez.blocs.bdd import Tables, Joueurs, Actions, Roles
-from lgrez.features import annexe, IA, inscription, informations, sync, open_close, voter_agir, remplissage_bdd, taches, actions_publiques
+from lgrez.features import annexe, IA, inscription, informations, sync, open_close, voter_agir, taches, actions_publiques, communication
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -239,12 +241,15 @@ async def _on_command_error(bot, ctx, exc):
     if ctx.guild.id != bot.GUILD_ID:            # Mauvais serveur
         return
 
-    if bdd.session:
-        bdd.bdd.session.rollback()       # Dans le doute, on vide la session SQL
     if isinstance(exc, commands.CommandInvokeError) and isinstance(exc.original, tools.CommandExit):     # STOP envoyé
         await ctx.send(str(exc.original) or "Mission aborted.")
 
     elif isinstance(exc, commands.CommandInvokeError):
+        if isinstance(exc.original, bdd.SQLAlchemyError) or isinstance(exc.original, bdd.DriverOperationalError):       # Erreur SQL
+            if bdd.session:
+                await tools.log(ctx, "Rollback session")
+                bdd.session.rollback()          # On rollback la session
+
         await ctx.send(f"Oups ! Un problème est survenu à l'exécution de la commande  :grimacing:\n"
                        f"{tools.mention_MJ(ctx)} ALED – "
                        f"{tools.ital(f'{type(exc.original).__name__}: {str(exc.original)}')}")
@@ -296,10 +301,15 @@ async def _on_error(bot, event, *args, **kwargs):
         event (str): Nom de l'évènement ayant généré une erreur (``"member_join"``, ``"message"``...)
         *args, \**kwargs: Arguments passés à la fonction traitant l'évènement : ``member``, ``message``...
     """
-    if bdd.session:
-        bdd.bdd.session.rollback()       # Dans le doute, on vide la session SQL
+    etype, exc, tb = sys.exc_info()         # Exception ayant causé l'appel
+
     guild = bot.get_guild(bot.GUILD_ID)
     assert guild, f"on_error : Serveur {bot.GUILD_ID} introuvable - Erreur initiale : \n{traceback.format_exc()}"
+
+    if isinstance(exc, bdd.SQLAlchemyError) or isinstance(exc, bdd.DriverOperationalError):     # Erreur SQL
+        if bdd.session:
+            bdd.session.rollback()          # On rollback la session
+            await tools.log(guild, "Rollback session")
 
     await tools.log(guild, (
         f"{tools.role(guild, 'MJ').mention} ALED : Exception Python !"
@@ -460,40 +470,55 @@ class Special(commands.Cog):
         commandes = {cmd.name: cmd for cmd in ctx.bot.commands}                             # Dictionnaire nom: commande
         aliases = {alias: nom for nom, cmd in commandes.items() for alias in cmd.aliases}   # Dictionnaire alias: nom de la commande
 
-        n_max = max([len(cmd) for cmd in commandes])
+        len_max = max(len(cmd) for cmd in commandes)
 
-        if not command:
-            ctx.bot.in_command.remove(ctx.channel.id)
-            async def runnable_commands(cog):       # obligé parce que can_run doit être await, donc c'est compliqué
-                L = []
-                for cmd in cog.get_commands():
+        if not command:         # Pas d'argument ==> liste toutes les commandes
+            ctx.bot.in_command.remove(ctx.channel.id)   # On désactive la limitation de une commande simultanée sinon can_run renvoie toujours False
+            async def filter_runnables(commands):           # Obligé parce que can_run doit être await, donc c'est compliqué
+                """Retourne la liste des commandes pouvant run parmis commands"""
+                runnables = []
+                for cmd in commands:
                     try:
                         runnable = await cmd.can_run(ctx)
-                    except Exception:
+                    except Exception:       # Parfois can_run raise une exception pour dire que la commande est pas runnable
                         runnable = False
                     if runnable:
-                        L.append(cmd)
-                return L
+                        runnables.append(cmd)
+                return runnables
 
-            r = f"""{ctx.bot.description} (v{__version__})\n\n"""
-            r += "\n\n".join([f"{cog.description} : \n  - " + "\n  - ".join(
-                    [pref + cmd.name.ljust(n_max+2) + cmd.short_doc for cmd in runnables]           # pour chaque commande runnable
-                ) for cog in cogs.values() if (runnables := await runnable_commands(cog))])         # pour chaque cog contenant des runnables
+            r = f"""{ctx.bot.description} (v{__version__})"""
+            for cog in cogs.values():
+                runnables = await filter_runnables(cog.get_commands())
+                if runnables:                           # pour chaque cog contenant des runnables
+                    r += f"\n\n{cog.description} :"
+                    for cmd in runnables:               # pour chaque commande runnable
+                        r += f"\n  - {pref}{cmd.name.ljust(len_max)}  {cmd.short_doc}"
+
+            runnables_hors_cog = await filter_runnables(cmd for cmd in ctx.bot.commands if not cmd.cog)
+            if runnables_hors_cog:
+                r += f"\n\nCommandes isolées :"
+                for cmd in runnables_hors_cog:
+                    r += f"\n  - {pref}{cmd.name.ljust(len_max)}  {cmd.short_doc}"
+
             r += f"\n\nUtilise <{pref}help command> pour plus d'information sur une commande."
-            ctx.bot.in_command.append(ctx.channel.id)
 
-        else:
+            ctx.bot.in_command.append(ctx.channel.id)   # On réactive la limitation
+
+        else:       # Aide détaillée sur une commande
             if command.startswith(pref):        # Si le joueur fait !help !command
                 command = command.lstrip(pref)
-
             if command in aliases:              # Si !help d'un alias
                 command = aliases[command]      # On remplace l'alias par sa commande
 
             if command in commandes:             # Si commande existante
                 cmd = commandes[command]
 
-                r = f"{pref}{command} {cmd.signature} – {cmd.help}\n"
-                # r += f"\n\nUtilise <{pref}help> pour la liste des commandes ou <{pref}help command> pour plus d'information sur une commande."
+                doc = cmd.help or ""
+                doc = doc.replace("``", "`")
+                doc = doc.replace("Args:", "Arguments :")
+                doc = re.sub(r":\w+?:`[\.~!]*(.+?)`", r"`\1`", doc)
+
+                r = f"{pref}{command} {cmd.signature} – {doc}\n"
                 if cmd_aliases := [alias for alias,cmd in aliases.items() if cmd == command]:       # Si la commande a des alias
                     r += f"\nAlias : {pref}" + f", {pref}".join(cmd_aliases)
 
@@ -527,9 +552,13 @@ class LGBot(commands.Bot):
             **kwargs
         )
 
-        #: :class:`int`: l'ID du serveur sur lequel tourne le bot.
+        #: :class:`int`: L'ID du serveur sur lequel tourne le bot.
         #: Vaut ``None`` avant l'appel à :meth:`run`, puis la valeur de la variable d'environnement ``LGREZ_SERVER_ID``.
         self.GUILD_ID = None
+
+        #: :class:`dict`: Personalisation du bot (à définir avant l'appel à :meth:`run`), utilisable par les différentes fonctionnalités
+        #: (exemples : ``bot.config["debut_saison"]``, ``bot.config["demande_porte"]``...)
+        self.config = {}
 
         #: :class:`list`\[:class:`int`\]: IDs des salons dans lequels une commande est en cours d'exécution.
         self.in_command = []
@@ -552,9 +581,9 @@ class LGBot(commands.Bot):
         self.add_cog(actions_publiques.ActionsPubliques(self))   # Haros et candidatures
         self.add_cog(IA.GestionIA(self))                         # Ajout, liste, modification des règles d'IA
         self.add_cog(open_close.OpenClose(self))                 # Ouverture/fermeture votes/actions (appel par webhook)
-        self.add_cog(sync.Sync(self))                            # Synchronisation TDB (appel par webhook)
+        self.add_cog(sync.Sync(self))                            # Synchronisation depuis GSheets
         self.add_cog(taches.GestionTaches(self))                 # Tâches planifiées
-        self.add_cog(remplissage_bdd.RemplissageBDD(self))       # Drop et remplissage table de données
+        self.add_cog(communication.Communication(self))          # Envoi de messages et embeds
         self.add_cog(annexe.Annexe(self))                        # Ouils divers et plus ou moins inutiles
 
         self.remove_command("help")

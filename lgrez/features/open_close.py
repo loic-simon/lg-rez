@@ -81,7 +81,7 @@ async def recup_joueurs(quoi, qui, heure=None):
             or (quoi == "close" and action.decision_)       #   ni fermer une déjà fermée
             or (quoi == "remind" and action.decision_ == "rien")):
 
-            return {Joueurs.query.get(action.player_id):[action]}
+            return {Joueurs.query.get(action.player_id): [action]}
         else:
             return {}
 
@@ -174,6 +174,18 @@ class OpenClose(commands.Cog):
         # Actions déclenchées par ouverture
         for action in Actions.query.filter_by(trigger_debut=f"open_{qui}"):
             await gestion_actions.open_action(ctx, action)
+
+        # Réinitialise haros/candids
+        items = []
+        if qui == "cond":
+            items = CandidHaro.query.filter_by(type="haro").all()
+        elif qui == "maire":
+            items = CandidHaro.query.filter_by(type="candidature").all()
+        if items:
+            for item in items:
+                bdd.session.delete(item)
+            bdd.session.commit()
+            await tools.log(ctx, f"!open {qui} : haros/candids wiped")
 
         # Programme fermeture
         if qui in ["cond", "maire", "loups"] and heure:
@@ -345,8 +357,8 @@ class OpenClose(commands.Cog):
 
         if motif == "divin":
             if cible != "all":
-                target = await tools.boucle_query_joueur(ctx, cible=cible, message = "Qui veux-tu recharger ?")
-                refillable = Actions.query.filter(Actions.player_id == target.discord_id, Actions.charges != None).all()
+                target = await tools.boucle_query_joueur(ctx, cible=cible, message="Qui veux-tu recharger ?")
+                refillable = Actions.query.filter(Actions.charges != None).filter_by(player_id=target.discord_id).all()
             else:
                 m = await ctx.send("Tu as choisi de recharger le pouvoir de TOUS les joueurs actifs, en es-tu sûr ?")
 
@@ -360,7 +372,7 @@ class OpenClose(commands.Cog):
         else: #refill WE, forgeron ou rebouteux
             if cible != "all":
                 target = await tools.boucle_query_joueur(ctx, cible=cible, message = "Qui veux-tu recharger ?")
-                refillable = Actions.query.filter(Actions.refill.contains(motif), Actions.player_id == target.discord_id).all()
+                refillable = Actions.query.filter(Actions.refill.contains(motif)).filter_by(player_id=target.discord_id).all()
             else:
                 refillable = Actions.query.filter(Actions.refill.contains(motif)).all()
 
@@ -372,15 +384,22 @@ class OpenClose(commands.Cog):
 
         await tools.send_code_blocs(ctx, txt)
 
+        # Détermination nouveau nombre de charges
         if motif == "weekends":
             remplissage = {action: BaseActions.query.get(action.action).base_charges for action in refillable}
         else:
             remplissage = {action: action.charges + 1 for action in refillable}
 
+        # Refill proprement dit
         for action, charge in remplissage.items():
-            bdd_tools.modif(action, "charges", charge)
+            if charge > action.charges:
+                if not action.charges and action.trigger_debut == "perma":           # Action permanente : on ré-ouvre !
+                    ts = tools.fin_pause() if motif == "weekends" else datetime.datetime.now() + datetime.timedelta(seconds=10)
+                    taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
 
-            await tools.send_blocs(tools.private_chan(ctx.guild.get_member(action.player_id)),f"Ton action {action.action} vient d'être rechargée, tu as maintenant {charge} charge(s) disponible(s) !")
+                bdd_tools.modif(action, "charges", charge)
+
+                await tools.send_blocs(tools.private_chan(ctx.guild.get_member(action.player_id)),f"Ton action {action.action} vient d'être rechargée, tu as maintenant {charge} charge(s) disponible(s) !")
 
         bdd.session.commit()
 
@@ -450,9 +469,14 @@ class OpenClose(commands.Cog):
                     r += f" - À 19h : !open {action.id} (trigger_debut == {action.trigger_debut})\n"
                     taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
 
+                # Programmation refill weekends
+                # r += "\nProgrammation des refills weekends :\n"
+                # taches.add_task(ctx.bot, tools.fin_pause() - datetime.timedelta(minutes=5), f"!refill weekends all")
+                # r += " - Dimanche à 18h55 : !refill weekends all\n"
+
                 # Programmation envoi d'un message aux connards
                 r += f"\nEt, à 18h50 : !send all [message de hype oue oue c'est génial]\n"
-                taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=10), "!send all Ah {member.mention}... J'espère que tu es prêt, parce que la partie commence DANS 10 MINUTES !!! https://tenor.com/view/thehungergames-hungergames-thggifs-effie-gif-5114734")
+                taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=10), "!send all Ah {member.mention}... J'espère que tu es prêt(e), parce que la partie commence DANS 10 MINUTES !!! https://tenor.com/view/thehungergames-hungergames-thggifs-effie-gif-5114734")
 
                 await tools.log(ctx, r, code=True)
 
