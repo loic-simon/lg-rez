@@ -11,7 +11,7 @@ from sqlalchemy.sql.expression import and_, or_, not_
 
 from lgrez.blocs import tools, bdd, bdd_tools
 from lgrez.features import gestion_actions, taches
-from lgrez.blocs.bdd import Joueurs, Actions, BaseActions, BaseActionsRoles
+from lgrez.blocs.bdd import Joueurs, Actions, BaseActions, BaseActionsRoles, CandidHaro
 
 
 async def recup_joueurs(quoi, qui, heure=None):
@@ -109,7 +109,7 @@ class OpenClose(commands.Cog):
                 ===========     ===========
 
             heure:
-                - si ``qui == "cond"``, ``"maire"`` ou ``"loup"``, programme en plus la fermeture à ``heure`` (et un rappel 10 minutes avant) ;
+                - si ``qui == "cond"``, ``"maire"`` ou ``"loup"``, programme en plus la fermeture à ``heure`` (et un rappel 30 minutes avant) ;
                 - si ``qui == "action"``, il est obligatoire : heure des actions à lancer (cf plus haut). Pour les actions, la fermeture est de toute façon programmée le cas échéant (``trigger_fin`` ``temporel`` ou ``delta``).
 
                 Dans tous les cas, format ``HHh`` ou ``HHhMM``.
@@ -145,7 +145,7 @@ class OpenClose(commands.Cog):
                 message = await chan.send(
                     f"""{tools.montre()}  Le vote pour le condamné du jour est ouvert !  {tools.emoji(ctx, "bucher")} \n"""
                     + (f"""Tu as jusqu'à {heure} pour voter. \n""" if heure else "")
-                    + tools.ital(f"""Tape {tools.code('!vote <joueur>')} ou utilise la réaction pour voter."""))
+                    + tools.ital(f"""Tape {tools.code('!vote (nom du joueur)')} ou utilise la réaction pour voter."""))
                 await message.add_reaction(tools.emoji(ctx, "bucher"))
 
             elif qui == "maire":
@@ -153,7 +153,7 @@ class OpenClose(commands.Cog):
                 message = await chan.send(
                     f"""{tools.montre()}  Le vote pour l'élection du maire est ouvert !  {tools.emoji(ctx, "maire")} \n"""
                     + (f"""Tu as jusqu'à {heure} pour voter. \n""" if heure else "")
-                    + tools.ital(f"""Tape {tools.code('!votemaire <joueur>')} ou utilise la réaction pour voter."""))
+                    + tools.ital(f"""Tape {tools.code('!votemaire (nom du joueur)')} ou utilise la réaction pour voter."""))
                 await message.add_reaction(tools.emoji(ctx, "maire"))
 
             elif qui == "loups":
@@ -161,7 +161,7 @@ class OpenClose(commands.Cog):
                 message = await chan.send(
                     f"""{tools.montre()}  Le vote pour la victime de cette nuit est ouvert !  {tools.emoji(ctx, "lune")} \n"""
                     + (f"""Tu as jusqu'à {heure} pour voter. \n""" if heure else "")
-                    + tools.ital(f"""Tape {tools.code('!voteloups <joueur>')} ou utilise la réaction pour voter."""))
+                    + tools.ital(f"""Tape {tools.code('!voteloups (nom du joueur)')} ou utilise la réaction pour voter."""))
                 await message.add_reaction(tools.emoji(ctx, "lune"))
 
             else:       # Action
@@ -186,11 +186,14 @@ class OpenClose(commands.Cog):
                 bdd.session.delete(item)
             bdd.session.commit()
             await tools.log(ctx, f"!open {qui} : haros/candids wiped")
+            await tools.channel(ctx, "haros").send(f"{tools.emoji(ctx, 'void')}\n"*30
+                + "Nouveu jour, nouveaux haros !\n"
+                + tools.ital(f"Les posts ci-dessus sont invalides pour le vote d'aujourd'hui. Utilisez {tools.code('!haro')} pour en relancer."))
 
         # Programme fermeture
         if qui in ["cond", "maire", "loups"] and heure:
             ts = tools.next_occurence(tools.heure_to_time(heure))
-            taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=10), f"!remind {qui}")
+            taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=30), f"!remind {qui}")
             if heure_chain:
                 taches.add_task(ctx.bot, ts, f"!close {qui} {heure_chain} {heure}")      # Programmera prochaine ouverture
             else:
@@ -214,7 +217,7 @@ class OpenClose(commands.Cog):
                 ===========     ===========
 
             heure:
-                - si ``qui == "cond"``, ``"maire"`` ou ``"loup"``, programme en plus une prochaine ouverture à ``heure`` (et un rappel 10 minutes avant) ;
+                - si ``qui == "cond"``, ``"maire"`` ou ``"loup"``, programme en plus une prochaine ouverture à ``heure`` (et un rappel 30 minutes avant) ;
                 - si ``qui == "action"``, il est obligatoire : heure des actions à lancer (cf plus haut). Pour les actions, la prochaine est de toute façon programmée le cas échéant (cooldown à 0 et reste des charges).
 
                 Dans tous les cas, format ``HHh`` ou ``HHhMM``.
@@ -324,20 +327,20 @@ class OpenClose(commands.Cog):
             assert member, f"!remind : member {joueur} introuvable"
 
             if qui == "cond":
-                message = await chan.send(f"""⏰ {member.mention} Plus que 10 minutes pour voter pour le condamné du jour ! 😱 \n""")
+                message = await chan.send(f"""⏰ {member.mention} Plus que 30 minutes pour voter pour le condamné du jour ! 😱 \n""")
                 await message.add_reaction(tools.emoji(ctx, "bucher"))
 
             elif qui == "maire":
-                message = await chan.send(f"""⏰ {member.mention} Plus que 10 minutes pour élire le nouveau maire ! 😱 \n""")
+                message = await chan.send(f"""⏰ {member.mention} Plus que 30 minutes pour élire le nouveau maire ! 😱 \n""")
                 await message.add_reaction(tools.emoji(ctx, "maire"))
 
             elif qui == "loups":
-                message = await chan.send(f"""⏰ {member.mention} Plus que 10 minutes voter pour la victime du soir ! 😱 \n""")
+                message = await chan.send(f"""⏰ {member.mention} Plus que 30 minutes voter pour la victime du soir ! 😱 \n""")
                 await message.add_reaction(tools.emoji(ctx, "lune"))
 
             else:       # Action
                 for action in joueurs[joueur]:
-                    message = await chan.send(f"""⏰ {member.mention} Plus que 10 minutes pour utiliser ton action {tools.code(action.action)} ! 😱 \n""")
+                    message = await chan.send(f"""⏰ {member.mention} Plus que 30 minutes pour utiliser ton action {tools.code(action.action)} ! 😱 \n""")
                     await message.add_reaction(tools.emoji(ctx, "action"))
 
 

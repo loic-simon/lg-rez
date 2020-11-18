@@ -146,7 +146,7 @@ Commandes informatives
     - :Commande ``!roles`` (alias ``!role``, ``!rôles``, ``!rôle``, ``!camp``, ``!camps``) : .. automethod:: lgrez.features.informations.Informations.roles.callback
     - :Commande ``!menu`` : .. automethod:: lgrez.features.informations.Informations.menu.callback
     - :Commande ``!infos`` : .. automethod:: lgrez.features.informations.Informations.infos.callback
-    - :Commande ``!vivants`` : .. automethod:: lgrez.features.informations.Informations.vivants.callback
+    - :Commande ``!vivants`` (alias ``!joueurs``) : .. automethod:: lgrez.features.informations.Informations.vivants.callback
     - :Commande ``!morts`` : .. automethod:: lgrez.features.informations.Informations.morts.callback
 
 .. }

@@ -248,7 +248,7 @@ class Taches(_MyTable, Base): #, tablename="taches"
     #: :class:`datetime.datetime`: moment où sera exécutée la tâche (NOT NULL)
     timestamp = sqlalchemy.Column(sqlalchemy.DateTime(), nullable=False)
     #: :class:`str`: texte à envoyer via le webhook (généralement une commande) (NOT NULL, ``len <= 200``)
-    commande = sqlalchemy.Column(sqlalchemy.String(200), nullable=False)
+    commande = sqlalchemy.Column(sqlalchemy.String(2000), nullable=False)
     #: :class:`int`: si la tâche est liée à une action, clé étrangère liée à :attr:`.Actions.id`
     action = sqlalchemy.Column(sqlalchemy.Integer(), nullable=True)
 

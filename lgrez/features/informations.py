@@ -23,23 +23,23 @@ class Informations(commands.Cog):
         Args:
             filtre: peut être
 
-                - Villageois, Loups, Nécros, Autres pour les rôles d'un camp ;
+                - "Villageois", "Loups", "Nécros", "Autres" pour les rôles d'un camp ;
                 - Un nom de rôle pour les informations sur ce rôle.
 
-        Si ``filtre`` n'est pas précisé, liste tous les rôles existants.
+        Sans argument liste tous les rôles existants.
         """
         if filtre:
             filtre = tools.remove_accents(filtre.lower())
 
         if not filtre:
             roles = Roles.query.order_by(Roles.nom).all()
-        elif filtre.startswith("villag"):
+        elif filtre in ("villageois", "village", "<villageois>", "<village>"):
             roles = Roles.query.filter_by(camp="village").all()
-        elif filtre.startswith("loup"):
+        elif filtre in ("loups", "<loups>"):
             roles = Roles.query.filter_by(camp="loups").all()
-        elif filtre.startswith("necro"):
+        elif filtre in ("necros", "<necros>"):
             roles = Roles.query.filter_by(camp="nécro").all()
-        elif filtre.startswith("autre") or filtre.startswith("solitaire"):
+        elif filtre in ("autres", "solitaires", "<autres>", "<solitaires>"):
             roles = Roles.query.filter_by(camp="solitaire").all()
         elif filtre:
             if role := Roles.query.get(filtre):     # Slug du rôle trouvé direct
@@ -59,6 +59,41 @@ class Informations(commands.Cog):
             + "\n".join([str(tools.emoji_camp(ctx, role.camp)) + tools.code(f"{role.nom.ljust(25)} {role.description_courte}") for role in roles if not role.nom.startswith("(")])
             + "\n" + tools.ital(f"({tools.code('!roles <role>')} pour plus d'informations sur un rôle.)")
         )
+
+
+    @commands.command()
+    @tools.mjs_only
+    async def rolede(self, ctx, *, cible):
+        """Donne le rôle d'un joueur (COMMANDE MJ)
+
+        Args:
+            cible: le joueur dont on veut connaître le rôle
+        """
+        joueur = await tools.boucle_query_joueur(ctx, cible, "Qui ?")
+        if joueur:
+            await ctx.send(tools.nom_role(joueur.role, prefixe=True))
+
+
+    @commands.command()
+    @tools.mjs_only
+    async def quiest(self, ctx, *, nomrole):
+        """Liste les joueurs ayant un rôle donné (COMMANDE MJ)
+
+        Args:
+            nomrole: le rôle qu'on cherche (doit être un slug ou nom de rôle valide)
+        """
+        roles = bdd_tools.find_nearest(tools.remove_accents(nomrole), Roles, carac="slug")
+        if roles:
+            role = roles[0][0]
+        else:
+            roles = await bdd_tools.find_nearest(tools.remove_accents(nomrole).capitalize(), Roles, carac="nom")
+            if roles:
+                role = roles[0][0]
+            else:
+                await ctx.send("Connais pas")
+
+        joueurs = Joueurs.query.filter_by(role=role.slug).filter(Joueurs.statut.in_(["vivant", "MV"])).all()
+        await ctx.send(f"{tools.nom_role(role.slug)} : " + (", ".join(joueur.nom for joueur in joueurs) if joueurs else "Personne."))
 
 
     @commands.command()
@@ -168,23 +203,24 @@ class Informations(commands.Cog):
 
 
 
-    @commands.command()
+    @commands.command(aliases=["joueurs"])
     async def vivants(self, ctx):
         """Affiche la liste des joueurs vivants
 
         Aussi dite : « liste des joueurs qui seront bientôt morts »
         """
-        mess = "Les joueurs vivants sont : \n"
         joueurs = [joueur for joueur in Joueurs.query.filter(Joueurs.statut != "mort").order_by(Joueurs.nom)]
 
+        mess = f" Joueur                     en chambre\n"
+        mess += f"––––––––––––––––––––––––––––––––––––––––––––––\n"
         if ctx.bot.config.get("demande_chambre", True):
             for joueur in joueurs:
-                mess += f" - {joueur.nom.ljust(15)} en chambre {joueur.chambre}\n"
+                mess += f" {joueur.nom.ljust(25)}  {joueur.chambre}\n"
         else:
             for joueur in joueurs:
-                mess += f" - {joueur.nom}\n"
+                mess += f" {joueur.nom}\n"
 
-        await tools.send_code_blocs(ctx, mess)
+        await tools.send_code_blocs(ctx, mess, prefixe=f"Les {len(joueurs)} joueurs vivants sont :")
 
 
     @commands.command()
@@ -193,11 +229,13 @@ class Informations(commands.Cog):
 
         Aussi dite : « liste des joueurs qui mangent leurs morts »
         """
-        mess = "Les morts sont :\n"
-        joueurs = [joueur.nom for joueur in Joueurs.query.filter_by(statut = "mort").order_by(Joueurs.nom)]
-        if not joueurs:
-            mess += "Toi (mais tu ne le sais pas encore)"
-        else:
+        joueurs = [joueur for joueur in Joueurs.query.filter_by(statut="mort").order_by(Joueurs.nom)]
+
+        if joueurs:
+            mess = ""
             for joueur in joueurs:
-                mess += f" - {joueur} \n"
-        await tools.send_code_blocs(ctx, mess)
+                mess += f" {joueur.nom}\n"
+        else:
+            mess = "Toi (mais tu ne le sais pas encore)"
+
+        await tools.send_code_blocs(ctx, mess, prefixe=f"Les {len(joueurs) or ''} morts sont :")

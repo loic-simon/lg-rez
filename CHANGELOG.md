@@ -5,6 +5,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## Unrealeased
+### Added
+
+- Inscription: customize default chambre with ``LGBot.config["chambre_mj"]``.
+- ``blocs.tools.send_code_blocs``: added ``prefix`` option (propagated to ``blocs.tools.log``).
+- ``!vivants``: new alias ``!joueurs``.
+- New command ``!reactfals`` (alias ``!rf``) using new function ``features.IA.fetch_tenor``.
+
+### Changed
+
+- ``LGBot.on_error``, ``!vivants``, ``!morts``: minor improvements using ``prefix`` option.
+- Renamed ``features.IA.tenor`` in ``features.IA.trigger_gif`` (consistency).
+
+### Fixed
+
+- Fixed critical bug with ``role`` change (through ``!sync``).
+- Inscription: fixed critical bug when more > 50 players.
+- Some docstrings corrections.
+
+
 ## 1.1.0 - 2020-11-03
 ### Added
 
@@ -24,10 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ``!fals`` can now be used in non-private channels.
 - ``blocs.bdd_tools.find_nearest`` is no longer a coroutine.
 - Some refactoring:
-    - ``features.informations.emoji_camp`` deplaced to ``tools.emoji_camp``.
-    - ``!plot`` deplaced from ``features.actions_publiques`` to ``features.communication``.
-    - ``!send`` and ``!embed`` deplaced from ``features.annexe`` to ``features.communication``.
-    - ``!fillroles`` deplaced from ``features.remplissage_bdd`` (deleted) to ``features.communication``.
+    - ``features.informations.emoji_camp`` moved to ``blocs.tools.emoji_camp``.
+    - ``!plot`` moved from ``features.actions_publiques`` to ``features.communication``.
+    - ``!send`` and ``!embed`` moved from ``features.annexe`` to ``features.communication``.
+    - ``!fillroles`` moved from ``features.remplissage_bdd`` (deleted) to ``features.communication``.
 
 ### Removed
 
@@ -39,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Issue with bot intents: proprer access to member list.
 - Improved handling of BDD disconnections.
 - Critical bug with ``!stop`` and voting commands.
-- ``!plot`` now creates ``./features`` folder if not existing.
+- ``!plot`` now creates ``./figures`` folder if not existing.
 - ``blocs.tools.wait_for_react_clic`` now handles correctly custom emojis.
 - Configuration Assistant Tool: escape ``\n``s in ``LGREZ_GCP_CREDENTIALS``.
 - Other minor bug fixes and improvements.

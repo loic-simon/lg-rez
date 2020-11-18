@@ -4,6 +4,7 @@ Tout ce qui concerne la manière dont le bot réagit aux messages : déterminati
 
 """
 
+import re
 import random
 import requests
 
@@ -45,6 +46,33 @@ async def _build_sequence(ctx):
             fini = True
 
     return reponse
+
+
+def fetch_tenor(trigger):
+    """Renvoie le GIF Tenor le plus pertinent (d'après Tenor) pour un texte donnée
+
+    Args:
+        trigger (:class:`str`): texte auquel réagir
+
+    Returns:
+        ``str`` (URL du GIF) ou ``None``
+    """
+    apikey = "J5UVWPVIM4A5"  # API key module ternorpy (parce que la flemme de créer un compte Tenor)
+
+    rep = requests.get(
+        url="https://api.tenor.com/v1/search",
+        params={
+            "q": trigger, "key": apikey, "limit": 1, "locale": "fr_FR",
+            "contentfilter": "off", "media_filter": "minimal", "ar_range": "all"
+        }
+    )
+
+    if rep:
+        gifs = rep.json()["results"]        # Payload Tenor : {..., "results":[ (https://tenor.com/gifapi/documentation#responseobjects-gif) ]}
+        if gifs:
+            return gifs[0]["itemurl"]
+
+    return None     # Pas de GIF trouvé
 
 
 
@@ -129,6 +157,23 @@ class GestionIA(commands.Cog):
         ctx.message.content = oc        # On rétablit le message original pour ne pas qu'il trigger l'IA 2 fois, le cas échéant
 
 
+    @commands.command(aliases=["rf"])
+    async def reactfals(self, ctx, *, trigger):
+        """Force le bot à réagir à un message comme en mode Foire à la saucisse
+
+        Args:
+            trigger: texte auquel le bot doit réagir
+
+        Permet de faire appel directement au mode Foire à la saucisse, même si il n'est pas activé / sur un chan public.
+        """
+        async with ctx.typing():
+            gif = fetch_tenor(trigger)
+            if gif:
+                await ctx.send(gif)
+            else:
+                await ctx.send("Palaref")
+
+
     @commands.command()
     @tools.mjs_et_redacteurs
     async def addIA(self, ctx, *, triggers=None):
@@ -154,7 +199,7 @@ class GestionIA(commands.Cog):
         async with ctx.typing():
             reac = Reactions(reponse=reponse)
             bdd.session.add(reac)
-            bdd.session.flush()          # On "fait comme si" on commitait l'ajout de reac, ce qui calcule read.id (autoincrément)
+            bdd.session.commit()          # On "fait comme si" on commitait l'ajout de reac, ce qui calcule read.id (autoincrément)
 
             trigs = [Triggers(trigger=trigger, reac_id=reac.id) for trigger in triggers]
             bdd.session.add_all(trigs)
@@ -362,7 +407,7 @@ async def trigger_reactions(bot, message, chain=None, sensi=0.7, debug=False):
                 await bot.process_commands(message)                 # Exécution de la commande
 
             else:                                               # Sinon, texte / média :
-                rep = tools.eval_accols(rep, locals=locals(), debug=debug)  # On remplace tous les "{expr}" par leur évaluation
+                rep = tools.eval_accols(rep, locals_=locals(), debug=debug)  # On remplace tous les "{expr}" par leur évaluation
                 # Passer locals permet d'accéder à bot, message... depuis eval_accols
                 await message.channel.send(rep)                     # On envoie
 
@@ -417,7 +462,7 @@ async def trigger_di(message):
     return False
 
 
-async def tenor(bot, message):
+async def trigger_gif(bot, message):
     """Réaction par GIF en mode Foire à la saucisse
 
     Args:
@@ -427,21 +472,10 @@ async def tenor(bot, message):
         ``True`` si le message correspond et qu'une réponse a été envoyée, ``False`` sinon
     """
     if message.channel.id in bot.in_fals:       # Chan en mode Foire à la saucisse
-        apikey = "J5UVWPVIM4A5"  # API key module ternorpy (parce que la flemme de créer un compte Tenor)
-
         async with message.channel.typing():
-            rep = requests.get(
-                url="https://api.tenor.com/v1/search",
-                params={
-                    "q": message.content, "key": apikey, "limit": 1, "locale": "fr_FR",
-                    "contentfilter": "off", "media_filter": "minimal", "ar_range": "all"
-                }
-            )
-
-        if rep:
-            gifs = rep.json()["results"]        # Payload Tenor : {..., "results":[ (https://tenor.com/gifapi/documentation#responseobjects-gif) ]}
-            if gifs:
-                await message.channel.send(gifs[0]["itemurl"])
+            gif = fetch_tenor(message.content)
+            if gif:
+                await message.channel.send(gif)
                 return True
 
     return False
@@ -456,8 +490,25 @@ async def trigger_mot_unique(message):
     Returns:
         ``True`` si le message correspond et qu'une réponse a été envoyée, ``False`` sinon
     """
-    if len(message.content.split()) == 1:
+    if len(message.content.split()) == 1 and not ":" in message.content:
         rep = f"{message.content.capitalize()} ?"
+        await message.channel.send(rep)
+        return True
+
+    return False
+
+
+async def trigger_a_ou_b(message):
+    """Réaction à un motif type « a ou b » : répond « b »
+
+    Args:
+        message (:class:`~discord.Message`): message auquel réagir
+
+    Returns:
+        ``True`` si le message correspond et qu'une réponse a été envoyée, ``False`` sinon
+    """
+    if (motif := re.fullmatch(r"(.+)\s+ou\s+(.+?)", message.content)):
+        rep = f"{motif.group(2).rstrip(' !?.,;')}.".capitalize()
         await message.channel.send(rep)
         return True
 
@@ -477,6 +528,14 @@ async def default(message):
     return True
 
 
+
+async def special(message):
+    if message.channel.name == "conv-bot-augustin-poinssot" and message.author.display_name == "Augustin Poinssot":
+        await message.channel.send("c'est pas la bonne réponse")
+        return True
+
+    return False
+
 async def process_IA(bot, message, debug=False):
     """Exécute les règles d'IA
 
@@ -485,11 +544,13 @@ async def process_IA(bot, message, debug=False):
         message (:class:`~discord.Message`): message auquel réagir
         debug (:class:`bool`): si ``True``, affiche les erreurs lors de l'évaluation des messages (voir :func:`.tools.eval_accols`)
     """
-    (await trigger_at_mj(message)                                   # @MJ (aled)
-        or await tenor(bot, message)                                # Un petit GIF ? (en mode FALS uniquement)
+    (await special(message)
+        or await trigger_at_mj(message)                                   # @MJ (aled)
+        or await trigger_gif(bot, message)                          # Un petit GIF ? (en mode FALS uniquement)
         or await trigger_roles(message)                             # Rôles
         or await trigger_reactions(bot, message, debug=debug)       # Table Reactions (IA proprement dite)
         or await trigger_sub_reactions(bot, message, debug=debug)   # IA sur les mots
+        or await trigger_a_ou_b(message)                                # di... / cri...
         or await trigger_di(message)                                # di... / cri...
         or await trigger_mot_unique(message)                        # Un seul mot ==> on répète
         or await default(message)                                   # Réponse par défaut

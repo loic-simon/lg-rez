@@ -95,7 +95,7 @@ async def _on_ready(bot):
 
     for tache in Tables["Taches"].query.all():
         delta = (tache.timestamp - now).total_seconds()
-        TH = bot.loop.call_later(delta, taches.execute, tache)  # Si delta < 0 (action manquée), l'exécute immédiatement, sinon attend jusqu'à tache.timestamp
+        TH = bot.loop.call_later(delta, taches.execute, tache, bot.loop)  # Si delta < 0 (action manquée), l'exécute immédiatement, sinon attend jusqu'à tache.timestamp
         bot.tasks[tache.id] = TH
         r += f"Récupération de la tâche {tools.code(tache.timestamp.strftime('%d/%m/%Y %H:%M:%S'))} > {tools.code(tache.commande)}\n"
 
@@ -168,6 +168,9 @@ async def _on_message(bot, message):
     if message.guild.id != bot.GUILD_ID:            # Mauvais serveur
         return
 
+    if message.content.startswith(bot.command_prefix + " "):
+        message.content = bot.command_prefix + message.content[2:]
+
     await bot.invoke(await bot.get_context(message))        # On trigger toutes les commandes
     # (ne PAS remplacer par bot.process_commands(message), en théorie c'est la même chose mais ça détecte pas les webhooks...)
 
@@ -202,28 +205,32 @@ async def _on_raw_reaction_add(bot, payload):
     if reactor == bot.user or not Joueurs.query.get(reactor.id):        # Boucles infinies + gens pas en base
         return
 
-    if payload.emoji == tools.emoji(reactor, "volatron", must_be_found=False):
-        await reactor.guild.get_channel(payload.channel_id).send(f"{reactor.mention}, GET VOLATRONED !!!")
+    # if payload.emoji == tools.emoji(reactor, "volatron", must_be_found=False):
+    #     await reactor.guild.get_channel(payload.channel_id).send(f"{reactor.mention}, GET VOLATRONED !!!")
 
     elif payload.emoji == tools.emoji(reactor, "bucher"):
         ctx = await tools.create_context(bot, reactor, "!vote")
-        await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le condamné du jour :")}""")
-        await bot.invoke(ctx)       # On trigger !vote
+        if ctx.guild.get_channel(payload.channel_id).name.startswith("conv-bot"):
+            await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le condamné du jour :")}""")
+            await bot.invoke(ctx)       # On trigger !vote
 
     elif payload.emoji == tools.emoji(reactor, "maire"):
         ctx = await tools.create_context(bot, reactor, "!votemaire")
-        await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le nouveau maire :")}""")
-        await bot.invoke(ctx)       # On trigger !votemaire
+        if ctx.guild.get_channel(payload.channel_id).name.startswith("conv-bot"):
+            await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le nouveau maire :")}""")
+            await bot.invoke(ctx)       # On trigger !votemaire
 
     elif payload.emoji == tools.emoji(reactor, "lune"):
         ctx = await tools.create_context(bot, reactor, "!voteloups")
-        await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour la victime des loups :")}""")
-        await bot.invoke(ctx)       # On trigger !voteloups
+        if ctx.guild.get_channel(payload.channel_id).name.startswith("conv-bot"):
+            await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour la victime des loups :")}""")
+            await bot.invoke(ctx)       # On trigger !voteloups
 
     elif payload.emoji == tools.emoji(reactor, "action"):
         ctx = await tools.create_context(bot, reactor, "!action")
-        await ctx.send(f"""{payload.emoji} > {tools.bold("Action :")}""")
-        await bot.invoke(ctx)       # On trigger !voteloups
+        if ctx.guild.get_channel(payload.channel_id).name.startswith("conv-bot"):
+            await ctx.send(f"""{payload.emoji} > {tools.bold("Action :")}""")
+            await bot.invoke(ctx)       # On trigger !voteloups
 
 
 # Gestion des erreurs dans les commandes
@@ -311,10 +318,9 @@ async def _on_error(bot, event, *args, **kwargs):
             bdd.session.rollback()          # On rollback la session
             await tools.log(guild, "Rollback session")
 
-    await tools.log(guild, (
-        f"{tools.role(guild, 'MJ').mention} ALED : Exception Python !"
-        f"{tools.code_bloc(traceback.format_exc())}"
-    ))
+    await tools.log(guild, traceback.format_exc(), code=True,
+        prefixe=f"{tools.role(guild, 'MJ').mention} ALED (with prefix) : Exception Python !")
+
     raise        # On remonte l'exception à Python (pour log, ça ne casse pas la loop)
 
 

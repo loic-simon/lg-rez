@@ -210,6 +210,7 @@ class Communication(commands.Cog):
             - ``vivants`` :             Les joueurs en vie
             - ``morts`` :               Les joueurs morts
             - ``<crit>=<filtre>`` :     Les joueurs répondant au critère ``Joueurs.<crit> == <filtre>``. ``crit`` peut être ``"nom"``, ``"chambre"``, ``"statut"``, ``"role"``, ``"camp"``... L'ensemble doit être entouré de guillements si ``filtre`` contient un espace.
+            - *le nom d'un joueur*      (raccourci pour ``nom=X``, doit être entouré de guillements si nom + prénom)
 
         ``message`` peut contenir un ou plusieurs bouts de code Python à évaluer, entourés d'accolades.
 
@@ -259,10 +260,25 @@ class Communication(commands.Cog):
             assert member, f"!send : Member associé à {joueur} introuvable"
             assert chan, f"!sed : Chan privé de {joueur} introuvable"
 
-            evaluated_message = tools.eval_accols(message, locals=locals())
+            evaluated_message = tools.eval_accols(message, locals_=locals())
             await chan.send(evaluated_message)
 
         await ctx.send(f"Fini.")
+
+
+
+    @commands.command()
+    @tools.mjs_only
+    async def post(self, ctx, chan, *, message):
+        """Envoie un message dans un salon (COMMANDE MJ)
+
+        Args:
+            chan: nom du salon ou sa mention
+            message: message à envoyer (peut être aussi long que nécessaire, contenir des sauts de lignes...)
+        """
+        chan = tools.channel(ctx, chan)
+        await chan.send(message)
+        await ctx.send(f"Fait.")
 
 
 
@@ -321,7 +337,7 @@ class Communication(commands.Cog):
                 colonne_cible = "CondamnéRéel"
                 colonne_votant = "VotantCond"
                 haro_candidature = "haro"
-                typo = "condamné du jour"
+                typo = "bûcher du jour"
                 mort_election = "Mort"
                 pour_contre = "contre"
                 emoji = "bucher"
@@ -413,13 +429,20 @@ class Communication(commands.Cog):
             plt.savefig(image_path, bbox_inches="tight")
 
             if choisi:
-                role = tools.nom_role(choisi.joueur.role, prefixe=True)
-                mess = await ctx.send(f"Rôle à afficher pour {choisi.nom} = {role} ? (Pas double peau ou autre)")
-                if not await tools.yes_no(ctx.bot, mess):
-                    await ctx.send("Rôle à afficher :")
-                    role = (await tools.wait_for_message_here(ctx)).content
+                if type == "cond":
+                    role = tools.nom_role(choisi.joueur.role, prefixe=True)
+                    mess = await ctx.send(f"Rôle à afficher pour {choisi.nom} = {role} ? (Pas double peau ou autre)")
+                    if await tools.yes_no(ctx.bot, mess):
+                        emoji_camp = tools.emoji_camp(ctx, choisi.joueur.camp)
+                    else:
+                        await ctx.send("Rôle à afficher :")
+                        role = (await tools.wait_for_message_here(ctx)).content
+                        mess = await ctx.send("Camp :")
+                        emoji_camp = await tools.wait_for_react_clic(ctx.bot, mess, [tools.emoji_camp(ctx, camp) for camp in ["village", "loups", "nécro", "solitaire", "autre"]])
 
-                nometrole = f"{tools.bold(choisi.nom)}, {role}"
+                    nometrole = f"{tools.bold(choisi.nom)}, {role}"
+                else:
+                    nometrole = f"{tools.bold(choisi.nom)}"
 
             # Création embed
             embed = discord.Embed(
@@ -429,31 +452,34 @@ class Communication(commands.Cog):
             )
             embed.set_author(name=f"Résultats du vote pour le {typo}", icon_url=tools.emoji(ctx, emoji).url)
 
+            if emoji_camp:
+                embed.set_thumbnail(url=emoji_camp.url)
+
             rd = "\n".join(("A" if cible.votes == 1 else "Ont") + f" voté {pour_contre} {cible.nom} : " + ", ".join(cible.votants) for cible in cibles)
             embed.set_footer(text=rd)
 
             file = discord.File(image_path, filename="image.png")
             embed.set_image(url="attachment://image.png")
 
+            # Envoi
+            mess = await ctx.send("Ça part ?\n", file=file, embed=embed)
+            if await tools.yes_no(ctx.bot, mess):
+                # Envoi du graphe
+                file = discord.File(image_path, filename="image.png")       # Un objet File ne peut servir qu'une fois, il faut le recréer
+                # embed.set_image(url="attachment://image.png")
+
+                await tools.channel(ctx, "annonces").send("@everyone Résultat du vote ! :fire:", file=file, embed=embed)
+                await ctx.send(f"Et c'est parti dans {tools.channel(ctx, 'annonces').mention} !")
+
+                if type == "cond":
+                    # Actions au mot des MJs
+                    for action in Actions.query.filter_by(trigger_debut="mot_mjs").all():
+                        await gestion_actions.open_action(ctx, action)
+
+                    await ctx.send("(actions liées au mot MJ activées)")
+
         except Exception:
             await tools.send_code_blocs(ctx, traceback.format_exc())
-
-        # Envoi
-        mess = await ctx.send("Ça part ?\n", file=file, embed=embed)
-        if await tools.yes_no(ctx.bot, mess):
-            # Envoi du graphe
-            file = discord.File(image_path, filename="image.png")       # Un objet File ne peut servir qu'une fois, il faut le recréer
-            # embed.set_image(url="attachment://image.png")
-
-            await tools.channel(ctx, "annonces").send("@everyone Résultat du vote ! :fire:", file=file, embed=embed)
-            await ctx.send(f"Et c'est parti dans {tools.channel(ctx, 'annonces').mention} !")
-
-            if type == "cond":
-                # Actions au mot des MJs
-                for action in Actions.query.filter_by(trigger_debut="mot_mjs").all():
-                    await gestion_actions.open_action(ctx, action)
-
-                await ctx.send("(actions liées au mot MJ activées)")
 
         else:
             await ctx.send("Mission aborted.")
@@ -487,7 +513,7 @@ class Communication(commands.Cog):
         desc = (await tools.wait_for_message_here(ctx)).content
 
         # Création embed
-        embed = discord.discord.Embed(
+        embed = discord.Embed(
             title=f"Mort de {tools.bold(joueur.nom)}, {role}",
             description=desc,
             color=0x730000

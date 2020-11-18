@@ -50,6 +50,7 @@ class VoterAgir(commands.Cog):
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
             message=f"Contre qui veux-tu voter ? (vote actuel : {tools.code(joueur.vote_condamne_)})"
                     f"\n(harotés : {', '.join(harotes) or 'aucun :pensive:'})"
+                    f"\n*Écris simplement le nom du joueur ci-dessous ({tools.code('stop')} pour annuler) :*"
         )
 
         # Test si la cible est sous le coup d'un haro
@@ -74,7 +75,7 @@ class VoterAgir(commands.Cog):
             sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet("votecond_brut")
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.vote_condamne_], value_input_option="USER_ENTERED")
 
-        await ctx.send(f"Votre contre {tools.code(cible.nom)} bien pris en compte.\n"
+        await ctx.send(f"Vote contre {tools.code(cible.nom)} bien pris en compte.\n"
                        + tools.ital("Tu peux modifier ton vote autant que nécessaire avant sa fermeture."))
 
 
@@ -111,6 +112,7 @@ class VoterAgir(commands.Cog):
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
             message=f"Pour qui veux-tu voter ? (vote actuel : {tools.code(joueur.vote_maire_)})"
                     f"\n(candidats : {', '.join(candidats) or 'aucun :pensive:'})"
+                    f"\n*Écris simplement le nom du joueur ci-dessous ({tools.code('stop')} pour annuler) :*"
         )
 
         # Test si la cible s'est présentée
@@ -135,7 +137,7 @@ class VoterAgir(commands.Cog):
             sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet("votemaire_brut")
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.vote_maire_], value_input_option="USER_ENTERED")
 
-        await ctx.send(f"Votre pour {tools.code(cible.nom)} bien pris en compte.\n"
+        await ctx.send(f"Vote pour {tools.code(cible.nom)} bien pris en compte.\n"
                        + tools.ital("Tu peux modifier ton vote autant que nécessaire avant sa fermeture."))
 
 
@@ -167,7 +169,8 @@ class VoterAgir(commands.Cog):
 
         # Choix de la cible
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
-                                                message=f"Qui veux-tu manger ? (vote actuel : {tools.code(joueur.vote_loups_)})")
+                                                message=f"Qui veux-tu manger ? (vote actuel : {tools.code(joueur.vote_loups_)})"
+                                                f"\n*Écris simplement le nom du joueur ci-dessous ({tools.code('stop')} pour annuler) :*")
 
         if joueur.vote_loups_ is None:          # On revérifie, si ça a fermé entre temps !!
             await ctx.send("Le vote pour la victime des loups a fermé entre temps, pas de chance !")
@@ -183,7 +186,7 @@ class VoterAgir(commands.Cog):
             sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet("voteloups_brut")
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.camp, joueur.vote_loups_], value_input_option="USER_ENTERED")
 
-        await ctx.send(f"Votre contre {tools.code(cible.nom)} bien pris en compte.")
+        await ctx.send(f"Vote contre {tools.code(cible.nom)} bien pris en compte.")
 
 
     @commands.command()

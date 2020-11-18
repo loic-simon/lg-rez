@@ -22,7 +22,8 @@ async def main(bot, member):
 
     Personalisation :
         - Si :attr:`bot.config <.LGBot.config>` ``["demande_chambre"]`` vaut ``False``, ne demande pas la chambre
-        - :attr:`bot.config <.LGBot.config>` ``["debut_saison"]`` permet de personnaliser la date de début de saison indiquée à la fin du processus
+        - Sinon :attr:`bot.config <.LGBot.config>` ``["chambre_mj"]`` indique la chambre par défaut (défaut : ``"[chambre MJ]"``)
+        - :attr:`bot.config <.LGBot.config>` ``["debut_saison"]`` permet de personnaliser la date de début de saison indiquée à la fin du processus (défaut : ``"32 plopembre"``)
 
     Commande appellée à l'arrivée sur le serveur, utiliser :meth:`\!co <.bot.Special.Special.co.callback>` pour trigger cette commande depuis Discord.
     """
@@ -33,12 +34,22 @@ async def main(bot, member):
     elif chan := tools.get(member.guild.text_channels, topic=f"{member.id}"):   # Inscription en cours
         await chan.set_permissions(member, read_messages=True, send_messages=True)
         await chan.send(f"Tu as déjà un channel à ton nom, {member.mention}, par ici !")
-    else:
-        chan = await member.guild.create_text_channel(f"conv-bot-{member.name}",  topic=str(member.id),
-                                                      category=tools.channel(member, "CONVERSATION BOT"))
-        # Crée le channel "conv-bot-nom" avec le topic "member.id" et au bon endroit
+    else:           # Pas d'inscription déjà en cours : création channel
+        categ = tools.channel(member, "CONVERSATION BOT")
+        if len(categ.channels) >= 50:         # Limitation Discord : 50 channels par catégorie
+            ok = False
+            N = 2
+            while not ok:
+                categ_new = tools.channel(member, f"CONVERSATION BOT {N}", must_be_found=False)
+                if not categ_new:
+                    categ = await categ.clone(name=f"CONVERSATION BOT {N}")
+                    ok = True
+                elif len(categ_new.channels) < 50:      # Catégorie N pas pleine
+                    categ = categ_new
+                    ok = True
+                N += 1
 
-        # await chan.edit(category=tools.channel(member, "CONVERSATION BOT")) #Met le channel au bon endroit (GROS CON DE BOT)
+        chan = await member.guild.create_text_channel(f"conv-bot-{member.name}",  topic=str(member.id), category=categ)
         await chan.set_permissions(member, read_messages=True, send_messages=True)
 
 
@@ -97,7 +108,7 @@ async def main(bot, member):
                 return len(m.content) < 200     # Longueur de chambre de rez maximale
             chambre = (await tools.boucle_message(bot, chan, "Alors, quelle est ta chambre ?", sortie_num_rez, rep_message="Désolé, ce n'est pas un numéro de chambre valide, réessaie...")).content
         else:
-            chambre = "XXX (chambre MJ)"
+            chambre = bot.config.get("chambre_mj", "[chambre MJ]")
 
         await chan.send(f"{nom}, en chambre {chambre}... Je t'inscris en base !")
 

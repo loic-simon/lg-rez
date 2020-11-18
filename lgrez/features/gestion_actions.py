@@ -121,12 +121,12 @@ async def open_action(ctx, action, chan=None):
     message = await chan.send(
         f"""{tools.montre()}  Tu peux maintenant utiliser ton action {tools.code(action.action)} !  {tools.emoji(ctx, "action")} \n"""
         + (f"""Tu as jusqu'à {heure_fin} pour le faire. \n""" if heure_fin else "")
-        + tools.ital(f"""Tape {tools.code('!action <phrase>')} ou utilise la réaction pour agir."""))
+        + tools.ital(f"""Tape {tools.code('!action (ce que tu veux faire)')} ou utilise la réaction pour agir."""))
     await message.add_reaction(tools.emoji(ctx, "action"))
 
     # Programmation remind / close
     if action.trigger_fin in ["temporel", "delta"]:
-        taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=10), f"!remind {action.id}", action=action.id)
+        taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=30), f"!remind {action.id}", action=action.id)
         taches.add_task(ctx.bot, ts, f"!close {action.id}", action=action.id)
     elif action.trigger_fin == "perma":       # Action permanente : fermer pour le WE
         ts = tools.debut_pause()

@@ -146,7 +146,7 @@ def mention_MJ(arg):
     """Renvoie la mention du rôle "MJ" si le joueur n'est pas un MJ, ``"@MJ"`` sinon.
 
     Args:
-        arg (:class:`~discord.ext.commands.Context` | :class:`~discord.Guild` | :class:`~discord.Member` | :class:`~discord.abc.GuildChannel`): argument "connecté" au serveur, permettant de remonter aux emojis
+        arg (:class:`~discord.Member` | :class:`~discord.ext.commands.Context`): membre ou contexte d'un message envoyé par un membre
     """
     member = arg.author if hasattr(arg, "author") else arg
     if hasattr(member, "top_role") and member.top_role.name == "MJ":    # Si webhook, pas de top_role
@@ -322,12 +322,12 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
             if joueur := Joueurs.query.get(int(id)):                # Si cet ID correspond à un utilisateur, on le récupère
                 return joueur                                       # On a trouvé l'utilisateur !
 
-        nearest = bdd_tools.find_nearest(rep, Joueurs, carac="nom", sensi=sensi)     # Sinon, recherche au plus proche
+        nearest = bdd_tools.find_nearest(rep, Joueurs, carac="nom", sensi=sensi, solo_si_parfait=False)     # Sinon, recherche au plus proche
 
         if not nearest:
             await ctx.send("Aucune entrée trouvée, merci de réessayer :")
 
-        elif nearest[0][1] == 1:        # Si le score le plus haut est égal à 1...
+        elif nearest[0][1] == 1 and not (len(nearest) > 1 and nearest[1][1] == 1):        # Si le score le plus haut est égal à 1...
             return nearest[0][0]        # ...renvoyer l'entrée correspondante
 
         elif len(nearest) == 1:
@@ -341,7 +341,7 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
             s = "Les joueurs les plus proches de ton entrée sont les suivants : \n"
             for i, j in enumerate(nearest[:10]):
                 s += f"{emoji_chiffre(i+1)}. {j[0].nom} \n"
-            m = await ctx.send(s + tools.ital("Tu peux les choisir en réagissant à ce message, ou en répondant au clavier."))
+            m = await ctx.send(s + ital("Tu peux les choisir en réagissant à ce message, ou en répondant au clavier."))
             n = await choice(ctx.bot, m, min(10, len(nearest)))
             return nearest[n-1][0]
 
@@ -745,7 +745,7 @@ def smooth_split(mess, N=1990, sep='\n', rep=''):
     return LM
 
 
-async def send_blocs(messageable, mess, N=1990, sep='\n', rep=''):
+async def send_blocs(messageable, mess, *, N=1990, sep='\n', rep=''):
     """Envoie un (potentiellement long) message en le coupant en blocs si nécaissaire
 
     Surcouche de :func:`.smooth_split` envoyant directement les messages formés
@@ -753,34 +753,50 @@ async def send_blocs(messageable, mess, N=1990, sep='\n', rep=''):
     Args:
         messageable (:class:`discord.abc.Messageable`): objet où envoyer le message (:class:`~discord.ext.commands.Context` ou :class:`~discord.TextChannel`)
         mess (:class:`str`): message à envoyer
-        N, sep, rep: passé à :func:`.smooth_split`
+        N, sep, rep: *identique à* :func:`.smooth_split`
     """
-    [await messageable.send(bloc) for bloc in smooth_split(mess, N=N, sep=sep, rep=rep)]
+    for bloc in smooth_split(mess, N=N, sep=sep, rep=rep):
+        await messageable.send(bloc)
 
 
-async def send_code_blocs(messageable, mess, N=1990, sep='\n', rep='', langage=""):
+async def send_code_blocs(messageable, mess, *, N=1990, sep='\n', rep='', prefixe="", langage=""):
     """Envoie un (potentiellement long) message sous forme de bloc(s) de code
 
     :Paramètres:
-        *identiques à :func:`.send_blocs`*: .
+        messageable, mess, N, sep, rep: *identiques à :func:`.send_blocs`*
+        prefixe (:class:`str`): texte à mettre hors des code blocs, au début du premier message
+        language: *identique à* :func:`.code_bloc`
     """
-    [await messageable.send(code_bloc(bloc, langage=langage)) for bloc in smooth_split(mess, N=N, sep=sep, rep=rep)]
+    if prefixe:
+        prefixe = prefixe.rstrip() + "\n"
+
+    for i, bloc in enumerate(smooth_split(prefixe + mess, N=N, sep=sep, rep=rep)):
+        if prefixe and i == 0:
+            bloc = bloc[len(prefixe):]
+            await messageable.send(prefixe + code_bloc(bloc, langage=langage))
+        else:
+            await messageable.send(code_bloc(bloc, langage=langage))
 
 
 # Log dans #logs
-async def log(arg, message, code=False):
+async def log(arg, message, *, code=False, N=1990, sep='\n', rep='', prefixe="", langage=""):
     """Envoie un message dans le channel ``#logs``
 
     Args:
         arg (:class:`~discord.ext.commands.Context` | :class:`~discord.Guild` | :class:`~discord.Member` | :class:`~discord.abc.GuildChannel`): argument "connecté" au serveur, permettant de remonter aux channels
         message (:class:`str`): message à log
         code (:class:`bool`): si ``True``, log sous forme de bloc(s) de code (défaut ``False``)
+        N, sep, rep: *identique à* :func:`.send_blocs`
+        prefixe: *identique à* :func:`.send_code_blocs`, simplement ajouté avant ``message`` si ``code`` vaut ``False``
+        language: *identique à* :func:`.send_code_blocs`, sans effet si `code` vaut ``False``
     """
     logchan = channel(arg, "logs")
     if code:
-        await send_code_blocs(logchan, message)
+        await send_code_blocs(logchan, message, N=N, sep=sep, rep=rep, prefixe=prefixe, langage=langage)
     else:
-        [await logchan.send(bloc) for bloc in smooth_split(message)]
+        if prefixe:
+            message = prefixe.rstrip() + "\n" + message
+        await send_blocs(logchan, message, N=N, sep=sep, rep=rep)
 
 
 
@@ -845,16 +861,21 @@ def remove_accents(s):
 
 
 # Évaluation d'accolades
-def eval_accols(rep, globals=None, locals=None, debug=False):
+def eval_accols(rep, globals_=None, locals_=None, debug=False):
     """Replace chaque bloc entouré par des ``{}`` par leur évaluation Python.
 
     Args:
-        globals (:class:`dict`): variables globales du contexte d'évaluation (passé à :func:`eval`)
-        locals (:class:`dict`): variables locales du contexte d'évaluation (passé à :func:`eval`)
+        globals_ (:class:`dict`): variables globales du contexte d'évaluation (passé à :func:`eval`)
+        locals_ (:class:`dict`): variables locales du contexte d'évaluation (passé à :func:`eval`)
         debug (:class:`bool`): si ``True``, insère le message d'erreur (type et texte de l'exception dans le message) ensuite si une exception est levée durant l'évaluation (défaut ``False``)
 
     Penser à passer les :func:`globals` et :func:`locals` si besoin. Généralement, il faut passer :func:`locals` qui contient ``ctx``, etc... mais pas :func:`globals` si on veut bénéficier de tous les modules importés dans ``tools.py`` (tous les modules du projet ou presque).
     """
+    if globals_ is None:
+        globals_ = globals()
+    if locals_ is None:
+        locals_ = globals_
+
     if "{" in rep:              # Si contient des expressions
         evrep = ""                  # Réponse évaluée
         expr = ""                   # Expression à évaluer
@@ -870,11 +891,11 @@ def eval_accols(rep, globals=None, locals=None, debug=False):
                     expr += c
                 else:               # Fin d'une expression
                     try:                                            # On essaie d'évaluer la chaîne
-                        evrep += str(eval(expr, globals, locals))       # eval("expr") = expr
+                        evrep += str(eval(expr, globals_, locals_))       # eval("expr") = expr
                     except Exception as e:
                         evrep += "{" + expr + "}"                   # Si erreur, on laisse {expr} non évaluée
                         if debug:
-                            evrep += tools.code(f"->!!! {e} !!!")
+                            evrep += code(f"->!!! {e} !!!")
                     expr = ""
             elif noc:               # Expression en cours
                 expr += c

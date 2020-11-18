@@ -164,15 +164,15 @@ async def modif_joueur(ctx, joueur_id, modifs, silent=False):
                 notif += f":arrow_forward: Nouveau statut : {tools.bold(val)} !\n"
 
         elif col == "role":                         # Modification rôle
-            old_bars = Joueurs.query.filter_by(role=joueur.role).all()
+            old_bars = BaseActionsRoles.query.filter_by(role=joueur.role).all()
             old_actions = []
             for bar in old_bars:
-                old_actions.extend(Joueurs.query.filter_by(action=bar.action, player_id=joueur.discord_id).all())
+                old_actions.extend(Actions.query.filter_by(action=bar.action, player_id=joueur.discord_id).all())
             for action in old_actions:
                 gestion_actions.delete_action(ctx, action)  # On supprime les anciennes actions de rôle (et les tâches si il y en a)
 
-            new_bars = Joueurs.query.filter_by(role=val).all()         # Actions associées au nouveau rôle
-            new_bas = [Joueurs.query.get(bar.action) for bar in new_bars]   # Nouvelles BaseActions
+            new_bars = BaseActionsRoles.query.filter_by(role=val).all()         # Actions associées au nouveau rôle
+            new_bas = [BaseActions.query.get(bar.action) for bar in new_bars]   # Nouvelles BaseActions
             cols = [col for col in bdd_tools.get_cols(BaseActions) if not col.startswith("base")]
             new_actions = [Actions(player_id=joueur.discord_id, **{col: getattr(ba, col) for col in cols},
                                    cooldown=0, charges=ba.base_charges) for ba in new_bas]

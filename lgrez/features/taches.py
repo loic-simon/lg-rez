@@ -5,6 +5,7 @@ Planification, liste, annulation, exécution de tâches planifiées
 """
 
 import datetime
+import asyncio
 
 from discord.ext import commands
 
@@ -13,7 +14,7 @@ from lgrez.blocs.bdd import Taches, Actions, Joueurs
 
 
 
-def execute(tache):
+def execute(tache, loop):
     """Exécute une tâche planifiée
 
     Args:
@@ -22,19 +23,25 @@ def execute(tache):
     Envoie un webhook (variable d'environnement ``LGREZ_WEBHOOK_URL``) avec la commande (:attr:`.bdd.Taches.commande`) et nettoie
     """
     LGREZ_WEBHOOK_URL = env.load("LGREZ_WEBHOOK_URL")
-    webhook.send(tache.commande, url=LGREZ_WEBHOOK_URL)
-    bdd.session.delete(tache)
-    bdd.session.commit()
+    if webhook.send(tache.commande, url=LGREZ_WEBHOOK_URL):     # envoi webhook OK
+        bdd.session.delete(tache)
+        bdd.session.commit()
+    else:
+        # On réessaie dans 2 secondes
+        loop.call_later(2, execute, tache, loop)
 
 
 def add_task(bot, timestamp, commande, action=None):
-    """Crée une nouvelle tâche planifiée sur le bot + en base
+    """Crée une nouvelle tâche planifiée sur le bot + en base, renvoie l'objet Tâche
 
     Args:
         bot (:class:`.LGBot`): bot connecté
         timestamp (:class:`datetime.datetime`): timestamp de la tâche à ajouter
         commande (:class:`str`): commande à exécuter à ``timestamp``
         action (:class:`int`): si tâche planifiée liée à une commande, son ID (:attr:`.bdd.Actions.id`)
+
+    Returns:
+        :class:`.bdd.Taches`
 
     (fonction pour usage ici et dans d'autres features)
     """
@@ -44,8 +51,10 @@ def add_task(bot, timestamp, commande, action=None):
     bdd.session.add(tache)                                                           # Enregistre la tâche en BDD
     bdd.session.commit()
 
-    TH = bot.loop.call_later((timestamp - now).total_seconds(), execute, tache)     # Programme la tâche (appellera execute(tache) à timestamp)
+    TH = bot.loop.call_later((timestamp - now).total_seconds(), execute, tache, bot.loop)     # Programme la tâche (appellera execute(tache, loop) à timestamp)
     bot.tasks[tache.id] = TH        # TaskHandler, pour pouvoir cancel
+
+    return tache
 
 
 def cancel_task(bot, tache):
@@ -72,18 +81,19 @@ class GestionTaches(commands.Cog):
         Affiche les commandes en attente d'exécution (dans la table :class:`.bdd.Taches`) et le timestamp d'exécution associé.
         Lorsque la tâche est liée à une action, affiche le nom de l'action et du joueur concerné.
         """
-        taches = Taches.query.order_by(Taches.timestamp).all()
-        LT = ""
-        for tache in taches:
-            LT += f"\n{str(tache.id).ljust(5)} {tache.timestamp.strftime('%d/%m/%Y %H:%M:%S')}    {tache.commande.ljust(25)} "
-            if tache.action and (action := Actions.query.get(tache.action)):
-                joueur = Joueurs.query.get(action.player_id)
-                assert joueur, f"!taches : joueur d'ID {action.player_id} introuvable"
-                LT += f"{action.action.ljust(20)} {joueur.nom}"
+        async with ctx.typing():
+            taches = Taches.query.order_by(Taches.timestamp).all()
+            LT = ""
+            for tache in taches:
+                LT += f"\n{str(tache.id).ljust(5)} {tache.timestamp.strftime('%d/%m/%Y %H:%M:%S')}    {tache.commande.ljust(25)} "
+                if tache.action and (action := Actions.query.get(tache.action)):
+                    joueur = Joueurs.query.get(action.player_id)
+                    assert joueur, f"!taches : joueur d'ID {action.player_id} introuvable"
+                    LT += f"{action.action.ljust(20)} {joueur.nom}"
 
-        mess = ("Tâches en attente : \n\nID    Timestamp              Commande                  Action               Joueur"
-                f"\n{'-'*105}{LT}\n\n"
-                "Utilisez !cancel <ID> pour annuler une tâche.") if LT else "Aucune tâche en attente."
+            mess = ("Tâches en attente : \n\nID    Timestamp              Commande                  Action               Joueur"
+                    f"\n{'-'*105}{LT}\n\n"
+                    "Utilisez !cancel <ID> pour annuler une tâche.") if LT else "Aucune tâche en attente."
 
         await tools.send_code_blocs(ctx, mess)
 
@@ -140,22 +150,18 @@ class GestionTaches(commands.Cog):
         time = datetime.time(hour=hour, minute=minute, second=second)
 
         ts = datetime.datetime.combine(date, time)
-        message = await ctx.send(f"Planifier {tools.code(commande)} pour le {tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))} ?")
 
-        if await tools.yes_no(ctx.bot, message):
-            action_id = None            # ID de l'action associée à la tâche (utile pour propagation à la suppression de l'action)
-            try:
-                quoi, id = commande.split(" ")
-                if quoi in ["!open", "!close", "!remind"]:
-                    action_id = int(id)
-            except ValueError:
-                pass
+        action_id = None            # ID de l'action associée à la tâche (utile pour propagation à la suppression de l'action)
+        try:
+            quoi, id = commande.split(" ")
+            if quoi in ["!open", "!close", "!remind"]:
+                action_id = int(id)
+        except ValueError:
+            pass
 
-            add_task(ctx.bot, ts, commande, action=action_id)
-            await ctx.send("Fait.")
+        tache = add_task(ctx.bot, ts, commande, action=action_id)
+        await ctx.send(f"{tools.code(commande)} planifiée pour le {tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))}.\n{tools.code(f'!cancel {tache.id}')} pour annuler.")
 
-        else:
-            await ctx.send("Mission aborted.")
 
 
     @commands.command(aliases=["retard", "doin"])
