@@ -75,7 +75,7 @@ async def open_action(ctx, action, chan=None):
     if action.cooldown > 0:                 # Action en cooldown
         bdd_tools.modif(action, "cooldown", action.cooldown - 1)
         bdd.session.commit()
-        await ctx.send(f"Action en cooldown, exit (reprogrammation si temporel).")
+        await ctx.send(f"Action {action} : en cooldown, exit (reprogrammation si temporel).")
         if action.trigger_debut == "temporel":      # Programmation action du lendemain
             ts = tools.next_occurence(action.heure_debut)
             taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
@@ -83,7 +83,7 @@ async def open_action(ctx, action, chan=None):
 
     # Vérification role_actif
     if not joueur.role_actif:    # role_actif == False : on reprogramme la tâche au lendemain, tanpis
-        await ctx.send(f"role_actif == False, exit (reprogrammation si temporel).")
+        await ctx.send(f"Action {action} : role_actif == False, exit (reprogrammation si temporel).")
         if action.trigger_debut == "temporel":
             ts = tools.next_occurence(action.heure_debut)
             taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
@@ -91,7 +91,7 @@ async def open_action(ctx, action, chan=None):
 
     # Vérification charges
     if action.charges == 0:                 # Plus de charges, mais action maintenue en base car refill / ...
-        await ctx.send(f"Plus de charges, exit (reprogrammation si temporel).")
+        await ctx.send(f"Action {action} : plus de charges, exit (reprogrammation si temporel).")
         return
 
     # Action "automatiques" (passives : notaire...) : lance la procédure de clôture / résolution
@@ -116,23 +116,35 @@ async def open_action(ctx, action, chan=None):
         ts = datetime.datetime.now() + datetime.timedelta(hours=delta.hour, minutes=delta.minute, seconds=delta.second)
         heure_fin = ts.time()
 
-    # Information du joueur
-    bdd_tools.modif(action, "decision_", "rien")
-    message = await chan.send(
-        f"""{tools.montre()}  Tu peux maintenant utiliser ton action {tools.code(action.action)} !  {tools.emoji(ctx, "action")} \n"""
-        + (f"""Tu as jusqu'à {heure_fin} pour le faire. \n""" if heure_fin else "")
-        + tools.ital(f"""Tape {tools.code('!action (ce que tu veux faire)')} ou utilise la réaction pour agir."""))
-    await message.add_reaction(tools.emoji(ctx, "action"))
-
     # Programmation remind / close
     if action.trigger_fin in ["temporel", "delta"]:
         taches.add_task(ctx.bot, ts - datetime.timedelta(minutes=30), f"!remind {action.id}", action=action.id)
         taches.add_task(ctx.bot, ts, f"!close {action.id}", action=action.id)
-    elif action.trigger_fin == "perma":       # Action permanente : fermer pour le WE
-        ts = tools.debut_pause()
-        taches.add_task(ctx.bot, ts, f"!close {action.id}", action=action.id)
+    elif action.trigger_fin == "perma":       # Action permanente : fermer pour le WE ou rappel / réinitialisation chaque jour
+        ts_matin = tools.next_occurence(datetime.time(hour=7))
+        ts_pause = tools.debut_pause()
+        if ts_matin < ts_pause:
+            taches.add_task(ctx.bot, ts_matin, f"!open {action.id}", action=action.id)      # Réopen le lendamain
+        else:
+            taches.add_task(ctx.bot, ts_pause, f"!close {action.id}", action=action.id)     # Sauf si pause d'ici là
+
+    # Information du joueur
+    if action.decision_ == "rien":      # déjà ouverte
+        message = await chan.send(
+            f"""{tools.montre()}  Rappel : tu peux utiliser quand tu le souhaites ton action {tools.code(action.action)} !  {tools.emoji(ctx, "action")} \n"""
+            + (f"""Tu as jusqu'à {heure_fin} pour le faire. \n""" if heure_fin else "")
+            + tools.ital(f"""Tape {tools.code('!action (ce que tu veux faire)')} ou utilise la réaction pour agir."""))
+    else:
+        bdd_tools.modif(action, "decision_", "rien")
+        message = await chan.send(
+            f"""{tools.montre()}  Tu peux maintenant utiliser ton action {tools.code(action.action)} !  {tools.emoji(ctx, "action")} \n"""
+            + (f"""Tu as jusqu'à {heure_fin} pour le faire. \n""" if heure_fin else "")
+            + tools.ital(f"""Tape {tools.code('!action (ce que tu veux faire)')} ou utilise la réaction pour agir."""))
+
+    await message.add_reaction(tools.emoji(ctx, "action"))
 
     bdd.session.commit()
+
 
 
 async def close_action(ctx, action, chan=None):

@@ -245,8 +245,7 @@ class Communication(commands.Cog):
                 await ctx.send(f"Critère \"{crit}\" incorrect. !help {ctx.invoked_with} pour plus d'infos.")
                 return
         else:
-            await ctx.send(f"Cible \"{cible}\" non reconnue. !help {ctx.invoked_with} pour plus d'infos.")
-            return
+            joueurs = [await tools.boucle_query_joueur(ctx, cible, "À qui ?")]
 
         if not joueurs:
             await ctx.send(f"Aucun joueur trouvé.")
@@ -428,6 +427,11 @@ class Communication(commands.Cog):
             image_path = f"figures/hist_{datetime.datetime.now().strftime('%Y-%m-%d')}_{type}.png"
             plt.savefig(image_path, bbox_inches="tight")
 
+
+            ### --------------- Partie Discord ---------------
+
+            # Détermination rôle et camp
+            emoji_camp = None
             if choisi:
                 if type == "cond":
                     role = tools.nom_role(choisi.joueur.role, prefixe=True)
@@ -489,7 +493,7 @@ class Communication(commands.Cog):
 
     @commands.command()
     @tools.mjs_only
-    async def annoncemort(self, ctx, victime=None):
+    async def annoncemort(self, ctx, *, victime=None):
         """Annonce un mort hors-vote (COMMANDE MJ)
 
         Args:
@@ -508,6 +512,12 @@ class Communication(commands.Cog):
             role = (await tools.wait_for_message_here(ctx)).content
             mess = await ctx.send("Camp :")
             emoji_camp = await tools.wait_for_react_clic(ctx.bot, mess, [tools.emoji_camp(ctx, camp) for camp in ["village", "loups", "nécro", "solitaire", "autre"]])
+
+        if joueur.statut == "MV":
+            mess = await ctx.send("Annoncer la mort-vivance ?")
+            if await tools.yes_no(ctx.bot, mess):
+                role += " Mort-Vivant"
+                emoji_camp = tools.emoji_camp(ctx, "nécro")
 
         await ctx.send("Contexte ?")
         desc = (await tools.wait_for_message_here(ctx)).content

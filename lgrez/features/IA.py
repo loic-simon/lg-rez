@@ -168,10 +168,11 @@ class GestionIA(commands.Cog):
         """
         async with ctx.typing():
             gif = fetch_tenor(trigger)
-            if gif:
-                await ctx.send(gif)
-            else:
-                await ctx.send("Palaref")
+
+        if gif:
+            await ctx.send(gif)
+        else:
+            await ctx.send("Palaref")
 
 
     @commands.command()
@@ -346,7 +347,7 @@ async def trigger_at_mj(message):
     return False
 
 
-async def trigger_roles(message, sensi=0.75):
+async def trigger_roles(message, sensi=0.8):
     """Réaction si un nom de rôle est donné
 
     Args:
@@ -362,7 +363,7 @@ async def trigger_roles(message, sensi=0.75):
 
     if roles:       # Au moins un trigger trouvé à cette sensi
         role = roles[0][0]                                  # Meilleur trigger (score max)
-        await message.channel.send(tools.code_bloc(f"{role.prefixe}{role.nom} – {role.description_courte}\n\n{role.description_longue}"))                    # On envoie
+        await message.channel.send(tools.code_bloc(f"{role.prefixe}{role.nom} – {role.description_courte} (camp : {role.camp})\n\n{role.description_longue}"))                    # On envoie
         return True
 
     return False
@@ -529,13 +530,6 @@ async def default(message):
 
 
 
-async def special(message):
-    if message.channel.name == "conv-bot-augustin-poinssot" and message.author.display_name == "Augustin Poinssot":
-        await message.channel.send("c'est pas la bonne réponse")
-        return True
-
-    return False
-
 async def process_IA(bot, message, debug=False):
     """Exécute les règles d'IA
 
@@ -544,8 +538,7 @@ async def process_IA(bot, message, debug=False):
         message (:class:`~discord.Message`): message auquel réagir
         debug (:class:`bool`): si ``True``, affiche les erreurs lors de l'évaluation des messages (voir :func:`.tools.eval_accols`)
     """
-    (await special(message)
-        or await trigger_at_mj(message)                                   # @MJ (aled)
+    (await trigger_at_mj(message)                                   # @MJ (aled)
         or await trigger_gif(bot, message)                          # Un petit GIF ? (en mode FALS uniquement)
         or await trigger_roles(message)                             # Rôles
         or await trigger_reactions(bot, message, debug=debug)       # Table Reactions (IA proprement dite)

@@ -6,6 +6,7 @@ Planification, liste, annulation, exécution de tâches planifiées
 
 import datetime
 import asyncio
+import time
 
 from discord.ext import commands
 
@@ -13,15 +14,27 @@ from lgrez.blocs import env, webhook, bdd, tools
 from lgrez.blocs.bdd import Taches, Actions, Joueurs
 
 
+_last_time = None       # Temps (time.time) du derner envoi de webhook
 
 def execute(tache, loop):
     """Exécute une tâche planifiée
 
     Args:
         tache (:class:`.bdd.Taches`): tâche planifiée arrivée à exécution
+        loop (:class:`asyncio.AbstractEventLoop`): boucle d'évènements du bot
 
     Envoie un webhook (variable d'environnement ``LGREZ_WEBHOOK_URL``) avec la commande (:attr:`.bdd.Taches.commande`) et nettoie
+
+    Limitation interne de 2 secondes minimum entre deux appels (reprogramme si appelé trop tôt), pour se conformer à la rate limit Discord (30 messages / minute) et ne pas engoncer la loop
     """
+    global _last_time
+
+    if _last_time and (time.time() - _last_time) < 2:      # Moins de deux secondes depuis le dernier envoi
+        loop.call_later(2, execute, tache, loop)        # on interdit l'envoi du webhook
+        return
+
+    _last_time = time.time()
+
     LGREZ_WEBHOOK_URL = env.load("LGREZ_WEBHOOK_URL")
     if webhook.send(tache.commande, url=LGREZ_WEBHOOK_URL):     # envoi webhook OK
         bdd.session.delete(tache)
@@ -158,6 +171,12 @@ class GestionTaches(commands.Cog):
                 action_id = int(id)
         except ValueError:
             pass
+
+        if ts < datetime.datetime.now():
+            mess = await ctx.send("Date dans le passé ==> exécution immédiate ! On valide ?")
+            if not await tools.yes_no(ctx.bot, mess):
+                await ctx.send("Mission aborted.")
+                return
 
         tache = add_task(ctx.bot, ts, commande, action=action_id)
         await ctx.send(f"{tools.code(commande)} planifiée pour le {tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))}.\n{tools.code(f'!cancel {tache.id}')} pour annuler.")

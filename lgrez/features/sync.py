@@ -15,20 +15,42 @@ from lgrez.blocs.bdd import engine, Tables, Joueurs, Actions, BaseActions, BaseA
 from lgrez.features import gestion_actions
 
 
-async def get_sync():
+class TDBModif():
+    """Modification flag sur le Tableau de bord, à appliquer"""
+
+    def __init__(self, id, col, val, row, column):
+        """Initializes self."""
+        #: :class:`int`: ID Discord du joueur concerné
+        self.id = id
+        #: :class:`str`: Colonne de Joueurs à modifier
+        self.col = col
+        #: :class:`object`: Nouvelle valeur
+        self.val = val
+
+        #: :class:`int`: Numéro de la ligne sur le TDB
+        self.row = row
+        #: :class:`int`: Numéro de la colonne TAMPON sur le TDB
+        self.column = column
+
+    def __repr__(self):
+        """Returns repr(self)"""
+        return f"<TDBModif id {self.id}: {self.col} = {self.val}>"
+
+
+def get_sync():
     """Récupère les modifications en attente sur le TDB
 
     Charge les données du Tableau de bord (variable d'environment ``LGREZ_TDB_SHEET_ID``), compare les informations qui y figurent avec celles de la base de données (:class:`.bdd.Joueurs`)
 
-    Pour les informations différant, met à jour le Tableau de bord (ligne plus en rouge)
-
     Returns:
-        :class:`dict`\[:attr:`.bdd.Joueurs.id`, :class:`dict`\[:class:`str`, :class:`object`\]\]: Le dictionnaire des modifications pour chaque joueur (repéré par son ID Discord)
+        :class:`list`\[:class:`.TDBModif`\]: liste des modifications à apporter
     """
 
-    cols = [col for col in bdd_tools.get_cols(Joueurs) if not col.endswith('_')]    # On élimine les colonnes locales
+    all_cols = bdd_tools.get_cols(Joueurs)
+    cols = [col for col in all_cols if not col.endswith('_')]    # On élimine les colonnes locales
     cols_SQL_types = bdd_tools.get_SQL_types(Joueurs)
     cols_SQL_nullable = bdd_tools.get_SQL_nullable(Joueurs)
+    primary_col = bdd_tools.get_primary_col(Joueurs)
 
     ### RÉCUPÉRATION INFOS GSHEET
 
@@ -37,7 +59,6 @@ async def get_sync():
     workbook = gsheets.connect(SHEET_ID)    # Tableau de bord
     sheet = workbook.worksheet("Journée en cours")
     values = sheet.get_all_values()         # Liste de liste des valeurs des cellules
-    (NL, NC) = (len(values), len(values[0]))
 
     head = values[2]            # Ligne d'en-têtes (noms des colonnes) = 3e ligne du TDB
     TDB_index = {col: head.index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
@@ -49,16 +70,15 @@ async def get_sync():
     ids_TDB = []                # discord_ids des différents joueurs du TDB
     rows_TDB = {}               # Indices des lignes ou sont les différents joueurs du TDB
 
-    for l in range(NL):
-        L = values[l]           # On parcourt les lignes du TDB
-        id_cell = L[TDB_index["discord_id"]]
+    for i_row in range(len(values)):
+        L = values[i_row]           # On parcourt les lignes du TDB
+        id_cell = L[TDB_index[primary_col]]
         if id_cell.isdigit():        # Si la cellule contient bien un ID (que des chiffres, et pas vide)
             id = int(id_cell)
-            joueur_TDB = {col: bdd_tools.transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}
-                # Dictionnaire correspondant à l'utilisateur
+            joueur_TDB = {col: bdd_tools.transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}    # Dictionnaire correspondant à l'utilisateur
             joueurs_TDB.append(joueur_TDB)
             ids_TDB.append(id)
-            rows_TDB[id] = l
+            rows_TDB[id] = i_row
 
     ### RÉCUPÉRATION UTILISATEURS CACHE
 
@@ -67,15 +87,14 @@ async def get_sync():
 
     ### COMPARAISON
 
-    modifs = []         # modifs à porter au TDB : tuple (id - colonne (nom) - valeur)
-    modified_ids = []
+    modifs = []         # modifs à porter au TDB (liste de TDBModifs)
 
-    for joueur_BDD in joueurs_BDD.copy():                   ## Joueurs dans le cache supprimés du TDB
+    for joueur_BDD in joueurs_BDD.copy():           # Joueurs dans le cache supprimés du TDB
         if joueur_BDD.discord_id not in ids_TDB:
             joueurs_BDD.remove(joueur_BDD)
             bdd.session.delete(joueur_BDD)
 
-    for joueur_TDB in joueurs_TDB:                              ## Différences
+    for joueur_TDB in joueurs_TDB:                  # Différences
         id = joueur_TDB["discord_id"]
 
         if id not in ids_BDD:             # Si joueur dans le cache pas dans le TDB
@@ -84,24 +103,35 @@ async def get_sync():
         joueur_BDD = [joueur for joueur in joueurs_BDD if joueur.discord_id == id][0]     # joueur correspondant dans le cache
 
         for col in cols:
-            if getattr(joueur_BDD, col) != joueur_TDB[col]:   # Si <col> diffère entre TDB et cache
-
-                modifs.append( (id, col, joueur_TDB[col]) )   # On ajoute les modifs
-                if id not in modified_ids:
-                    modified_ids.append(id)
-
-    ### APPLICATION DES MODIFICATIONS SUR LE TDB
-
-    if modifs:
-        modifs_lc = [(rows_TDB[id], TDB_tampon_index[col], v) for (id, col, v) in modifs]
-            # On transforme les infos en coordonnées dans le TDB : ID -> ligne et col -> colonne,
-        gsheets.update(sheet, modifs_lc)
-
+            if getattr(joueur_BDD, col) != joueur_TDB[col]:     # Si <col> diffère entre TDB et cache
+                modif = TDBModif(id, col, joueur_TDB[col],
+                                 rows_TDB[id], TDB_tampon_index[col])
+                modifs.append(modif)   # On ajoute les modifs
 
     ### RETOURNAGE DES RÉSULTATS
 
-    return {id: {col: v for (idM, col, v) in modifs if idM == id} for id in modified_ids}
+    return modifs
 
+
+def validate_sync(modifs):
+    """Valide des modificatons sur le Tableau de bord (case plus en rouge)
+
+    Args:
+        modifs (:class:`list`\[:class:`.TDBModif`\]): liste des modifications à apporter
+
+    Modifie sur le Tableau de bord (variable d'environment ``LGREZ_TDB_SHEET_ID``) et applique les modifications contenues dans modifs
+    """
+
+    ### APPLICATION DES MODIFICATIONS SUR LE TDB
+
+    SHEET_ID = env.load("LGREZ_TDB_SHEET_ID")
+
+    workbook = gsheets.connect(SHEET_ID)    # Tableau de bord
+    sheet = workbook.worksheet("Journée en cours")
+
+    modifs_lc = [(modif.row, modif.column, modif.val) for modif in modifs]
+        # On transforme les infos en coordonnées dans le TDB : ID -> ligne et col -> colonne,
+    gsheets.update(sheet, modifs_lc)
 
 
 async def modif_joueur(ctx, joueur_id, modifs, silent=False):
@@ -109,7 +139,8 @@ async def modif_joueur(ctx, joueur_id, modifs, silent=False):
 
     Args:
         ctx (:class:`~discord.ext.commands.Context`): contexte quelconque du bot
-        modifs (:class:`dict`\[:class:`str`, :class:`object`\]\]): dictionnaire {colonne BDD: nouvelle valeur}
+        joueur_id (:class:`int`): id Discord du joueur concerné
+        modifs (:class:`list`\[:class:`.TDBModif`\]): liste des modifications à apporter
         silent (:class:`bool`): si ``True``, no notifie pas le joueur des modifications
 
     Pour chaque modifications de ``modif``, applique les conséquences adéquates (rôles, nouvelles actions, tâches planifiées...) et informe le joueur si ``silent`` vaut ``False``.
@@ -126,26 +157,26 @@ async def modif_joueur(ctx, joueur_id, modifs, silent=False):
     changelog = f"\n- {member.display_name} (@{member.name}#{member.discriminator}) :\n"
     notif = ""
 
-    for col, val in modifs.items():
-        changelog += f"    - {col} : {val}\n"
+    for modif in modifs:
+        changelog += f"    - {modif.col} : {modif.val}\n"
 
-        if col == "nom":                            # Renommage joueur
-            await chan.edit(name=f"conv-bot-{val}")
-            await member.edit(nick=val)
+        if modif.col == "nom":                            # Renommage joueur
+            await chan.edit(name=f"conv-bot-{modif.val}")
+            await member.edit(nick=modif.val)
             if not silent:
-                notif += f":arrow_forward: Tu t'appelles maintenant {tools.bold(val)}.\n"
+                notif += f":arrow_forward: Tu t'appelles maintenant {tools.bold(modif.val)}.\n"
 
-        elif col == "chambre" and not silent:       # Modification chambre
-            notif += f":arrow_forward: Tu habites maintenant en chambre {tools.bold(val)}.\n"
+        elif modif.col == "chambre" and not silent:       # Modification chambre
+            notif += f":arrow_forward: Tu habites maintenant en chambre {tools.bold(modif.val)}.\n"
 
-        elif col == "statut":
-            if val == "vivant":                     # Statut = vivant
+        elif modif.col == "statut":
+            if modif.val == "vivant":                     # Statut = vivant
                 await member.add_roles(tools.role(ctx, "Joueur en vie"))
                 await member.remove_roles(tools.role(ctx, "Joueur mort"))
                 if not silent:
                     notif += f":arrow_forward: Tu es maintenant en vie. EN VIE !!!\n"
 
-            elif val == "mort":                     # Statut = mort
+            elif modif.val == "mort":                     # Statut = mort
                 await member.add_roles(tools.role(ctx, "Joueur mort"))
                 await member.remove_roles(tools.role(ctx, "Joueur en vie"))
                 if not silent:
@@ -154,16 +185,16 @@ async def modif_joueur(ctx, joueur_id, modifs, silent=False):
                 for action in Actions.query.filter_by(player_id=joueur.discord_id, trigger_debut="mort"):
                     await gestion_actions.open_action(ctx, action, chan)
 
-            elif val == "MV":                       # Statut = MV
+            elif modif.val == "MV":                       # Statut = MV
                 await member.add_roles(tools.role(ctx, "Joueur en vie"))
                 await member.remove_roles(tools.role(ctx, "Joueur mort"))
                 if not silent:
                     notif += f":arrow_forward: Te voilà maintenant réduit(e) au statut de mort-vivant... Un MJ viendra te voir très vite, si ce n'est déjà fait, mais retient que la partie n'est pas finie pour toi !\n"
 
             elif not silent:                        # Statut = autre
-                notif += f":arrow_forward: Nouveau statut : {tools.bold(val)} !\n"
+                notif += f":arrow_forward: Nouveau statut : {tools.bold(modif.val)} !\n"
 
-        elif col == "role":                         # Modification rôle
+        elif modif.col == "role":                         # Modification rôle
             old_bars = BaseActionsRoles.query.filter_by(role=joueur.role).all()
             old_actions = []
             for bar in old_bars:
@@ -171,7 +202,7 @@ async def modif_joueur(ctx, joueur_id, modifs, silent=False):
             for action in old_actions:
                 gestion_actions.delete_action(ctx, action)  # On supprime les anciennes actions de rôle (et les tâches si il y en a)
 
-            new_bars = BaseActionsRoles.query.filter_by(role=val).all()         # Actions associées au nouveau rôle
+            new_bars = BaseActionsRoles.query.filter_by(role=modif.val).all()         # Actions associées au nouveau rôle
             new_bas = [BaseActions.query.get(bar.action) for bar in new_bars]   # Nouvelles BaseActions
             cols = [col for col in bdd_tools.get_cols(BaseActions) if not col.startswith("base")]
             new_actions = [Actions(player_id=joueur.discord_id, **{col: getattr(ba, col) for col in cols},
@@ -181,35 +212,35 @@ async def modif_joueur(ctx, joueur_id, modifs, silent=False):
             for action in new_actions:
                 gestion_actions.add_action(ctx, action)     # Ajout et création des tâches si trigger temporel
 
-            role = tools.nom_role(val)
-            if not role:        # role <val> pas en base : Error!
-                role = f"« {val} »"
-                await tools.log(ctx, f"{tools.mention_MJ(ctx)} ALED : rôle \"{val}\" attribué à {joueur.nom} inconnu en base !")
+            role = tools.nom_role(modif.val)
+            if not role:        # role <modif.val> pas en base : Error!
+                role = f"« {modif.val} »"
+                await tools.log(ctx, f"{tools.mention_MJ(ctx)} ALED : rôle \"{modif.val}\" attribué à {joueur.nom} inconnu en base !")
             if not silent:
-                notif += f":arrow_forward: Ton nouveau rôle, si tu l'acceptes : {tools.bold(role)} !\nQue ce soit pour un jour ou pour le reste de la partie, renseigne toi en tapant {tools.code(f'!roles {val}')}.\n"
+                notif += f":arrow_forward: Ton nouveau rôle, si tu l'acceptes : {tools.bold(role)} !\nQue ce soit pour un jour ou pour le reste de la partie, renseigne toi en tapant {tools.code(f'!roles {modif.val}')}.\n"
 
-        elif col == "camp" and not silent:          # Modification camp
-            notif += f":arrow_forward: Tu fais maintenant partie du camp « {tools.bold(val)} ».\n"
+        elif modif.col == "camp" and not silent:          # Modification camp
+            notif += f":arrow_forward: Tu fais maintenant partie du camp « {tools.bold(modif.val)} ».\n"
 
-        elif col == "votant_village" and not silent:
-            if val:                                 # votant_village = True
+        elif modif.col == "votant_village" and not silent:
+            if modif.val:                                 # votant_village = True
                 notif += f":arrow_forward: Tu peux maintenant participer aux votes du village !\n"
             else:                                   # votant_village = False
                 notif += f":arrow_forward: Tu ne peux maintenant plus participer aux votes du village.\n"
 
-        elif col == "votant_loups" and not silent:
-            if val:                                 # votant_loups = True
+        elif modif.col == "votant_loups" and not silent:
+            if modif.val:                                 # votant_loups = True
                 notif += f":arrow_forward: Tu peux maintenant participer aux votes des loups ! Amuse-toi bien :wolf:\n"
             else:                                   # votant_loups = False
                 notif += f":arrow_forward: Tu ne peux maintenant plus participer aux votes des loups.\n"
 
-        elif col == "role_actif" and not silent:
-            if val:                                 # role_actif = True
+        elif modif.col == "role_actif" and not silent:
+            if modif.val:                                 # role_actif = True
                 notif += f":arrow_forward: Tu peux maintenant utiliser tes pouvoirs !\n"
             else:                                   # role_actif = False
                 notif += f":arrow_forward: Tu ne peux maintenant plus utiliser aucun pouvoir.\n"
 
-        bdd_tools.modif(joueur, col, val)           # Dans tous les cas, on modifie en base (après, pour pouvoir accéder aux vieux attribus plus haut)
+        bdd_tools.modif(joueur, modif.col, modif.val)           # Dans tous les cas, on modifie en base (après, pour pouvoir accéder aux vieux attribus plus haut)
 
     if not silent:
         await chan.send(f":zap: {member.mention} Une action divine vient de modifier ton existence ! :zap:\n"
@@ -232,35 +263,47 @@ class Sync(commands.Cog):
 
         Cette commande va récupérer les modifications en attente sur le Tableau de bord (lignes en rouge), modifer la BDD Joueurs, et appliquer les modificatons dans Discord le cas échéant : renommage des utilisateurs, modification des rôles...
         """
-        try:
-            await ctx.send("Récupération des modifications...")
-            async with ctx.typing():
-                dic = await get_sync()                  # Récupération du dictionnaire {joueur_id: modified_attrs}
-                silent = bool(silent)
-                changelog = f"Synchronisation TDB (silencieux = {silent}) :"
+        await ctx.send("Récupération des modifications...")
+        async with ctx.typing():
+            modifs = get_sync()                 # Récupération du dictionnaire {joueur_id: modified_attrs}
+            silent = bool(silent)
+            changelog = f"Synchronisation TDB (silencieux = {silent}) :"
 
-            if dic:
-                nb_modifs = sum(len(modifs) for modifs in dic.values())
-                await ctx.send(f"{nb_modifs} modification(s) trouvée(s) pour {len(dic)} joueur(s), application...")
-                async with ctx.typing():
-                    for joueur_id, modifs in dic.items():               # Joueurs dont au moins un attribut a été modifié
-                        try:
-                            changelog += await modif_joueur(ctx, joueur_id, modifs, silent)
-                        except Exception as e:
-                            changelog += traceback.format_exc()
-                            await ctx.send(f"Erreur joueur {joueur_id}, passage au suivant, voir logs pour les détails")
+        if not modifs:
+            await ctx.send("Pas de nouvelles modificatons.")
+            return
 
-                    bdd.session.commit()
+        dic = {}
+        for modif in modifs:
+            if modif.id not in dic:
+                dic[modif.id] = []
+            dic[modif.id].append(modif)
 
-                    await tools.log(ctx, changelog, code=True)
+        message = await ctx.send(f"{len(modifs)} modification(s) trouvée(s) pour {len(dic)} joueur(s), go ?")
+        if not await tools.yes_no(ctx.bot, message):
+            await ctx.send("Mission aborted.")
+            return
 
-                await ctx.send(f"Fait (voir {tools.channel(ctx, 'logs')} pour le détail)")
+        # Go sync
+        done = []
+        async with ctx.typing():
+            for joueur_id, modifs in dic.items():        # Joueurs dont au moins un attribut a été modifié
+                try:
+                    changelog += await modif_joueur(ctx, joueur_id, modifs, silent)
+                except Exception:
+                    changelog += traceback.format_exc()
+                    await ctx.send(f"Erreur joueur {joueur_id}, passage au suivant, voir logs pour les détails")
+                else:
+                    done.extend(modifs)
 
-            else:
-                await ctx.send("Pas de nouvelles modificatons.")
+            bdd.session.commit()
 
-        except Exception:
-            await tools.log(ctx, traceback.format_exc(), code=True)
+            if done:
+                validate_sync(done)
+
+            await tools.log(ctx, changelog, code=True)
+
+        await ctx.send(f"Fait (voir {tools.channel(ctx, 'logs').mention} pour le détail)")
 
 
     @commands.command()

@@ -9,7 +9,7 @@ import unidecode
 
 from discord.ext import commands
 
-from lgrez.blocs import bdd_tools, tools
+from lgrez.blocs import bdd, bdd_tools, tools
 from lgrez.blocs.bdd import session, Joueurs, Roles, Actions, BaseActions
 
 
@@ -180,7 +180,7 @@ class Informations(commands.Cog):
 
         member = ctx.author
         joueur = Joueurs.query.get(member.id)
-        assert joueur, f"!menu : joueur {member} introuvable"
+        assert joueur, f"!infos : joueur {member} introuvable"
         r = ""
 
         r += f"Ton rôle actuel : {tools.bold(tools.nom_role(joueur.role) or joueur.role)}\n"
@@ -202,8 +202,104 @@ class Informations(commands.Cog):
         await ctx.send(r + f"\n{tools.code('!menu')} pour voir les votes et actions en cours, {tools.code('@MJ')} en cas de problème")
 
 
+    @commands.command()
+    @tools.mjs_only
+    async def actions(self, ctx, *, cible):
+        """Affiche et modifie les actions d'un joueur (COMMANDE MJ)
 
-    @commands.command(aliases=["joueurs"])
+        Args:
+            cible: le joueur dont on veut voir ou modifier les actions
+        """
+        joueur = await tools.boucle_query_joueur(ctx, cible, "Qui ?")
+        if joueur:
+
+            member = ctx.guild.get_member(joueur.discord_id)
+            assert member, f"!actions : membre {joueur} introuvable"
+            r = ""
+
+            r += f"Rôle : {tools.nom_role(joueur.role) or joueur.role}\n"
+
+            actions = Actions.query.filter_by(player_id=joueur.discord_id).all()
+
+            if actions:
+                r += "Actions :"
+                r += tools.code_bloc(
+                    f"#️⃣  id   action                   début     fin       cd   charges   refill\n"
+                    "----------------------------------------------------------------------------------\n"
+                    + "\n".join([(tools.emoji_chiffre(i+1) + "  "
+                        + str(action.id).ljust(5)
+                        + str(action.action).ljust(25)
+                        + str(action.heure_debut if action.trigger_debut == "temporel" else action.trigger_debut).ljust(10)
+                        + str(action.heure_fin if action.trigger_fin == "temporel" else action.trigger_fin).ljust(10)
+                        + str(action.cooldown).ljust(5)
+                        + str(action.charges).ljust(10)
+                        + str(action.refill)
+                    ) for i, action in enumerate(actions)]
+                ))
+                r += "Modifier/ajouter/stop :"
+                message = await ctx.send(r)
+                i = await tools.choice(ctx.bot, message, len(actions), additionnal={"⏺": -1, "⏹": 0})
+                if i > 0:       # modifier
+                    action = actions[i-1]
+                    stop = False
+                    while not stop:
+                        await ctx.send(f"Modifier : (parmis {tools.code('début, fin, cd, charges, refill')})\n{tools.code('valider')} pour finir\n(Utiliser {tools.code('!open id')}/{tools.code('!close id')} pour ouvrir/fermer)")
+                        modif = (await tools.wait_for_message_here(ctx)).content.lower()
+
+                        if modif in ["début", "fin"]:
+                            await ctx.send(f"Trigger (parmis {tools.code('temporel, delta, perma, start, auto, mort, mot_mjs, {open|close|remind}_{cond|maire|loups}')}) ou heure direct si {tools.code('temporel')} :")
+                            trigger = (await tools.wait_for_message_here(ctx)).content.lower()
+                            heure = None
+                            if ":" in trigger or "h" in trigger:
+                                heure = trigger
+                                trigger = "temporel"
+
+                            if trigger in ["temporel", "delta"]:
+                                if not heure:
+                                    await ctx.send(f"Heure / delta {tools.code('HHhMM ou HH:MM')} :")
+                                    heure = (await tools.wait_for_message_here(ctx)).content
+                                ts = tools.heure_to_time(heure)
+                                bdd_tools.modif(action, "trigger_debut" if modif == "début" else "trigger_fin", trigger)
+                                bdd_tools.modif(action, "heure_debut" if modif == "début" else "heure_fin", ts)
+                            elif trigger in ["perma", "start", "auto", "mot_mjs", "mort"] + [f"{quoi}_{qui}" for quoi in ["open", "close", "remind"] for qui in ["cond", "maire", "loups"]]:
+                                bdd_tools.modif(action, "trigger_debut" if modif == "début" else "trigger_fin", trigger)
+                                bdd_tools.modif(action, "heure_debut" if modif == "début" else "heure_fin", None)
+                            else:
+                                await ctx.send("Valeur incorrecte")
+
+                        elif modif in ["cd", "cooldown"]:
+                            await ctx.send(f"Combien ?")
+                            cd = int((await tools.wait_for_message_here(ctx)).content)
+                            bdd_tools.modif(action, "cooldown", cd)
+
+                        elif modif == "charges":
+                            await ctx.send(f"Combien ? ({tools.code('None')} pour illimité)")
+                            entry = (await tools.wait_for_message_here(ctx)).content
+                            charges = None if entry.lower() == "none" else int(entry)
+                            bdd_tools.modif(action, "charges", charges)
+
+                        elif modif == "refill":
+                            await ctx.send(f"Quoi ? ({tools.code('rebouteux / forgeron / weekends')} séparés par des {tools.code(', ')})")
+                            refill = (await tools.wait_for_message_here(ctx)).content.lower()
+                            bdd_tools.modif(action, "refill", refill)
+
+                        elif modif == "valider":
+                            bdd.session.commit()
+                            await ctx.send("Fait.")
+
+                        else:
+                            await ctx.send("Valeur incorrecte")
+
+                elif i < 0:     # ajouter
+                    await ctx.send("Pas encore codé, pas de chance")
+
+            else:
+                r += "Aucune action pour ce joueur."
+                await ctx.send(r)
+
+
+
+    @commands.command(aliases=["joueurs", "vivant"])
     async def vivants(self, ctx):
         """Affiche la liste des joueurs vivants
 
@@ -223,7 +319,7 @@ class Informations(commands.Cog):
         await tools.send_code_blocs(ctx, mess, prefixe=f"Les {len(joueurs)} joueurs vivants sont :")
 
 
-    @commands.command()
+    @commands.command(aliases=["mort"])
     async def morts(self, ctx):
         """Affiche la liste des joueurs morts
 

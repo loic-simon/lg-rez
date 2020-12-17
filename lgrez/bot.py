@@ -1,8 +1,8 @@
 import sys
-import os
 import asyncio
 import logging
 import traceback
+import time
 import datetime
 import re
 
@@ -10,7 +10,7 @@ import discord
 from discord.ext import commands
 
 from lgrez import __version__
-from lgrez.blocs import tools, bdd, env, bdd_tools, gsheets, webhook, pseudoshell
+from lgrez.blocs import tools, bdd, env, bdd_tools, gsheets, webhook, realshell
 from lgrez.blocs.bdd import Tables, Joueurs, Actions, Roles
 from lgrez.features import annexe, IA, inscription, informations, sync, open_close, voter_agir, taches, actions_publiques, communication
 
@@ -36,8 +36,15 @@ async def already_in_command(ctx):
     Args:
         ctx (:class:`discord.ext.commands.Context`): contexte d'invocation de la commande.
     """
-    if ctx.channel.id in ctx.bot.in_command and ctx.command.name != "stop":    # Cas particulier : !stop
-        raise AlreadyInCommand()
+    if (ctx.channel.id in ctx.bot.in_command
+        and ctx.command.name not in ["stop", "panik"]):     # Cas particuliers : !stop/!panik
+
+        await ctx.send("stop", delete_after=0)      # On envoie (discrètement) l'ordre d'arrêt commande précédente
+        await asyncio.sleep(1)                      # On attend qu'il soit pris en compte
+        if ctx.channel.id in ctx.bot.in_command:    # Si ça n'a pas suffit
+            raise AlreadyInCommand()                    # on raise l'erreur
+        else:
+            return True
     else:
         return True
 
@@ -77,7 +84,11 @@ async def _on_ready(bot):
     """Méthode appellée par Discord au démarrage du bot.
 
     Vérifie le serveur, log et affiche publiquement que le bot est fonctionnel ; restaure les tâches planifiées éventuelles et exécute celles manquées.
+
+    Si :attr:`bot.config <.LGBot.config>` ``["output_liveness"]`` vaut ``True``, lance :attr:`bot.i_am_alive <.LGBot.i_am_alive>` (écriture chaque minute sur un fichier disque)
     """
+    if bot.config.get("output_liveness"):
+        bot.i_am_alive()            # Start liveness regular output
 
     guild = bot.get_guild(bot.GUILD_ID)
     assert guild, f"on_ready : Guilde d'ID {bot.GUILD_ID} introuvable"
@@ -91,16 +102,17 @@ async def _on_ready(bot):
 
     # Tâches planifiées
     now = datetime.datetime.now()
-    r = ""
+    r = 0
 
     for tache in Tables["Taches"].query.all():
         delta = (tache.timestamp - now).total_seconds()
         TH = bot.loop.call_later(delta, taches.execute, tache, bot.loop)  # Si delta < 0 (action manquée), l'exécute immédiatement, sinon attend jusqu'à tache.timestamp
         bot.tasks[tache.id] = TH
-        r += f"Récupération de la tâche {tools.code(tache.timestamp.strftime('%d/%m/%Y %H:%M:%S'))} > {tools.code(tache.commande)}\n"
+        # r += f"Récupération de la tâche {tools.code(tache.timestamp.strftime('%d/%m/%Y %H:%M:%S'))} > {tools.code(tache.commande)}\n"
+        r += 1
 
     if r:
-        await tools.log(guild, r)
+        await tools.log(guild, f"{r} tâches planifiées récupérées en base et reprogrammées.")
 
 
 # À l'arrivée d'un membre sur le serveur
@@ -161,12 +173,12 @@ async def _on_message(bot, message):
         await message.channel.send("Je n'accepte pas les messages privés, désolé !")
         return
 
-    if (not message.webhook_id                  # Pas de rôle affecté (et pas un webhook)
-        and message.author.top_role == tools.role(message, "@everyone")):
-        return      # le bot te calcule même pas
-
-    if message.guild.id != bot.GUILD_ID:            # Mauvais serveur
+    if message.guild.id != bot.GUILD_ID:        # Mauvais serveur
         return
+
+    if not message.webhook_id:                  # Pas un webhook
+        if message.author.top_role == tools.role(message, "@everyone"):     # Pas de rôle affecté
+            return                                                              # le bot te calcule même pas
 
     if message.content.startswith(bot.command_prefix + " "):
         message.content = bot.command_prefix + message.content[2:]
@@ -202,31 +214,40 @@ async def _on_raw_reaction_add(bot, payload):
         return
 
     reactor = payload.member
-    if reactor == bot.user or not Joueurs.query.get(reactor.id):        # Boucles infinies + gens pas en base
+    if reactor == bot.user:
         return
 
-    # if payload.emoji == tools.emoji(reactor, "volatron", must_be_found=False):
-    #     await reactor.guild.get_channel(payload.channel_id).send(f"{reactor.mention}, GET VOLATRONED !!!")
+    if payload.emoji == tools.emoji(reactor, "bucher"):
+        if not Joueurs.query.get(reactor.id):        # Gens pas en base
+            return
 
-    elif payload.emoji == tools.emoji(reactor, "bucher"):
         ctx = await tools.create_context(bot, reactor, "!vote")
         if ctx.guild.get_channel(payload.channel_id).name.startswith("conv-bot"):
             await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le condamné du jour :")}""")
             await bot.invoke(ctx)       # On trigger !vote
 
     elif payload.emoji == tools.emoji(reactor, "maire"):
+        if not Joueurs.query.get(reactor.id):        # Gens pas en base
+            return
+
         ctx = await tools.create_context(bot, reactor, "!votemaire")
         if ctx.guild.get_channel(payload.channel_id).name.startswith("conv-bot"):
             await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le nouveau maire :")}""")
             await bot.invoke(ctx)       # On trigger !votemaire
 
     elif payload.emoji == tools.emoji(reactor, "lune"):
+        if not Joueurs.query.get(reactor.id):        # Gens pas en base
+            return
+
         ctx = await tools.create_context(bot, reactor, "!voteloups")
         if ctx.guild.get_channel(payload.channel_id).name.startswith("conv-bot"):
             await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour la victime des loups :")}""")
             await bot.invoke(ctx)       # On trigger !voteloups
 
     elif payload.emoji == tools.emoji(reactor, "action"):
+        if not Joueurs.query.get(reactor.id):        # Gens pas en base
+            return
+
         ctx = await tools.create_context(bot, reactor, "!action")
         if ctx.guild.get_channel(payload.channel_id).name.startswith("conv-bot"):
             await ctx.send(f"""{payload.emoji} > {tools.bold("Action :")}""")
@@ -330,6 +351,16 @@ async def _on_error(bot, event, *args, **kwargs):
 class Special(commands.Cog):
     """Special - Commandes spéciales (méta-commandes, imitant ou impactant le déroulement des autres)"""
 
+    @commands.command(aliases=["kill"])
+    @tools.mjs_only
+    async def panik(self, ctx):
+        """Tue instantanément le bot, sans confirmation (COMMANDE MJ)
+
+        PAAAAANIK
+        """
+        sys.exit()
+
+
     @commands.command()
     @tools.mjs_only
     async def do(self, ctx, *, code):
@@ -363,21 +394,13 @@ class Special(commands.Cog):
 
         Évidemment, les avertissements dans ``!do`` s'appliquent ici : ne pas faire n'imp avec cette commande !! (même si ça peut être très utile, genre pour ajouter des gens en masse à un channel)
         """
-        async def in_func():
-            mess = await tools.wait_for_message_here(ctx)
-            return mess.content
-
-        async def out_func(text, color=False):
-            await tools.send_code_blocs(ctx, text, langage="py" if color else "")
-
-        ps = pseudoshell.Shell(
-            globals(), locals(), in_func, out_func, shut_keywords=["stop"],
-            welcome_text="""Variables accessibles : "ctx", "Tables" (dictionnaire {nom: Table}), modules usuels."""
-        )
+        locs = globals()
+        locs["ctx"] = ctx
+        shell = realshell.RealShell(ctx.bot, ctx.channel, locs)
         try:
-            await ps.run()
-        except pseudoshell.PseudoShellExit as exc:
-            raise tools.CommandExit(str(exc) or "!shell: Pseudo-shell forced to end.")
+            await shell.interact()
+        except realshell.RealShellExit as exc:
+            raise tools.CommandExit(*exc.args if exc else "!shell: Forced to end.")
 
 
     @commands.command()
@@ -626,6 +649,18 @@ class LGBot(commands.Bot):
     async def on_error(self, event, *args, **kwargs):
         await _on_error(self, event, *args, **kwargs)
     on_error.__doc__ = _on_error.__doc__
+
+
+    # Système de vérification de vie
+    def i_am_alive(self, filename="alive.log"):
+        """Exporte le temps actuel (UTC) et planifie un nouvel appel dans 60s
+
+        Args:
+            filename (:class:`str`): fichier où exporter le temps actuel
+        """
+        with open(filename, "w") as f:
+            f.write(str(time.time()))
+        self.loop.call_later(60, self.i_am_alive, filename)
 
 
     # Lancement du bot

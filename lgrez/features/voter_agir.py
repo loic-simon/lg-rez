@@ -48,7 +48,7 @@ class VoterAgir(commands.Cog):
         haros = CandidHaro.query.filter_by(type="haro").all()
         harotes = [Joueurs.query.get(haro.player_id).nom for haro in haros]
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
-            message=f"Contre qui veux-tu voter ? (vote actuel : {tools.code(joueur.vote_condamne_)})"
+            message=f"Contre qui veux-tu voter ? (vote actuel : {tools.bold(joueur.vote_condamne_)})"
                     f"\n(harotés : {', '.join(harotes) or 'aucun :pensive:'})"
                     f"\n*Écris simplement le nom du joueur ci-dessous ({tools.code('stop')} pour annuler) :*"
         )
@@ -75,7 +75,7 @@ class VoterAgir(commands.Cog):
             sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet("votecond_brut")
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.vote_condamne_], value_input_option="USER_ENTERED")
 
-        await ctx.send(f"Vote contre {tools.code(cible.nom)} bien pris en compte.\n"
+        await ctx.send(f"Vote contre {tools.bold(cible.nom)} bien pris en compte.\n"
                        + tools.ital("Tu peux modifier ton vote autant que nécessaire avant sa fermeture."))
 
 
@@ -110,7 +110,7 @@ class VoterAgir(commands.Cog):
         candids = CandidHaro.query.filter_by(type="candidature").all()
         candidats = [Joueurs.query.get(candid.player_id).nom for candid in candids]
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
-            message=f"Pour qui veux-tu voter ? (vote actuel : {tools.code(joueur.vote_maire_)})"
+            message=f"Pour qui veux-tu voter ? (vote actuel : {tools.bold(joueur.vote_maire_)})"
                     f"\n(candidats : {', '.join(candidats) or 'aucun :pensive:'})"
                     f"\n*Écris simplement le nom du joueur ci-dessous ({tools.code('stop')} pour annuler) :*"
         )
@@ -137,7 +137,7 @@ class VoterAgir(commands.Cog):
             sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet("votemaire_brut")
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.vote_maire_], value_input_option="USER_ENTERED")
 
-        await ctx.send(f"Vote pour {tools.code(cible.nom)} bien pris en compte.\n"
+        await ctx.send(f"Vote pour {tools.bold(cible.nom)} bien pris en compte.\n"
                        + tools.ital("Tu peux modifier ton vote autant que nécessaire avant sa fermeture."))
 
 
@@ -169,7 +169,7 @@ class VoterAgir(commands.Cog):
 
         # Choix de la cible
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
-                                                message=f"Qui veux-tu manger ? (vote actuel : {tools.code(joueur.vote_loups_)})"
+                                                message=f"Qui veux-tu manger ? (vote actuel : {tools.bold(joueur.vote_loups_)})"
                                                 f"\n*Écris simplement le nom du joueur ci-dessous ({tools.code('stop')} pour annuler) :*")
 
         if joueur.vote_loups_ is None:          # On revérifie, si ça a fermé entre temps !!
@@ -186,7 +186,7 @@ class VoterAgir(commands.Cog):
             sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet("voteloups_brut")
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.camp, joueur.vote_loups_], value_input_option="USER_ENTERED")
 
-        await ctx.send(f"Vote contre {tools.code(cible.nom)} bien pris en compte.")
+        await ctx.send(f"Vote contre {tools.bold(cible.nom)} bien pris en compte.")
 
 
     @commands.command()
@@ -226,7 +226,7 @@ class VoterAgir(commands.Cog):
 
         # Choix de la décision : très simple pour l'instant, car pas de résolution auto
         if not decision:                    # Si décision pas précisée à l'appel de la commande
-            await ctx.send(f"Que veux-tu faire pour l'action {tools.code(action.action)} ? (action actuelle : {tools.code(action.decision_)})")
+            await ctx.send(f"Que veux-tu faire pour l'action {tools.code(action.action)} ? (action actuelle : {tools.bold(action.decision_)})")
             message = await tools.wait_for_message_here(ctx)
             decision = message.content
 
@@ -260,7 +260,7 @@ class VoterAgir(commands.Cog):
                 deleted = False
                 if action.charges:
                     bdd_tools.modif(action, "charges", action.charges - 1)
-                    pcs = " pour cette semaine" if "weekends" in action.refill else ""
+                    pcs = " pour cette semaine" if "weekends" in (action.refill or "").split() else ""
                     await ctx.send(f"Il te reste {action.charges} charge(s){pcs}.")
                     if action.charges == 0 and not action.refill:
                         gestion_actions.delete_action(ctx, action)
@@ -271,5 +271,5 @@ class VoterAgir(commands.Cog):
             await ctx.send(tools.ital(f"[Allo {tools.role(ctx, 'MJ').mention}, conséquence instantanée ici !]"))
 
         else:
-            await ctx.send(f"Action « {tools.code(action.decision_)} » bien prise en compte pour {tools.code(action.action)}.\n"
+            await ctx.send(f"Action « {tools.bold(action.decision_)} » bien prise en compte pour {tools.code(action.action)}.\n"
                            + tools.ital("Tu peux modifier ta décision autant que nécessaire avant la fin du créneau."))

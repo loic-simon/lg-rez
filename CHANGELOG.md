@@ -5,24 +5,53 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Unrealeased
+## 1.2.0 - 2020-12-18
 ### Added
 
-- Inscription: customize default chambre with ``LGBot.config["chambre_mj"]``.
-- ``blocs.tools.send_code_blocs``: added ``prefix`` option (propagated to ``blocs.tools.log``).
-- ``!vivants``: new alias ``!joueurs``.
-- New command ``!reactfals`` (alias ``!rf``) using new function ``features.IA.fetch_tenor``.
+- Commands:
+    - ``!vivants``: new aliases ``!joueurs`` and ``!vivant`` / ``!morts``: new aliases ``!mort``.
+    - ``!post`` (in ``features.communication.Communication``) to send a message to a specific channel.
+    - ``!panik`` (in ``bot.Special``) to instantly kill the bot.
+    - ``!actions`` (in ``features.informations.Informations``) to see and edit players actions [beta].
+    - ``!reactfals`` (alias ``!rf``, in ``features.IA.GestionIA``) using new function ``features.IA.fetch_tenor``.
+    - ``!xkcd (in ``features.annexe.Annexe``).
+    -
+- Bot behavior:
+    - New IA rule: "A ou B" ==> "B" (``features.IA.trigger_a_ou_b``).
+    - ``!plot cond``: thumbnail of camp.
+    - ``!open cond``: send post on #haros and wipes.
+    - New liveness checking system: new method ``LGBot.i_am_alive`` writes every 60s current UTC time to a ``"alive.log"`` (set `LGBot.config["output_liveness"]`` to ``True`` to enable)
+    - Now BONKs every message of users with "puni" in their top role name (needs a :bonk: emoji)
+- API usage:
+    - Emojis with names starting with ``"suric"`` are deleted and ``"!r suricate"`` is invoked in their private chan if no-MJ user.
+    - Inscription: customize default chambre with ``LGBot.config["chambre_mj"]``.
+    - ``blocs.tools.yes_no``: new ``additionnal`` option to add aditionnal emojis.
 
 ### Changed
 
-- ``LGBot.on_error``, ``!vivants``, ``!morts``: minor improvements using ``prefix`` option.
-- Renamed ``features.IA.tenor`` in ``features.IA.trigger_gif`` (consistency).
+- Commands:
+    - ``!send`` can now accept a player name (send to private chan).
+    - ``!plot cond`` now shows faction (emoji) of killed player.
+    - ``!annoncemort`` now announces if killed player is living-dead.
+    - ``!sync`` now asks for confirmation before applying modifications.
+- Bot behavior:
+    - Calling a command when already in a command now tries to stop running command and run afterwards instead of aborting.
+    - Actions by emojis: only trigger in private chans.
+    - Now sends a reminder every morning to always-usable actions.
+- API usage:
+    - Renamed ``features.IA.tenor`` in ``features.IA.trigger_gif`` (consistency).
+    - ``features.sync``: better management of modification with new class ``TDBModif`` and of exceptions with new specific function ``validate_sync``.
+    - ``tools.bdd_tools.find_nearest``: standardized first word comparison with ``match_first_word`` option.
+    - ``!shell``: now using (new) ``blocs.realshell`` module (based on (new dependency) ``asyncode`` module) instead of (removed) ``blocs.pseudoshell``.
+- Other minor improvements.
 
 ### Fixed
 
-- Fixed critical bug with ``role`` change (through ``!sync``).
-- Inscription: fixed critical bug when more > 50 players.
+- Fixed critical bug when changing ``role`` (through ``!sync``).
+- ``features.taches``: fixed critical bug when too much tasks at the same times (Discord's webhooks rate limits).
+- Inscription: fixed critical bug when > 50 players.
 - Some docstrings corrections.
+- Other minor bugs.
 
 
 ## 1.1.0 - 2020-11-03

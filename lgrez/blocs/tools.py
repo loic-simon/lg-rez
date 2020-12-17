@@ -238,7 +238,10 @@ async def wait_for_message(bot, check, trigger_on_commands=False):
 
     message = await bot.wait_for('message', check=trig_check)
     if message.content.lower() in ["stop", "!stop"]:
-        raise CommandExit("Arrêt demandé")
+        if message.author == bot.user:
+            raise CommandExit(ital("(Arrêt commande précédente)"))
+        else:
+            raise CommandExit("Arrêt demandé")
     else:
         return message
 
@@ -316,13 +319,13 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
             rep = cible
         else:
             mess = await wait_for_message_here(ctx)
-            rep = mess.content
+            rep = mess.content.strip("()[]{}<>")
 
         if id := ''.join([c for c in rep if c.isdigit()]):      # Si la chaîne contient un nombre, on l'extrait
             if joueur := Joueurs.query.get(int(id)):                # Si cet ID correspond à un utilisateur, on le récupère
                 return joueur                                       # On a trouvé l'utilisateur !
 
-        nearest = bdd_tools.find_nearest(rep, Joueurs, carac="nom", sensi=sensi, solo_si_parfait=False)     # Sinon, recherche au plus proche
+        nearest = bdd_tools.find_nearest(rep, Joueurs, carac="nom", sensi=sensi, solo_si_parfait=False, match_first_word=True)     # Sinon, recherche au plus proche
 
         if not nearest:
             await ctx.send("Aucune entrée trouvée, merci de réessayer :")
@@ -335,7 +338,7 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
             if await yes_no(ctx.bot, m):
                 return nearest[0][0]
             else:
-                await ctx.send("Bon d'accord, alors tu votes contre qui ?")
+                await ctx.send("Bon d'accord, alors qui ?")
 
         else:
             s = "Les joueurs les plus proches de ton entrée sont les suivants : \n"
@@ -404,7 +407,7 @@ async def wait_for_react_clic(bot, message, emojis={}, *, process_text=False,
 
         done, pending = await asyncio.wait([react_task, mess_task], return_when=asyncio.FIRST_COMPLETED)      # On lance
         # Le bot attend ici qu'une des deux tâches aboutissent
-        done_task = list(done)[0]        # done = tâche réussie
+        done_task = next(iter(done))        # done = tâche réussie
 
         if done_task.get_name() == "react":
             emoji = done_task.result().emoji
@@ -455,7 +458,7 @@ async def yes_no(bot, message):
 
 
 # Surcouche de wait_for_react_clic pour demander de choisir dans une liste simplement
-async def choice(bot, message, N, start=1):
+async def choice(bot, message, N, start=1, *, additionnal={}):
     """Ajoute des reacts chiffres (1️⃣, 2️⃣, 3️⃣...) à message et renvoie le numéro cliqué OU détecté par réponse textuelle
 
     Surcouche de :func:`wait_for_react_clic` pour demander de choisir dans une liste simplement.
@@ -465,14 +468,18 @@ async def choice(bot, message, N, start=1):
         message (:class:`discord.Message`): message où ajouter les réactions
         N (:class:`int`): chiffre jusqu'auquel aller, inclus (``<= 10``)
         start (:class:`int`): chiffre auquel commencer (``<= N``, défaut ``1``)
+        additionnal (:class:`dict`): dictionnaire emoji à ajouter après les chiffres -> valeur renvoyée si cliqué
 
     Réponses textuelles reconnues : nombres seuls entre ``start`` et ``N``
 
     Returns:
         :class:`int`
     """
+    emojis = {emoji_chiffre(i): i for i in range(start, N+1)}
+    if additionnal:
+        emojis.update(additionnal)
     return await wait_for_react_clic(
-        bot, message, emojis={emoji_chiffre(i): i for i in range(start, N+1)}, process_text=True,
+        bot, message, emojis=emojis, process_text=True,
         text_filter=lambda s: s.isdigit() and start <= int(s) <= N, post_converter=int)
 
 
@@ -603,13 +610,16 @@ def heure_to_time(heure):
     """Convertit l'écriture d'une heure en objet :class:`datetime.time`
 
     Args:
-        heure (:class:`str`): heure au format ``HHh`` ou ``HHhMM``
+        heure (:class:`str`): heure au format ``HHh``, ``HHhMM`` ou ``HH:MM``
 
     Returns:
         :class:`datetime.time`
     """
     try:
-        hh, mm = heure.split("h")
+        if "h" in heure:
+            hh, mm = heure.split("h")
+        else:
+            hh, mm = heure.split(":")
         return datetime.time(int(hh), int(mm) if mm else 0)
     except ValueError as exc:
         raise ValueError(f"Valeur \"{heure}\" non convertible en temps") from exc
@@ -750,37 +760,56 @@ async def send_blocs(messageable, mess, *, N=1990, sep='\n', rep=''):
 
     Surcouche de :func:`.smooth_split` envoyant directement les messages formés
 
+    Retourne la liste des messages envoyés
+
     Args:
         messageable (:class:`discord.abc.Messageable`): objet où envoyer le message (:class:`~discord.ext.commands.Context` ou :class:`~discord.TextChannel`)
         mess (:class:`str`): message à envoyer
         N, sep, rep: *identique à* :func:`.smooth_split`
+
+    Returns:
+        :class:`list`\[:class:`discord.Message`\]
     """
+    messages = []
     for bloc in smooth_split(mess, N=N, sep=sep, rep=rep):
-        await messageable.send(bloc)
+        messages.append(await messageable.send(bloc))
+
+    return messages
 
 
 async def send_code_blocs(messageable, mess, *, N=1990, sep='\n', rep='', prefixe="", langage=""):
     """Envoie un (potentiellement long) message sous forme de bloc(s) de code
 
+    Retourne la liste des messages envoyés
+
     :Paramètres:
         messageable, mess, N, sep, rep: *identiques à :func:`.send_blocs`*
         prefixe (:class:`str`): texte à mettre hors des code blocs, au début du premier message
         language: *identique à* :func:`.code_bloc`
+
+    Returns:
+        :class:`list`\[:class:`discord.Message`\]
     """
     if prefixe:
         prefixe = prefixe.rstrip() + "\n"
 
+    messages = []
     for i, bloc in enumerate(smooth_split(prefixe + mess, N=N, sep=sep, rep=rep)):
         if prefixe and i == 0:
             bloc = bloc[len(prefixe):]
-            await messageable.send(prefixe + code_bloc(bloc, langage=langage))
+            message = await messageable.send(prefixe + code_bloc(bloc, langage=langage))
         else:
-            await messageable.send(code_bloc(bloc, langage=langage))
+            message = await messageable.send(code_bloc(bloc, langage=langage))
+        messages.append(message)
+
+    return messages
 
 
 # Log dans #logs
 async def log(arg, message, *, code=False, N=1990, sep='\n', rep='', prefixe="", langage=""):
     """Envoie un message dans le channel ``#logs``
+
+    Retourne la liste des messages envoyés
 
     Args:
         arg (:class:`~discord.ext.commands.Context` | :class:`~discord.Guild` | :class:`~discord.Member` | :class:`~discord.abc.GuildChannel`): argument "connecté" au serveur, permettant de remonter aux channels
@@ -789,14 +818,17 @@ async def log(arg, message, *, code=False, N=1990, sep='\n', rep='', prefixe="",
         N, sep, rep: *identique à* :func:`.send_blocs`
         prefixe: *identique à* :func:`.send_code_blocs`, simplement ajouté avant ``message`` si ``code`` vaut ``False``
         language: *identique à* :func:`.send_code_blocs`, sans effet si `code` vaut ``False``
+
+    Returns:
+        :class:`list`\[:class:`discord.Message`\]
     """
     logchan = channel(arg, "logs")
     if code:
-        await send_code_blocs(logchan, message, N=N, sep=sep, rep=rep, prefixe=prefixe, langage=langage)
+        return (await send_code_blocs(logchan, message, N=N, sep=sep, rep=rep, prefixe=prefixe, langage=langage))
     else:
         if prefixe:
             message = prefixe.rstrip() + "\n" + message
-        await send_blocs(logchan, message, N=N, sep=sep, rep=rep)
+        return (await send_blocs(logchan, message, N=N, sep=sep, rep=rep))
 
 
 

@@ -5,6 +5,7 @@ Commandes diverses qu'on ne savait pas où ranger
 """
 
 import random
+import requests
 import traceback
 import datetime
 import asyncio
@@ -25,7 +26,7 @@ class Annexe(commands.Cog):
         """Lance un ou plusieurs dés
 
         Args:
-            XdY: dés à lancer + modifieurs, au format {XdY + XdY + ... + Z - Z ... } avec X le nombre de dés, Y le nombre de faces et Z les modifieurs (constants).
+            XdY: dés à lancer + modifieurs, au format ``XdY + XdY + ... + Z - Z ...`` avec X le nombre de dés, Y le nombre de faces et Z les modifieurs (constants).
 
         Examples:
             - ``!roll 1d6``           -> lance un dé à 6 faces
@@ -96,11 +97,11 @@ class Annexe(commands.Cog):
         """Ajoute les membres au chan courant (COMMANDE MJ)
 
         Args:
-            *joueurs: membres à ajouter
+            *joueurs: membres à ajouter, chacun entouré par des guillemets si nom + prénom
 
         Si ``*joueurs`` est un seul élément, il peut être de la forme ``<crit>=<filtre>`` tel que décrit dans l'aide de ``!send``.
         """
-        ts_debut = ctx.message.created_at
+        ts_debut = ctx.message.created_at - datetime.timedelta(microseconds=1)
 
         if len(joueurs) == 1 and "=" in joueurs[0]:      # Si critère : on remplace joueurs
             crit, filtre = joueurs[0].split("=", maxsplit=1)
@@ -137,7 +138,7 @@ class Annexe(commands.Cog):
             mess = await ctx.send(f"Supprimer tous les messages de ce chan ?")
 
         if await tools.yes_no(ctx.bot, mess):
-            await ctx.channel.purge(limit=N)
+            await ctx.channel.purge(limit=int(N) if N else None)
 
 
     @commands.command()
@@ -171,3 +172,25 @@ class Annexe(commands.Cog):
             await ctx.send("Yay\nhttps://fr.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png")
         else:
             await ctx.send("Oof\nhttps://fr.akinator.com/bundles/elokencesite/images/akitudes_670x1096/deception.png")
+
+
+    @commands.command()
+    async def xkcd(self, ctx, N):
+        """J'ai aussi glissé chef, mais un peu moins
+
+        Args:
+            N: numéro du comic
+        """
+        async with ctx.typing():
+            r = requests.get(f"https://xkcd.com/{N}/info.0.json")
+
+        if not r:
+            await ctx.send("Paramètre incorrect ou service non accessible.")
+            return
+
+        url = r.json().get("img")
+        if not url:
+            await ctx.send("Paramètre incorrect ou service non accessible.")
+            return
+
+        await ctx.send(url)

@@ -310,7 +310,7 @@ class CandidHaro(_MyTable, Base): #, tablename="candid_haro"
 
     def __repr__(self):
         """Return repr(self)."""
-        return f"<CandidHaro #{self.id} ({self.player_id/self.type})>"
+        return f"<CandidHaro #{self.id} ({self.player_id}/{self.type})>"
 
 
 

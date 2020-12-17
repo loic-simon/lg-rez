@@ -32,6 +32,7 @@ Commandes spéciales
     :members:
 
     .. include:: cognote.rst
+    - :Commande ``!panik`` (alias ``!kill``) : .. automethod:: lgrez.bot.Special.panik.callback
     - :Commande ``!do`` : .. automethod:: lgrez.bot.Special.do.callback
     - :Commande ``!shell`` : .. automethod:: lgrez.bot.Special.shell.callback
     - :Commande ``!co`` : .. automethod:: lgrez.bot.Special.co.callback
@@ -93,6 +94,7 @@ Commandes annexes
     - :Commande ``!addhere`` : .. automethod:: lgrez.features.annexe.Annexe.addhere.callback
     - :Commande ``!purge`` : .. automethod:: lgrez.features.annexe.Annexe.purge.callback
     - :Commande ``!akinator`` : .. automethod:: lgrez.features.annexe.Annexe.akinator.callback
+    - :Commande ``!xkcd`` : .. automethod:: lgrez.features.annexe.Annexe.xkcd.callback
 
 .. }
 
@@ -122,6 +124,7 @@ IA des réponses
     - :Commande ``!stfu`` : .. automethod:: lgrez.features.IA.GestionIA.stfu.callback
     - :Commande ``!fals`` (alias ``!cancer``, ``!214``) : .. automethod:: lgrez.features.IA.GestionIA.fals.callback
     - :Commande ``!react`` (alias ``!r``) : .. automethod:: lgrez.features.IA.GestionIA.react.callback
+    - :Commande ``!reactfals`` (alias ``!rf``) : .. automethod:: lgrez.features.IA.GestionIA.reactfals.callback
     - :Commande ``!addIA`` : .. automethod:: lgrez.features.IA.GestionIA.addIA.callback
     - :Commande ``!listIA`` : .. automethod:: lgrez.features.IA.GestionIA.listIA.callback
     - :Commande ``!modifIA`` : .. automethod:: lgrez.features.IA.GestionIA.modifIA.callback
@@ -144,10 +147,13 @@ Commandes informatives
 
     .. include:: cognote.rst
     - :Commande ``!roles`` (alias ``!role``, ``!rôles``, ``!rôle``, ``!camp``, ``!camps``) : .. automethod:: lgrez.features.informations.Informations.roles.callback
+    - :Commande ``!rolede`` : .. automethod:: lgrez.features.informations.Informations.rolede.callback
+    - :Commande ``!quiest`` : .. automethod:: lgrez.features.informations.Informations.quiest.callback
     - :Commande ``!menu`` : .. automethod:: lgrez.features.informations.Informations.menu.callback
     - :Commande ``!infos`` : .. automethod:: lgrez.features.informations.Informations.infos.callback
-    - :Commande ``!vivants`` (alias ``!joueurs``) : .. automethod:: lgrez.features.informations.Informations.vivants.callback
-    - :Commande ``!morts`` : .. automethod:: lgrez.features.informations.Informations.morts.callback
+    - :Commande ``!actions`` : .. automethod:: lgrez.features.informations.Informations.actions.callback
+    - :Commande ``!vivants`` (alias ``!joueurs``, ``!vivant``) : .. automethod:: lgrez.features.informations.Informations.vivants.callback
+    - :Commande ``!morts`` (alias ``!mort``) : .. automethod:: lgrez.features.informations.Informations.morts.callback
 
 .. }
 
@@ -263,6 +269,7 @@ Communication
     .. include:: cognote.rst
     - :Commande ``!embed`` : .. automethod:: lgrez.features.communication.Communication.embed.callback
     - :Commande ``!send`` (alias ``!tell``) : .. automethod:: lgrez.features.communication.Communication.send.callback
+    - :Commande ``!post`` : .. automethod:: lgrez.features.communication.Communication.post.callback
     - :Commande ``!plot`` : .. automethod:: lgrez.features.communication.Communication.plot.callback
     - :Commande ``!annoncemort`` : .. automethod:: lgrez.features.communication.Communication.annoncemort.callback
 
@@ -325,7 +332,7 @@ Outils divers et variés
    :member-order: bysource
 
 
-Émulation de pseudo-terminaux (avancé)
+Émulation de terminal Python (avancé)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: lgrez.blocs.pseudoshell
+.. automodule:: lgrez.blocs.realshell

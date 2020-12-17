@@ -17,7 +17,7 @@ class ActionsPubliques(commands.Cog):
     @commands.command()
     @tools.vivants_only
     @tools.private
-    async def haro(self, ctx, cible=None):
+    async def haro(self, ctx, *, cible=None):
         """Lance publiquement un haro contre un autre joueur
 
         Args:
@@ -34,7 +34,7 @@ class ActionsPubliques(commands.Cog):
             await ctx.send("Pas de vote pour le condamné de jour en cours !")
             return
 
-        cible = await tools.boucle_query_joueur(ctx, cible, 'Contre qui souhaite-tu déverser ta haine ?')
+        cible = await tools.boucle_query_joueur(ctx, cible, 'Contre qui souhaites-tu déverser ta haine ?')
 
         if cible.statut == "mort":
             await ctx.send("Nan mais oh, tu crois qu'il a pas assez souffert en mourant lui ?")
@@ -44,7 +44,7 @@ class ActionsPubliques(commands.Cog):
             await ctx.send(f"Comment oses-tu t'en prendre à ceux qui te sont supérieurs ? {tools.role(ctx, 'MJ').mention}, regardez un peu ce qu'il se passe là...")
             return
 
-        await tools.send_blocs(ctx, "Et quel est la raison de cette haine, d'ailleurs ?")
+        await tools.send_blocs(ctx, "Et quelle est la raison de cette haine, d'ailleurs ?")
         motif = await tools.wait_for_message_here(ctx)
 
         emb = discord.Embed(title = f"**{tools.emoji(ctx, 'ha')}{tools.emoji(ctx, 'ro')} contre {cible.nom} !**",
@@ -70,7 +70,7 @@ class ActionsPubliques(commands.Cog):
             bdd.session.commit()
 
             await tools.channel(ctx, "haros").send(f"(Psst, {cible_member.mention} :3)", embed=emb)
-            await tools.channel(ctx, "débats").send(f"{tools.emoji(ctx, 'ha')}{tools.emoji(ctx, 'ro')} de {auteur.display_name} sur {cible.nom} ! Vous en pensez quoi vous ? (détails sur {tools.channel(ctx, 'haros').mention})")
+            await tools.channel(ctx, "débats").send(f"{tools.emoji(ctx, 'ha')}{tools.emoji(ctx, 'ro')} de {auteur.mention} sur {cible_member.mention} ! Vous en pensez quoi vous ? (détails sur {tools.channel(ctx, 'haros').mention})")
             await ctx.send(f"Allez, c'est parti ! ({tools.channel(ctx, 'haros').mention})")
 
         else:
@@ -115,6 +115,7 @@ class ActionsPubliques(commands.Cog):
             bdd.session.commit()
 
             await tools.channel(ctx, "haros").send("Here comes a new challenger !", embed=emb)
+            await tools.channel(ctx, "débats").send(f"{auteur.mention} se présente à la Mairie ! Vous en pensez quoi vous ?\n (détails sur {tools.channel(ctx, 'haros').mention})")
             await ctx.send(f"Allez, c'est parti ! ({tools.channel(ctx, 'haros').mention})")
 
 

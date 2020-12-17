@@ -77,7 +77,8 @@ async def recup_joueurs(quoi, qui, heure=None):
         #{joueur.player_id:[action for action in actions if action.player_id == joueur.player_id] for joueur in [Joueurs.query.get(action.player_id) for action in actions]}
 
     elif qui.isdigit() and (action := Actions.query.get(int(qui))):     # Appel direct action par son numéro
-        if ((quoi == "open" and not action.decision_)       # Sécurité : ne pas lancer une action déjà lancer,
+        if ((quoi == "open" and (not action.decision_       # Sécurité : ne pas lancer une action déjà lancée,
+                    or action.trigger_debut == "perma"))        # (sauf si permanente ==> ré-ouverture)
             or (quoi == "close" and action.decision_)       #   ni fermer une déjà fermée
             or (quoi == "remind" and action.decision_ == "rien")):
 
@@ -165,7 +166,6 @@ class OpenClose(commands.Cog):
                 await message.add_reaction(tools.emoji(ctx, "lune"))
 
             else:       # Action
-
                 for action in joueurs[joueur]:
                     await gestion_actions.open_action(ctx, action, chan)
 
@@ -187,8 +187,8 @@ class OpenClose(commands.Cog):
             bdd.session.commit()
             await tools.log(ctx, f"!open {qui} : haros/candids wiped")
             await tools.channel(ctx, "haros").send(f"{tools.emoji(ctx, 'void')}\n"*30
-                + "Nouveu jour, nouveaux haros !\n"
-                + tools.ital(f"Les posts ci-dessus sont invalides pour le vote d'aujourd'hui. Utilisez {tools.code('!haro')} pour en relancer."))
+                + "Nouveau vote, nouveaux haros !\n"
+                + tools.ital(f"Les posts ci-dessus sont invalides pour le vote actuel. Utilisez {tools.code('!haro')} pour en relancer."))
 
         # Programme fermeture
         if qui in ["cond", "maire", "loups"] and heure:
@@ -347,7 +347,7 @@ class OpenClose(commands.Cog):
 
     @commands.command()
     @tools.mjs_only
-    async def refill(self, ctx, motif, cible=None):
+    async def refill(self, ctx, motif, *, cible=None):
         """Permet de recharger le/les pouvoirs rechargeables (COMMANDE BOT / MJ)
 
         Args:
@@ -402,7 +402,7 @@ class OpenClose(commands.Cog):
 
                 bdd_tools.modif(action, "charges", charge)
 
-                await tools.send_blocs(tools.private_chan(ctx.guild.get_member(action.player_id)),f"Ton action {action.action} vient d'être rechargée, tu as maintenant {charge} charge(s) disponible(s) !")
+                await tools.send_blocs(tools.private_chan(ctx.guild.get_member(action.player_id)), f"Ton action {action.action} vient d'être rechargée, tu as maintenant {charge} charge(s) disponible(s) !")
 
         bdd.session.commit()
 
@@ -426,29 +426,6 @@ class OpenClose(commands.Cog):
                 joueurs = Joueurs.query.all()
                 r = "C'est parti !\n"
 
-                # Ajout de toutes les actions en base
-                # r += "\nChargement des actions :\n"
-                # actions = []
-                # cols = [col for col in bdd_tools.get_cols(BaseActions) if not col.startswith("base")]
-                #
-                # for joueur in joueurs:
-                #     base_actions_roles = BaseActionsRoles.query.filter_by(role=joueur.role).all()
-                #     base_actions = [BaseActions.query.get(bar.action) for bar in base_actions_roles]
-                #     actions.extend([Actions(player_id=joueur.discord_id, **{col: getattr(ba, col) for col in cols},
-                #                             cooldown=0, charges=ba.base_charges) for ba in base_actions])
-                #
-                # for action in actions:
-                #     bdd.session.add(action)  # add_all marche pas, problème d'ids étou étou
-                # bdd.session.commit()
-                # for action in actions:      # Après le commit pour que action.id existe
-                #     r += f" - {action.id} ({joueur.nom} > {action.action})\n"
-                #
-                # # Programmation des actions temporelles
-                # r += "\nProgrammation des tâches :\n"
-                # for action in actions:
-                #     if action.trigger_debut == "temporel":
-                #         taches.add_task(ctx.bot, tools.next_occurence(action.heure_debut), f"!open {action.id}")
-                #         r += f" - !open {action.id}"
 
                 r += "\n\nBon plus besoin de lancer les actions, c'est fait à la synchro des rôles mais les !open n'ont aucun impact tant que tout le monde est en role_actif == False, DU COUP passer tout le monde en True genre MAINTENANT (et en silencieux !) si on veut vraiment lancer\n\n"
 

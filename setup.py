@@ -44,6 +44,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),        # ['lgrez', 'lgrez.blocs', 'lgrez.features']
     classifiers=[
         "Development Status :: 5 - Production/Stable",
+        "Framework :: AsyncIO",
         "Intended Audience :: Developers",
         "Natural Language :: French",
         "Programming Language :: Python :: 3.8",
@@ -56,6 +57,3 @@ setuptools.setup(
     install_requires=requirements,
     python_requires='>=3.8',
 )
-
-# python3 setup.py sdist bdist_wheel
-# twine upload dist/*

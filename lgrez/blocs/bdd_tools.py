@@ -142,7 +142,7 @@ def get_SQL_nullable(table):
     return {col.key: col.nullable for col in raw_cols}
 
 
-def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_si_parfait=True):
+def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_si_parfait=True, match_first_word=False):
     """Recherche le(s) plus proche résultat(s) dans une table
 
     Args:
@@ -152,6 +152,7 @@ def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_si_par
         filtre (:class:`sqlalchemy.sql.elements.BinaryExpression`): argument de :meth:`~sqlalchemy.orm.query.Query.filter` (``Table.colonne == valeur``)
         carac (:class:`str`): colonne selon laquelle rechercher (défaut : colonne primaire de la table)
         solo_si_parfait (:class:`bool`): si ``True``, renvoie uniquement le premier élément de score ``1`` trouvé s'il existe (ignore les autres éléments, même si ``>= sensi``)
+        match_first_word (:class:`bool`): si ``True``, teste aussi ``chaine`` vis à vis du premier *mot* (caractères précédent la première espace) de chaque entrée, et conserve ce score si il est supérieur (``table.carac`` doit être de type ``String``).
 
     Returns:
         :class:`list`\[\(:class:`.bdd.Base`, :class:`float`\)\]: La/les entrée(s) correspondant le mieux à ``chaine``, sous forme de liste de tuples ``(element, score*)`` triés par score\* décroissant
@@ -177,16 +178,21 @@ def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_si_par
         SM.set_seq2(slug2)                              # Pour chaque élément, on compare la cible à son nom (en non accentué)
         score = SM.ratio()                              # On calcule la ressemblance
 
-        if carac == "nom":          # CP Prénom Nom : on test sur prénom only aussi
+        if match_first_word:
             SM.set_seq2(slug2.split(maxsplit=1)[0])
             scorep = SM.ratio()
             if scorep > score:
                 score = scorep
 
-        if score == 1 and solo_si_parfait:              # Cas particulier : élément demandé correspondant exactement à un en BDD
-            return [(entry, score)]
+        if score == 1:          # Cas particulier : élément demandé correspondant exactement à un en BDD
+            if solo_si_parfait:             # Si demandé, on le renvoie direct
+                return [(entry, score)]
+            else:                           # Sinon, on ne renverra que les éléments de score 1
+                sensi = 1
+
         scores.append((entry, score))
 
-    # Si pas d'élément correspondant parfaitement
-    bests = [(entry, score) for (entry, score) in sorted(scores, key=lambda x: x[1], reverse=True) if score >= sensi]  # Meilleurs noms, dans l'ordre
+
+    bests = [(entry, score) for (entry, score) in sorted(scores, key=lambda x: x[1], reverse=True) if score >= sensi]
+    # Meilleurs résultats, dans l'ordre ; si élément parfait trouvé, sensi = 1 donc ne renvoie que les parfaits
     return bests
