@@ -10,8 +10,9 @@ import time
 from discord import Embed
 from discord.ext import commands
 
+from lgrez import config
 from lgrez.blocs import tools, bdd, bdd_tools, env, gsheets
-from lgrez.blocs.bdd import engine, Tables, Joueurs, Actions, BaseActions, BaseActionsRoles, Roles, Taches
+from lgrez.blocs.bdd import tables, Joueur, Action, Role, Statut, ActionTrigger
 from lgrez.features import gestion_actions
 
 
@@ -22,7 +23,7 @@ class TDBModif():
         """Initializes self."""
         #: :class:`int`: ID Discord du joueur concerné
         self.id = id
-        #: :class:`str`: Colonne de Joueurs à modifier
+        #: :class:`str`: Colonne de :class:`~blocs.bdd.Joueur` à modifier
         self.col = col
         #: :class:`object`: Nouvelle valeur
         self.val = val
@@ -40,17 +41,17 @@ class TDBModif():
 def get_sync():
     """Récupère les modifications en attente sur le TDB
 
-    Charge les données du Tableau de bord (variable d'environment ``LGREZ_TDB_SHEET_ID``), compare les informations qui y figurent avec celles de la base de données (:class:`.bdd.Joueurs`)
+    Charge les données du Tableau de bord (variable d'environment ``LGREZ_TDB_SHEET_ID``), compare les informations qui y figurent avec celles de la base de données (:class:`.bdd.Joueur`)
 
     Returns:
         :class:`list`\[:class:`.TDBModif`\]: liste des modifications à apporter
     """
 
-    all_cols = bdd_tools.get_cols(Joueurs)
+    all_cols = bdd_tools.get_cols(Joueur)
     cols = [col for col in all_cols if not col.endswith('_')]    # On élimine les colonnes locales
-    cols_SQL_types = bdd_tools.get_SQL_types(Joueurs)
-    cols_SQL_nullable = bdd_tools.get_SQL_nullable(Joueurs)
-    primary_col = bdd_tools.get_primary_col(Joueurs)
+    cols_SQL_types = bdd_tools.get_SQL_types(Joueur)
+    cols_SQL_nullable = bdd_tools.get_SQL_nullable(Joueur)
+    primary_col = bdd_tools.get_primary_col(Joueur)
 
     ### RÉCUPÉRATION INFOS GSHEET
 
@@ -82,7 +83,7 @@ def get_sync():
 
     ### RÉCUPÉRATION UTILISATEURS CACHE
 
-    joueurs_BDD = Joueurs.query.all()     # Liste des joueurs tels qu'actuellement en cache
+    joueurs_BDD = Joueur.query.all()    # Liste des joueurs tels qu'actuellement en cache
     ids_BDD = [joueur_BDD.discord_id for joueur_BDD in joueurs_BDD]
 
     ### COMPARAISON
@@ -92,7 +93,7 @@ def get_sync():
     for joueur_BDD in joueurs_BDD.copy():           # Joueurs dans le cache supprimés du TDB
         if joueur_BDD.discord_id not in ids_TDB:
             joueurs_BDD.remove(joueur_BDD)
-            bdd.session.delete(joueur_BDD)
+            config.session.delete(joueur_BDD)
 
     for joueur_TDB in joueurs_TDB:                  # Différences
         id = joueur_TDB["discord_id"]
@@ -145,18 +146,16 @@ async def modif_joueur(ctx, joueur_id, modifs, silent=False):
 
     Pour chaque modifications de ``modif``, applique les conséquences adéquates (rôles, nouvelles actions, tâches planifiées...) et informe le joueur si ``silent`` vaut ``False``.
     """
-    joueur = Joueurs.query.get(int(joueur_id))
+    joueur = Joueur.query.get(joueur_id)
     assert joueur, f"!sync : joueur d'ID {joueur_id} introuvable"
 
-    member = ctx.guild.get_member(joueur.discord_id)
-    assert member, f"!sync : member {joueur} introuvable"
-
-    chan = ctx.guild.get_channel(joueur.chan_id_)
-    assert chan, f"!sync : chan privé de {member} introuvable"
+    member = joueur.member
+    chan = joueur.private_chan
 
     changelog = f"\n- {member.display_name} (@{member.name}#{member.discriminator}) :\n"
     notif = ""
 
+    done = []
     for modif in modifs:
         changelog += f"    - {modif.col} : {modif.val}\n"
 
@@ -170,22 +169,23 @@ async def modif_joueur(ctx, joueur_id, modifs, silent=False):
             notif += f":arrow_forward: Tu habites maintenant en chambre {tools.bold(modif.val)}.\n"
 
         elif modif.col == "statut":
-            if modif.val == "vivant":                     # Statut = vivant
+            if modif.val == Statut.vivant.name:         # Statut = vivant
                 await member.add_roles(tools.role(ctx, "Joueur en vie"))
                 await member.remove_roles(tools.role(ctx, "Joueur mort"))
                 if not silent:
                     notif += f":arrow_forward: Tu es maintenant en vie. EN VIE !!!\n"
 
-            elif modif.val == "mort":                     # Statut = mort
+            elif modif.val == Statut.mort.name:         # Statut = mort
                 await member.add_roles(tools.role(ctx, "Joueur mort"))
                 await member.remove_roles(tools.role(ctx, "Joueur en vie"))
                 if not silent:
                     notif += f":arrow_forward: Tu es malheureusement décédé(e) :cry:\nÇa arrive même aux meilleurs, en espérant que ta mort ait été belle !\n"
                 # Actions à la mort
-                for action in Actions.query.filter_by(player_id=joueur.discord_id, trigger_debut="mort"):
-                    await gestion_actions.open_action(ctx, action, chan)
+                for action in joueur.actions:
+                    if action.trigger_debut == ActionTrigger.mort:
+                        await gestion_actions.open_action(ctx, action, chan)
 
-            elif modif.val == "MV":                       # Statut = MV
+            elif modif.val == Statut.MV.name:           # Statut = MV
                 await member.add_roles(tools.role(ctx, "Joueur en vie"))
                 await member.remove_roles(tools.role(ctx, "Joueur mort"))
                 if not silent:
@@ -195,59 +195,52 @@ async def modif_joueur(ctx, joueur_id, modifs, silent=False):
                 notif += f":arrow_forward: Nouveau statut : {tools.bold(modif.val)} !\n"
 
         elif modif.col == "role":                         # Modification rôle
-            old_bars = BaseActionsRoles.query.filter_by(role=joueur.role).all()
-            old_actions = []
-            for bar in old_bars:
-                old_actions.extend(Actions.query.filter_by(action=bar.action, player_id=joueur.discord_id).all())
-            for action in old_actions:
-                gestion_actions.delete_action(ctx, action)  # On supprime les anciennes actions de rôle (et les tâches si il y en a)
+            for action in joueur.actions:
+                if action.base in joueur.role.base_actions:
+                    gestion_actions.delete_action(ctx, action)  # On supprime les anciennes actions de rôle (et les tâches si il y en a)
 
-            new_bars = BaseActionsRoles.query.filter_by(role=modif.val).all()         # Actions associées au nouveau rôle
-            new_bas = [BaseActions.query.get(bar.action) for bar in new_bars]   # Nouvelles BaseActions
-            cols = [col for col in bdd_tools.get_cols(BaseActions) if not col.startswith("base")]
-            new_actions = [Actions(player_id=joueur.discord_id, **{col: getattr(ba, col) for col in cols},
-                                   cooldown=0, charges=ba.base_charges) for ba in new_bas]
-            await tools.log(ctx, str(new_actions))
+            new_role = Role.query.get(modif.val)
+            if not new_role:
+                changelog += f"!!!! Rôle `{modif.val}` inconnu pour `{joueur}`, passé !!!!\n"
+                continue
 
-            for action in new_actions:
+            for base in new_role.base_actions:
+                action = Action(joueur=joueur, base=base, cooldown=0, charges=base.base_charges)
                 gestion_actions.add_action(ctx, action)     # Ajout et création des tâches si trigger temporel
 
-            role = tools.nom_role(modif.val)
-            if not role:        # role <modif.val> pas en base : Error!
-                role = f"« {modif.val} »"
-                await tools.log(ctx, f"{tools.mention_MJ(ctx)} ALED : rôle \"{modif.val}\" attribué à {joueur.nom} inconnu en base !")
             if not silent:
-                notif += f":arrow_forward: Ton nouveau rôle, si tu l'acceptes : {tools.bold(role)} !\nQue ce soit pour un jour ou pour le reste de la partie, renseigne toi en tapant {tools.code(f'!roles {modif.val}')}.\n"
+                notif += f":arrow_forward: Ton nouveau rôle, si tu l'acceptes : {tools.bold(new_role.nom_complet)} !\nQue ce soit pour un jour ou pour le reste de la partie, renseigne toi en tapant {tools.code(f'!roles {new_role.slug}')}.\n"
 
-        elif modif.col == "camp" and not silent:          # Modification camp
+        elif modif.col == "camp" and not silent:    # Modification camp
             notif += f":arrow_forward: Tu fais maintenant partie du camp « {tools.bold(modif.val)} ».\n"
 
         elif modif.col == "votant_village" and not silent:
-            if modif.val:                                 # votant_village = True
+            if modif.val:                           # votant_village = True
                 notif += f":arrow_forward: Tu peux maintenant participer aux votes du village !\n"
             else:                                   # votant_village = False
                 notif += f":arrow_forward: Tu ne peux maintenant plus participer aux votes du village.\n"
 
         elif modif.col == "votant_loups" and not silent:
-            if modif.val:                                 # votant_loups = True
+            if modif.val:                           # votant_loups = True
                 notif += f":arrow_forward: Tu peux maintenant participer aux votes des loups ! Amuse-toi bien :wolf:\n"
             else:                                   # votant_loups = False
                 notif += f":arrow_forward: Tu ne peux maintenant plus participer aux votes des loups.\n"
 
         elif modif.col == "role_actif" and not silent:
-            if modif.val:                                 # role_actif = True
+            if modif.val:                           # role_actif = True
                 notif += f":arrow_forward: Tu peux maintenant utiliser tes pouvoirs !\n"
             else:                                   # role_actif = False
                 notif += f":arrow_forward: Tu ne peux maintenant plus utiliser aucun pouvoir.\n"
 
-        bdd_tools.modif(joueur, modif.col, modif.val)           # Dans tous les cas, on modifie en base (après, pour pouvoir accéder aux vieux attribus plus haut)
+        bdd_tools.modif(joueur, modif.col, modif.val)       # Dans tous les cas, on modifie en base (après, pour pouvoir accéder aux vieux attribus plus haut)
+        done.append(modif)
 
     if not silent:
         await chan.send(f":zap: {member.mention} Une action divine vient de modifier ton existence ! :zap:\n"
                         + f"\n{notif}\n"
                         + tools.ital(":warning: Si tu penses qu'il y a erreur, appelle un MJ au plus vite !"))
 
-    return changelog
+    return done, changelog
 
 
 class Sync(commands.Cog):
@@ -261,7 +254,7 @@ class Sync(commands.Cog):
         Args:
             silent: si spécifié (quelque soit sa valeur), les joueurs ne sont pas notifiés des modifications.
 
-        Cette commande va récupérer les modifications en attente sur le Tableau de bord (lignes en rouge), modifer la BDD Joueurs, et appliquer les modificatons dans Discord le cas échéant : renommage des utilisateurs, modification des rôles...
+        Cette commande va récupérer les modifications en attente sur le Tableau de bord (lignes en rouge), modifer la BDD, et appliquer les modificatons dans Discord le cas échéant : renommage des utilisateurs, modification des rôles...
         """
         await ctx.send("Récupération des modifications...")
         async with ctx.typing():
@@ -289,14 +282,15 @@ class Sync(commands.Cog):
         async with ctx.typing():
             for joueur_id, modifs in dic.items():        # Joueurs dont au moins un attribut a été modifié
                 try:
-                    changelog += await modif_joueur(ctx, joueur_id, modifs, silent)
+                    done, cgl = await modif_joueur(ctx, int(joueur_id), modifs, silent)
+                    changelog += cgl
                 except Exception:
                     changelog += traceback.format_exc()
                     await ctx.send(f"Erreur joueur {joueur_id}, passage au suivant, voir logs pour les détails")
                 else:
                     done.extend(modifs)
 
-            bdd.session.commit()
+            config.session.commit()
 
             if done:
                 validate_sync(done)
@@ -311,7 +305,7 @@ class Sync(commands.Cog):
     async def fillroles(self, ctx):
         """Remplit les tables des rôles / actions et #roles depuis le GSheet ad hoc (COMMANDE MJ)
 
-        - Remplit les tables :class:`.bdd.Roles`, :class:`.bdd.BaseActions` et :class:`.bdd.BaseActionsRoles` avec les informations du Google Sheets "Rôles et actions" (variable d'environnement ``LGREZ_ROLES_SHEET_ID``) ;
+        - Remplit les tables :class:`.bdd.Role` et :class:`.bdd.BaseAction` avec les informations du Google Sheets "Rôles et actions" (variable d'environnement ``LGREZ_ROLES_SHEET_ID``) ;
         - Vide le chan ``#roles`` puis le remplit avec les descriptifs de chaque rôle.
 
         Utile à chaque début de saison / changement dans les rôles/actions. Écrase toutes les entrées déjà en base, mais ne supprime pas celles obsolètes.
@@ -320,14 +314,14 @@ class Sync(commands.Cog):
         SHEET_ID = env.load("LGREZ_ROLES_SHEET_ID")
         workbook = gsheets.connect(SHEET_ID)    # Tableau de bord
 
-        for table_name in ["Roles", "BaseActions", "BaseActionsRoles"]:
+        for table_name in ["Role", "BaseAction"]:
             await ctx.send(f"Remplissage de la table {tools.code(table_name)}...")
             async with ctx.typing():
 
                 sheet = workbook.worksheet(table_name)
                 values = sheet.get_all_values()         # Liste de liste des valeurs des cellules
 
-                table = Tables[table_name]
+                table = tables[table_name]
                 cols = bdd_tools.get_cols(table)
                 SQL_types = bdd_tools.get_SQL_types(table)
                 SQL_nullable = bdd_tools.get_SQL_nullable(table)
@@ -345,9 +339,9 @@ class Sync(commands.Cog):
                             if getattr(existants[id], col) != args[col]:
                                 bdd_tools.modif(existants[id], col, args[col])
                     else:
-                        bdd.session.add(table(**args))
+                        config.session.add(table(**args))
 
-                bdd.session.commit()
+                config.session.commit()
 
             await ctx.send(f"Table {tools.code(table_name)} remplie !")
             await tools.log(ctx, f"Table {tools.code(table_name)} remplie !")
@@ -358,17 +352,17 @@ class Sync(commands.Cog):
         async with ctx.typing():
             await chan_roles.purge(limit=1000)
 
-        roles = {camp: Roles.query.filter_by(camp=camp).all() for camp in ["village", "loups", "nécro", "solitaire", "autre"]}
-        await ctx.send(f"Remplissage... (temps estimé : {sum([len(v) + 2 for v in roles.values()]) + 1} secondes)")
+        camps = Camp.query.filter_by(visible=True).all()
+        await ctx.send(f"Remplissage... (temps estimé : {sum(len(camp.roles) + 2 for camp in camps) + 2} secondes)")
 
         t0 = time.time()
         await chan_roles.send(f"Voici la liste des rôles : (accessible en faisant {tools.code('!roles')}, mais on l'a mis là parce que pourquoi pas)\n\n——————————————————————————")
         async with ctx.typing():
-            for camp, roles_camp in roles.items():
-                if roles_camp:
+            for camp in camps:
+                if camp.roles:
                     await chan_roles.send(embed=Embed(title=f"Camp : {camp}").set_image(url=tools.emoji_camp(ctx, camp).url))
                     await chan_roles.send(f"——————————————————————————")
-                    for role in roles_camp:
+                    for role in camp.roles:
                         await chan_roles.send(f"{tools.emoji_camp(ctx, role.camp)} {tools.bold(role.prefixe + role.nom)} – {role.description_courte} (camp : {role.camp})\n\n{role.description_longue}\n\n——————————————————————————")
 
         await ctx.send(f"{chan_roles.mention} rempli ! (en {(time.time() - t0):.4} secondes)")

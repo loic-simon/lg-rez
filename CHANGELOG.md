@@ -5,6 +5,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## Unrealeased
+
+### Major refactoring
+
+- ``blocs.bdd``:
+    - Rename every data classes to singular names (``Joueur``, ``Role``...)
+    - Use SQLAlchemy relationships and make foreign key arguments private (``Joueur.role`` -> ``Joueur._role_slug``, ``Joueur.role`` = ``Role`` object)
+    - Enhance data classes with custom properties and classmethods: ``Joueur.member``, ``Joueur.private_chan``, ``Joueur.from_member``, ``Role.nom_complet``, ``Role.default``, ``Camp.default``
+    - Use ``Enum``s when needed: ``Statut``, ``ActionTrigger``, ``CandidHaroType``
+    - ``__all__`` contains all data classes
+
+- ``config``: new global namespace file for global variables: ``config.bot``, ``config.guild``, ``config.session``
+
+
+### Also added
+
+- ``blocs.bdd.Camp`` table
+
+
+### Also changed
+
+- ``blocs.bdd.Tables`` renamed in ``tables`` and auto-build by SQLAlchemy Declarative
+- ``blocs.bdd.Base`` renamed in ``TableBase``
+- ``blocs.bdd.<Table>.query`` uses ``config.session`` (raises ``RuntimeError`` if not initialised)
+- ``!roles`` adapted to new ``Camp`` table
+
+
+### Also removed
+
+- ``blocs.bdd.BaseActionsRoles``: use private junction table instead
+- ``blocs.bdd.BaseAction``: base arguments (not specific to action) removed; use ``action.base.arg`` instead
+
+
+
+
 ## 1.2.0 - 2020-12-18
 ### Added
 
@@ -13,17 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - ``!post`` (in ``features.communication.Communication``) to send a message to a specific channel.
     - ``!panik`` (in ``bot.Special``) to instantly kill the bot.
     - ``!actions`` (in ``features.informations.Informations``) to see and edit players actions [beta].
+    - ``!quiest`` and ``!rolede`` (in ``features.informations.Informations``) to see players with a given role and vice versa.
     - ``!reactfals`` (alias ``!rf``, in ``features.IA.GestionIA``) using new function ``features.IA.fetch_tenor``.
-    - ``!xkcd (in ``features.annexe.Annexe``).
-    -
+    - ``!xkcd`` (in ``features.annexe.Annexe``).
 - Bot behavior:
     - New IA rule: "A ou B" ==> "B" (``features.IA.trigger_a_ou_b``).
     - ``!plot cond``: thumbnail of camp.
     - ``!open cond``: send post on #haros and wipes.
-    - New liveness checking system: new method ``LGBot.i_am_alive`` writes every 60s current UTC time to a ``"alive.log"`` (set `LGBot.config["output_liveness"]`` to ``True`` to enable)
-    - Now BONKs every message of users with "puni" in their top role name (needs a :bonk: emoji)
+    - New liveness checking system: new method ``LGBot.i_am_alive`` writes every 60s current UTC time to a ``"alive.log"`` (set ``LGBot.config["output_liveness"]`` to ``True`` to enable)
 - API usage:
-    - Emojis with names starting with ``"suric"`` are deleted and ``"!r suricate"`` is invoked in their private chan if no-MJ user.
     - Inscription: customize default chambre with ``LGBot.config["chambre_mj"]``.
     - ``blocs.tools.yes_no``: new ``additionnal`` option to add aditionnal emojis.
 

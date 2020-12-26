@@ -163,16 +163,17 @@ def find_nearest(chaine, table, sensi=0.25, filtre=None, carac=None, solo_si_par
     slug1 = _remove_accents(chaine).lower()             # Cible en minuscule et sans accents
     SM.set_seq1(slug1)                                  # Première chaîne à comparer : cible demandée
 
-    if not filtre:
-        query = table.query.all()
-    else:
-        query = table.query.filter(filtre).all()
+    query = table.query
+    if filtre:
+        query = query.filter(filtre)
+        
+    results = query.all()
 
     scores = []
     if not carac:
         carac = get_primary_col(table)
 
-    for entry in query:
+    for entry in results:
         slug2 = _remove_accents(getattr(entry, carac)).lower()
 
         SM.set_seq2(slug2)                              # Pour chaque élément, on compare la cible à son nom (en non accentué)

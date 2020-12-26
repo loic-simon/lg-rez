@@ -6,7 +6,8 @@
 
 from discord.ext import commands
 
-from lgrez.blocs.bdd import Joueurs
+from lgrez import config
+from lgrez.blocs.bdd import Joueur, Role, Camp, Statut
 from lgrez.blocs import tools, bdd, env, gsheets, bdd_tools
 
 
@@ -27,13 +28,20 @@ async def main(bot, member):
 
     Commande appellée à l'arrivée sur le serveur, utiliser :meth:`\!co <.bot.Special.Special.co.callback>` pour trigger cette commande depuis Discord.
     """
-    if Joueurs.query.get(member.id):                                            # Joueur dans la bdd = déjà inscrit
-        await tools.private_chan(member).set_permissions(member, read_messages=True, send_messages=True)
-        await tools.private_chan(member).send(f"Saloww ! {member.mention} tu es déjà inscrit, viens un peu ici enculé !")
+    try:
+        joueur = Joueur.from_member(member)
+    except ValueError:      # Joueur pas encore inscrit en base
+        pass
+    else:                   # Joueur dans la bdd = déjà inscrit
+        chan = joueur.private_chan
+        await chan.set_permissions(member, read_messages=True, send_messages=True)
+        await chan.send(f"Saloww ! {member.mention} tu es déjà inscrit, viens un peu ici enculé !")
         return
-    elif chan := tools.get(member.guild.text_channels, topic=f"{member.id}"):   # Inscription en cours
+
+    if chan := tools.get(member.guild.text_channels, topic=str(member.id)):     # Inscription en cours
         await chan.set_permissions(member, read_messages=True, send_messages=True)
         await chan.send(f"Tu as déjà un channel à ton nom, {member.mention}, par ici !")
+
     else:           # Pas d'inscription déjà en cours : création channel
         categ = tools.channel(member, "CONVERSATION BOT")
         if len(categ.channels) >= 50:         # Limitation Discord : 50 channels par catégorie
@@ -51,12 +59,6 @@ async def main(bot, member):
 
         chan = await member.guild.create_text_channel(f"conv-bot-{member.name}",  topic=str(member.id), category=categ)
         await chan.set_permissions(member, read_messages=True, send_messages=True)
-
-
-    ### Mise en mode STFU le temps de l'inscription, si pas déjà fait par l'appel à !co (arrivée nouveau membre)
-
-    if chan.id not in bot.in_stfu:
-        bot.in_stfu.append(chan.id)
 
 
     ### Récupération nom et renommages
@@ -120,15 +122,15 @@ async def main(bot, member):
     async with chan.typing():     # Envoi indicateur d'écriture pour informer le joueur que le bot fait des trucs
         # Ajout à la BDD
 
-        joueur = Joueurs(discord_id=member.id, chan_id_=chan.id, nom=member.display_name,
-                         chambre=chambre, statut="vivant", role="nonattr", camp="Non attribué",
-                         votant_village=True, votant_loups=False, role_actif=False)
-        bdd.session.add(joueur)
-        bdd.session.commit()
+        joueur = Joueur(discord_id=member.id, chan_id_=chan.id, nom=member.display_name,
+                        chambre=chambre, statut=Statut.vivant, role=Role.default(), camp=Camp.default(),
+                        votant_village=True, votant_loups=False, role_actif=False)
+        config.session.add(joueur)
+        config.session.commit()
 
         # Ajout au TDB
 
-        cols = [col for col in bdd_tools.get_cols(Joueurs) if not col.endswith('_')]    # On élimine les colonnes locales
+        cols = [col for col in bdd_tools.get_cols(Joueur) if not col.endswith('_')]     # On élimine les colonnes locales
 
         SHEET_ID = env.load("LGREZ_TDB_SHEET_ID")
 
@@ -166,8 +168,3 @@ async def main(bot, member):
 
     # Log
     await tools.log(member, f"Inscription de {member.name}#{member.discriminator} réussie\n - Nom : {nom}\n - Chambre : {chambre}\n - Channel créé : {chan.mention}")
-
-
-    # Retrait du mode STFU
-    if chan.id in bot.in_stfu:
-        bot.in_stfu.remove(chan.id)

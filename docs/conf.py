@@ -215,6 +215,7 @@ intersphinx_mapping = {
     'sqlalchemy': ('https://docs.sqlalchemy.org/en/latest/', None),
     'gspread': ('https://gspread.readthedocs.io/en/latest/', None),
     'requests': ('https://requests.readthedocs.io/en/latest/', None),
+    'psycopg2': ('https://www.psycopg.org/docs/', None),
 }
 
 

@@ -9,8 +9,9 @@ import unidecode
 
 from discord.ext import commands
 
+from lgrez import config
 from lgrez.blocs import bdd, bdd_tools, tools
-from lgrez.blocs.bdd import session, Joueurs, Roles, Actions, BaseActions
+from lgrez.blocs.bdd import Joueur, Role, Camp, Statut
 
 
 class Informations(commands.Cog):
@@ -30,29 +31,25 @@ class Informations(commands.Cog):
         """
         if filtre:
             filtre = tools.remove_accents(filtre.lower())
+            filtre = filtre.strip("<>[](){}")
 
         if not filtre:
-            roles = Roles.query.order_by(Roles.nom).all()
-        elif filtre in ("villageois", "village", "<villageois>", "<village>"):
-            roles = Roles.query.filter_by(camp="village").all()
-        elif filtre in ("loups", "<loups>"):
-            roles = Roles.query.filter_by(camp="loups").all()
-        elif filtre in ("necros", "<necros>"):
-            roles = Roles.query.filter_by(camp="nécro").all()
-        elif filtre in ("autres", "solitaires", "<autres>", "<solitaires>"):
-            roles = Roles.query.filter_by(camp="solitaire").all()
-        elif filtre:
-            if role := Roles.query.get(filtre):     # Slug du rôle trouvé direct
-                pass
-            else:                                   # Sinon, on cherche en base
-                roles = bdd_tools.find_nearest(filtre, Roles, carac="nom")
-                if roles:
-                    role = roles[0][0]
-                else:
+            roles = Role.query.order_by(Role.nom).all()
+        else:
+            camps = bdd_tools.find_nearest(filtre, Camp, carac="nom",
+                sensi=0.6, filtre=(Camp.visible == True))
+
+            if camps:
+                roles = camps[0][0].roles
+            else:
+                roles = bdd_tools.find_nearest(filtre, Role, carac="nom")
+                if not roles:
                     await ctx.send(f"Rôle / camp \"{filtre}\" non trouvé.")
                     return
-            await ctx.send(tools.code_bloc(f"{role.prefixe}{role.nom} – {role.description_courte} (camp : {role.camp})\n\n{role.description_longue}"))
-            return
+
+                role = roles[0][0]
+                await ctx.send(tools.code_bloc(f"{role.prefixe}{role.nom} – {role.description_courte} (camp : {role.camp.nom})\n\n{role.description_longue}"))
+                return
 
         await tools.send_blocs(ctx,
             f"Rôles trouvés :\n"
@@ -82,17 +79,17 @@ class Informations(commands.Cog):
         Args:
             nomrole: le rôle qu'on cherche (doit être un slug ou nom de rôle valide)
         """
-        roles = bdd_tools.find_nearest(tools.remove_accents(nomrole), Roles, carac="slug")
+        roles = bdd_tools.find_nearest(nomrole, Role)
         if roles:
             role = roles[0][0]
         else:
-            roles = await bdd_tools.find_nearest(tools.remove_accents(nomrole).capitalize(), Roles, carac="nom")
+            roles = await bdd_tools.find_nearest(nomrole, Role, carac="nom")
             if roles:
                 role = roles[0][0]
             else:
                 await ctx.send("Connais pas")
 
-        joueurs = Joueurs.query.filter_by(role=role.slug).filter(Joueurs.statut.in_(["vivant", "MV"])).all()
+        joueurs = Joueur.query.filter_by(role=role.slug).filter(Joueur.statut.in_([Statut.vivant, Statut.MV])).all()
         await ctx.send(f"{tools.nom_role(role.slug)} : " + (", ".join(joueur.nom for joueur in joueurs) if joueurs else "Personne."))
 
 
@@ -105,8 +102,7 @@ class Informations(commands.Cog):
         Le menu a une place beaucoup moins importante ici que sur Messenger, vu que tout est accessible par commandes.
         """
         member = ctx.author
-        joueur = Joueurs.query.get(member.id)
-        assert joueur, f"!menu : joueur {member} introuvable"
+        joueur = Joueur.from_member(member)
 
         reacts = []
         r = "––– MENU –––\n\n"
@@ -124,7 +120,7 @@ class Informations(commands.Cog):
         if not reacts:
             r += "Aucun vote en cours.\n"
 
-        actions = Actions.query.filter_by(player_id=member.id).filter(Actions.decision_ != None).all()
+        actions = [action for action in joueur.actions if action.decision_]
         if actions:
             for action in actions:
                 r += f" - {tools.emoji(ctx, 'action')}  Action en cours : {tools.code(action.action)} (id {action.id}) – décision : {tools.code(action.decision_)}\n"
@@ -179,22 +175,19 @@ class Informations(commands.Cog):
 
 
         member = ctx.author
-        joueur = Joueurs.query.get(member.id)
-        assert joueur, f"!infos : joueur {member} introuvable"
+        joueur = Joueur.from_member(member)
         r = ""
 
         r += f"Ton rôle actuel : {tools.bold(tools.nom_role(joueur.role) or joueur.role)}\n"
         r += tools.ital(f"({tools.code(f'!roles {joueur.role}')} pour tout savoir sur ce rôle)")
 
-        actions = Actions.query.filter_by(player_id=member.id).all()
-
-        if actions:
+        if joueur.actions:
             r += "\n\nActions :"
             r += tools.code_bloc("\n".join([(
                 f" - {str(action.action).ljust(20)} "
                 + (f"Cooldown : {cooldown}" if (cooldown := action.cooldown) else disponible(action)).ljust(22)
                 + (f"   {action.charges} charge(s){' pour cette semaine' if (action.refill and 'weekends' in action.refill) else ''}" if isinstance(action.charges, int) else "Illimitée")     # Vraiment désolé pour cette immondice
-                ) for action in actions]
+                ) for action in joueur.actions]
             ))
         else:
             r += "\n\nAucune action disponible."
@@ -212,16 +205,9 @@ class Informations(commands.Cog):
         """
         joueur = await tools.boucle_query_joueur(ctx, cible, "Qui ?")
         if joueur:
+            r = f"Rôle : {tools.nom_role(joueur.role) or joueur.role}\n"
 
-            member = ctx.guild.get_member(joueur.discord_id)
-            assert member, f"!actions : membre {joueur} introuvable"
-            r = ""
-
-            r += f"Rôle : {tools.nom_role(joueur.role) or joueur.role}\n"
-
-            actions = Actions.query.filter_by(player_id=joueur.discord_id).all()
-
-            if actions:
+            if joueur.actions:
                 r += "Actions :"
                 r += tools.code_bloc(
                     f"#️⃣  id   action                   début     fin       cd   charges   refill\n"
@@ -234,13 +220,13 @@ class Informations(commands.Cog):
                         + str(action.cooldown).ljust(5)
                         + str(action.charges).ljust(10)
                         + str(action.refill)
-                    ) for i, action in enumerate(actions)]
+                    ) for i, action in enumerate(joueur.actions)]
                 ))
                 r += "Modifier/ajouter/stop :"
                 message = await ctx.send(r)
-                i = await tools.choice(ctx.bot, message, len(actions), additionnal={"⏺": -1, "⏹": 0})
+                i = await tools.choice(ctx.bot, message, len(joueur.actions), additionnal={"⏺": -1, "⏹": 0})
                 if i > 0:       # modifier
-                    action = actions[i-1]
+                    action = joueur.actions[i-1]
                     stop = False
                     while not stop:
                         await ctx.send(f"Modifier : (parmis {tools.code('début, fin, cd, charges, refill')})\n{tools.code('valider')} pour finir\n(Utiliser {tools.code('!open id')}/{tools.code('!close id')} pour ouvrir/fermer)")
@@ -284,7 +270,7 @@ class Informations(commands.Cog):
                             bdd_tools.modif(action, "refill", refill)
 
                         elif modif == "valider":
-                            bdd.session.commit()
+                            config.session.commit()
                             await ctx.send("Fait.")
 
                         else:
@@ -305,7 +291,7 @@ class Informations(commands.Cog):
 
         Aussi dite : « liste des joueurs qui seront bientôt morts »
         """
-        joueurs = [joueur for joueur in Joueurs.query.filter(Joueurs.statut != "mort").order_by(Joueurs.nom)]
+        joueurs = Joueur.query.filter(Joueur.statut != Statut.mort).order_by(Joueur.nom).all()
 
         mess = f" Joueur                     en chambre\n"
         mess += f"––––––––––––––––––––––––––––––––––––––––––––––\n"
@@ -325,7 +311,7 @@ class Informations(commands.Cog):
 
         Aussi dite : « liste des joueurs qui mangent leurs morts »
         """
-        joueurs = [joueur for joueur in Joueurs.query.filter_by(statut="mort").order_by(Joueurs.nom)]
+        joueurs = Joueur.query.filter_by(statut=Statut.mort).order_by(Joueur.nom)
 
         if joueurs:
             mess = ""

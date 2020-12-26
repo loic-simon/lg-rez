@@ -10,8 +10,9 @@ import time
 
 from discord.ext import commands
 
+from lgrez import config
 from lgrez.blocs import env, webhook, bdd, tools
-from lgrez.blocs.bdd import Taches, Actions, Joueurs
+from lgrez.blocs.bdd import Tache
 
 
 _last_time = None       # Temps (time.time) du derner envoi de webhook
@@ -20,10 +21,10 @@ def execute(tache, loop):
     """Exécute une tâche planifiée
 
     Args:
-        tache (:class:`.bdd.Taches`): tâche planifiée arrivée à exécution
+        tache (:class:`.bdd.Tache`): tâche planifiée arrivée à exécution
         loop (:class:`asyncio.AbstractEventLoop`): boucle d'évènements du bot
 
-    Envoie un webhook (variable d'environnement ``LGREZ_WEBHOOK_URL``) avec la commande (:attr:`.bdd.Taches.commande`) et nettoie
+    Envoie un webhook (variable d'environnement ``LGREZ_WEBHOOK_URL``) avec la commande (:attr:`.bdd.Tache.commande`) et nettoie
 
     Limitation interne de 2 secondes minimum entre deux appels (reprogramme si appelé trop tôt), pour se conformer à la rate limit Discord (30 messages / minute) et ne pas engoncer la loop
     """
@@ -37,8 +38,8 @@ def execute(tache, loop):
 
     LGREZ_WEBHOOK_URL = env.load("LGREZ_WEBHOOK_URL")
     if webhook.send(tache.commande, url=LGREZ_WEBHOOK_URL):     # envoi webhook OK
-        bdd.session.delete(tache)
-        bdd.session.commit()
+        config.session.delete(tache)
+        config.session.commit()
     else:
         # On réessaie dans 2 secondes
         loop.call_later(2, execute, tache, loop)
@@ -51,21 +52,21 @@ def add_task(bot, timestamp, commande, action=None):
         bot (:class:`.LGBot`): bot connecté
         timestamp (:class:`datetime.datetime`): timestamp de la tâche à ajouter
         commande (:class:`str`): commande à exécuter à ``timestamp``
-        action (:class:`int`): si tâche planifiée liée à une commande, son ID (:attr:`.bdd.Actions.id`)
+        action (:class:`int`): si tâche planifiée liée à une commande, son ID (:attr:`.bdd.Action.id`)
 
     Returns:
-        :class:`.bdd.Taches`
+        :class:`.bdd.Tache`
 
     (fonction pour usage ici et dans d'autres features)
     """
     now = datetime.datetime.now()
-    tache = Taches(timestamp=timestamp, commande=commande, action=action)
+    tache = Tache(timestamp=timestamp, commande=commande, action=action)
 
-    bdd.session.add(tache)                                                           # Enregistre la tâche en BDD
-    bdd.session.commit()
+    config.session.add(tache)           # Enregistre la tâche en BDD
+    config.session.commit()
 
     TH = bot.loop.call_later((timestamp - now).total_seconds(), execute, tache, bot.loop)     # Programme la tâche (appellera execute(tache, loop) à timestamp)
-    bot.tasks[tache.id] = TH        # TaskHandler, pour pouvoir cancel
+    bot.tasks[tache.id] = TH            # TaskHandler, pour pouvoir cancel
 
     return tache
 
@@ -75,11 +76,11 @@ def cancel_task(bot, tache):
 
     Args:
         bot (:class:`.LGBot`): bot connecté
-        tache (:class:`.bdd.Taches`): tâche à annuler
+        tache (:class:`.bdd.Tache`): tâche à annuler
     """
     bot.tasks[tache.id].cancel()        # Annulation (objet TaskHandler)
-    bdd.session.delete(tache)            # Suppression en base
-    bdd.session.commit()
+    config.session.delete(tache)            # Suppression en base
+    config.session.commit()
     del bot.tasks[tache.id]             # Suppression TaskHandler
 
 
@@ -91,18 +92,16 @@ class GestionTaches(commands.Cog):
     async def taches(self, ctx):
         """Liste les tâches en attente (COMMANDE MJ)
 
-        Affiche les commandes en attente d'exécution (dans la table :class:`.bdd.Taches`) et le timestamp d'exécution associé.
+        Affiche les commandes en attente d'exécution (dans la table :class:`.bdd.Tache`) et le timestamp d'exécution associé.
         Lorsque la tâche est liée à une action, affiche le nom de l'action et du joueur concerné.
         """
         async with ctx.typing():
-            taches = Taches.query.order_by(Taches.timestamp).all()
+            taches = Tache.query.order_by(Tache.timestamp).all()
             LT = ""
             for tache in taches:
                 LT += f"\n{str(tache.id).ljust(5)} {tache.timestamp.strftime('%d/%m/%Y %H:%M:%S')}    {tache.commande.ljust(25)} "
-                if tache.action and (action := Actions.query.get(tache.action)):
-                    joueur = Joueurs.query.get(action.player_id)
-                    assert joueur, f"!taches : joueur d'ID {action.player_id} introuvable"
-                    LT += f"{action.action.ljust(20)} {joueur.nom}"
+                if action := tache.action:
+                    LT += f"{action.base.slug.ljust(20)} {action.joueur.nom}"
 
             mess = ("Tâches en attente : \n\nID    Timestamp              Commande                  Action               Joueur"
                     f"\n{'-'*105}{LT}\n\n"
@@ -241,7 +240,10 @@ class GestionTaches(commands.Cog):
 
         Utiliser ``!taches`` pour voir la liste des IDs.
         """
-        taches = [tache for id in ids if id.isdigit() and (tache := Taches.query.get(int(id)))]
+        for id in ids:
+            if id.isdigit() and (tache := Tache.query.get(int(id))):
+                taches.append(tache)
+
         if taches:
             message = await ctx.send("Annuler les tâches :\n" + "\n".join([f" - {tools.code(tache.timestamp.strftime('%d/%m/%Y %H:%M:%S'))} > {tools.code(tache.commande)}" for tache in taches]))
             if await tools.yes_no(ctx.bot, message):

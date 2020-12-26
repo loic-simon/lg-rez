@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from lgrez.blocs import tools, env, gsheets
-from lgrez.blocs.bdd import session, Joueurs, Actions, CandidHaro
+from lgrez.blocs.bdd import Joueur, Action, CandidHaro, Statut, ActionTrigger, CandidHaroType
 from lgrez.features import gestion_actions
 
 
@@ -209,7 +209,7 @@ class Communication(commands.Cog):
             - ``all`` :                 Tous les joueurs inscrits, vivants et morts
             - ``vivants`` :             Les joueurs en vie
             - ``morts`` :               Les joueurs morts
-            - ``<crit>=<filtre>`` :     Les joueurs répondant au critère ``Joueurs.<crit> == <filtre>``. ``crit`` peut être ``"nom"``, ``"chambre"``, ``"statut"``, ``"role"``, ``"camp"``... L'ensemble doit être entouré de guillements si ``filtre`` contient un espace.
+            - ``<crit>=<filtre>`` :     Les joueurs répondant au critère ``Joueur.<crit> == <filtre>``. ``crit`` peut être ``"nom"``, ``"chambre"``, ``"statut"``, ``"role"``, ``"camp"``... L'ensemble doit être entouré de guillements si ``filtre`` contient un espace.
             - *le nom d'un joueur*      (raccourci pour ``nom=X``, doit être entouré de guillements si nom + prénom)
 
         ``message`` peut contenir un ou plusieurs bouts de code Python à évaluer, entourés d'accolades.
@@ -222,7 +222,7 @@ class Communication(commands.Cog):
         Attention :
             - ``ctx`` :             objet :class:`discord.ext.commands.Context` de ``!send``  ==> ``ctx.author`` = lanceur de la commande !!!
 
-        Les différentes tables de données sont accessibles sous leur nom (``Joueurs``, ``Roles``...)
+        Les différentes tables de données sont accessibles sous leur nom (``Joueur``, ``Role``...)
 
         Il est impossible d'appeller des coroutines (await) dans le code à évaluer.
 
@@ -232,15 +232,15 @@ class Communication(commands.Cog):
             - ``!send "role=Servante Dévouée" Ça va vous ? Vous êtes bien {joueur.role} ?``
         """
         if cible == "all":
-            joueurs = Joueurs.query.all()
+            joueurs = Joueur.query.all()
         elif cible == "vivants":
-            joueurs = Joueurs.query.filter_by(statut="vivant").all()
+            joueurs = (Joueur.query.filter(Joueur.statut == Statut.vivant | Joueur.statut == Statut.MV).all())
         elif cible == "morts":
-            joueurs = Joueurs.query.filter_by(statut="mort").all()
+            joueurs = Joueur.query.filter_by(statut=Statut.morts).all()
         elif "=" in cible:
-            crit, filtre = cible.split("=", maxsplit=1)
-            if hasattr(Joueurs, crit):
-                joueurs = Joueurs.query.filter(getattr(Joueurs, crit) == filtre).all()
+            crit, _, filtre = cible.partition("=")
+            if hasattr(Joueur, crit):
+                joueurs = Joueur.query.filter_by(**{crit: filtre}).all()
             else:
                 await ctx.send(f"Critère \"{crit}\" incorrect. !help {ctx.invoked_with} pour plus d'infos.")
                 return
@@ -305,11 +305,11 @@ class Communication(commands.Cog):
 
                 self.votants = []
 
-                self.joueur = Joueurs.query.filter_by(nom=nom).one()
+                self.joueur = Joueur.query.filter_by(nom=nom).one()
                 if not self.joueur:
                     raise ValueError(f"Joueur \"{nom}\" non trouvé en base")
 
-                self.eligible = bool(CandidHaro.query.filter_by(type=haro_candidature, player_id=self.joueur.discord_id).all())
+                self.eligible = bool(CandidHaro.query.filter_by(joueur=self.joueur, type=haro_candidature).all())
 
             def __repr__(self):
                 return f"{self.nom} ({self.votes})"
@@ -335,7 +335,7 @@ class Communication(commands.Cog):
             if type == "cond":
                 colonne_cible = "CondamnéRéel"
                 colonne_votant = "VotantCond"
-                haro_candidature = "haro"
+                haro_candidature = CandidHaroType.haro
                 typo = "bûcher du jour"
                 mort_election = "Mort"
                 pour_contre = "contre"
@@ -346,7 +346,7 @@ class Communication(commands.Cog):
             elif type == "maire":
                 colonne_cible = "MaireRéel"
                 colonne_votant = "VotantMaire"
-                haro_candidature = "candidature"
+                haro_candidature = CandidHaroType.candidature
                 typo = "nouveau maire"
                 mort_election = "Élection"
                 pour_contre = "pour"
@@ -477,7 +477,7 @@ class Communication(commands.Cog):
 
                 if type == "cond":
                     # Actions au mot des MJs
-                    for action in Actions.query.filter_by(trigger_debut="mot_mjs").all():
+                    for action in Action.query.filter_by(trigger_debut=ActionTrigger.mot_mjs).all():
                         await gestion_actions.open_action(ctx, action)
 
                     await ctx.send("(actions liées au mot MJ activées)")

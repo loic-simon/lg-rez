@@ -9,7 +9,6 @@ import time
 from discord_webhook import DiscordWebhook
 
 
-
 def send(message, url):
     """Envoie un webhook Discord
 

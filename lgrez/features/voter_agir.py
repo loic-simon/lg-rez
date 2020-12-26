@@ -9,8 +9,9 @@ import datetime
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
+from lgrez import config
 from lgrez.blocs import env, bdd, bdd_tools, gsheets, tools
-from lgrez.blocs.bdd import Joueurs, Actions, CandidHaro
+from lgrez.blocs.bdd import Joueur, Action, CandidHaro
 from lgrez.features import gestion_actions
 
 
@@ -33,8 +34,7 @@ class VoterAgir(commands.Cog):
 
         La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
         """
-        joueur = Joueurs.query.get(ctx.author.id)
-        assert joueur, f"!vote : joueur {ctx.author} introuvable"
+        joueur = Joueur.from_member(ctx.author)
 
         # Vérification vote en cours
         if not joueur.votant_village:
@@ -45,8 +45,8 @@ class VoterAgir(commands.Cog):
             return
 
         # Choix de la cible
-        haros = CandidHaro.query.filter_by(type="haro").all()
-        harotes = [Joueurs.query.get(haro.player_id).nom for haro in haros]
+        haros = CandidHaro.query.filter_by(type=CandidHaroType.haro).all()
+        harotes = [haro.joueur.nom for haro in haros]
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
             message=f"Contre qui veux-tu voter ? (vote actuel : {tools.bold(joueur.vote_condamne_)})"
                     f"\n(harotés : {', '.join(harotes) or 'aucun :pensive:'})"
@@ -54,7 +54,7 @@ class VoterAgir(commands.Cog):
         )
 
         # Test si la cible est sous le coup d'un haro
-        cible_ds_haro = CandidHaro.query.filter_by(player_id=cible.discord_id, type='haro').all()
+        cible_ds_haro = CandidHaro.query.filter_by(joueur=cible, type=CandidHaroType.haro).all()
         if not cible_ds_haro:
             mess = await ctx.send(f"{cible.nom} n'a pas (encore) subi ou posté de haro ! Si c'est toujours le cas à la fin du vote, ton vote sera compté comme blanc... \n Veux-tu continuer ?")
             if not await tools.yes_no(ctx.bot, mess):
@@ -68,7 +68,7 @@ class VoterAgir(commands.Cog):
         async with ctx.typing():
             # Modification en base
             bdd_tools.modif(joueur, "vote_condamne_", cible.nom)
-            bdd.session.commit()
+            config.session.commit()
 
             # Écriture dans sheet Données brutes
             LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
@@ -94,8 +94,7 @@ class VoterAgir(commands.Cog):
 
         La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
         """
-        joueur = Joueurs.query.get(ctx.author.id)
-        assert joueur, f"!vote : joueur {ctx.author} introuvable"
+        joueur = Joueur.from_member(ctx.author)
 
         # Vérification vote en cours
         if not joueur.votant_village:
@@ -107,8 +106,8 @@ class VoterAgir(commands.Cog):
 
 
         # Choix de la cible
-        candids = CandidHaro.query.filter_by(type="candidature").all()
-        candidats = [Joueurs.query.get(candid.player_id).nom for candid in candids]
+        candids = CandidHaro.query.filter_by(type=CandidHaroType.candidature).all()
+        candidats = [candid.joueur.nom for candid in candids]
         cible = await tools.boucle_query_joueur(ctx, cible=cible,
             message=f"Pour qui veux-tu voter ? (vote actuel : {tools.bold(joueur.vote_maire_)})"
                     f"\n(candidats : {', '.join(candidats) or 'aucun :pensive:'})"
@@ -116,7 +115,7 @@ class VoterAgir(commands.Cog):
         )
 
         # Test si la cible s'est présentée
-        cible_ds_candid = CandidHaro.query.filter_by(player_id=cible.discord_id, type='candidature').all()
+        cible_ds_candid = CandidHaro.query.filter_by(joueur=cible, type=CandidHaroType.candidature).all()
         if not cible_ds_candid:
             mess = await ctx.send(f"{cible.nom} ne s'est pas (encore) présenté(e) ! Si c'est toujours le cas à la fin de l'élection, ton vote sera compté comme blanc... \n Veux-tu continuer ?")
             if not await tools.yes_no(ctx.bot, mess):
@@ -130,7 +129,7 @@ class VoterAgir(commands.Cog):
         async with ctx.typing():
             # Modification en base
             bdd_tools.modif(joueur, "vote_maire_", cible.nom)
-            bdd.session.commit()
+            config.session.commit()
 
             # Écriture dans sheet Données brutes
             LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
@@ -156,8 +155,7 @@ class VoterAgir(commands.Cog):
 
         La commande peut être utilisée autant que voulu pour changer de cible tant que le vote est en cours.
         """
-        joueur = Joueurs.query.get(ctx.author.id)
-        assert joueur, f"!vote : joueur {ctx.author} introuvable"
+        joueur = Joueur.from_member(ctx.author)
 
         # Vérification vote en cours
         if not joueur.votant_loups:
@@ -179,7 +177,7 @@ class VoterAgir(commands.Cog):
         async with ctx.typing():
             # Modification en base
             bdd_tools.modif(joueur, "vote_loups_", cible.nom)
-            bdd.session.commit()
+            config.session.commit()
 
             # Écriture dans sheet Données brutes
             LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
@@ -205,11 +203,10 @@ class VoterAgir(commands.Cog):
 
         La commande peut être utilisée autant que voulu pour changer d'action tant que la fenêtre d'action est en cours, SAUF pour certaines actions (dites "instantanées") ayant une conséquence immédiate (Barbier, Licorne...). Le bot mettra dans ce cas un message d'avertissement.
         """
-        joueur = Joueurs.query.get(ctx.author.id)
-        assert joueur, f"!vote : joueur {ctx.author} introuvable"
+        joueur = Joueur.from_member(ctx.author)
 
         # Détermine la/les actions en cours pour le joueur
-        actions = Actions.query.filter(Actions.player_id == joueur.discord_id, Actions.decision_ != None).all()
+        actions = Action.query.filter_by(joueur=joueur).filter(Action.decision_ != None).all()
         if not actions:
             await ctx.send("Aucune action en cours pour toi.")
             return
@@ -217,7 +214,7 @@ class VoterAgir(commands.Cog):
             txt = "Tu as plusieurs actions actuellement en cours :\n"
             decision = None #Evite de lancer une décision en blind si le joueur a plusieurs actions
             for i in range(N):
-                txt += f" {tools.emoji_chiffre(i+1)} - {tools.code(actions[i].action)}\n"
+                txt += f" {tools.emoji_chiffre(i+1)} - {tools.code(actions[i].base.slug)}\n"
             message = await ctx.send(txt + "\nPour laquelle veux-tu agir ?")
             i = await tools.choice(ctx.bot, message, N)
             action = actions[i-1]
@@ -226,7 +223,7 @@ class VoterAgir(commands.Cog):
 
         # Choix de la décision : très simple pour l'instant, car pas de résolution auto
         if not decision:                    # Si décision pas précisée à l'appel de la commande
-            await ctx.send(f"Que veux-tu faire pour l'action {tools.code(action.action)} ? (action actuelle : {tools.bold(action.decision_)})")
+            await ctx.send(f"Que veux-tu faire pour l'action {tools.code(action.base.slug)} ? (action actuelle : {tools.bold(action.decision_)})")
             message = await tools.wait_for_message_here(ctx)
             decision = message.content
 
@@ -251,7 +248,7 @@ class VoterAgir(commands.Cog):
             LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
             sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet("actions_brut")
             sheet.append_row([datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), joueur.nom, joueur.role, joueur.camp,
-                              "\n+\n".join([f"{action.action} : {action.decision_}" for action in actions])],
+                              "\n+\n".join([f"{action.base.slug} : {action.decision_}" for action in actions])],
                              value_input_option="USER_ENTERED")
 
         # Conséquences si action instantanée
@@ -260,9 +257,9 @@ class VoterAgir(commands.Cog):
                 deleted = False
                 if action.charges:
                     bdd_tools.modif(action, "charges", action.charges - 1)
-                    pcs = " pour cette semaine" if "weekends" in (action.refill or "").split() else ""
+                    pcs = " pour cette semaine" if "weekends" in (action.base.refill or "").split() else ""
                     await ctx.send(f"Il te reste {action.charges} charge(s){pcs}.")
-                    if action.charges == 0 and not action.refill:
+                    if action.charges == 0 and not action.base.refill:
                         gestion_actions.delete_action(ctx, action)
                         deleted = True
                 if not deleted:
@@ -271,5 +268,5 @@ class VoterAgir(commands.Cog):
             await ctx.send(tools.ital(f"[Allo {tools.role(ctx, 'MJ').mention}, conséquence instantanée ici !]"))
 
         else:
-            await ctx.send(f"Action « {tools.bold(action.decision_)} » bien prise en compte pour {tools.code(action.action)}.\n"
+            await ctx.send(f"Action « {tools.bold(action.decision_)} » bien prise en compte pour {tools.code(action.base.slug)}.\n"
                            + tools.ital("Tu peux modifier ta décision autant que nécessaire avant la fin du créneau."))

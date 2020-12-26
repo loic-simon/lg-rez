@@ -10,8 +10,9 @@ import requests
 
 from discord.ext import commands
 
+from lgrez import config
 from lgrez.blocs import bdd, tools, bdd_tools
-from lgrez.blocs.bdd import Triggers, Reactions, Roles
+from lgrez.blocs.bdd import Trigger, Reaction, Role
 
 
 # Marqueurs de séparation du mini-langage des séquences-réactions
@@ -198,13 +199,13 @@ class GestionIA(commands.Cog):
 
         await ctx.send(f"Résumé de la séquence : {tools.code(reponse)}")
         async with ctx.typing():
-            reac = Reactions(reponse=reponse)
-            bdd.session.add(reac)
-            bdd.session.commit()          # On "fait comme si" on commitait l'ajout de reac, ce qui calcule read.id (autoincrément)
+            reac = Reaction(reponse=reponse)
+            config.session.add(reac)
+            config.session.commit()          # On "fait comme si" on commitait l'ajout de reac, ce qui calcule read.id (autoincrément)
 
-            trigs = [Triggers(trigger=trigger, reac_id=reac.id) for trigger in triggers]
-            bdd.session.add_all(trigs)
-            bdd.session.commit()
+            trigs = [Trigger(trigger=trigger, reaction=reac) for trigger in triggers]
+            config.session.add_all(trigs)
+            config.session.commit()
         await ctx.send(f"Règle ajoutée en base.")
 
 
@@ -219,16 +220,18 @@ class GestionIA(commands.Cog):
         """
         async with ctx.typing():
             if trigger:
-                trigs = bdd_tools.find_nearest(trigger, table=Triggers, carac="trigger", sensi=sensi, solo_si_parfait=False)
+                trigs = bdd_tools.find_nearest(trigger, table=Trigger, carac="trigger", sensi=sensi, solo_si_parfait=False)
                 if not trigs:
                     await ctx.send(f"Rien trouvé, pas de chance (sensi = {sensi})")
                     return
             else:
-                raw_trigs = Triggers.query.order_by(Triggers.id).all()          # Trié par date de création
+                raw_trigs = Trigger.query.order_by(Trigger.id).all()            # Trié par date de création
                 trigs = list(zip(raw_trigs, [None]*len(raw_trigs)))             # Mise au format (trig, score)
 
-            reacts_ids = []     # IDs des réactions associées à notre liste de triggers
-            [reacts_ids.append(id) for trig in trigs if (id := trig[0].reac_id) not in reacts_ids]    # Pas de doublons, et reste ordonné
+            reacts = []         # Réactions associées à notre liste de triggers
+            for trig in trigs:
+                if (reac := trig[0].reaction) not in reacts:    # Pas de doublons, et reste ordonné
+                    reacts.append(reac)
 
             def nettoy(s):      # Abrège la réponse si trop longue et neutralise les sauts de ligne / rupture code_bloc, pour affichage
                 s = s.replace('\r\n', '\\n').replace('\n', '\\n').replace('\r', '\\r').replace("```", "'''")
@@ -237,12 +240,17 @@ class GestionIA(commands.Cog):
                 else:
                     return s[:50] + " [...] " + s[-15:]
 
-            L = ["- " + " – ".join([(f"({float(score):.2}) " if score else "") + trig.trigger       # (score) trigger - (score) trigger ...
-                                    for (trig, score) in trigs if trig.reac_id == id]).ljust(50)        # pour chaque trigger
-                 + f" ⇒ {nettoy(Reactions.query.get(id).reponse)}"                                 # ⇒ réponse
-                 for id in reacts_ids]                                                                  # pour chaque réponse
+            rep = ""
+            for reac in reacts:                     # pour chaque réponse
+                r = ""
+                for (trig, score) in trigs:             # pour chaque trigger
+                    if trig.reaction == reac:
+                        sc = f"({float(score):.2}) " if score else ""
+                        r += f" - {sc}{trig.trigger}"                   # (score) trigger - (score) trigger ...
 
-            r = "\n".join(L) + "\n\nPour modifier une réaction, utiliser !modifIA <trigger>."
+                rep += r.ljust(50) + f" ⇒ {nettoy(reac.reponse)}\n"     # ⇒ réponse
+
+            rep += "\nPour modifier une réaction, utiliser !modifIA <trigger>."
 
         await tools.send_code_blocs(ctx, r)       # On envoie, en séparant en blocs de 2000 caractères max
 
@@ -262,17 +270,16 @@ class GestionIA(commands.Cog):
             mess = await tools.wait_for_message_here(ctx)
             trigger = mess.content
 
-        trigs = bdd_tools.find_nearest(trigger, Triggers, carac="trigger")
+        trigs = bdd_tools.find_nearest(trigger, Trigger, carac="trigger")
         if not trigs:
             await ctx.send("Rien trouvé.")
             return
 
         trig = trigs[0][0]
-        rep = Reactions.query.get(trig.reac_id)
-        assert rep, f"!modifIA : réaction associée à {trig} introuvable"
+        reac = trig.reaction
 
-        displ_seq = rep.reponse if rep.reponse.startswith('`') else tools.code(rep.reponse)     # Pour affichage
-        trigs = Triggers.query.filter_by(reac_id=trig.reac_id).all()
+        displ_seq = reac.reponse if reac.reponse.startswith('`') else tools.code(reac.reponse)     # Pour affichage
+        trigs = reac.triggers
 
         await ctx.send(f"Triggers : `{'` – `'.join([trig.trigger for trig in trigs])}`\n"
                        f"Séquence réponse : {displ_seq}")
@@ -293,19 +300,19 @@ class GestionIA(commands.Cog):
                 if r == "0":
                     fini = True
                 elif r.isdigit() and (n := int(r)) <= len(trigs):
-                    bdd.session.delete(trigs[n-1])
-                    bdd.session.commit()
+                    config.session.delete(trigs[n-1])
+                    config.session.commit()
                     del trigs[n-1]
                 else:
-                    trig = Triggers(trigger=r, reac_id=rep.id)
-                    trigs.append(trig)
-                    bdd.session.add(trig)
-                    bdd.session.commit()
+                    new_trig = Trigger(trigger=r, reaction=reac)
+                    trigs.append(new_trig)
+                    config.session.add(trig)
+                    config.session.commit()
 
             if not trigs:        # on a tout supprimé !
                 await ctx.send("Tous les triggers supprimés, suppression de la réaction")
-                bdd.session.delete(rep)
-                bdd.session.commit()
+                config.session.delete(reac)
+                config.session.commit()
                 return
 
         if MR:                  # Modification de la réponse
@@ -313,18 +320,18 @@ class GestionIA(commands.Cog):
             if MT:      # Si ça fait longtemps, on remet la séquence
                 r += f"Séquence actuelle : {displ_seq}"
 
-            if any([mark in rep.reponse for mark in MARKS]):                    # Séquence compliquée
+            if any([mark in reac.reponse for mark in MARKS]):                    # Séquence compliquée
                 r += f"\nLa séquence-réponse peut être refaite manuellement ou modifiée rapidement en envoyant directment la séquence ci-dessus modifiée (avec les marqueurs : OU = {tools.code(MARK_OR)}, ET = {tools.code(MARK_THEN)}, REACT = {tools.code(MARK_REACT)}, CMD = {tools.code(MARK_CMD)})"
 
             reponse = await _build_sequence(ctx)
-            bdd_tools.modif(rep, "reponse", reponse)
+            bdd_tools.modif(reac, "reponse", reponse)
 
         if not (MT or MR):      # Suppression
-            bdd.session.delete(rep)
+            config.session.delete(reac)
             for trig in trigs:
-                bdd.session.delete(trig)
+                config.session.delete(trig)
 
-        bdd.session.commit()
+        config.session.commit()
 
         await ctx.send("Fini.")
 
@@ -354,12 +361,12 @@ async def trigger_roles(message, sensi=0.8):
         message (:class:`~discord.Message`): message auquel réagir
         sensi (:class:`float`): sensibilité de la recherche (voir :func:`.bdd_tools.find_nearest`)
 
-    Trouve l'entrée la plus proche de ``message.content`` dans la table :class:`.bdd.Roles`.
+    Trouve l'entrée la plus proche de ``message.content`` dans la table :class:`.bdd.Role`.
 
     Returns:
         ``True`` si un rôle a été trouvé (sensibilité ``> sensi``) et qu'une réponse a été envoyée, ``False`` sinon
     """
-    roles = bdd_tools.find_nearest(message.content, Roles, carac="nom", sensi=sensi)
+    roles = bdd_tools.find_nearest(message.content, Role, carac="nom", sensi=sensi)
 
     if roles:       # Au moins un trigger trouvé à cette sensi
         role = roles[0][0]                                  # Meilleur trigger (score max)
@@ -370,7 +377,7 @@ async def trigger_roles(message, sensi=0.8):
 
 
 async def trigger_reactions(bot, message, chain=None, sensi=0.7, debug=False):
-    """Réaction à partir de la base Reactions
+    """Réaction à partir de la table "reactions"
 
     Args:
         bot (:class:`.LGBot`): bot
@@ -379,20 +386,18 @@ async def trigger_reactions(bot, message, chain=None, sensi=0.7, debug=False):
         sensi (:class:`float`): sensibilité de la recherche (voir :func:`.bdd_tools.find_nearest`)
         debug (:class:`bool`): si ``True``, affiche les erreurs lors de l'évaluation des messages (voir :func:`.tools.eval_accols`)
 
-    Trouve l'entrée la plus proche de ``chain`` dans la table :class:`.bdd.Reactions` ; si il contient des accolades, évalue le message selon le contexte de ``message``.
+    Trouve l'entrée la plus proche de ``chain`` dans la table :class:`.bdd.Reaction` ; si il contient des accolades, évalue le message selon le contexte de ``message``.
 
     Returns:
         ``True`` si une réaction a été trouvée (sensibilité ``> sensi``) et qu'une réponse a été envoyée, ``False`` sinon
     """
     if not chain:                   # Si pas précisé,
         chain = message.content         # contenu de message
-    trigs = bdd_tools.find_nearest(chain, Triggers, carac="trigger", sensi=sensi)
+    trigs = bdd_tools.find_nearest(chain, Trigger, carac="trigger", sensi=sensi)
 
     if trigs:       # Au moins un trigger trouvé à cette sensi
         trig = trigs[0][0]                                  # Meilleur trigger (score max)
-        rep = Reactions.query.get(trig.reac_id)
-        assert rep, f"trigger_reactions : Réaction associée à {trig} introuvable"
-        seq = rep.reponse                                   # Séquence-réponse associée
+        seq = trig.reaction.reponse                         # Séquence-réponse associée
 
         for rep in seq.split(MARK_THEN):                    # Pour chaque étape :
             if MARK_OR in rep:                                  # Si plusieurs possiblités :
@@ -418,7 +423,7 @@ async def trigger_reactions(bot, message, chain=None, sensi=0.7, debug=False):
 
 
 async def trigger_sub_reactions(bot, message, sensi=0.9, debug=False):
-    """Réaction à partir de la base Reactions sur les mots
+    """Réaction à partir de la table "reactions", mais sur les mots
 
     Appelle :func:`trigger_reactions(bot, message, mot, sensi, debug) <.trigger_reactions>` pour tous les mots ``mot`` composant ``message.content`` (mots de plus de 4 lettres, essayés des plus longs aux plus courts).
 
@@ -541,9 +546,9 @@ async def process_IA(bot, message, debug=False):
     (await trigger_at_mj(message)                                   # @MJ (aled)
         or await trigger_gif(bot, message)                          # Un petit GIF ? (en mode FALS uniquement)
         or await trigger_roles(message)                             # Rôles
-        or await trigger_reactions(bot, message, debug=debug)       # Table Reactions (IA proprement dite)
+        or await trigger_reactions(bot, message, debug=debug)       # Table Reaction (IA proprement dite)
         or await trigger_sub_reactions(bot, message, debug=debug)   # IA sur les mots
-        or await trigger_a_ou_b(message)                                # di... / cri...
+        or await trigger_a_ou_b(message)                            # "a ou b" ==> "b"
         or await trigger_di(message)                                # di... / cri...
         or await trigger_mot_unique(message)                        # Un seul mot ==> on répète
         or await default(message)                                   # Réponse par défaut

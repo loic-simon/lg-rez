@@ -11,6 +11,14 @@ Référence de l'API
 
 
 
+``lgrez.config`` (variables globales)
+------------------------------------------------
+
+.. automodule:: lgrez.config
+    :members:
+
+
+
 ``lgrez.bot`` (fonctions centrales)
 ------------------------------------------------
 
@@ -68,8 +76,6 @@ Actions publiques
     - :Commande ``!haro`` : .. automethod:: lgrez.features.actions_publiques.ActionsPubliques.haro.callback
     - :Commande ``!candid`` : .. automethod:: lgrez.features.actions_publiques.ActionsPubliques.candid.callback
     - :Commande ``!wipe`` : .. automethod:: lgrez.features.actions_publiques.ActionsPubliques.wipe.callback
-    - :Commande ``!listharo`` : .. automethod:: lgrez.features.actions_publiques.ActionsPubliques.listharo.callback
-    - :Commande ``!listcandid`` : .. automethod:: lgrez.features.actions_publiques.ActionsPubliques.listcandid.callback
 
 .. }
 
@@ -290,6 +296,7 @@ Gestion des données
 .. automodule:: lgrez.blocs.bdd
    :members:
    :member-order: bysource
+   :ignore-module-all:
 
 
 Outils pour tables de données

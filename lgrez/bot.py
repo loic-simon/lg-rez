@@ -1,18 +1,18 @@
-import sys
 import asyncio
-import logging
-import traceback
-import time
 import datetime
+import logging
 import re
+import sys
+import time
+import traceback
 
 import discord
 from discord.ext import commands
 
-from lgrez import __version__
-from lgrez.blocs import tools, bdd, env, bdd_tools, gsheets, webhook, realshell
-from lgrez.blocs.bdd import Tables, Joueurs, Actions, Roles
-from lgrez.features import annexe, IA, inscription, informations, sync, open_close, voter_agir, taches, actions_publiques, communication
+from lgrez import __version__, config
+from lgrez.features import *        # all submodules
+from lgrez.blocs import *           # all submodules
+from lgrez.blocs.bdd import *       # all tables
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -91,7 +91,10 @@ async def _on_ready(bot):
         bot.i_am_alive()            # Start liveness regular output
 
     guild = bot.get_guild(bot.GUILD_ID)
-    assert guild, f"on_ready : Guilde d'ID {bot.GUILD_ID} introuvable"
+    if not guild:
+        raise RuntimeError(f"on_ready : Guilde d'ID {bot.GUILD_ID} introuvable")
+
+    config.guild = guild
 
     print(f"{bot.user} connecté au serveur « {guild.name} » (id : {guild.id})\n")
     print(f"Guild Members: " + " - ".join([member.display_name for member in guild.members]))
@@ -104,7 +107,7 @@ async def _on_ready(bot):
     now = datetime.datetime.now()
     r = 0
 
-    for tache in Tables["Taches"].query.all():
+    for tache in Tache.query.all():
         delta = (tache.timestamp - now).total_seconds()
         TH = bot.loop.call_later(delta, taches.execute, tache, bot.loop)  # Si delta < 0 (action manquée), l'exécute immédiatement, sinon attend jusqu'à tache.timestamp
         bot.tasks[tache.id] = TH
@@ -217,41 +220,34 @@ async def _on_raw_reaction_add(bot, payload):
     if reactor == bot.user:
         return
 
-    if payload.emoji == tools.emoji(reactor, "bucher"):
-        if not Joueurs.query.get(reactor.id):        # Gens pas en base
-            return
+    try:
+        Joueur.from_member(reactor)
+    except ValueError:          # Gens pas en base
+        return
 
+    chan = config.guild.get_channel(payload.channel_id)
+    if not chan.name.startswith("conv-bot"):        # On est pas dans un chan privé
+        return
+
+    if payload.emoji == tools.emoji(reactor, "bucher"):
         ctx = await tools.create_context(bot, reactor, "!vote")
-        if ctx.guild.get_channel(payload.channel_id).name.startswith("conv-bot"):
-            await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le condamné du jour :")}""")
-            await bot.invoke(ctx)       # On trigger !vote
+        await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le condamné du jour :")}""")
+        await bot.invoke(ctx)       # On trigger !vote
 
     elif payload.emoji == tools.emoji(reactor, "maire"):
-        if not Joueurs.query.get(reactor.id):        # Gens pas en base
-            return
-
         ctx = await tools.create_context(bot, reactor, "!votemaire")
-        if ctx.guild.get_channel(payload.channel_id).name.startswith("conv-bot"):
-            await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le nouveau maire :")}""")
-            await bot.invoke(ctx)       # On trigger !votemaire
+        await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour le nouveau maire :")}""")
+        await bot.invoke(ctx)       # On trigger !votemaire
 
     elif payload.emoji == tools.emoji(reactor, "lune"):
-        if not Joueurs.query.get(reactor.id):        # Gens pas en base
-            return
-
         ctx = await tools.create_context(bot, reactor, "!voteloups")
-        if ctx.guild.get_channel(payload.channel_id).name.startswith("conv-bot"):
-            await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour la victime des loups :")}""")
-            await bot.invoke(ctx)       # On trigger !voteloups
+        await ctx.send(f"""{payload.emoji} > {tools.bold("Vote pour la victime des loups :")}""")
+        await bot.invoke(ctx)       # On trigger !voteloups
 
     elif payload.emoji == tools.emoji(reactor, "action"):
-        if not Joueurs.query.get(reactor.id):        # Gens pas en base
-            return
-
         ctx = await tools.create_context(bot, reactor, "!action")
-        if ctx.guild.get_channel(payload.channel_id).name.startswith("conv-bot"):
-            await ctx.send(f"""{payload.emoji} > {tools.bold("Action :")}""")
-            await bot.invoke(ctx)       # On trigger !voteloups
+        await ctx.send(f"""{payload.emoji} > {tools.bold("Action :")}""")
+        await bot.invoke(ctx)       # On trigger !voteloups
 
 
 # Gestion des erreurs dans les commandes
@@ -274,9 +270,9 @@ async def _on_command_error(bot, ctx, exc):
 
     elif isinstance(exc, commands.CommandInvokeError):
         if isinstance(exc.original, bdd.SQLAlchemyError) or isinstance(exc.original, bdd.DriverOperationalError):       # Erreur SQL
-            if bdd.session:
+            if config.session:
                 await tools.log(ctx, "Rollback session")
-                bdd.session.rollback()          # On rollback la session
+                config.session.rollback()          # On rollback la session
 
         await ctx.send(f"Oups ! Un problème est survenu à l'exécution de la commande  :grimacing:\n"
                        f"{tools.mention_MJ(ctx)} ALED – "
@@ -335,8 +331,8 @@ async def _on_error(bot, event, *args, **kwargs):
     assert guild, f"on_error : Serveur {bot.GUILD_ID} introuvable - Erreur initiale : \n{traceback.format_exc()}"
 
     if isinstance(exc, bdd.SQLAlchemyError) or isinstance(exc, bdd.DriverOperationalError):     # Erreur SQL
-        if bdd.session:
-            bdd.session.rollback()          # On rollback la session
+        if config.session:
+            config.session.rollback()          # On rollback la session
             await tools.log(guild, "Rollback session")
 
     await tools.log(guild, traceback.format_exc(), code=True,
@@ -367,7 +363,7 @@ class Special(commands.Cog):
         """Exécute du code Python et affiche le résultat (COMMANDE MJ)
 
         Args:
-            code: instructions valides dans le contexte du fichier ``bot.py`` (utilisables notemment : ``ctx``, ``bdd.session``, ``Tables``...)
+            code: instructions valides dans le contexte du fichier ``bot.py`` (utilisables notemment : ``ctx``, ``config.session``, ``Tables``...)
 
         Si ``code`` est une coroutine, elle sera awaited (ne pas inclure ``await`` dans ``code``).
 
@@ -437,13 +433,11 @@ class Special(commands.Cog):
         Example:
             ``!doas Vincent Croquette !vote Annie Colin``
         """
-        qui, quoi = qui_quoi.split(" " + ctx.bot.command_prefix, maxsplit=1)       # !doas <@!id> !vote R ==> qui = "<@!id>", quoi = "vote R"
-        joueur = await tools.boucle_query_joueur(ctx, qui.strip() or None, Tables["Joueurs"])
-        member = ctx.guild.get_member(joueur.discord_id)
-        assert member, f"!doas : Member {joueur} introuvable"
+        qui, _, quoi = qui_quoi.partition(" " + ctx.bot.command_prefix)         # !doas <@!id> !vote R ==> qui = "<@!id>", quoi = "vote R"
+        joueur = await tools.boucle_query_joueur(ctx, qui.strip())
 
         ctx.message.content = ctx.bot.command_prefix + quoi
-        ctx.message.author = member
+        ctx.message.author = joueur.member
 
         await ctx.send(f":robot: Exécution en tant que {joueur.nom} :")
         await remove_from_in_command(ctx)       # Bypass la limitation de 1 commande à la fois
@@ -595,7 +589,7 @@ class LGBot(commands.Bot):
         self.in_stfu = []
         #: :class:`list`\[:class:`int`\]: IDs des salons en mode Foire à la saucisse.
         self.in_fals = []
-        #: :class:`dict`\[:class:`int` (:attr:`.bdd.Taches.id`), :class:`asyncio.TimerHandle`]): Tâches planifiées actuellement en attente.
+        #: :class:`dict`\[:class:`int` (:attr:`.bdd.Tache.id`), :class:`asyncio.TimerHandle`]): Tâches planifiées actuellement en attente.
         self.tasks = {}
 
         # Checks et système de blocage
@@ -679,5 +673,8 @@ class LGBot(commands.Bot):
         # Connection BDD
         bdd.connect()
 
-        # Lancement du bot
+        # Enregistrement
+        config.bot = self
+
+        # Lancement du bot (bloquant)
         super().run(LGREZ_DISCORD_TOKEN, *args, **kwargs)

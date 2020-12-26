@@ -15,7 +15,7 @@ import discord.utils
 from discord.ext import commands
 
 from lgrez.blocs import bdd, bdd_tools
-from lgrez.blocs.bdd import Tables, Joueurs, Roles, BaseActions, Actions, BaseActionsRoles, Taches, Triggers, Reactions, CandidHaro
+from lgrez.blocs.bdd import *
 # on importe toutes les tables, plus simple pour y accéder depuis des réactions etc (via eval_accols)
 
 
@@ -133,12 +133,8 @@ def private_chan(member, must_be_found=True):
     Returns:
         :class:`discord.TextChannel`
     """
-    joueur = Joueurs.query.get(member.id)
-    assert joueur, f"tools.private_chan : Joueur {member} introuvable"
-    chan = member.guild.get_channel(joueur.chan_id_)
-    if must_be_found:
-        assert chan, f"tools.private_chan : Chan privé de {joueur} introuvable"
-    return chan
+    joueur = Joueur.from_member(member)
+    return joueur.private_chan
 
 
 # Appel aux MJs
@@ -307,9 +303,9 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
         sensi (:class:`float`): sensibilité de la recherche (c.f. :func:`.bdd_tools.find_nearest`)
 
     Returns:
-        :class:`.bdd.Joueurs`
+        :class:`.bdd.Joueur`
 
-    Attend que le joueur entre un nom de joueur, et boucle 5 fois au max (avant de l'insulter et de raise une erreur) pour chercher le plus proche joueur dans la table :class:`.bdd.Joueurs`.
+    Attend que le joueur entre un nom de joueur, et boucle 5 fois au max (avant de l'insulter et de raise une erreur) pour chercher le plus proche joueur dans la table :class:`.bdd.Joueur`.
     """
     if message and not cible:
         await ctx.send(message)
@@ -322,10 +318,10 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
             rep = mess.content.strip("()[]{}<>")
 
         if id := ''.join([c for c in rep if c.isdigit()]):      # Si la chaîne contient un nombre, on l'extrait
-            if joueur := Joueurs.query.get(int(id)):                # Si cet ID correspond à un utilisateur, on le récupère
+            if joueur := Joueur.query.get(int(id)):                 # Si cet ID correspond à un utilisateur, on le récupère
                 return joueur                                       # On a trouvé l'utilisateur !
 
-        nearest = bdd_tools.find_nearest(rep, Joueurs, carac="nom", sensi=sensi, solo_si_parfait=False, match_first_word=True)     # Sinon, recherche au plus proche
+        nearest = bdd_tools.find_nearest(rep, Joueur, carac="nom", sensi=sensi, solo_si_parfait=False, match_first_word=True)     # Sinon, recherche au plus proche
 
         if not nearest:
             await ctx.send("Aucune entrée trouvée, merci de réessayer :")
@@ -850,24 +846,25 @@ async def create_context(bot, member, content):
     Returns:
         :class:`discord.ext.commands.Context`
     """
-    chan = private_chan(member)
+    chan = Joueur.from_member(member).private_chan
     message = (await chan.history(limit=1).flatten())[0]        # On a besoin de récupérer un message, ici le dernier de la conv privée
     message.author = member
     message.content = content
-    return await bot.get_context(message)
+    ctx = await bot.get_context(message)
+    return ctx
 
 
 def nom_role(role, prefixe=False):
     """Retourne le nom d'un rôle à partir de son *slug*
 
     Args:
-        role (:class:`str`): :attr:`.bdd.Roles.slug` à chercher
+        role (:class:`str`): :attr:`.bdd.Role.slug` à chercher
         prefile (:class:`bool`): inclure le préfixe ou non
 
     Returns:
-        :class:`str` (:attr:`.bdd.Roles.slug`) | ``None`` (si non trouvé)
+        :class:`str` (:attr:`.bdd.Role.slug`) | ``None`` (si non trouvé)
     """
-    if role := Roles.query.get(role):
+    if role := Role.query.get(role):
         if prefixe:
             return f"{role.prefixe}{role.nom}"
         else:

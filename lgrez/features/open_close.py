@@ -9,9 +9,10 @@ import datetime
 from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
+from lgrez import config
 from lgrez.blocs import tools, bdd, bdd_tools
 from lgrez.features import gestion_actions, taches
-from lgrez.blocs.bdd import Joueurs, Actions, BaseActions, BaseActionsRoles, CandidHaro
+from lgrez.blocs.bdd import Joueur, Action, CandidHaro, CandidHaroType, ActionTrigger
 
 
 async def recup_joueurs(quoi, qui, heure=None):
@@ -23,7 +24,7 @@ async def recup_joueurs(quoi, qui, heure=None):
         heure (:class:`str`): si ``qui == "action"``, heure associée (au format ``HHhMM``)
 
     Returns:
-        :class:`list`\[:class:`.bdd.Joueurs`\]
+        :class:`list`\[:class:`.bdd.Joueur`\]
 
     Examples:
         ``!open cond`` -> joueurs avec droit de vote
@@ -31,28 +32,28 @@ async def recup_joueurs(quoi, qui, heure=None):
     """
     criteres = {
         "cond": {
-            "open": and_(Joueurs.votant_village == True,        # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
-                         Joueurs.vote_condamne_ == None),
-            "close": Joueurs.vote_condamne_ != None,
-            "remind": Joueurs.vote_condamne_ == "non défini",
+            "open": and_(Joueur.votant_village == True,     # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
+                         Joueur.vote_condamne_ == None),
+            "close": Joueur.vote_condamne_ != None,
+            "remind": Joueur.vote_condamne_ == "non défini",
             },
         "maire": {
-            "open": and_(Joueurs.votant_village == True,        # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
-                         Joueurs.vote_maire_ == None),
-            "close": Joueurs.vote_maire_ != None,
-            "remind": Joueurs.vote_maire_ == "non défini",
+            "open": and_(Joueur.votant_village == True,     # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
+                         Joueur.vote_maire_ == None),
+            "close": Joueur.vote_maire_ != None,
+            "remind": Joueur.vote_maire_ == "non défini",
             },
         "loups": {
-            "open": and_(Joueurs.votant_loups == True,          # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
-                         Joueurs.vote_loups_ == None),
-            "close": Joueurs.vote_loups_ != None,
-            "remind": Joueurs.vote_loups_ == "non défini",
+            "open": and_(Joueur.votant_loups == True,       # Objets spéciaux SQLAlchemy.BinaryExpression : ne PAS simplifier !!!
+                         Joueur.vote_loups_ == None),
+            "close": Joueur.vote_loups_ != None,
+            "remind": Joueur.vote_loups_ == "non défini",
             },
         }
 
     if qui in criteres:
         critere = criteres[qui][quoi]
-        return Joueurs.query.filter(critere).all()      # Liste des joueurs répondant aux critères
+        return Joueur.query.filter(critere).all()      # Liste des joueurs répondant aux critères
 
     elif qui == "action":
         if heure and isinstance(heure, str):            # Si l'heure est précisée, on convertit str "HHhMM" -> datetime.time
@@ -67,22 +68,22 @@ async def recup_joueurs(quoi, qui, heure=None):
 
         dic = {}
         for action in actions:
-            if (joueur := Joueurs.query.get(action.player_id)) in dic:
+            if (joueur := action.joueur) in dic:
                 dic[joueur].append(action)
             else:
                 dic[joueur] = [action]
 
         return dic
         #Formerly :
-        #{joueur.player_id:[action for action in actions if action.player_id == joueur.player_id] for joueur in [Joueurs.query.get(action.player_id) for action in actions]}
+        #{joueur.player_id:[action for action in actions if action.player_id == joueur.player_id] for joueur in [Joueur.query.get(action.player_id) for action in actions]}
 
-    elif qui.isdigit() and (action := Actions.query.get(int(qui))):     # Appel direct action par son numéro
+    elif qui.isdigit() and (action := Action.query.get(int(qui))):      # Appel direct action par son numéro
         if ((quoi == "open" and (not action.decision_       # Sécurité : ne pas lancer une action déjà lancée,
                     or action.trigger_debut == "perma"))        # (sauf si permanente ==> ré-ouverture)
             or (quoi == "close" and action.decision_)       #   ni fermer une déjà fermée
             or (quoi == "remind" and action.decision_ == "rien")):
 
-            return {Joueurs.query.get(action.player_id): [action]}
+            return {action.joueur: [action]}
         else:
             return {}
 
@@ -106,7 +107,7 @@ class OpenClose(commands.Cog):
                 ``maire``       pour le vote du maire
                 ``loups``       pour le vote des loups
                 ``action``      pour les actions commençant à ``heure``
-                ``{id}``        pour une action spécifique (paramètre :attr:`.bdd.Actions.id`)
+                ``{id}``        pour une action spécifique (paramètre :attr:`.bdd.Action.id`)
                 ===========     ===========
 
             heure:
@@ -169,22 +170,22 @@ class OpenClose(commands.Cog):
                 for action in joueurs[joueur]:
                     await gestion_actions.open_action(ctx, action, chan)
 
-        bdd.session.commit()
+        config.session.commit()
 
         # Actions déclenchées par ouverture
-        for action in Actions.query.filter_by(trigger_debut=f"open_{qui}"):
+        for action in Action.query.filter_by(trigger_debut=f"open_{qui}"):
             await gestion_actions.open_action(ctx, action)
 
         # Réinitialise haros/candids
         items = []
         if qui == "cond":
-            items = CandidHaro.query.filter_by(type="haro").all()
+            items = CandidHaro.query.filter_by(type=CandidHaroType.haro).all()
         elif qui == "maire":
-            items = CandidHaro.query.filter_by(type="candidature").all()
+            items = CandidHaro.query.filter_by(type=CandidHaroType.candidature).all()
         if items:
             for item in items:
-                bdd.session.delete(item)
-            bdd.session.commit()
+                config.session.delete(item)
+            config.session.commit()
             await tools.log(ctx, f"!open {qui} : haros/candids wiped")
             await tools.channel(ctx, "haros").send(f"{tools.emoji(ctx, 'void')}\n"*30
                 + "Nouveau vote, nouveaux haros !\n"
@@ -213,7 +214,7 @@ class OpenClose(commands.Cog):
                 ``maire``       pour le vote du maire
                 ``loups``       pour le vote des loups
                 ``action``      pour les actions se terminant à ``heure``
-                ``{id}``        pour une action spécifique (paramètre :attr:`.bdd.Actions.id`)
+                ``{id}``        pour une action spécifique (paramètre :attr:`.bdd.Action.id`)
                 ===========     ===========
 
             heure:
@@ -270,10 +271,10 @@ class OpenClose(commands.Cog):
                                     f"""Action définitive : {action.decision_}""")
                     await gestion_actions.close_action(ctx, action, chan)
 
-        bdd.session.commit()
+        config.session.commit()
 
         # Actions déclenchées par fermeture
-        for action in Actions.query.filter_by(trigger_debut=f"close_{qui}"):
+        for action in Action.query.filter_by(trigger_debut=f"close_{qui}"):
             await gestion_actions.open_action(ctx, action)
 
         # Programme prochaine ouverture
@@ -298,7 +299,7 @@ class OpenClose(commands.Cog):
                 ``maire``       pour le vote du maire
                 ``loups``       pour le vote des loups
                 ``action``      pour les actions se terminant à ``heure``
-                ``{id}``        pour une action spécifique (paramètre :attr:`.bdd.Actions.id`)
+                ``{id}``        pour une action spécifique (paramètre :attr:`.bdd.Action.id`)
                 ===========     ===========
 
             heure: ne sert que dans le cas où <qui> == "action" (il est alors obligatoire), contrairement à !open et !close.
@@ -361,12 +362,12 @@ class OpenClose(commands.Cog):
         if motif == "divin":
             if cible != "all":
                 target = await tools.boucle_query_joueur(ctx, cible=cible, message="Qui veux-tu recharger ?")
-                refillable = Actions.query.filter(Actions.charges != None).filter_by(player_id=target.discord_id).all()
+                refillable = Action.query.filter(Action.charges != None).filter_by(joueur=target).all()
             else:
                 m = await ctx.send("Tu as choisi de recharger le pouvoir de TOUS les joueurs actifs, en es-tu sûr ?")
 
                 if await tools.yes_no(ctx.bot, m):
-                    refillable = Actions.query.filter(Actions.charges != None).all()
+                    refillable = Action.query.filter(Action.charges != None).all()
 
                 else:
                     await ctx.send("Mission aborted.")
@@ -375,9 +376,9 @@ class OpenClose(commands.Cog):
         else: #refill WE, forgeron ou rebouteux
             if cible != "all":
                 target = await tools.boucle_query_joueur(ctx, cible=cible, message = "Qui veux-tu recharger ?")
-                refillable = Actions.query.filter(Actions.refill.contains(motif)).filter_by(player_id=target.discord_id).all()
+                refillable = Action.query.filter(Action.refill.contains(motif)).filter_by(joueur=target).all()
             else:
-                refillable = Actions.query.filter(Actions.refill.contains(motif)).all()
+                refillable = Action.query.filter(Action.refill.contains(motif)).all()
 
         await tools.log(ctx, refillable)
 
@@ -389,7 +390,7 @@ class OpenClose(commands.Cog):
 
         # Détermination nouveau nombre de charges
         if motif == "weekends":
-            remplissage = {action: BaseActions.query.get(action.action).base_charges for action in refillable}
+            remplissage = {action: action.base.base_charges for action in refillable}
         else:
             remplissage = {action: action.charges + 1 for action in refillable}
 
@@ -398,13 +399,13 @@ class OpenClose(commands.Cog):
             if charge > action.charges:
                 if not action.charges and action.trigger_debut == "perma":           # Action permanente : on ré-ouvre !
                     ts = tools.fin_pause() if motif == "weekends" else datetime.datetime.now() + datetime.timedelta(seconds=10)
-                    taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
+                    taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action)
 
                 bdd_tools.modif(action, "charges", charge)
 
                 await tools.send_blocs(tools.private_chan(ctx.guild.get_member(action.player_id)), f"Ton action {action.action} vient d'être rechargée, tu as maintenant {charge} charge(s) disponible(s) !")
 
-        bdd.session.commit()
+        config.session.commit()
 
 
     @commands.command()
@@ -423,7 +424,7 @@ class OpenClose(commands.Cog):
         message = await ctx.send("C'est parti ?\nLes rôles ont bien été attribués et synchronisés ? (si non, le faire AVANT de valider)\n\nOn est bien après 10h le jour du lancement ?\n\nTu es conscient que tous les joueurs reçevront à 18h55 un message en mode « happy Hunger Games » ? (codé en dur parce que flemme)")
         if await tools.yes_no(ctx.bot, message):
             async with ctx.typing():
-                joueurs = Joueurs.query.all()
+                joueurs = Joueur.query.all()
                 r = "C'est parti !\n"
 
 
@@ -445,9 +446,9 @@ class OpenClose(commands.Cog):
                 # Programmation actions au lancement et actions permanentes
                 r += "\nProgrammation des actions start / perma :\n"
                 ts = tools.next_occurence(datetime.time(hour=19))
-                for action in Actions.query.filter_by(trigger_debut="start").all() + Actions.query.filter_by(trigger_debut="perma").all():
+                for action in Action.query.filter(Action.trigger_debut.in_([ActionTrigger.start, ActionTrigger.perma])).all():
                     r += f" - À 19h : !open {action.id} (trigger_debut == {action.trigger_debut})\n"
-                    taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action.id)
+                    taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action)
 
                 # Programmation refill weekends
                 # r += "\nProgrammation des refills weekends :\n"

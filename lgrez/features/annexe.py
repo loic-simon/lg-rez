@@ -15,7 +15,7 @@ from akinator.async_aki import Akinator
 import akinator
 
 from lgrez.blocs import tools
-from lgrez.blocs.bdd import session, Joueurs
+from lgrez.blocs.bdd import Joueur
 
 
 class Annexe(commands.Cog):
@@ -104,9 +104,9 @@ class Annexe(commands.Cog):
         ts_debut = ctx.message.created_at - datetime.timedelta(microseconds=1)
 
         if len(joueurs) == 1 and "=" in joueurs[0]:      # Si critère : on remplace joueurs
-            crit, filtre = joueurs[0].split("=", maxsplit=1)
-            if hasattr(Joueurs, crit):
-                joueurs = Joueurs.query.filter(getattr(Joueurs, crit) == filtre).all()
+            crit, _, filtre = joueurs[0].partition("=")
+            if hasattr(Joueur, crit):
+                joueurs = Joueur.query.filter_by(**{crit: filtre}).all()
             else:
                 await ctx.send(f"Critère \"{crit}\" incorrect. !help {ctx.invoked_with} pour plus d'infos.")
                 return
