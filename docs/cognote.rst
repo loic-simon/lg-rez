@@ -12,10 +12,9 @@
 
         async def command(ctx, [ arg1, [..., argN,] ] [{*args | *, rest}]) -> None
 
-    avec
-        - ``ctx`` (:class:`discord.ext.commands.Context`) le **contexte d'invocation** de la commande, construit automatiquement par ``discord.py`` à l'appel de :py:meth:`Bot.process_commands <discord.ext.commands.Bot.process_commands>` ou :py:meth:`Bot.get_context <discord.ext.commands.Bot.get_context>`, puis
-        - ``arg1, ..., argN`` (:class:`str`) zéro, un ou plusieurs arguments(s) positionnels parsés à partir du texte entré par l'utilisateur (mots séparés par des espaces) ;
-        - ``args`` (:class:`list`\[:class:`str`\]) un nombre arbitraire d'arguments, OU
-        - ``rest`` (:class:`str`) le texte restant après le traitement des arguments positionnels.
+    - ``ctx`` (:class:`discord.ext.commands.Context`) le **contexte d'invocation** de la commande, construit automatiquement par ``discord.py`` à l'appel de :py:meth:`Bot.process_commands <discord.ext.commands.Bot.process_commands>` ou :py:meth:`Bot.get_context <discord.ext.commands.Bot.get_context>`, puis
+    - ``arg1, ..., argN`` (:class:`str`) zéro, un ou plusieurs arguments(s) positionnels parsés à partir du texte entré par l'utilisateur (mots séparés par des espaces) ;
+    - ``args`` (:class:`list`\[:class:`str`\]) un nombre arbitraire d'arguments, OU
+    - ``rest`` (:class:`str`) le texte restant après le traitement des arguments positionnels.
 
     Une exception dérivant de :class:`discord.ext.commands.UserInputError` est levée en cas d'utilisation incorrecte (puis traitée par :meth:`.LGBot.on_command_error`).

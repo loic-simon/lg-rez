@@ -11,7 +11,7 @@ import requests
 from discord.ext import commands
 
 from lgrez import config
-from lgrez.blocs import bdd, tools, bdd_tools
+from lgrez.blocs import bdd, tools
 from lgrez.blocs.bdd import Trigger, Reaction, Role
 
 
@@ -220,7 +220,7 @@ class GestionIA(commands.Cog):
         """
         async with ctx.typing():
             if trigger:
-                trigs = bdd_tools.find_nearest(trigger, table=Trigger, carac="trigger", sensi=sensi, solo_si_parfait=False)
+                trigs = Trigger.find_nearest(trigger, col=Trigger.trigger, sensi=sensi, solo_si_parfait=False)
                 if not trigs:
                     await ctx.send(f"Rien trouvé, pas de chance (sensi = {sensi})")
                     return
@@ -270,7 +270,7 @@ class GestionIA(commands.Cog):
             mess = await tools.wait_for_message_here(ctx)
             trigger = mess.content
 
-        trigs = bdd_tools.find_nearest(trigger, Trigger, carac="trigger")
+        trigs = Trigger.find_nearest(trigger, col=Trigger.trigger)
         if not trigs:
             await ctx.send("Rien trouvé.")
             return
@@ -324,7 +324,7 @@ class GestionIA(commands.Cog):
                 r += f"\nLa séquence-réponse peut être refaite manuellement ou modifiée rapidement en envoyant directment la séquence ci-dessus modifiée (avec les marqueurs : OU = {tools.code(MARK_OR)}, ET = {tools.code(MARK_THEN)}, REACT = {tools.code(MARK_REACT)}, CMD = {tools.code(MARK_CMD)})"
 
             reponse = await _build_sequence(ctx)
-            bdd_tools.modif(reac, "reponse", reponse)
+            reac.reponse = reponse
 
         if not (MT or MR):      # Suppression
             config.session.delete(reac)
@@ -359,14 +359,14 @@ async def trigger_roles(message, sensi=0.8):
 
     Args:
         message (:class:`~discord.Message`): message auquel réagir
-        sensi (:class:`float`): sensibilité de la recherche (voir :func:`.bdd_tools.find_nearest`)
+        sensi (:class:`float`): sensibilité de la recherche (voir :func:`.bdd.TableMeta.find_nearest`)
 
     Trouve l'entrée la plus proche de ``message.content`` dans la table :class:`.bdd.Role`.
 
     Returns:
         ``True`` si un rôle a été trouvé (sensibilité ``> sensi``) et qu'une réponse a été envoyée, ``False`` sinon
     """
-    roles = bdd_tools.find_nearest(message.content, Role, carac="nom", sensi=sensi)
+    roles = Role.find_nearest(message.content, col=Role.nom, sensi=sensi)
 
     if roles:       # Au moins un trigger trouvé à cette sensi
         role = roles[0][0]                                  # Meilleur trigger (score max)
@@ -383,7 +383,7 @@ async def trigger_reactions(bot, message, chain=None, sensi=0.7, debug=False):
         bot (:class:`.LGBot`): bot
         message (:class:`~discord.Message`): message auquel réagir
         chain (:class:`str`): contenu auquel réagir (défaut : contenu de ``message``)
-        sensi (:class:`float`): sensibilité de la recherche (voir :func:`.bdd_tools.find_nearest`)
+        sensi (:class:`float`): sensibilité de la recherche (voir :func:`.bdd.TableMeta.find_nearest`)
         debug (:class:`bool`): si ``True``, affiche les erreurs lors de l'évaluation des messages (voir :func:`.tools.eval_accols`)
 
     Trouve l'entrée la plus proche de ``chain`` dans la table :class:`.bdd.Reaction` ; si il contient des accolades, évalue le message selon le contexte de ``message``.
@@ -393,7 +393,7 @@ async def trigger_reactions(bot, message, chain=None, sensi=0.7, debug=False):
     """
     if not chain:                   # Si pas précisé,
         chain = message.content         # contenu de message
-    trigs = bdd_tools.find_nearest(chain, Trigger, carac="trigger", sensi=sensi)
+    trigs = Trigger.find_nearest(chain, col=Trigger.trigger, sensi=sensi)
 
     if trigs:       # Au moins un trigger trouvé à cette sensi
         trig = trigs[0][0]                                  # Meilleur trigger (score max)

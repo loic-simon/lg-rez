@@ -14,7 +14,7 @@ import discord
 import discord.utils
 from discord.ext import commands
 
-from lgrez.blocs import bdd, bdd_tools
+from lgrez.blocs import bdd
 from lgrez.blocs.bdd import *
 # on importe toutes les tables, plus simple pour y accéder depuis des réactions etc (via eval_accols)
 
@@ -123,20 +123,6 @@ def emoji(arg, nom, must_be_found=True):
                                    must_be_found=must_be_found, raiser="tools.emoji")
 
 
-def private_chan(member, must_be_found=True):
-    """Renvie le channel privé d'un joueur
-
-    Args:
-        member (:class:`discord.Member`): membre du serveur
-        must_be_found (:class:`bool`): si ``True`` (défaut), raise une :exc:`AssertionError` si le channel n'existe pas (si ``False``, renvoie ``None``)
-
-    Returns:
-        :class:`discord.TextChannel`
-    """
-    joueur = Joueur.from_member(member)
-    return joueur.private_chan
-
-
 # Appel aux MJs
 def mention_MJ(arg):
     """Renvoie la mention du rôle "MJ" si le joueur n'est pas un MJ, ``"@MJ"`` sinon.
@@ -193,7 +179,7 @@ def private(cmd):
     async def new_cmd(self, ctx, *args, **kwargs):              # Cette commande est renvoyée à la place de cmd
         if not ctx.channel.name.startswith("conv-bot-"):            # Si pas déjà dans une conv bot :
             await ctx.message.delete()                                  # On supprime le message,
-            ctx.channel = private_chan(ctx.author)                      # On remplace le chan dans le contexte d'appel par le chan privé,
+            ctx.channel = Joueur.from_member(ctx.author).private_chan   # On remplace le chan dans le contexte d'appel par le chan privé,
             await ctx.send(f"{quote(ctx.message.content)}\n"            # On envoie un warning dans le chan privé,
                            f"{ctx.author.mention} :warning: Cette commande est interdite en dehors de ta conv privée ! :warning:\n"
                            f"J'ai supprimé ton message, et j'exécute la commande ici :")
@@ -300,7 +286,7 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
         ctx (:class:`discord.ext.commands.Context`): contexte d'une commande
         cible (:class:`str`): premier essai de cible (donnée par le joueur dans l'appel à une commande, par exemple)
         message (:class:`str`): si défini (et ``cible`` non définie), message à envoyer avant la boucle
-        sensi (:class:`float`): sensibilité de la recherche (c.f. :func:`.bdd_tools.find_nearest`)
+        sensi (:class:`float`): sensibilité de la recherche (c.f. :meth:`.bdd.TableMeta.find_nearest`)
 
     Returns:
         :class:`.bdd.Joueur`
@@ -321,30 +307,31 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
             if joueur := Joueur.query.get(int(id)):                 # Si cet ID correspond à un utilisateur, on le récupère
                 return joueur                                       # On a trouvé l'utilisateur !
 
-        nearest = bdd_tools.find_nearest(rep, Joueur, carac="nom", sensi=sensi, solo_si_parfait=False, match_first_word=True)     # Sinon, recherche au plus proche
+        nearest = Joueur.find_nearest(rep, col=Joueur.nom, sensi=sensi, solo_si_parfait=False, match_first_word=True)     # Sinon, recherche au plus proche
 
         if not nearest:
             await ctx.send("Aucune entrée trouvée, merci de réessayer :")
 
-        elif nearest[0][1] == 1 and not (len(nearest) > 1 and nearest[1][1] == 1):        # Si le score le plus haut est égal à 1...
-            return nearest[0][0]        # ...renvoyer l'entrée correspondante
+        elif len(nearest) == 1:         # Une seule correspondance
+            joueur, score = nearest[0]
+            if score == 1:          # parfait
+                return joueur
 
-        elif len(nearest) == 1:
-            m = await ctx.send(f"Je n'ai trouvé qu'une correspondance : {nearest[0][0].nom}\nÇa part ?")
+            m = await ctx.send(f"Je n'ai trouvé qu'une correspondance : {joueur.nom}\nÇa part ?")
             if await yes_no(ctx.bot, m):
-                return nearest[0][0]
+                return joueur
             else:
                 await ctx.send("Bon d'accord, alors qui ?")
 
         else:
             s = "Les joueurs les plus proches de ton entrée sont les suivants : \n"
-            for i, j in enumerate(nearest[:10]):
-                s += f"{emoji_chiffre(i+1)}. {j[0].nom} \n"
+            for i, (joueur, score) in enumerate(nearest[:10]):
+                s += f"{emoji_chiffre(i+1)}. {joueur.nom} \n"
             m = await ctx.send(s + ital("Tu peux les choisir en réagissant à ce message, ou en répondant au clavier."))
             n = await choice(ctx.bot, m, min(10, len(nearest)))
             return nearest[n-1][0]
 
-    await ctx.send("Et puis non, tiens ! \n https://giphy.com/gifs/fuck-you-middle-finger-ryan-stiles-x1kS7NRIcIigU")
+    await ctx.send("Et puis non, tiens !\nhttps://giphy.com/gifs/fuck-you-middle-finger-ryan-stiles-x1kS7NRIcIigU")
     raise RuntimeError("Le joueur est trop con, je peux rien faire")
 
 
@@ -496,26 +483,6 @@ async def sleep(chan, x):
 ### ---------------------------------------------------------------------------
 ### Utilitaires d'emojis
 ### ---------------------------------------------------------------------------
-
-def emoji_camp(arg, camp):
-    """Renvoie l'emoji associé à un camp donné.
-
-    Args:
-        arg (:class:`~discord.ext.commands.Context` | :class:`~discord.Guild` | :class:`~discord.Member` | :class:`~discord.abc.GuildChannel`): argument "connecté" au serveur, permettant de remonter aux emojis
-        camp (str): parmis ``"village"``, ``"loups"``, ``"nécro"``, ``"solitaire"``, ``"autre"``
-
-    Returns:
-        :class:`discord.Emoji` or `""`
-    """
-    d = {"village": "village",
-         "loups": "lune",
-         "nécro": "necro",
-         "solitaire": "pion",
-         "autre": "pion"}
-    if camp in d:
-        return emoji(arg, d[camp])
-    else:
-        return ""
 
 
 def montre(heure=None):

@@ -10,7 +10,7 @@ from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
 from lgrez import config
-from lgrez.blocs import env, bdd, bdd_tools, gsheets, tools
+from lgrez.blocs import env, bdd, gsheets, tools
 from lgrez.blocs.bdd import Joueur, Action, CandidHaro
 from lgrez.features import gestion_actions
 
@@ -67,7 +67,7 @@ class VoterAgir(commands.Cog):
 
         async with ctx.typing():
             # Modification en base
-            bdd_tools.modif(joueur, "vote_condamne_", cible.nom)
+            joueur.vote_condamne_ = cible.nom
             config.session.commit()
 
             # Écriture dans sheet Données brutes
@@ -128,7 +128,7 @@ class VoterAgir(commands.Cog):
 
         async with ctx.typing():
             # Modification en base
-            bdd_tools.modif(joueur, "vote_maire_", cible.nom)
+            joueur.vote_maire_ = cible.nom
             config.session.commit()
 
             # Écriture dans sheet Données brutes
@@ -176,7 +176,7 @@ class VoterAgir(commands.Cog):
 
         async with ctx.typing():
             # Modification en base
-            bdd_tools.modif(joueur, "vote_loups_", cible.nom)
+            joueur.vote_loups_ = cible.nom
             config.session.commit()
 
             # Écriture dans sheet Données brutes
@@ -242,7 +242,7 @@ class VoterAgir(commands.Cog):
 
         async with ctx.typing():
             # Modification en base
-            bdd_tools.modif(action, "decision_", decision)
+            action.decision_ = decision
 
             # Écriture dans sheet Données brutes
             LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
@@ -256,14 +256,14 @@ class VoterAgir(commands.Cog):
             async with ctx.typing():
                 deleted = False
                 if action.charges:
-                    bdd_tools.modif(action, "charges", action.charges - 1)
+                    action.charges = action.charges - 1
                     pcs = " pour cette semaine" if "weekends" in (action.base.refill or "").split() else ""
                     await ctx.send(f"Il te reste {action.charges} charge(s){pcs}.")
                     if action.charges == 0 and not action.base.refill:
                         gestion_actions.delete_action(ctx, action)
                         deleted = True
                 if not deleted:
-                    bdd_tools.modif(action, "decision_", None)
+                    action.decision_ = None
 
             await ctx.send(tools.ital(f"[Allo {tools.role(ctx, 'MJ').mention}, conséquence instantanée ici !]"))
 

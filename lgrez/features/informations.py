@@ -10,8 +10,8 @@ import unidecode
 from discord.ext import commands
 
 from lgrez import config
-from lgrez.blocs import bdd, bdd_tools, tools
-from lgrez.blocs.bdd import Joueur, Role, Camp, Statut
+from lgrez.blocs import bdd, tools
+from lgrez.blocs.bdd import Joueur, Role, Camp, Statut, ActionTrigger
 
 
 class Informations(commands.Cog):
@@ -36,13 +36,13 @@ class Informations(commands.Cog):
         if not filtre:
             roles = Role.query.order_by(Role.nom).all()
         else:
-            camps = bdd_tools.find_nearest(filtre, Camp, carac="nom",
+            camps = Camp.find_nearest(filtre, col=Camp.nom,
                 sensi=0.6, filtre=(Camp.visible == True))
 
             if camps:
                 roles = camps[0][0].roles
             else:
-                roles = bdd_tools.find_nearest(filtre, Role, carac="nom")
+                roles = Role.find_nearest(filtre, col=Role.nom)
                 if not roles:
                     await ctx.send(f"Rôle / camp \"{filtre}\" non trouvé.")
                     return
@@ -53,7 +53,7 @@ class Informations(commands.Cog):
 
         await tools.send_blocs(ctx,
             f"Rôles trouvés :\n"
-            + "\n".join([str(tools.emoji_camp(ctx, role.camp)) + tools.code(f"{role.nom.ljust(25)} {role.description_courte}") for role in roles if not role.nom.startswith("(")])
+            + "\n".join([str(role.camp.discord_emoji_or_none or "") + tools.code(f"{role.nom.ljust(25)} {role.description_courte}") for role in roles if not role.nom.startswith("(")])
             + "\n" + tools.ital(f"({tools.code('!roles <role>')} pour plus d'informations sur un rôle.)")
         )
 
@@ -79,11 +79,11 @@ class Informations(commands.Cog):
         Args:
             nomrole: le rôle qu'on cherche (doit être un slug ou nom de rôle valide)
         """
-        roles = bdd_tools.find_nearest(nomrole, Role)
+        roles = Role.find_nearest(nomrole)
         if roles:
             role = roles[0][0]
         else:
-            roles = await bdd_tools.find_nearest(nomrole, Role, carac="nom")
+            roles = await Role.find_nearest(nomrole, col=Role.nom)
             if roles:
                 role = roles[0][0]
             else:
@@ -143,26 +143,24 @@ class Informations(commands.Cog):
         """
         def disponible(action):
             """Renvoie une description human readible des conditions de déclenchement d'<action>"""
-            if action.trigger_debut == "temporel":
+            if action.trigger_debut == ActionTrigger.temporel:
                 dispo = f"De {tools.time_to_heure(action.heure_debut)} à {tools.time_to_heure(action.heure_fin)}"
-            elif action.trigger_debut == "perma":
+            elif action.trigger_debut == ActionTrigger.perma:
                 dispo = f"N'importe quand"
-            elif action.trigger_debut == "start":
+            elif action.trigger_debut == ActionTrigger.start:
                 dispo = f"Au lancement de la partie"
-            elif action.trigger_debut == "mort":
+            elif action.trigger_debut == ActionTrigger.mort:
                 dispo = f"S'active à ta mort"
-            elif action.trigger_debut == "mot_mjs":
+            elif action.trigger_debut == ActionTrigger.mot_mjs:
                 dispo = f"S'active à l'annonce des résultats du vote"
-            elif "_" in action.trigger_debut:
+            elif "_" in action.trigger_debut.value:
                 quoi, qui = action.trigger_debut.split("_")
                 d_quoi = {"open": "l'ouverture",
                           "close": "la fermeture",
-                          "remind": "personne utilise ça",
                 }
                 d_qui = {"cond": "du vote condamné",
                          "maire": "du vote pour la mairie",
                          "loups": "du vote pour les loups",
-                         "action": "personne utilise ça",
                 }
                 try:
                     dispo = f"S'active à {d_quoi[quoi]} {d_qui[qui]}"
@@ -238,36 +236,44 @@ class Informations(commands.Cog):
                             heure = None
                             if ":" in trigger or "h" in trigger:
                                 heure = trigger
-                                trigger = "temporel"
+                                trigger = ActionTrigger.temporel
+                            else:
+                                try:
+                                    trigger = ActionTrigger(trigger)
+                                except ValueError:
+                                    await ctx.send("Valeur incorrecte")
 
-                            if trigger in ["temporel", "delta"]:
+                            if trigger in [ActionTrigger.temporel, ActionTrigger.delta]:
                                 if not heure:
                                     await ctx.send(f"Heure / delta {tools.code('HHhMM ou HH:MM')} :")
                                     heure = (await tools.wait_for_message_here(ctx)).content
                                 ts = tools.heure_to_time(heure)
-                                bdd_tools.modif(action, "trigger_debut" if modif == "début" else "trigger_fin", trigger)
-                                bdd_tools.modif(action, "heure_debut" if modif == "début" else "heure_fin", ts)
-                            elif trigger in ["perma", "start", "auto", "mot_mjs", "mort"] + [f"{quoi}_{qui}" for quoi in ["open", "close", "remind"] for qui in ["cond", "maire", "loups"]]:
-                                bdd_tools.modif(action, "trigger_debut" if modif == "début" else "trigger_fin", trigger)
-                                bdd_tools.modif(action, "heure_debut" if modif == "début" else "heure_fin", None)
                             else:
-                                await ctx.send("Valeur incorrecte")
+                                ts = None
+
+                            if modif == "début":
+                                action.trigger_debut = trigger
+                                action.heure_debut = ts
+                            else:
+                                action.trigger_fin = trigger
+                                action.heure_fin = ts
+
 
                         elif modif in ["cd", "cooldown"]:
                             await ctx.send(f"Combien ?")
                             cd = int((await tools.wait_for_message_here(ctx)).content)
-                            bdd_tools.modif(action, "cooldown", cd)
+                            action.cooldown = cd
 
                         elif modif == "charges":
                             await ctx.send(f"Combien ? ({tools.code('None')} pour illimité)")
                             entry = (await tools.wait_for_message_here(ctx)).content
                             charges = None if entry.lower() == "none" else int(entry)
-                            bdd_tools.modif(action, "charges", charges)
+                            action.charges = charges
 
                         elif modif == "refill":
                             await ctx.send(f"Quoi ? ({tools.code('rebouteux / forgeron / weekends')} séparés par des {tools.code(', ')})")
                             refill = (await tools.wait_for_message_here(ctx)).content.lower()
-                            bdd_tools.modif(action, "refill", refill)
+                            action.refill = refill
 
                         elif modif == "valider":
                             config.session.commit()

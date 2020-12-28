@@ -10,7 +10,7 @@ from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
 from lgrez import config
-from lgrez.blocs import tools, bdd, bdd_tools
+from lgrez.blocs import tools, bdd
 from lgrez.features import gestion_actions, taches
 from lgrez.blocs.bdd import Joueur, Action, CandidHaro, CandidHaroType, ActionTrigger
 
@@ -79,7 +79,7 @@ async def recup_joueurs(quoi, qui, heure=None):
 
     elif qui.isdigit() and (action := Action.query.get(int(qui))):      # Appel direct action par son numéro
         if ((quoi == "open" and (not action.decision_       # Sécurité : ne pas lancer une action déjà lancée,
-                    or action.trigger_debut == "perma"))        # (sauf si permanente ==> ré-ouverture)
+                    or action.trigger_debut == ActionTrigger.perma))    # (sauf si permanente ==> ré-ouverture)
             or (quoi == "close" and action.decision_)       #   ni fermer une déjà fermée
             or (quoi == "remind" and action.decision_ == "rien")):
 
@@ -143,7 +143,7 @@ class OpenClose(commands.Cog):
             assert chan, f"!open : chan privé de {joueur} introuvable"
 
             if qui == "cond":
-                bdd_tools.modif(joueur, "vote_condamne_", "non défini")
+                joueur.vote_condamne_ = "non défini"
                 message = await chan.send(
                     f"""{tools.montre()}  Le vote pour le condamné du jour est ouvert !  {tools.emoji(ctx, "bucher")} \n"""
                     + (f"""Tu as jusqu'à {heure} pour voter. \n""" if heure else "")
@@ -151,7 +151,7 @@ class OpenClose(commands.Cog):
                 await message.add_reaction(tools.emoji(ctx, "bucher"))
 
             elif qui == "maire":
-                bdd_tools.modif(joueur, "vote_maire_", "non défini")
+                joueur.vote_maire_ = "non défini"
                 message = await chan.send(
                     f"""{tools.montre()}  Le vote pour l'élection du maire est ouvert !  {tools.emoji(ctx, "maire")} \n"""
                     + (f"""Tu as jusqu'à {heure} pour voter. \n""" if heure else "")
@@ -159,7 +159,7 @@ class OpenClose(commands.Cog):
                 await message.add_reaction(tools.emoji(ctx, "maire"))
 
             elif qui == "loups":
-                bdd_tools.modif(joueur, "vote_loups_", "non défini")
+                joueur.vote_loups_ = "non défini"
                 message = await chan.send(
                     f"""{tools.montre()}  Le vote pour la victime de cette nuit est ouvert !  {tools.emoji(ctx, "lune")} \n"""
                     + (f"""Tu as jusqu'à {heure} pour voter. \n""" if heure else "")
@@ -253,17 +253,17 @@ class OpenClose(commands.Cog):
                 await chan.send(f"""{tools.montre()}  Fin du vote pour le condamné du jour ! \n"""
                                 f"""Vote définitif : {joueur.vote_condamne_}\n"""
                                 f"""Les résultats arrivent dans l'heure !\n""")
-                bdd_tools.modif(joueur, "vote_condamne_", None)
+                joueur.vote_condamne_ = None
 
             elif qui == "maire":
                 await chan.send(f"""{tools.montre()}  Fin du vote pour le maire ! \n"""
                                 f"""Vote définitif : {joueur.vote_maire_}""")
-                bdd_tools.modif(joueur, "vote_maire_", None)
+                joueur.vote_maire_ = None
 
             elif qui == "loups":
                 await chan.send(f"""{tools.montre()}  Fin du vote pour la victime du soir ! \n"""
                                 f"""Vote définitif : {joueur.vote_loups_}""")
-                bdd_tools.modif(joueur, "vote_loups_", None)
+                joueur.vote_loups_ = None
 
             else:       # Action
                 for action in joueurs[joueur]:
@@ -384,7 +384,7 @@ class OpenClose(commands.Cog):
 
         txt = "Action(s) répondant aux critères :\n"
         for action in refillable:
-            txt += f"- {action.action}, id = {action.id} \n"
+            txt += f"- {action.base.slug}, id = {action.id} \n"
 
         await tools.send_code_blocs(ctx, txt)
 
@@ -401,9 +401,9 @@ class OpenClose(commands.Cog):
                     ts = tools.fin_pause() if motif == "weekends" else datetime.datetime.now() + datetime.timedelta(seconds=10)
                     taches.add_task(ctx.bot, ts, f"!open {action.id}", action=action)
 
-                bdd_tools.modif(action, "charges", charge)
+                action.charges = charges
 
-                await tools.send_blocs(tools.private_chan(ctx.guild.get_member(action.player_id)), f"Ton action {action.action} vient d'être rechargée, tu as maintenant {charge} charge(s) disponible(s) !")
+                await tools.send_blocs(action.joueur.private_chan, f"Ton action {action.base.slug} vient d'être rechargée, tu as maintenant {charge} charge(s) disponible(s) !")
 
         config.session.commit()
 

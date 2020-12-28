@@ -4,14 +4,15 @@ Récupération et application des données des GSheets : modifications décidée
 
 """
 
-import traceback
+import datetime
 import time
+import traceback
 
 from discord import Embed
 from discord.ext import commands
 
 from lgrez import config
-from lgrez.blocs import tools, bdd, bdd_tools, env, gsheets
+from lgrez.blocs import tools, bdd, env, gsheets
 from lgrez.blocs.bdd import tables, Joueur, Action, Role, Statut, ActionTrigger
 from lgrez.features import gestion_actions
 
@@ -38,6 +39,55 @@ class TDBModif():
         return f"<TDBModif id {self.id}: {self.col} = {self.val}>"
 
 
+
+def transtype(value, col):
+    """Utilitaire : caste une donnée brute d'un GSheet selon la colonne correspondante
+
+    Args:
+        value (:class:`object`): valeur à transtyper
+        col (:class:`sqlalchemy.Column`): colonne associée. Types pris en charge :
+            - :class:`sqlalchemy.String` et dérivés (``Text``, ``Varchar``...)
+            - :class:`sqlalchemy.Integer` et dérivés (``BigInteger``...)
+            - :class:`sqlalchemy.Boolean`
+            - :class:`sqlalchemy.Time`
+
+    Returns:
+        L'objet Python correspondant au type de la colonne (:class:`str`, :class:`int`, :class:`bool`, :class:`datetime.time`) ou ``None``
+
+    Raises:
+        ``ValueError``: la conversion n'est pas possible (ou ``value`` est évaluée ``None`` et la colonne n'est pas *nullable*)
+        ``KeyError``: type de colonne non pris en compte
+    """
+    try:
+        if value in (None, '', 'None', 'none', 'Null', 'null'):
+            if not col.nullable:
+                raise ValueError
+            return None
+        elif isinstance(col.type, sqlalchemy.String):
+            return str(value)
+        elif isinstance(col.type, sqlalchemy.Integer):
+            return int(value)
+        elif isinstance(col.type, sqlalchemy.Boolean):
+            if value in {True, 1} or (isinstance(value, str) and value.lower() in {'true', 'vrai'}):
+                return True
+            elif value in {False, 0} or (isinstance(value, str) and value.lower() in {'false', 'faux'}):
+                return False
+            else:
+                raise ValueError
+        elif isinstance(col.type, sqlalchemy.Time):                # hh:mm
+            try:
+                h, m, _ = value.split(':')
+            except ValueError:
+                h, m = value.split(':')
+            return datetime.time(hour=int(h), minute=int(m))
+        else:
+            raise KeyError(f"unhandled type for column '{col.key}': '{col.type}'")
+
+    except (ValueError, TypeError):
+        raise ValueError(f"Valeur '{value}' incorrecte pour la colonne '{col.key}' (type '{col.type}'/{'NOT NULL' if not column.nullable else ''})") from None
+
+
+
 def get_sync():
     """Récupère les modifications en attente sur le TDB
 
@@ -47,11 +97,7 @@ def get_sync():
         :class:`list`\[:class:`.TDBModif`\]: liste des modifications à apporter
     """
 
-    all_cols = bdd_tools.get_cols(Joueur)
-    cols = [col for col in all_cols if not col.endswith('_')]    # On élimine les colonnes locales
-    cols_SQL_types = bdd_tools.get_SQL_types(Joueur)
-    cols_SQL_nullable = bdd_tools.get_SQL_nullable(Joueur)
-    primary_col = bdd_tools.get_primary_col(Joueur)
+    cols = [col for col in Joueur.columns if not col.key.endswith('_')]    # On élimine les colonnes locales
 
     ### RÉCUPÉRATION INFOS GSHEET
 
@@ -62,8 +108,8 @@ def get_sync():
     values = sheet.get_all_values()         # Liste de liste des valeurs des cellules
 
     head = values[2]            # Ligne d'en-têtes (noms des colonnes) = 3e ligne du TDB
-    TDB_index = {col: head.index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
-    TDB_tampon_index = {col: head.index(f"tampon_{col}") for col in cols if col != 'discord_id'}    # Idem pour la partie « tampon »
+    TDB_index = {col: head.index(col.key) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
+    TDB_tampon_index = {col: head.index(f"tampon_{col.key}") for col in cols if not col.primary_key}    # Idem pour la partie « tampon » (sauf la clé primaire, pas reprise en double)
 
     # CONVERSION INFOS GSHEET EN UTILISATEURS
 
@@ -73,10 +119,10 @@ def get_sync():
 
     for i_row in range(len(values)):
         L = values[i_row]           # On parcourt les lignes du TDB
-        id_cell = L[TDB_index[primary_col]]
+        id_cell = L[TDB_index[Joueur.primary_col]]
         if id_cell.isdigit():        # Si la cellule contient bien un ID (que des chiffres, et pas vide)
             id = int(id_cell)
-            joueur_TDB = {col: bdd_tools.transtype(L[TDB_index[col]], col, cols_SQL_types[col], cols_SQL_nullable[col]) for col in cols}    # Dictionnaire correspondant à l'utilisateur
+            joueur_TDB = {col: transtype(L[TDB_index[col]], col) for col in cols}    # Dictionnaire correspondant à l'utilisateur
             joueurs_TDB.append(joueur_TDB)
             ids_TDB.append(id)
             rows_TDB[id] = i_row
@@ -232,7 +278,7 @@ async def modif_joueur(ctx, joueur_id, modifs, silent=False):
             else:                                   # role_actif = False
                 notif += f":arrow_forward: Tu ne peux maintenant plus utiliser aucun pouvoir.\n"
 
-        bdd_tools.modif(joueur, modif.col, modif.val)       # Dans tous les cas, on modifie en base (après, pour pouvoir accéder aux vieux attribus plus haut)
+        setattr(joueur, modif.col, modif.val)       # Dans tous les cas, on modifie en base (après, pour pouvoir accéder aux vieux attribus plus haut)
         done.append(modif)
 
     if not silent:
@@ -322,22 +368,20 @@ class Sync(commands.Cog):
                 values = sheet.get_all_values()         # Liste de liste des valeurs des cellules
 
                 table = tables[table_name]
-                cols = bdd_tools.get_cols(table)
-                SQL_types = bdd_tools.get_SQL_types(table)
-                SQL_nullable = bdd_tools.get_SQL_nullable(table)
-                primary_col = bdd_tools.get_primary_col(table)
+                cols = table.columns
+                primary_col = table.primary_col
 
                 cols_index = {col: values[0].index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
 
-                existants = {getattr(item, primary_col):item for item in table.query.all()}
+                existants = {getattr(item, primary_col): item for item in table.query.all()}
 
                 for L in values[1:]:
-                    args = {col: bdd_tools.transtype(L[cols_index[col]], col, SQL_types[col], SQL_nullable[col]) for col in cols}
+                    args = {col: transtype(L[cols_index[col]], col) for col in cols}
                     id = args[primary_col]
                     if id in existants:
                         for col in cols:
                             if getattr(existants[id], col) != args[col]:
-                                bdd_tools.modif(existants[id], col, args[col])
+                                setattr(existants[id], col, args[col])
                     else:
                         config.session.add(table(**args))
 
@@ -360,9 +404,10 @@ class Sync(commands.Cog):
         async with ctx.typing():
             for camp in camps:
                 if camp.roles:
-                    await chan_roles.send(embed=Embed(title=f"Camp : {camp}").set_image(url=tools.emoji_camp(ctx, camp).url))
+                    emoji = camp.emoji.discord_emoji_or_none
+                    await chan_roles.send(embed=Embed(title=f"Camp : {camp}").set_image(url=emoji.url if emoji else None))
                     await chan_roles.send(f"——————————————————————————")
                     for role in camp.roles:
-                        await chan_roles.send(f"{tools.emoji_camp(ctx, role.camp)} {tools.bold(role.prefixe + role.nom)} – {role.description_courte} (camp : {role.camp})\n\n{role.description_longue}\n\n——————————————————————————")
+                        await chan_roles.send(f"{emoji or ''} {tools.bold(role.prefixe + role.nom)} – {role.description_courte} (camp : {role.camp})\n\n{role.description_longue}\n\n——————————————————————————")
 
         await ctx.send(f"{chan_roles.mention} rempli ! (en {(time.time() - t0):.4} secondes)")

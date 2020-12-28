@@ -8,7 +8,7 @@ from discord.ext import commands
 
 from lgrez import config
 from lgrez.blocs.bdd import Joueur, Role, Camp, Statut
-from lgrez.blocs import tools, bdd, env, gsheets, bdd_tools
+from lgrez.blocs import tools, bdd, env, gsheets
 
 
 # Routine d'inscription (fonction appellée par la commande !co)
@@ -130,7 +130,7 @@ async def main(bot, member):
 
         # Ajout au TDB
 
-        cols = [col for col in bdd_tools.get_cols(Joueur) if not col.endswith('_')]     # On élimine les colonnes locales
+        cols = [col for col in Joueur.columns if not col.endswith('_')]     # On élimine les colonnes locales
 
         SHEET_ID = env.load("LGREZ_TDB_SHEET_ID")
 
@@ -140,15 +140,15 @@ async def main(bot, member):
         NL = len(values)
 
         head = values[2]            # Ligne d'en-têtes (noms des colonnes) = 3e ligne du TDB
-        TDB_index = {col: head.index(col) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
-        TDB_tampon_index = {col: head.index(f"tampon_{col}") for col in cols if col != 'discord_id'}    # Idem pour la partie « tampon »
+        TDB_index = {col: head.index(col.key) for col in cols}    # Dictionnaire des indices des colonnes GSheet pour chaque colonne de la table
+        TDB_tampon_index = {col: head.index(f"tampon_{col.key}") for col in cols if not col.primary_key}    # Idem pour la partie « tampon »
 
         plv = 3        # Première ligne vide (si tableau vide, 4e ligne ==> l=3)
         for l in range(NL):
-            if values[l][TDB_index["discord_id"]].isdigit():    # Si il y a un vrai ID dans la colonne ID, ligne l
+            if values[l][TDB_index[Joueur.primary_col]].isdigit():    # Si il y a un vrai ID dans la colonne ID, ligne l
                 plv = l + 1
 
-        modifs = [(plv, TDB_index[col], getattr(joueur, col)) for col in TDB_index] + [(plv, TDB_tampon_index[col], getattr(joueur, col)) for col in TDB_tampon_index]   # modifs : toutes les colonnes de la partie principale + du cache
+        modifs = [(plv, TDB_index[col], getattr(joueur, col.key)) for col in TDB_index] + [(plv, TDB_tampon_index[col], getattr(joueur, col.key)) for col in TDB_tampon_index]   # modifs : toutes les colonnes de la partie principale + du cache
         gsheets.update(sheet, modifs)
 
 

@@ -10,7 +10,7 @@ from discord.ext import commands
 from sqlalchemy.sql.expression import and_, or_, not_
 
 from lgrez import config
-from lgrez.blocs import tools, bdd, bdd_tools
+from lgrez.blocs import tools, bdd
 from lgrez.blocs.bdd import Action, BaseAction, Joueur, Tache, ActionTrigger
 from lgrez.features import taches
 
@@ -72,7 +72,7 @@ async def open_action(ctx, action, chan=None):
 
     # Vérification cooldown
     if action.cooldown > 0:                 # Action en cooldown
-        bdd_tools.modif(action, "cooldown", action.cooldown - 1)
+        action.cooldown = action.cooldown - 1
         config.session.commit()
         await ctx.send(f"Action {action} : en cooldown, exit (reprogrammation si temporel).")
         if action.trigger_debut == ActionTrigger.temporel:      # Programmation action du lendemain
@@ -134,7 +134,7 @@ async def open_action(ctx, action, chan=None):
             + (f"""Tu as jusqu'à {heure_fin} pour le faire. \n""" if heure_fin else "")
             + tools.ital(f"""Tape {tools.code('!action (ce que tu veux faire)')} ou utilise la réaction pour agir."""))
     else:
-        bdd_tools.modif(action, "decision_", "rien")
+        action.decision_ = "rien"
         message = await chan.send(
             f"""{tools.montre()}  Tu peux maintenant utiliser ton action {tools.code(action.action)} !  {tools.emoji(ctx, "action")} \n"""
             + (f"""Tu as jusqu'à {heure_fin} pour le faire. \n""" if heure_fin else "")
@@ -168,7 +168,7 @@ async def close_action(ctx, action, chan=None):
     if action.decision_ != "rien" and not action.instant:
         # Résolution de l'action (pour l'instant juste charge -= 1 et suppression le cas échéant)
         if action.charges:
-            bdd_tools.modif(action, "charges", action.charges - 1)
+            action.charges = action.charges - 1
             pcs = " pour cette semaine" if "weekends" in action.refill else ""
             await chan.send(f"Il te reste {action.charges} charge(s){pcs}.")
 
@@ -177,12 +177,12 @@ async def close_action(ctx, action, chan=None):
                 deleted = True
 
     if not deleted:
-        bdd_tools.modif(action, "decision_", None)
+        action.decision_ = None
 
         # Si l'action a un cooldown, on le met
         ba = action.base
         if ba and ba.base_cooldown > 0:
-            bdd_tools.modif(action, "cooldown", ba.base_cooldown)
+            action.cooldown = ba.base_cooldown
 
         # Programmation prochaine ouverture
         if action.trigger_debut == ActionTrigger.temporel:

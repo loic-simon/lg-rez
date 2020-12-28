@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from lgrez.blocs import tools, env, gsheets
-from lgrez.blocs.bdd import Joueur, Action, CandidHaro, Statut, ActionTrigger, CandidHaroType
+from lgrez.blocs.bdd import Joueur, Action, Camp, CandidHaro, Statut, ActionTrigger, CandidHaroType
 from lgrez.features import gestion_actions
 
 
@@ -437,12 +437,12 @@ class Communication(commands.Cog):
                     role = tools.nom_role(choisi.joueur.role, prefixe=True)
                     mess = await ctx.send(f"Rôle à afficher pour {choisi.nom} = {role} ? (Pas double peau ou autre)")
                     if await tools.yes_no(ctx.bot, mess):
-                        emoji_camp = tools.emoji_camp(ctx, choisi.joueur.camp)
+                        emoji_camp = choisi.joueur.camp.discord_emoji_or_none
                     else:
                         await ctx.send("Rôle à afficher :")
                         role = (await tools.wait_for_message_here(ctx)).content
                         mess = await ctx.send("Camp :")
-                        emoji_camp = await tools.wait_for_react_clic(ctx.bot, mess, [tools.emoji_camp(ctx, camp) for camp in ["village", "loups", "nécro", "solitaire", "autre"]])
+                        emoji_camp = await tools.wait_for_react_clic(ctx.bot, mess, [camp.emoji for camp in Camp.query.filter_by(visible=True).all() if camp.emoji])
 
                     nometrole = f"{tools.bold(choisi.nom)}, {role}"
                 else:
@@ -506,18 +506,19 @@ class Communication(commands.Cog):
         role = tools.nom_role(joueur.role, prefixe=True)
         mess = await ctx.send(f"Rôle à afficher pour {joueur.nom} = {role} ? (Pas double peau ou autre)")
         if await tools.yes_no(ctx.bot, mess):
-            emoji_camp = tools.emoji_camp(ctx, joueur.camp)
+            emoji_camp = joueur.camp.discord_emoji_or_none
         else:
             await ctx.send("Rôle à afficher :")
             role = (await tools.wait_for_message_here(ctx)).content
             mess = await ctx.send("Camp :")
-            emoji_camp = await tools.wait_for_react_clic(ctx.bot, mess, [tools.emoji_camp(ctx, camp) for camp in ["village", "loups", "nécro", "solitaire", "autre"]])
+            emoji_camp = await tools.wait_for_react_clic(ctx.bot, mess, [camp.emoji for camp in Camp.query.filter_by(visible=True).all() if camp.emoji])
 
-        if joueur.statut == "MV":
+        if joueur.statut == Statut.MV:
             mess = await ctx.send("Annoncer la mort-vivance ?")
             if await tools.yes_no(ctx.bot, mess):
                 role += " Mort-Vivant"
-                emoji_camp = tools.emoji_camp(ctx, "nécro")
+            else:
+                emoji_camp = joueur.role.camp.discord_emoji_or_none
 
         await ctx.send("Contexte ?")
         desc = (await tools.wait_for_message_here(ctx)).content

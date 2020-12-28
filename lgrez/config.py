@@ -28,7 +28,7 @@ class NotReady():
 
 
 #: :class:`discord.Guild`: Le serveur Discord sur lequel se déroule la partie
-#: Vaut ``None`` avant l'appel à :meth:`LGBot.run`.
+#: Vaut ``None`` avant l'appel de :meth:`LGBot.on_ready`.
 guild = None
 
 #: :class:`LGBot`: Le bot en activité

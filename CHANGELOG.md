@@ -10,18 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Major refactoring
 
 - ``blocs.bdd``:
+    - Split in ``blocs.bdd.base`` (base classes) and ``blocs.bdd.model`` (data classes and enums only)
     - Rename every data classes to singular names (``Joueur``, ``Role``...)
     - Use SQLAlchemy relationships and make foreign key arguments private (``Joueur.role`` -> ``Joueur._role_slug``, ``Joueur.role`` = ``Role`` object)
-    - Enhance data classes with custom properties and classmethods: ``Joueur.member``, ``Joueur.private_chan``, ``Joueur.from_member``, ``Role.nom_complet``, ``Role.default``, ``Camp.default``
+    - Use custom metaclass ``bdd.TableMeta`` for class tables: more robust implementation of ``Table.query``, and other convenience properties
+    - Enhance data classes with custom properties and classmethods: ``Joueur.member``, ``Joueur.private_chan``, ``Joueur.from_member``, ``Role.nom_complet``, ``Role.default``, ``Camp.default``, ``Camp.discord_emoji(_or_none)``
     - Use ``Enum``s when needed: ``Statut``, ``ActionTrigger``, ``CandidHaroType``
     - ``__all__`` contains all data classes
 
 - ``config``: new global namespace file for global variables: ``config.bot``, ``config.guild``, ``config.session``
 
+- ``bot.Special`` cog moved to new file ``features.special`` for finest control
+
 
 ### Also added
 
-- ``blocs.bdd.Camp`` table
+- ``blocs.bdd.Camp`` table (and made ``Joueur.camp`` and ``Role.camp`` relationships)
 
 
 ### Also changed
@@ -36,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ``blocs.bdd.BaseActionsRoles``: use private junction table instead
 - ``blocs.bdd.BaseAction``: base arguments (not specific to action) removed; use ``action.base.arg`` instead
+- ``blocs.tools.emoji_camp`` (use ``Emoji.discord_emoji`` property instead)
+- ``blocs.tools.private_chan`` (use ``Joueur.private_chan`` property instead)
+- ``blocs.bdd_tools`` (use ``Table.columns`` and ``Table.primary_col`` properties, ``Table.find_nearest`` method, and ``features.sync.transtype`` function instead)
 
 
 
