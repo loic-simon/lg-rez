@@ -17,6 +17,35 @@ Référence de l'API
 .. automodule:: lgrez.config
     :members:
 
+    .. data:: guild
+
+        Le serveur Discord sur lequel se déroule la partie.
+        Lève une :exc:`NotReadyError` avant l'appel de :meth:`.LGBot.on_ready`.
+
+        :type: :class:`discord.Guild`
+
+    .. data:: bot
+
+        Le bot en activité.
+        Lève une :exc:`NotReadyError` avant l'appel à :meth:`.LGBot.run`.
+
+        :type: :class:`.LGBot`
+
+    .. data:: engine
+
+        Moteur de connection à la BDD.
+        Lève une :exc:`NotReadyError` avant l'appel à :func:`blocs.bdd.connect`.
+
+        :type: :class:`sqlalchemy.engine.Engine`
+
+    .. data:: session
+
+        Session de transaction avec la BDD.
+        Lève une :exc:`NotReadyError` avant l'appel à :func:`blocs.bdd.connect`.
+
+        :type: :class:`sqlalchemy.orm.session.Session`
+
+
 
 
 ``lgrez.bot`` (fonctions centrales)

@@ -9,7 +9,7 @@ import difflib
 import sqlalchemy
 from sqlalchemy.ext import declarative
 
-# from lgrez import config
+from lgrez import config
 from lgrez.blocs import env
 
 
@@ -157,8 +157,7 @@ TableBase.__doc__ = """Classe de base des tables de données (construite par :fu
 def connect():
     """Se connecte à la base de données (variable d'environment ``LGREZ_DATABASE_URI``), crée les tables si nécessaire, construit :attr:`config.engine` et ouvre :attr:`config.session`"""
 
-    LGREZ_DATABASE_URI = "postgresql://lg-rez:#^Wc8Kex2P6L@postgresql-lg-rez.alwaysdata.net/lg-rez_test"
-    # LGREZ_DATABASE_URI = env.load("LGREZ_DATABASE_URI")
+    LGREZ_DATABASE_URI = env.load("LGREZ_DATABASE_URI")
     config.engine = sqlalchemy.create_engine(LGREZ_DATABASE_URI, pool_pre_ping=True)           # Moteur SQL : connexion avec le serveur
 
     # Création des tables si elles n'existent pas déjà
