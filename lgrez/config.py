@@ -1,137 +1,173 @@
-"""config - variables globales"""
+"""lg-rez / Variables globales
+
+Personalisation de différents paramètres et accès global
+
+"""
 
 import discord
 
-
-class NotReadyError(RuntimeError):
-    """Raised when an attribute is accessed before it is ready. Inherits from :exc:`RuntimeError`."""
-    pass
+from lgrez.blocs import ready_check
 
 
-class _RCDict(dict):
-    def __init__(self, *args, _is_ready=None, _class=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        if _is_ready is None:
-            _is_ready = lambda item: item is not None
-        self._is_ready = _is_ready
-        if _class:
-            self._errormsg = f"'{_class.__qualname__}' has no attribute"
-        else:
-            self._errormsg = f"No attribute"
+#: str: Préfixe des noms des salons de conversation bot.
+private_chan_prefix = "conv-bot-"
 
-    def __getitem__(self, name):
-        try:
-            val = super().__getitem__(name)
-        except KeyError:
-            raise AttributeError(f"{self._errormsg} '{name}'") from None
-
-        ready = self._is_ready(val)
-        if not ready:
-            raise NotReadyError(f"'{name}' is not ready yet!")
-        return val
+#: str: Nom de la catégorie des conversations bot, pour l'inscription
+#: (sera éventuellement suivi de 2, 3... si plus de 50 joueurs).
+private_chan_category_name = "CONVERSATION BOT"
 
 
-class _RCMeta(type):
-    def __new__(metacls, name, bases, dict, check=None, check_type=None):
-        # register directly private/magic names only
-        _ps_dict = {name: dict[name] for name in dict if name.startswith('_')}
-        return super().__new__(metacls, name, bases, _ps_dict)
+#: str: Date de début de saison (pour information lors de l'inscription).
+debut_saison = "32 plopembre"
 
-    def __init__(cls, name, bases, dict, check=None, check_type=None):
-        _ps_dict = {name: dict[name] for name in dict if name.startswith('_')}
-        super().__init__(name, bases, _ps_dict)
-        if check_type:
-            if check:
-                check = lambda item: isinstance(item, check_type) and check(item)
-            else:
-                check = lambda item: isinstance(item, check_type)
-        cls._dict = _RCDict(_is_ready=check, _class=cls, **dict)
+#: bool: Si ``False``, le processus d'insciption ne demandera pas la
+#: chambre des joueurs, qui seront tous inscrits en :attr:`chambre_mj`
+#: (et la chambre ne sera pas indiquée dans ``!vivants``).
+demande_chambre = True
 
-    def __getattr__(cls, name):
-        if name.startswith('_'):
-            # private/magic name: do not search in ._dict (infinite recursion)
-            raise AttributeError(f"'{cls.__qualname__}' has no attribute '{name}'")
-        return cls._dict[name]
-
-    def __setattr__(cls, name, value):
-        if name.startswith('_'):
-            super().__setattr__(name, value)
-        else:
-            cls._dict[name] = value
-
-    def __delattr__(cls, name):
-        try:
-            super().__delattr__(name)
-        except AttributeError:
-            del cls._dict[name]
+#: str: Nom par défaut de la :attr:`~.bdd.Joueur.chambre` des joueurs.
+chambre_mj = "[chambre MJ]"
 
 
-class ReadyCheck(metaclass=_RCMeta):
-    """Proxy class to prevent accessing not initialised objects.
+#: bool: Si ``True``, le bot appellera :meth:`.LGBot.i_am_alive` toutes
+#: les 60 secondes. Ce n'est pas activé par défaut.
+output_liveness = False
 
-    When accessing a class attribute, this class:
-        - returns its value (classic behavior) if it is evaluated
-          *ready* (see below);
-        - raises a :exc:`NotReadyError` exception otherwise.
+# Journée en cours (nom sheet)
 
-    Subclass this class to implment readiness check on class attributes
-    and define "readiness" as needed. By default, attributes are
-    considered *not ready* only if their value is ``None``::
+# STOP keywords
 
-        class NotNone(ReadyCheck):
-            a = None            # NotNone.a will raise a NotReadyError
-            b = <any object>    # NotNone.b will be the given object
 
-    Use ``check_type`` class-definition argument to define readiness based
-    on attributes types (using :func:`isinstance()`)::
+class Role(ready_check.ReadyCheck, check_type=discord.Role):
+    """Rôles Discord nécessaires au jeu
 
-        class MustBeList(ReadyCheck, check_type=list):
-            a = "TDB"           # MustBeList.a will raise a NotReadyError
-            b = [1, 2, 3]       # MustBeList.b will be the given list
+    Cette classe dérive de :class:`ready_check.ReadyCheck` :
+    accéder aux attributs ci-dessous avant que le bot ne soit connecté
+    au serveur lève une :exc:`~ready_check.NotReadyError`.
 
-    Use ``check`` class-definition argument to define custom readiness
-    check (``value -> bool`` function)::
+    Plus précisément, :meth:`.LGBot.on_ready` remplace le nom du rôle
+    par l'objet :class:`discord.Role` correspondant : si les noms des
+    rôles sur Discord ont été modifiés, indiquer leur nom ici
+    (``lgrez.config.Role.x = "nouveau nom"``) avant de lancer le bot,
+    sans quoi :meth:`.LGBot.on_ready` lèvera une erreur.
 
-        class MustBePositive(ReadyCheck, check=lambda val: val > 0):
-            a = 0               # MustBePositive.a will raise a NotReadyError
-            b = 37              # MustBePositive.b will be 37
+    **Ne pas instancier cette classe.**
 
-    If both arguments are provided, attribute type will be checked first
-    and custom check will be called only for suitable attributes.
+    Rôles utilisés (dans l'ordre hiérarchique conseillé) :
 
-    Attributes can be added, modified and deleted the normal way.
-    Readiness is evaluated at access time, so changing an attribute's
-    value will change its readiness with no aditionnal work required.
-
-    Note:
-        Attributes whose name start with ``'_'`` (private and magic attributes)
-        are not affected and will be returned even if not ready.
-
-    Warning:
-        Class derivating from this class are not meant to be instantiated.
-        Due to the checking proxy on class attributes, instances will not
-        see attributes defined at class level, and attributes defined in
-        ``__init__`` or after construction will **not** be ready-checked.
-
-        This class defines no attributes or methods, but relies on a custom
-        metaclass: you will not be able to create mixin classes from this
-        one and a custom-metaclass one.
+    Attributes:
+        mj: Maître du Jeu.
+            Nom par défaut : "MJ".
+        joueur_en_vie: Joueur vivant, pouvant parler publiquement.
+            Nom par défaut : "Joueur en vie".
+        joueur_mort: Joueur mort, ne pouvant pas parler publiquement.
+            Nom par défaut : "Joueur mort".
+        maire: Joueur élu Maire, mis en avant et pouvant utiliser @everyone.
+            Nom par défaut : "Maire".
+        redacteur: Rôle permettant à un joueur d'utiliser les commandes de
+            gestion d'IA (voir :class:`features.gestion_ia.GestionIA`). Mettre
+            le même nom que le rôle des MJs si vous voulez supprimer ce rôle.
+            Nom par défaut : "Rédacteur".
+        everyone: Rôle de base. Les joueurs dont le rôle le plus élevé
+            est ce rôle (ou moins) seront ignorés par le bot.
+            Nom par défaut: "@everyone" (rôle Discord de base)
     """
-    pass
+    mj = "MJ"
+    redacteur = "Rédacteur"
+    joueur_en_vie = "Joueur en vie"
+    joueur_mort = "Joueur mort"
+    maire = "Maire"
+    everyone = "@everyone"
 
 
-class _ModuleGlobals(ReadyCheck):
-    """Module attributes with not-None ReadyCheck, returned by __getattr__
+class Channel(ready_check.ReadyCheck, check_type=discord.TextChannel):
+    """Salons Discord nécessaires au jeu
 
-    (documented directly in api.rst)
+    Cette classe dérive de :class:`ready_check.ReadyCheck` : accéder
+    aux attributs ci-dessous avant que le bot ne soit connecté au
+    serveur lève une :exc:`~ready_check.NotReadyError`.
+
+    Plus précisément, :meth:`.LGBot.on_ready` remplace le nom du rôle
+    par l'objet :class:`discord.TextChannel` correspondant : si les noms
+    des salons sur Discord ont été modifiés, indiquer leur nom ici
+    (``lgrez.config.Channel.x = "nouveau nom"``) avant de lancer le bot,
+    sans quoi :meth:`.LGBot.on_ready` lèvera une erreur.
+
+    **Ne pas instancier cette classe.**
+
+    Salons utilisés (dans l'ordre d'affichage conseillé) :
+
+    Attributes:
+        roles: Salon listant les rôles (catégorie Informations).
+            Nom par défaut : "roles".
+        logs: Salon pour les messages techniques (catégorie réservée aux MJs).
+            Nom par défaut : "logs".
+        annonces: Salon d'annonces (catégorie Place du village).
+            Nom par défaut : "annonces".
+        haros: Salon des haros et candidatures (catégorie Place du village).
+            Nom par défaut : "haros".
+        debats: Salon de discussion principal (catégorie Place du village).
+            Nom par défaut : "débats".
+    """
+    roles = "roles"
+    logs = "logs"
+    annonces = "annonces"
+    haros = "haros"
+    debats = "débats"
+
+
+class Emoji(ready_check.ReadyCheck, check_type=discord.Emoji):
+    """Emojis Discord nécessaires au jeu
+
+    Cette classe dérive de :class:`ready_check.ReadyCheck` : accéder
+    aux attributs ci-dessous avant que le bot ne soit connecté au
+    serveur lève une :exc:`~ready_check.NotReadyError`.
+
+    Plus précisément, :meth:`.LGBot.on_ready` remplace le nom du rôle
+    par l'objet :class:`discord.Emoji` correspondant : si les noms
+    des emojis sur Discord ont été modifiés, indiquer leur nom ici
+    (``lgrez.config.Emoji.x = "nouveau nom"``) avant de lancer le bot,
+    sans quoi :meth:`.LGBot.on_ready` lèvera une erreur.
+
+    **Ne pas instancier cette classe.**
+
+    Emojis utilisés (noms par défaut identiques aux noms des attributs) :
+
+    Attributes:
+        ha
+        ro: Accolés, forment le mot « haro »
+        bucher: Représente le vote pour le condamné du jour
+        maire: Représente le vote pour le nouveau maire
+        lune: Représente le vote des loups
+        action: Représente les actions de rôle
+        void: Image vide, pour séparations verticales et autres filouteries
+    """
+    ha = "ha"
+    ro = "ro"
+    bucher = "bucher"
+    maire = "maire"
+    action = "action"
+    lune = "lune"
+    void = "void"
+
+
+class _ModuleGlobals(ready_check.ReadyCheck):
+    """Module-level attributes with not-None ReadyCheck
+
+    (attributes accessed by __getattr__, documented directly in config.rst)
     """
     guild = None
     bot = None
+    loop = None
     engine = None
     session = None
 
+
+# Called when module attribute not found: try to look in _ModuleGlobals
 def __getattr__(attr):
     try:
         return getattr(_ModuleGlobals, attr)
     except AttributeError:
-        raise AttributeError(f"module '{__name__}' has no attribute '{attr}'") from None
+        raise AttributeError(
+            f"module '{__name__}' has no attribute '{attr}'"
+        ) from None

@@ -7,43 +7,137 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unrealeased
 
-### Major refactoring
+### Major refactorings
 
-- ``blocs.bdd``:
-    - Split in ``blocs.bdd.base`` (base classes) and ``blocs.bdd.model`` (data classes and enums only)
-    - Rename every data classes to singular names (``Joueur``, ``Role``...)
-    - Use SQLAlchemy relationships and make foreign key arguments private (``Joueur.role`` -> ``Joueur._role_slug``, ``Joueur.role`` = ``Role`` object)
-    - Use custom metaclass ``bdd.TableMeta`` for class tables: more robust implementation of ``Table.query``, and other convenience properties
-    - Enhance data classes with custom properties and classmethods: ``Joueur.member``, ``Joueur.private_chan``, ``Joueur.from_member``, ``Role.nom_complet``, ``Role.default``, ``Camp.default``, ``Camp.discord_emoji(_or_none)``
-    - Use ``Enum``s when needed: ``Statut``, ``ActionTrigger``, ``CandidHaroType``
-    - ``__all__`` contains all data classes
+#### Data management
 
-- ``config``: new global namespace file for global variables: ``config.bot``, ``config.guild``, ``config.session``
+  - ``blocs.bdd`` moved to :mod:`.bdd` module and splitted in
+    :mod:`.bdd.base` (base classes and utilities),
+    :mod:`.bdd.enums` (enums, directly imported in ``.bdd``),
+    and :mod:`.bdd.model_joueurs`, :mod:`.bdd.model_jeu`,
+    :mod:`.bdd.model_actions`, :mod:`.bdd.model_ia` modules
+    (data classes, directly imported in ``bdd``);
+  - Every data classes names changed to singular names
+    (:class:`.bdd.Joueur`, :class:`.bdd.Role`...);
+  - Implemented SQLAlchemy relationships and made foreign key
+    arguments private (``Joueur.role`` -> ``Joueur._role_slug``,
+    ``Joueur.role`` = direct access to ``Role`` object);
+  - Added custom metaclass ``bdd.TableMeta`` for class tables: more
+    robust implementation of ``Table.query``, and other convenience
+    properties;
+  - Enhanced data classes with custom properties and classmethods:
+    :meth:`.bdd.Joueur.member`, :meth:`.bdd.Joueur.private_chan`,
+    :meth:`.bdd.Joueur.from_member`, :meth:`.bdd.Role.nom_complet`,
+    :meth:`.bdd.Role.default`, :meth:`.bdd.Camp.default`,
+    :meth:`.bdd.Camp.discord_emoji`,
+    :meth:`.bdd.Camp.discord_emoji_or_none`;
+  - Enhanced data classes with instances methods:
+    :meth:`~.bdd.base.TableBase.add`, :meth:`~.bdd.base.TableBase.delete`
+    (global handy methods), :meth:`.bdd.Tache.add`, and specific
+    :meth:`.bdd.Tache.delete`, :meth:`.bdd.Tache.register`,
+    :meth:`.bdd.Tache.cancel`, :meth:`.bdd.Tache.execute`;
+  - Use Enums when needed: :class:`.bdd.Statut`,
+    :class:`.bdd.ActionTrigger`, :class:`.bdd.CandidHaroType`;
+  - ``bdd.__all__`` contains all data classes (for ``import *``).
 
-- ``bot.Special`` cog moved to new file ``features.special`` for finest control
+#### Global namespace
+
+New :mod:`.config` namespace module for:
+  - **Global variables**: implemented system of readiness check on
+    attributes (through new :mod:`.blocs.ready_check` module), used for:
+      - Bot objects: :attr:`.config.bot` (loaded by :meth:`.LGBot.run`)
+        and :attr:`.config.loop` (loaded by :meth:`.LGBot.on_ready`),
+      - Server: :attr:`.config.guild` (loaded by :meth:`.LGBot.on_ready`),
+      - Database connection: :attr:`.config.engine` and
+        :attr:`.config.session` (loaded by :meth:`.bdd.connect`),
+      - Discord objects: :class:`.config.Role`, :class:`.config.Channel`,
+        :class:`.config.Emoji` classes store roles/channels/emojis
+        the bot needs to work, registered as names (customizable) and
+        then transformed in connected objects by :meth:`.LGBot.on_ready`.
+  - **Customization**:
+      - Private channels creation: :attr:`.config.private_chan_prefix`,
+        :attr:`.config.private_chan_category_name`,
+      - Old ``bot.config`` keys: :attr:`~lgrez.config.debut_saison`,
+        :attr:`~lgrez.config.demande_chambre`,
+        :attr:`~lgrez.config.chambre_mj`,
+        :attr:`~lgrez.config.output_liveness`.
+
+Consequences:
+  - **LGBot is no more thread-safe**: only one bot instance should
+    run concurrently in an interpreter.
+
+  - "Connected" arguments (``bot``, ``ctx``, ``loop``...) removed from
+    several functions signatures, now using ``config`` attributes:
+      - :func:`.blocs.tools.channel`, :func:`~.blocs.tools.role`,
+        :func:`~.blocs.tools.member`, :func:`~.blocs.tools.emoji`,
+        :func:`~.blocs.tools.log`, :func:`~.blocs.tools.yes_no`,
+        :func:`~.blocs.tools.wait_for_message`,
+        :func:`~.blocs.tools.boucle_message`,
+        :func:`~.blocs.tools.wait_for_react_clic`,
+        :func:`~.blocs.tools.choice`, :func:`~.blocs.tools.create_context`;
+      - :func:`.features.gestion_actions.add_action`,
+        :func:`~.features.gestion_actions.delete_action`,
+        :func:`~.features.gestion_actions.open_action`,
+        :func:`~.features.gestion_actions.close_action` ;
+      - :func:`.features.inscription.main`;
+      - :func:`.features.IA.process_IA`,
+        :func:`~.features.IA.trigger_reactions`,
+        :func:`~.features.IA.trigger_sub_reactions`,
+        :func:`~.features.IA.trigger_gif` ;
+      - :func:`.features.sync.modif_joueur`.
 
 
 ### Also added
 
-- ``blocs.bdd.Camp`` table (and made ``Joueur.camp`` and ``Role.camp`` relationships)
+  - :class:`bdd.Camp` table (and made :attr:`.bdd.Joueur.camp` and
+    :attr:`.bdd.Role.camp` relationships);
+  - :func:`.bdd.base.autodoc_Column`, :func:`.autodoc_OneToMany`,
+    :func:`.autodoc_ManyToOne` and :func:`.autodoc_ManyToMany`
+    convenience functions to easily document bdd attributes;
+  - :attr:`.bdd.Tache.handler` convenience property.
 
 
 ### Also changed
 
-- ``blocs.bdd.Tables`` renamed in ``tables`` and auto-build by SQLAlchemy Declarative
-- ``blocs.bdd.Base`` renamed in ``TableBase``
-- ``blocs.bdd.<Table>.query`` uses ``config.session`` (raises ``RuntimeError`` if not initialised)
-- ``!roles`` adapted to new ``Camp`` table
-
+  - ``bot.Special`` cog moved to new :mod:`.features.special` module.
+  - :class:`~.LGbot` one-command-at-a-time system moved to new
+    :mod:`.blocs.one_command` module.
+  - Renamed ``blocs.bdd.Tables`` in :attr:`lgrez.bdd.tables`, and
+    made it auto-build by SQLAlchemy Declarative;
+  - Renamed ``blocs.bdd.Base`` in :attr:`lgrez.bdd.base.TableBase`;
+  - :meth:`<Table>.query <.bdd.base.TableMeta.query>` uses
+    :attr:`config.session` (raises :exc:`.blocs.ready_check.NotReadyError`
+    if not initialised);
+  - Adapted ``!roles`` behavior to new ``Camp`` table;
+  - Removed unused option ``chan`` from
+    :func:`.features.gestion_actions.open_action` and
+    :func:`~.features.gestion_actions.close_action`;
+  - Splitted API Reference in several doc pages, and other global
+    documentation and codestyle improvements (source code now almost
+    entirely PEP8-compliant).
 
 ### Also removed
 
-- ``blocs.bdd.BaseActionsRoles``: use private junction table instead
-- ``blocs.bdd.BaseAction``: base arguments (not specific to action) removed; use ``action.base.arg`` instead
-- ``blocs.tools.emoji_camp`` (use ``Emoji.discord_emoji`` property instead)
-- ``blocs.tools.private_chan`` (use ``Joueur.private_chan`` property instead)
-- ``blocs.bdd_tools`` (use ``Table.columns`` and ``Table.primary_col`` properties, ``Table.find_nearest`` method, and ``features.sync.transtype`` function instead)
-
+  - Made ``blocs.bdd.BaseActionsRoles`` private: use directly
+    :attr:`.bdd.BaseAction.roles` and :attr:`.bdd.Role.base_actions`
+    *many-to-many relationship* attributes);
+  - :class:`.bdd.BaseAction`: removed ``base_`` arguments, not specific
+    to the action (use ``action.base.<arg>`` instead);
+  - :mod:`blocs.tools`: removed ``emoji_camp``, ``private_chan`` and
+    ``nom_role`` functions (use :attr:`.bdd.Camp.discord_emoji` or
+    :attr:`~.bdd.Camp.discord_emoji_or_none` properties /
+    :attr:`.bdd.Joueur.private_chan` property / :attr:`.bdd.Role.nom`
+    attribute or :attr:`.bdd.Role.nom_complet` property instead);
+  - Removed ``blocs.bdd_tools`` module (use
+    :attr:`<Table>.columns <.bdd.base.TableMeta.columns>` and
+    :attr:`<Table>.primary_col <.bdd.base.TableMeta.primary_col>` properties,
+    :meth:`<Table>.find_nearest() <.bdd.base.TableMeta.find_nearest>` method,
+    and :func:`.features.sync.transtype` function instead);
+  - Removed ``features.taches.add_task``, ``delete_task``, ``execute``
+    functions (use :meth:`.bdd.Tache.add`, :meth:`~.bdd.Tache.delete` and
+    :meth:`~.bdd.Tache.execute` methods instead);
+  - Removed ``LGBot.config`` attribute (use :mod:`.lgrez.config` module
+    instead).
 
 
 

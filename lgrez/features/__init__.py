@@ -1,10 +1,16 @@
 """lg-rez / Commandes et autres fonctionnalités
 
-Chaque module de ``lgrez.features`` implémente une fonctionnalité spécifique des LGBots. La majorité implémentent un *Cog* (:class:`discord.ext.commands.Cog`) contenant une ou plusieurs commandes Discord, mais peuvent aussi définir des fonctions pour un usage public.
+Chaque module de ``lgrez.features`` implémente une fonctionnalité
+spécifique des LGBots. La majorité implémentent un *Cog*
+(:class:`discord.ext.commands.Cog`) contenant une ou plusieurs
+commandes Discord, mais peuvent aussi définir des fonctions pour
+un usage public.
 
 .. note ::
 
-    Les Cogs et leurs commandes peuvent être vus en envoyant ``!help`` à un LGBot fonctionnel (en possédant les rôles `MJ` et `Joueur en vie`)
+    Les Cogs et leurs commandes peuvent être vus en envoyant ``!help``
+    à un LGBot fonctionnel (en possédant les rôles :attr:`.config.Role.mj`
+    et :attr:`.config.Role.joueur_en_vie`)
 
 """
 

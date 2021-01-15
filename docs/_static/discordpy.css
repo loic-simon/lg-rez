@@ -194,7 +194,6 @@ a.headerlink:hover {
 
 div.body ul {
   list-style: disc;
-  margin: 1em 0;
   padding-left: 1.3em;
 }
 
@@ -287,6 +286,13 @@ a.toc-backref {
 /* bold and fix the Parameter, Raises, etc. */
 dl.field-list > dt {
   font-weight: bold;
+  padding-left: 0em;
+}
+
+/* shifts field contents */
+dl.field-list > dd {
+  margin-left: 1em;
+  margin-bottom: 0.5em;
 }
 
 /* remove flex from field lists */
@@ -294,11 +300,16 @@ dl.field-list {
   display: block;
 }
 
-/* internal references are forced to bold for some reason */
-a.reference.internal > strong {
+/* references are forced to bold for some reason */
+a.reference > strong {
   font-weight: unset;
-  font-family: monospace;
 }
+
+/* references are forced to italic & not-monospace for some reason */
+a.reference > em {
+  font-style: unset;
+}
+
 
 div.danger, div.error {
   background-color: #ffe4e4;
@@ -315,6 +326,12 @@ p.admonition-title {
 
 p.admonition-title:after {
   content: ':';
+}
+
+
+
+.sig-paren {
+  font-size: unset;
 }
 
 /* helpful admonitions */
@@ -356,9 +373,10 @@ pre {
   padding: 10px;
 }
 
-pre, tt, code {
-  font-family: 'Consolas', 'Menlo', 'Deja Vu Sans Mono', 'Bitstream Vera Sans Mono', monospace;
-  font-size: 0.9em;
+pre, tt, code, a.reference > em, em.sig-param, dd a.reference {
+  font-family: 'Consolas', 'Menlo', 'Deja Vu Sans Mono',
+               'Bitstream Vera Sans Mono', monospace;
+  font-size: 0.95em;
 }
 
 tt, code {
@@ -387,8 +405,9 @@ dl.attribute > dt,
 dl.classmethod > dt,
 dl.method > dt,
 dl.class > dt,
+dl.data > dt,
 dl.exception > dt {
-  background-color: #f5f5f5;
+  background-color: #e0e0e0;
   padding: 1px 10px;
 }
 
@@ -492,6 +511,23 @@ div#welcome-to-discord-py > h1 {
 div.code-block-caption {
   font-size: medium;
   font-weight: bold;
+}
+
+
+div.sphinxsidebar h3 {
+    margin-top: 40px;
+}
+
+
+div.sphinxsidebar h4 {
+    font-weight: bold;
+    margin-top: 20px;
+}
+
+
+p.topless {
+    margin-top: 5px;
+    margin-left: 10px;
 }
 
 @media screen and (max-width: 870px) {

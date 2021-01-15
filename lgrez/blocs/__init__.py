@@ -1,6 +1,8 @@
 """lg-rez / Blocs transversaux
 
-Chaque module de ``lgrez.blocs`` réalise une tâche non liée à une fonctionnalité spécifique du bot : connection à un service, outils divers...
+Chaque module de ``lgrez.blocs`` réalise une tâche non liée à une
+fonctionnalité spécifique du bot : connection à un service, outils
+divers...
 
 """
 
