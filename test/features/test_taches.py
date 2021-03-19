@@ -7,7 +7,7 @@ import freezegun
 
 from lgrez import config, bdd
 from lgrez.features import taches
-from test import mock_discord, mock_bdd, mock_env
+from test import mock_discord, mock_bdd
 
 
 class TestGestionTaches(unittest.IsolatedAsyncioTestCase):

@@ -55,8 +55,8 @@ def transtype(value, cst):
 
     Args:
         value (Any): valeur à transtyper.
-        cst (:class:`sqlalchemy.schema.Column` | :class:`.bdd.base.TableMeta` |
-            :class:`sqlalchemy.orm.RelationshipProperty`): colonne, table ou
+        cst (:class:`sqlalchemy.schema.Column` | :class:`.bdd.base.TableMeta`\
+            | :class:`sqlalchemy.orm.RelationshipProperty`): colonne, table ou
             relationship (many-to-one) associée.
 
     Types pris en charge dans le cas d'une colonne :

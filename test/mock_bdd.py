@@ -59,29 +59,6 @@ def patch_db(func=None):
         return _PatchDB()
 
 
-def new_basic_db():   # rewrite
-    new_empty_db()
-    add_campsroles(1, 1)
-
-    bdd.Joueur(
-        discord_id=1,
-        chan_id_=11,
-        nom="j1",
-        chambre="c1",
-        statut=bdd.Statut.vivant,
-        role=bdd.Role.default(),
-        camp=bdd.Camp.default(),
-    ).add()
-    bdd.Joueur(
-        discord_id=2,
-        chan_id_=21,
-        nom="j2",
-        chambre=config.chambre_mj,
-        statut=bdd.Statut.vivant,
-        role=bdd.Role.default(),
-        camp=bdd.Camp.default(),
-    ).add()
-
 
 def add_campsroles(n_camps=1, n_roles=1):
     """Ajoute `n_camps` camps et `n_roles` rôles à la BDD.

@@ -48,6 +48,9 @@
         .. _help:
     - :Commande ``!help``  (alias ``!aide``, ``!aled``, ``!oskour``) :
         .. automethod:: lgrez.features.special.Special.help.callback
+        .. _apropos:
+    - :Commande ``!apropos``  (alias ``!about``, ``!copyright``, ``!licence``, ``!auteurs``) :
+        .. automethod:: lgrez.features.special.Special.apropos.callback
 
 .. }
 

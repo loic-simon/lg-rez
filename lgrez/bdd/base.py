@@ -372,7 +372,7 @@ def autodoc_Column(*args, doc="", comment=None, **kwargs):
                    and isinstance(col.type, sqlalchemy.Integer))
                else "")
     nullable = "" if (col.nullable or autoinc) else " (NOT NULL)"
-    default = f" (défaut ``{col.default.arg}``)" if col.default else ""
+    default = f" (défaut ``{col.default.arg!r}``)" if col.default else ""
     col.doc = (f"{doc}{primary}{autoinc}{nullable}{default}\n\n"
                f"Type SQLAlchemy : {sa_type} / Type SQL : ``{col.type}``\n\n"
                f":type: :class:`{py_type_str}`{or_none}")

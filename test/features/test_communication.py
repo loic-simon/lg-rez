@@ -1,13 +1,11 @@
-import datetime
 import unittest
 from unittest import mock
 
 import discord
-import freezegun
 
 from lgrez import config, bdd
 from lgrez.features import communication
-from test import mock_discord, mock_bdd, mock_env
+from test import mock_discord, mock_bdd
 
 
 class TestCommunication(unittest.IsolatedAsyncioTestCase):
