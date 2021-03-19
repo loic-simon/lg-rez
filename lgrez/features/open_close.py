@@ -11,7 +11,7 @@ from discord.ext import commands
 from lgrez import config
 from lgrez.blocs import tools
 from lgrez.features import gestion_actions
-from lgrez.bdd import (Joueur, Action, Tache, CandidHaro,
+from lgrez.bdd import (Joueur, Action, BaseAction, Tache, CandidHaro,
                        CandidHaroType, ActionTrigger)
 
 
@@ -20,7 +20,15 @@ async def recup_joueurs(quoi, qui, heure=None):
 
     Args:
         quoi (str): évènement, ``"open" / "close" / "remind"``.
-        qui (str): cible, ``"cond" / "maire" / "loups" / "action"``.
+        qui (str):
+            ===========     ===========
+            ``cond``        pour le vote du condamné
+            ``maire``       pour le vote du maire
+            ``loups``       pour le vote des loups
+            ``action``      pour les actions commençant à ``heure``
+            ``{id}``        pour une action précise (:attr:`bdd.Action.id`)
+            ===========     ===========
+
         heure (str): si ``qui == "action"``, heure associée
             (au format ``HHhMM``).
 
@@ -31,23 +39,26 @@ async def recup_joueurs(quoi, qui, heure=None):
         ``!open cond`` -> joueurs avec droit de vote
         ``!close action 17h`` -> joueurs dont l'action se termine à 17h
     """
+    if quoi not in ["open", "close", "remind"]:
+        raise ValueError(f"recup_joueurs: bad value for `quoi`: `{quoi}`")
+
     criteres = {
         "cond": {
             "open": (Joueur.votant_village.is_(True)
                      & Joueur.vote_condamne_.is_(None)),
-            "close": Joueur.vote_condamne_.is_not(None),
+            "close": Joueur.vote_condamne_.isnot(None),
             "remind": Joueur.vote_condamne_ == "non défini",
         },
         "maire": {
             "open": (Joueur.votant_village.is_(True)
                      & Joueur.vote_maire_.is_(None)),
-            "close": Joueur.vote_maire_.is_not(None),
+            "close": Joueur.vote_maire_.isnot(None),
             "remind": Joueur.vote_maire_ == "non défini",
         },
         "loups": {
             "open": (Joueur.votant_loups.is_(True)
                      & Joueur.vote_loups_.is_(None)),
-            "close": Joueur.vote_loups_.is_not(None),
+            "close": Joueur.vote_loups_.isnot(None),
             "remind": Joueur.vote_loups_ == "non défini",
         },
     }
@@ -62,21 +73,20 @@ async def recup_joueurs(quoi, qui, heure=None):
             # Si l'heure est précisée, on convertit "HHhMM" -> datetime.time
             tps = tools.heure_to_time(heure)
         else:
-            # Si l'heure n'est pas précisée, on prend l'heure actuelle
             raise ValueError(
                 "[heure] doit être spécifiée lorque <qui> == \"action\""
             )
 
-        actions = await gestion_actions.get_actions(
+        actions = gestion_actions.get_actions(
             quoi, ActionTrigger.temporel, tps
         )
 
         dic = {}
         for action in actions:
-            if (joueur := action.joueur) in dic:
-                dic[joueur].append(action)
-            else:
-                dic[joueur] = [action]
+            joueur = action.joueur
+            if joueur not in dic:
+                dic[joueur] = []
+            dic[joueur].append(action)
 
         return dic
         # Formerly :
@@ -84,10 +94,16 @@ async def recup_joueurs(quoi, qui, heure=None):
         # action.player_id == joueur.player_id] for joueur in
         # [Joueur.query.get(action.player_id) for action in actions]}
 
-    elif qui.isdigit() and (action := Action.query.get(int(qui))):
+    elif qui.isdigit():
+        action = Action.query.get(int(qui))
+        if not action:
+            raise ValueError(f"Pas d'action d'ID = {qui}")
+
         # Appel direct action par son numéro
-        if ((quoi == "open" and (action.trigger_debut == ActionTrigger.perma
-                                 or not action.decision_))
+        if ((quoi == "open" and (
+                not action.decision_
+                or action.base.trigger_debut == ActionTrigger.perma
+            ))
             or (quoi == "close" and action.decision_)
             or (quoi == "remind" and action.decision_ == "rien")):
             # Action lançable
@@ -97,6 +113,44 @@ async def recup_joueurs(quoi, qui, heure=None):
 
     else:
         raise ValueError(f"""Argument <qui> == \"{qui}" invalide""")
+
+
+async def _do_refill(motif, actions):
+    # Détermination nouveau nombre de charges
+    if motif in config.refills_full:
+        # Refill -> nombre de charges initial de l'action
+        new_charges = {action: action.base.base_charges for action in actions}
+    else:
+        # Refill -> + 1 charge
+        new_charges = {action: action.charges + 1 for action in actions}
+
+    # Refill proprement dit
+    for action, charge in new_charges.items():
+        if charge <= action.charges:
+            # Pas de rechargement à faire (déjà base_charges)
+            continue
+
+        if (not action.charges
+            and action.base.trigger_debut == ActionTrigger.perma):
+            # Action permanente qui était épuisée : on ré-ouvre !
+            if tools.en_pause():
+                ts = tools.fin_pause()
+            else:
+                ts = datetime.datetime.now() + datetime.timedelta(seconds=10)
+                # + 10 secondes pour ouvrir après le message de refill
+            Tache(timestamp=ts,
+                  commande=f"!open {action.id}",
+                  action=action).add()
+
+        action.charges = charge
+
+        await action.joueur.private_chan.send(
+            f"Ton action {action.base.slug} vient d'être rechargée, "
+            f"tu as maintenant {charge} charge(s) disponible(s) !"
+        )
+
+    config.session.commit()
+
 
 
 class OpenClose(commands.Cog):
@@ -166,8 +220,7 @@ class OpenClose(commands.Cog):
         )
 
         for joueur in joueurs:
-            chan = ctx.guild.get_channel(joueur.chan_id_)
-            assert chan, f"!open : chan privé de {joueur} introuvable"
+            chan = joueur.private_chan
 
             if qui == "cond":
                 joueur.vote_condamne_ = "non défini"
@@ -216,9 +269,10 @@ class OpenClose(commands.Cog):
         config.session.commit()
 
         # Actions déclenchées par ouverture
-        for action in Action.query.filter_by(
-                trigger_debut=ActionTrigger(f"open_{qui}")):
-            await gestion_actions.open_action(action)
+        if qui in ["cond", "maire", "loups"] :
+            for action in Action.query.filter(Action.base.has(
+                    BaseAction.trigger_debut == ActionTrigger[f"open_{qui}"])):
+                await gestion_actions.open_action(action)
 
         # Réinitialise haros/candids
         items = []
@@ -316,8 +370,7 @@ class OpenClose(commands.Cog):
         ))
 
         for joueur in joueurs:
-            chan = ctx.guild.get_channel(joueur.chan_id_)
-            assert chan, f"!close : chan privé de {joueur} introuvable"
+            chan = joueur.private_chan
 
             if qui == "cond":
                 await chan.send(
@@ -345,7 +398,7 @@ class OpenClose(commands.Cog):
                 for action in joueurs[joueur]:
                     await chan.send(
                         f"{tools.montre()}  Fin de la possiblité d'utiliser "
-                        f"ton action {tools.code(action.action)} ! \n"
+                        f"ton action {tools.code(action.base.slug)} ! \n"
                         f"Action définitive : {action.decision_}"
                     )
                     await gestion_actions.close_action(action)
@@ -353,8 +406,10 @@ class OpenClose(commands.Cog):
         config.session.commit()
 
         # Actions déclenchées par fermeture
-        for action in Action.query.filter_by(trigger_debut=f"close_{qui}"):
-            await gestion_actions.open_action(action)
+        if qui in ["cond", "maire", "loups"] :
+            for action in Action.query.filter(Action.base.has(
+                  BaseAction.trigger_debut == ActionTrigger[f"close_{qui}"])):
+                await gestion_actions.close_action(action)
 
         # Programme prochaine ouverture
         if qui in ["cond", "maire", "loups"] and heure:
@@ -411,10 +466,8 @@ class OpenClose(commands.Cog):
         ))
 
         for joueur in joueurs:
-            chan = ctx.guild.get_channel(joueur.chan_id_)
-            assert chan, f"!remind : chan privé de {joueur} introuvable"
-            member = ctx.guild.get_member(joueur.discord_id)
-            assert member, f"!remind : member {joueur} introuvable"
+            chan = joueur.private_chan
+            member = joueur.member
 
             if qui == "cond":
                 message = await chan.send(
@@ -432,7 +485,7 @@ class OpenClose(commands.Cog):
 
             elif qui == "loups":
                 message = await chan.send(
-                    f"⏰ {member.mention} Plus que 30 minutes voter "
+                    f"⏰ {member.mention} Plus que 30 minutes pour voter "
                     "pour la victime du soir ! 😱 \n"
                 )
                 await message.add_reaction(config.Emoji.lune)
@@ -458,17 +511,19 @@ class OpenClose(commands.Cog):
                 tout-puissants l'ont décidé)
             cible: ``"all"`` ou le nom d'un joueur
         """
-        if motif not in ["weekends", "forgeron", "rebouteux", "divin"]:
-            await ctx.send(f"{motif} n'est pas un <motif> valide")
+        motif = motif.lower()
+
+        if motif not in [*config.refills_full, *config.refills_one]:
+            await ctx.send(f"{motif} n'est pas un motif valide")
             return
 
-        if motif == "divin":
+        if motif in config.refills_divins:
             if cible != "all":
                 target = await tools.boucle_query_joueur(
-                    cible=cible, message="Qui veux-tu recharger ?"
+                    ctx, cible=cible, message="Qui veux-tu recharger ?"
                 )
                 refillable = Action.query.filter(
-                    Action.charges.is_not(None)).filter_by(joueur=target).all()
+                    Action.charges.isnot(None)).filter_by(joueur=target).all()
             else:
                 m = await ctx.send(
                     "Tu as choisi de recharger le pouvoir de "
@@ -476,7 +531,7 @@ class OpenClose(commands.Cog):
                 )
                 if await tools.yes_no(m):
                     refillable = Action.query.filter(
-                        Action.charges.is_not(None)).all()
+                        Action.charges.isnot(None)).all()
 
                 else:
                     await ctx.send("Mission aborted.")
@@ -485,54 +540,28 @@ class OpenClose(commands.Cog):
         else:       # refill WE, forgeron ou rebouteux
             if cible != "all":
                 target = await tools.boucle_query_joueur(
-                    cible=cible, message="Qui veux-tu recharger ?"
+                    ctx, cible=cible, message="Qui veux-tu recharger ?"
                 )
-                refillable = Action.query.filter(
-                    Action.refill.contains(motif)).filter_by(
+                refillable = Action.query.filter(Action.base.has(
+                    BaseAction.refill.contains(motif))).filter_by(
                     joueur=target).all()
             else:
-                refillable = Action.query.filter(
-                    Action.refill.contains(motif)).all()
+                refillable = Action.query.filter(Action.base.has(
+                    BaseAction.refill.contains(motif))).all()
 
-        await tools.log(refillable)
+        # do refill
+        await tools.log(refillable, code=True,
+                        prefixe=f"Refill {motif} {cible} :")
 
-        txt = "Action(s) répondant aux critères :\n"
-        for action in refillable:
-            txt += f"- {action.base.slug}, id = {action.id} \n"
+        await tools.send_code_blocs(
+            ctx,
+            "\n".join(f"- {action.base.slug}, id = {action.id} \n"
+                      for action in refillable),
+            prefixe="Action(s) répondant aux critères :\n"
+        )
 
-        await tools.send_code_blocs(ctx, txt)
+        await _do_refill(motif, refillable)
 
-        # Détermination nouveau nombre de charges
-        if motif == "weekends":
-            remplissage = {action: action.base.base_charges
-                           for action in refillable}
-        else:
-            remplissage = {action: action.charges + 1
-                           for action in refillable}
-
-        # Refill proprement dit
-        for action, charge in remplissage.items():
-            if charge > action.charges:
-                if not action.charges and action.trigger_debut == "perma":
-                    # Action permanente : on ré-ouvre !
-                    if motif == "weekends":
-                        ts = tools.fin_pause()
-                    else:
-                        ts = (datetime.datetime.now()
-                              + datetime.timedelta(seconds=10))
-                    Tache(timestamp=ts,
-                          commande=f"!open {action.id}",
-                          action=action).add()
-
-                action.charges = charge
-
-                await tools.send_blocs(
-                    action.joueur.private_chan,
-                    f"Ton action {action.base.slug} vient d'être rechargée, "
-                    f"tu as maintenant {charge} charge(s) disponible(s) !"
-                )
-
-        config.session.commit()
 
 
     @commands.command()
@@ -540,9 +569,6 @@ class OpenClose(commands.Cog):
     async def cparti(self, ctx):
         """Lance le jeu (COMMANDE MJ)
 
-        - Crée (et programme) les actions associées aux rôles de
-          tous les joueurs     ==> EN FAIT NON, plus besoin vu que
-          c'est fait à la synchro des rôles
         - Programme les votes condamnés quotidiens (avec chaînage) 10h-18h
         - Programme un vote maire 10h-18h
         - Programme les actions au lancement du jeu (choix de mentor...)
@@ -562,16 +588,21 @@ class OpenClose(commands.Cog):
         )
         if not await tools.yes_no(message):
             await ctx.send("Mission aborted.")
+            return
+
+        message = await ctx.send(
+            "Les actions des joueurs ont été attribuées à la synchronisation "
+            "des rôles, mais les !open n'ont aucun impact tant que tout le "
+            "monde est en `role_actif == False` sur le Tableau de bord.\n"
+            "Il faut donc **passer tout le monde à `True` maintenant**"
+            "(puis `!sync silent`) avant de continuer."
+        )
+        if not await tools.yes_no(message):
+            await ctx.send("Mission aborted.")
+            return
 
         taches = []
-        r = "C'est parti !\n\n"
-
-        r += ("Bon plus besoin de lancer les actions, c'est fait "
-              "à la synchro des rôles mais les !open n'ont aucun "
-              "impact tant que tout le monde est en role_actif == "
-              "False, DU COUP passer tout le monde en True genre "
-              "MAINTENANT (et en silencieux !) si on veut vraiment "
-              "lancer\n\n")
+        r = "C'est parti !\n"
 
         n10 = tools.next_occurence(datetime.time(hour=10))
         n19 = tools.next_occurence(datetime.time(hour=19))
@@ -591,12 +622,13 @@ class OpenClose(commands.Cog):
 
         # Programmation actions au lancement et actions permanentes
         r += "\nProgrammation des actions start / perma :\n"
-        start_perma = Action.query.filter(Action.trigger_debut.in_(
-            [ActionTrigger.start, ActionTrigger.perma]
-        )).all()
+        start_perma = Action.query.filter(
+            Action.base.has(BaseAction.trigger_debut.in_(
+                [ActionTrigger.start, ActionTrigger.perma]
+        ))).all()
         for action in start_perma:
             r += (f" - À 19h : !open {action.id} "
-                  f"(trigger_debut == {action.trigger_debut})\n")
+                  f"(trigger_debut == {action.base.trigger_debut})\n")
             taches.append(Tache(timestamp=n19,
                                 commande=f"!open {action.id}",
                                 action=action))
@@ -624,4 +656,6 @@ class OpenClose(commands.Cog):
 
         Tache.add(*taches)      # On enregistre et programme le tout !
 
-        await ctx.send("C'est tout bon ! (normalement) (détails dans #logs)")
+        await ctx.send(
+            f"C'est tout bon ! (détails dans {config.Channel.logs.mention})"
+        )

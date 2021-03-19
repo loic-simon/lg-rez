@@ -6,9 +6,11 @@ Liste, création, suppression, ouverture, fermeture d'actions
 
 import datetime
 
+from discord.ext import commands
+
 from lgrez import config
 from lgrez.blocs import tools
-from lgrez.bdd import Action, Tache, ActionTrigger
+from lgrez.bdd import Action, BaseAction, Tache, ActionTrigger
 
 
 def add_action(action):
@@ -20,13 +22,13 @@ def add_action(action):
     action.add()
 
     # Ajout tâche ouverture
-    if action.trigger_debut == ActionTrigger.temporel:
+    if action.base.trigger_debut == ActionTrigger.temporel:
         # Temporel : on programme
-        Tache(timestamp=tools.next_occurence(action.heure_debut),
+        Tache(timestamp=tools.next_occurence(action.base.heure_debut),
               commande=f"!open {action.id}",
               action=action).add()
 
-    elif action.trigger_debut == ActionTrigger.perma:
+    elif action.base.trigger_debut == ActionTrigger.perma:
         # Perma : ON LANCE DIRECT
         Tache(timestamp=datetime.datetime.now(),
               commande=f"!open {action.id}",
@@ -40,7 +42,8 @@ def delete_action(action):
         action (.bdd.Action): l'action à supprimer
     """
     # Suppression tâches liées à l'action
-    Tache.delete(*action.taches)
+    if action.taches:
+        Tache.delete(*action.taches)
     action.delete()
 
 
@@ -55,7 +58,7 @@ async def open_action(action):
           reprogrammation si nécessaire ;
         - Gestion des tâches planifiées (planifie remind/close si
           applicable) ;
-        - Information du joueur dans ``chan``.
+        - Information du joueur.
     """
     joueur = action.joueur
     chan = joueur.private_chan
@@ -68,9 +71,9 @@ async def open_action(action):
             f"Action {action} : en cooldown, exit "
             "(reprogrammation si temporel)."
         )
-        if action.trigger_debut == ActionTrigger.temporel:
+        if action.base.trigger_debut == ActionTrigger.temporel:
             # Programmation action du lendemain
-            ts = tools.next_occurence(action.heure_debut)
+            ts = tools.next_occurence(action.base.heure_debut)
             Tache(timestamp=ts,
                   commande=f"!open {action.id}",
                   action=action).add()
@@ -83,8 +86,8 @@ async def open_action(action):
             f"Action {action} : role_actif == False, exit "
             "(reprogrammation si temporel)."
         )
-        if action.trigger_debut == ActionTrigger.temporel:
-            ts = tools.next_occurence(action.heure_debut)
+        if action.base.trigger_debut == ActionTrigger.temporel:
+            ts = tools.next_occurence(action.base.heure_debut)
             Tache(timestamp=ts,
                   commande=f"!open {action.id}",
                   action=action).add()
@@ -101,17 +104,17 @@ async def open_action(action):
 
     # Action "automatiques" (passives : notaire...) :
     # lance la procédure de clôture / résolution
-    if action.trigger_fin == ActionTrigger.auto:
-        if action.trigger_debut == ActionTrigger.temporel:
+    if action.base.trigger_fin == ActionTrigger.auto:
+        if action.base.trigger_debut == ActionTrigger.temporel:
             await tools.log(
                 f"Action {action.base.slug} pour {joueur.nom} pas vraiment "
                 f"automatique, {config.Role.mj.mention} VENEZ M'AIDER "
                 "JE PANIQUE 😱 (comme je suis vraiment sympa je vous "
-                f"file son chan, {joueur.private_chan.mention})"
+                f"file son chan, {chan.mention})"
             )
         else:
             await tools.log(
-                "Action automatique, appel processus de clôture"
+                f"Action {action} : automatique, appel processus de clôture"
             )
 
         await close_action(action)
@@ -121,12 +124,12 @@ async def open_action(action):
 
     # Calcul heure de fin (si applicable)
     heure_fin = None
-    if action.trigger_fin == ActionTrigger.temporel:
-        heure_fin = action.heure_fin
+    if action.base.trigger_fin == ActionTrigger.temporel:
+        heure_fin = action.base.heure_fin
         ts = tools.next_occurence(heure_fin)
-    elif action.trigger_fin == ActionTrigger.delta:
+    elif action.base.trigger_fin == ActionTrigger.delta:
         # Si delta, on calcule la vraie heure de fin (pas modifié en base)
-        delta = action.heure_fin
+        delta = action.base.heure_fin
         ts = (datetime.datetime.now()
               + datetime.timedelta(hours=delta.hour,
                                    minutes=delta.minute,
@@ -134,14 +137,15 @@ async def open_action(action):
         heure_fin = ts.time()
 
     # Programmation remind / close
-    if action.trigger_fin in [ActionTrigger.temporel, ActionTrigger.delta]:
+    if action.base.trigger_fin in [ActionTrigger.temporel,
+                                   ActionTrigger.delta]:
         Tache(timestamp=ts - datetime.timedelta(minutes=30),
               commande=f"!remind {action.id}",
               action=action).add()
         Tache(timestamp=ts,
               commande=f"!close {action.id}",
               action=action).add()
-    elif action.trigger_fin == ActionTrigger.perma:
+    elif action.base.trigger_fin == ActionTrigger.perma:
         # Action permanente : fermer pour le WE
         # ou rappel / réinitialisation chaque jour
         ts_matin = tools.next_occurence(datetime.time(hour=7))
@@ -198,22 +202,22 @@ async def close_action(action):
         - Suppression si nécessaire ;
         - Gestion des tâches planifiées (planifie prochaine ouverture
           si applicable) ;
-        - Information joueur dans <chan>.
+        - Information du joueur (si charge-- seulement).
     """
     joueur = action.joueur
     chan = joueur.private_chan
 
     deleted = False
-    if action.decision_ != "rien" and not action.instant:
+    if action.decision_ != "rien":
         # Résolution de l'action
         # (pour l'instant juste charge -= 1 et suppression le cas échéant)
-        if not action.charges:
+        if action.charges:
             action.charges = action.charges - 1
             pcs = (" pour cette semaine"
-                   if "weekends" in action.refill else "")
+                   if "weekends" in action.base.refill else "")
             await chan.send(f"Il te reste {action.charges} charge(s){pcs}.")
 
-            if action.charges == 0 and not action.refill:
+            if action.charges == 0 and not action.base.refill:
                 delete_action(action)
                 deleted = True
 
@@ -221,16 +225,16 @@ async def close_action(action):
         action.decision_ = None
 
         # Si l'action a un cooldown, on le met
-        if action.base and action.base.base_cooldown > 0:
+        if action.base.base_cooldown > 0:
             action.cooldown = action.base.base_cooldown
 
         # Programmation prochaine ouverture
-        if action.trigger_debut == ActionTrigger.temporel:
-            ts = tools.next_occurence(action.heure_debut)
+        if action.base.trigger_debut == ActionTrigger.temporel:
+            ts = tools.next_occurence(action.base.heure_debut)
             Tache(timestamp=ts,
                   commande=f"!open {action.id}",
                   action=action).add()
-        elif action.trigger_debut == ActionTrigger.perma:
+        elif action.base.trigger_debut == ActionTrigger.perma:
             # Action permanente : ouvrir après le WE
             ts = tools.fin_pause()
             Tache(timestamp=ts,
@@ -240,7 +244,7 @@ async def close_action(action):
     config.session.commit()
 
 
-async def get_actions(quoi, trigger, heure=None):
+def get_actions(quoi, trigger, heure=None):
     """Renvoie les actions répondant à un déclencheur donné.
 
     Args:
@@ -263,31 +267,33 @@ async def get_actions(quoi, trigger, heure=None):
     """
     if trigger == ActionTrigger.temporel:
         if not heure:
-            raise ValueError("Merci de préciser une heure......\n "
-                             "https://tenor.com/view/mr-bean-checking-time-"
-                             "waiting-gif-11570520")
+            raise commands.UserInputError("merci de préciser une heure")
 
         if quoi == "open":
-            criteres = (Action.trigger_debut == trigger
-                        & Action.heure_debut == heure
+            criteres = (Action.base.has(BaseAction.trigger_debut == trigger)
+                        & Action.base.has(BaseAction.heure_debut == heure)
                         & Action.decision_.is_(None))
         elif quoi == "close":
-            criteres = (Action.trigger_fin == trigger
-                        & Action.heure_fin == heure
-                        & Action.decision_.is_not(None))
+            criteres = (Action.base.has(BaseAction.trigger_fin == trigger)
+                        & Action.base.has(BaseAction.heure_fin == heure)
+                        & Action.decision_.isnot(None))
         elif quoi == "remind":
-            criteres = (Action.trigger_fin == trigger
-                        & Action.heure_fin == heure
-                        & Action.decision_ == "rien")
+            criteres = (Action.base.has(BaseAction.trigger_fin == trigger)
+                        & Action.base.has(BaseAction.heure_fin == heure)
+                        & (Action.decision_ == "rien"))
+        else:
+            raise commands.UserInputError(f"bad value for quoi: '{quoi}'")
     else:
         if quoi == "open":
-            criteres = (Action.trigger_debut == trigger
+            criteres = (Action.base.has(BaseAction.trigger_debut == trigger)
                         & Action.decision_.is_(None))
         elif quoi == "close":
-            criteres = (Action.trigger_fin == trigger
-                        & Action.decision_.is_not(None))
+            criteres = (Action.base.has(BaseAction.trigger_fin == trigger)
+                        & Action.decision_.isnot(None))
         elif quoi == "remind":
-            criteres = (Action.trigger_fin == trigger
-                        & Action.decision_ == "rien")
+            criteres = (Action.base.has(BaseAction.trigger_fin == trigger)
+                        & (Action.decision_ == "rien"))
+        else:
+            raise commands.UserInputError(f"bad value for quoi: '{quoi}'")
 
     return Action.query.filter(criteres).all()

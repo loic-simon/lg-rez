@@ -20,6 +20,11 @@
   :members:
   :member-order: bysource
 
+  .. exception:: WorksheetNotFound
+
+      Alias de :exc:`gspread.exceptions.WorksheetNotFound` : erreur levée
+      en cas de tentative d'appel d'une feuille non existante.
+
 
 ``.one_command``
 ---------------------------------------------------------------------------------------------------

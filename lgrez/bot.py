@@ -12,7 +12,7 @@ import traceback
 import discord
 from discord.ext import commands
 
-from lgrez import config, bdd
+from lgrez import __version__, config, bdd
 from lgrez.blocs import env, tools, one_command, ready_check
 from lgrez.features import *        # Tous les sous-modules
 
@@ -35,6 +35,12 @@ async def _on_ready(bot):
         raise RuntimeError(f"on_ready : Serveur d'ID {bot.GUILD_ID} "
                            "(``LGREZ_SERVER_ID``) introuvable")
 
+    print(f"      Connected to '{guild.name}'! "
+          f"({len(guild.channels)} channels, {len(guild.members)} members)")
+
+    print("[3/3] Initialization (bot.on_ready)...")
+
+
     # Préparations des objects globaux
     config.guild = guild
 
@@ -49,7 +55,9 @@ async def _on_ready(bot):
             try:
                 ready = converter(name)
             except ValueError:
-                errors.append(f"{rc_class}.{attr} = \"{name}\" non trouvé")
+                qualname = f"config.{rc_class.__name__}.{attr}"
+                errors.append(f"{discord_type.__name__} {qualname} = "
+                              f"\"{name}\" non trouvé !")
             else:
                 setattr(rc_class, attr, ready)
 
@@ -64,23 +72,27 @@ async def _on_ready(bot):
                       f"\"{config.private_chan_category_name}\" non trouvée")
 
     if errors:
+        msg = (f"LGBot.on_ready: {len(errors)} errors:\n - "
+               + "\n - ".join(errors))
+        logging.error(msg)
+
         try:
             atmj = config.Role.mj.mention
         except ready_check.NotReadyError:
             atmj = "@everyone"
-        msg = f"{atmj} ERREURS :\n - " + "\n - ".join(errors)
-        logging.error(msg)
 
         try:
-            await tools.log(msg)
+            await tools.log(msg, code=True, prefixe=f"{atmj} ERREURS :")
         except ready_check.NotReadyError:
-            await config.guild.text_channels[0].send(msg)
+            await tools.send_code_blocs(config.guild.text_channels[0],
+                                        msg,
+                                        prefixe=f"{atmj} ERREURS :")
 
     await tools.log("Juste rebooted!")
     await bot.change_presence(activity=discord.Activity(
         type=discord.ActivityType.listening,
-        name="vos demandes (!help)")
-    )
+        name="vos demandes (!help)"
+    ))
 
     # Tâches planifiées
     taches = bdd.Tache.query.all()
@@ -91,6 +103,9 @@ async def _on_ready(bot):
     if taches:
         await tools.log(f"{len(taches)} tâches planifiées récupérées "
                         "en base et reprogrammées.")
+
+    print("      Initialization complete.")
+    print("\nListening for events.")
 
 
 # À l'arrivée d'un membre sur le serveur
@@ -128,7 +143,7 @@ async def _on_message(bot, message):
         return
 
     if (not message.webhook_id              # Pas un webhook
-        and message.author.top_role.name <= config.Role.everyone):
+        and message.author.top_role <= config.Role.everyone):
         # Pas de rôle affecté : le bot te calcule même pas
         return
 
@@ -206,7 +221,7 @@ def _showexc(exc):
 
 # Gestion des erreurs dans les commandes
 async def _on_command_error(bot, ctx, exc):
-    if ctx.guild.id != config.guild:            # Mauvais serveur
+    if ctx.guild != config.guild:               # Mauvais serveur
         return
 
     if isinstance(exc, commands.CommandInvokeError):
@@ -222,11 +237,19 @@ async def _on_command_error(bot, ctx, exc):
             except ready_check.NotReadyError:
                 pass
 
-        await ctx.send(
-            f"Oups ! Un problème est survenu à l'exécution de "
-            f"la commande  :grimacing:\n{tools.mention_MJ(ctx)} ALED – "
-            + tools.ital(_showexc(exc.original))
-        )
+        # Dans tous les cas (sauf STOP), si erreur à l'exécution
+        prefixe = ("Oups ! Un problème est survenu à l'exécution de "
+                   "la commande  :grimacing: :")
+
+        if ctx.author.top_role >= config.Role.mj:
+            # MJ : affiche le traceback complet
+            e = traceback.format_exception(type(exc.original), exc.original,
+                                           exc.original.__traceback__)
+            await tools.send_code_blocs(ctx, "".join(e), prefixe=prefixe)
+        else:
+            # Pas MJ : exception seulement
+            await ctx.send(f"{prefixe}\n{tools.mention_MJ(ctx)} ALED – "
+                           + tools.ital(_showexc(exc.original)))
 
     elif isinstance(exc, commands.CommandNotFound):
         await ctx.send(
@@ -240,7 +263,7 @@ async def _on_command_error(bot, ctx, exc):
     elif isinstance(exc, (commands.ConversionError, commands.UserInputError)):
         await ctx.send(
             f"Hmm, ce n'est pas comme ça qu'on utilise cette commande !"
-            f"Petit rappel : {tools.code(_showexc(exc.original))}"
+            f"Petit rappel : {tools.code(_showexc(exc))}"
         )
         ctx.message.content = f"!help {ctx.command.name}"
         ctx = await bot.get_context(ctx.message)
@@ -369,7 +392,7 @@ class LGBot(commands.Bot):
         if intents is None:
             intents = discord.Intents.all()
         if member_cache_flags is None:
-            intents = discord.MemberCacheFlags.all()
+            member_cache_flags = discord.MemberCacheFlags.all()
 
         # Construction du bot Discord.py
         super().__init__(
@@ -566,15 +589,22 @@ class LGBot(commands.Bot):
         Args:
             \**kwargs: Passés à :meth:`discord.ext.commands.Bot.run`.
         """
+        print(f"--- LGBot v{__version__} ---")
+
         # Récupération du token du bot et de l'ID du serveur
         LGREZ_DISCORD_TOKEN = env.load("LGREZ_DISCORD_TOKEN")
         self.GUILD_ID = int(env.load("LGREZ_SERVER_ID"))
 
         # Connection BDD
+        print("[1/3] Connecting to database...")
         bdd.connect()
+        print("      Connected!")
 
         # Enregistrement
         config.bot = self
 
         # Lancement du bot (bloquant)
+        print("[2/3] Connecting to Discord...")
         super().run(LGREZ_DISCORD_TOKEN, **kwargs)
+
+        print("\nDisconnected.")

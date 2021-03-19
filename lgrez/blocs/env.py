@@ -37,6 +37,7 @@ def load(VAR_NAME):
     Raises:
         RuntimeError: la variable d'environnement n'est pas définie
     """
-    VAR = os.getenv(VAR_NAME)
-    assert VAR, f"Variable d'environnement {VAR_NAME} manquante"
-    return VAR
+    var = os.getenv(VAR_NAME)
+    if var is None:
+        raise RuntimeError(f"Variable d'environnement {VAR_NAME} manquante")
+    return var

@@ -92,7 +92,7 @@ class RealShell(asyncode.AsyncInteractiveConsole):
         if banner is None:
             base = ('Type "help", "copyright", "credits" or "license" for '
                     'more information.\nasync REPL: use "await" directly '
-                    'instead of asyncio.run()".\n')
+                    'instead of asyncio.run().\n')
             dsc = ('Discord implementation: the caret (‸) indicates the '
                    'current position of the cursor.\nUse control reactions or '
                    'send "<", ">", "=" to (un)indent it and send empty lines.')

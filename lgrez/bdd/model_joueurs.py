@@ -33,17 +33,17 @@ class Joueur(base.TableBase):
     chambre = autodoc_Column(sqlalchemy.String(200),
         doc="Emplacement du joueur (demandé à l'inscription)")
     statut = autodoc_Column(sqlalchemy.Enum(Statut), nullable=False,
-        doc="Statut RP")
+        default=Statut.vivant, doc="Statut RP")
 
     _role_slug = sqlalchemy.Column(sqlalchemy.ForeignKey("roles.slug"),
-        nullable=False)
+        nullable=False, default=lambda: config.default_role_slug)
     role = autodoc_ManyToOne("Role", back_populates="joueurs",
-        doc="Rôle du joueur")
+        doc="Rôle du joueur (défaut :meth:`.bdd.Role.default`)")
 
     _camp_slug = sqlalchemy.Column(sqlalchemy.ForeignKey("camps.slug"),
-        nullable=False)
+        nullable=False, default=lambda: config.default_camp_slug)
     camp = autodoc_ManyToOne("Camp", back_populates="joueurs",
-        doc="Camp du joueur")
+        doc="Camp du joueur (défaut :meth:`.bdd.Camp.default`)")
 
     votant_village = autodoc_Column(sqlalchemy.Boolean(), nullable=False,
         default=True, doc="Le joueur participe aux votes du village ?")
@@ -152,4 +152,4 @@ class CandidHaro(base.TableBase):
 
     def __repr__(self):
         """Return repr(self)."""
-        return f"<CandidHaro #{self.id} ({self.player_id}/{self.type})>"
+        return f"<CandidHaro #{self.id} ({self._joueur_id}/{self.type})>"

@@ -38,7 +38,7 @@ class Action(base.TableBase):
     base = autodoc_ManyToOne("BaseAction", back_populates="actions",
         doc="Action de base")
 
-    cooldown = autodoc_Column(sqlalchemy.Integer(), nullable=False,
+    cooldown = autodoc_Column(sqlalchemy.Integer(), nullable=False, default=0,
         doc="Nombre d'ouvertures avant disponiblité de l'action")
     charges = autodoc_Column(sqlalchemy.Integer(),
         doc="Nombre de charges restantes (``None`` si illimité)")
@@ -70,8 +70,7 @@ class Tache(base.TableBase):
     commande = autodoc_Column(sqlalchemy.String(2000), nullable=False,
         doc="Texte à envoyer via le webhook (généralement une commande)")
 
-    _action_id = sqlalchemy.Column(sqlalchemy.ForeignKey("actions.id"),
-        nullable=False)
+    _action_id = sqlalchemy.Column(sqlalchemy.ForeignKey("actions.id"))
     action = autodoc_ManyToOne("Action", back_populates="taches",
         doc="Si la tâche est liée à une action, action concernée")
 

@@ -35,7 +35,7 @@ class Role(base.TableBase):
     slug = autodoc_Column(sqlalchemy.String(32), primary_key=True,
         doc="Identifiant unique du rôle")
 
-    prefixe = autodoc_Column(sqlalchemy.String(8), nullable=False,
+    prefixe = autodoc_Column(sqlalchemy.String(8), nullable=False, default="",
         doc="Article du nom du rôle (``\"Le \"``, ``\"La \"``, ``\"L'\"``...)")
     nom = autodoc_Column(sqlalchemy.String(32), nullable=False,
         doc="Nom (avec casse et accents) du rôle")
@@ -47,8 +47,10 @@ class Role(base.TableBase):
             "``joueur.camp != joueur.role.camp`` si damnation, passage MV...)")
 
     description_courte = autodoc_Column(sqlalchemy.String(140), nullable=False,
+        default="",
         doc="Description du rôle en une ligne")
     description_longue = autodoc_Column(sqlalchemy.String(2000),
+        nullable=False, default="",
         doc="Règles et background complets du rôle")
 
     # to-manys
@@ -69,30 +71,37 @@ class Role(base.TableBase):
 
     @classmethod
     def default(cls):
-        """Retourne le rôle par défaut (non attribué).
+        """Retourne le rôle par défaut (celui avant attribution).
 
         Warning:
-            Un rôle de :attr:`.slug` ``"nonattr"`` doit être défini en base.
+            Un rôle de :attr:`.slug` :attr:`.config.default_role_slug`
+            doit être défini en base.
 
         Returns:
             ~bdd.Role
 
         Raises:
-            ValueError: rôle ``"nonattr"`` introuvable en base
+            ValueError: rôle introuvable en base
             RuntimeError: session non initialisée
                 (:attr:`.config.session` vaut ``None``)
         """
-        role = cls.query.get("nonattr")
+        slug = config.default_role_slug
+        role = cls.query.get(slug)
         if not role:
-            raise ValueError("Pas de rôle pas défaut (`nonattr`) !")
+            raise ValueError(
+                "Rôle par défaut (de slug "
+                f"`lgrez.config.default_role_slug = \"{slug}\"`) non "
+                "défini (dans le GSheet Rôles et actions) "
+                "ou non chargé (`!fillroles`) !"
+            )
         return role
 
 
 class Camp(base.TableBase):
     """Table de données des camps, publics et secrets.
 
-    [À FAIRE ==>] Cette table est remplie automatiquement à partir du
-    Google Sheet "Rôles et actions" par la commande
+    Cette table est remplie automatiquement à partir du Google Sheet
+    "Rôles et actions" par la commande
     :meth:`\!fillroles <.sync.Sync.Sync.fillroles.callback>`.
     """
     slug = autodoc_Column(sqlalchemy.String(32), primary_key=True,
@@ -101,6 +110,7 @@ class Camp(base.TableBase):
     nom = autodoc_Column(sqlalchemy.String(32), nullable=False,
         doc="Nom (affiché) du camp")
     description = autodoc_Column(sqlalchemy.String(140), nullable=False,
+        default="",
         doc="Description (courte) du camp")
 
     public = autodoc_Column(sqlalchemy.Boolean(), nullable=False, default=True,
@@ -153,22 +163,29 @@ class Camp(base.TableBase):
 
     @classmethod
     def default(cls):
-        """Retourne le camp par défaut (non attribué).
+        """Retourne le camp par défaut (celui avant attribution).
 
         Warning:
-            Un camp de :attr:`.slug` ``"nonattr"`` doit être défini en base.
+            Un camp de :attr:`.slug` :attr:`.config.default_camp_slug`
+            doit être défini en base.
 
         Returns:
             ~bdd.Camp
 
         Raises:
-            ValueError: camp ``"nonattr"`` introuvable en base
+            ValueError: camp introuvable en base
             RuntimeError: session non initialisée
                 (:attr:`.config.session` vaut ``None``)
         """
-        camp = cls.query.get("nonattr")
+        slug = config.default_camp_slug
+        camp = cls.query.get(slug)
         if not camp:
-            raise ValueError("Pas de camp pas défaut (`nonattr`) !")
+            raise ValueError(
+                "Camp par défaut (de slug "
+                f"lgrez.config.default_camp_slug = \"{slug}\") non "
+                "défini (dans le GSheet Rôles et actions) ou non "
+                f"chargé ({tools.code('!fillroles')}) !"
+            )
         return camp
 
 
@@ -183,12 +200,13 @@ class BaseAction(base.TableBase):
         doc="Identifiant unique de l'action")
 
     trigger_debut = autodoc_Column(sqlalchemy.Enum(ActionTrigger),
-        nullable=False,
+        nullable=False, default=ActionTrigger.perma,
         doc="Mode de déclenchement de l'ouverture de l'action")
     trigger_fin = autodoc_Column(sqlalchemy.Enum(ActionTrigger),
-        nullable=False,
+        nullable=False, default=ActionTrigger.perma,
         doc="Mode de déclenchement de la clôture de l'action")
     instant = autodoc_Column(sqlalchemy.Boolean(), nullable=False,
+        default=False,
         doc="L'action est instantannée (conséquence dès la prise de décision)"
             " ou non (conséquence à la fin du créneau d'action)")
 
@@ -201,11 +219,12 @@ class BaseAction(base.TableBase):
             "- :attr:`~ActionTrigger.delta`, l'intervalle associé")
 
     base_cooldown = autodoc_Column(sqlalchemy.Integer(), nullable=False,
+        default=0,
         doc="Temps de rechargement entre deux utilisations du pouvoir "
-            "(``0`` si pas de cooldown)", default=0)
+            "(``0`` si pas de cooldown)")
     base_charges = autodoc_Column(sqlalchemy.Integer(),
         doc="Nombre de charges initiales du pouvoir (``None`` si illimité)")
-    refill = autodoc_Column(sqlalchemy.String(32),
+    refill = autodoc_Column(sqlalchemy.String(32), nullable=False, default="",
         doc="Évènements pouvant recharger l'action, séparés par des virgules "
             "(``\"weekends\"``, ``\"forgeron\"``, ``\"rebouteux\"``...)")
 
@@ -235,4 +254,4 @@ class BaseAction(base.TableBase):
 
     def __repr__(self):
         """Return repr(self)."""
-        return f"<BaseAction '{self.action}'>"
+        return f"<BaseAction '{self.slug}'>"

@@ -94,7 +94,8 @@ Consequences:
   - :func:`.bdd.base.autodoc_Column`, :func:`.autodoc_OneToMany`,
     :func:`.autodoc_ManyToOne` and :func:`.autodoc_ManyToMany`
     convenience functions to easily document bdd attributes;
-  - :attr:`.bdd.Tache.handler` convenience property.
+  - :attr:`.bdd.Tache.handler` convenience property;
+  - :func:`.blocs.tools.en_pause` helper function.
 
 
 ### Also changed
@@ -108,16 +109,23 @@ Consequences:
   - :meth:`<Table>.query <.bdd.base.TableMeta.query>` uses
     :attr:`config.session` (raises :exc:`.blocs.ready_check.NotReadyError`
     if not initialised);
+  - made `gestion_actions.get_actions` not async;
   - Adapted ``!roles`` behavior to new ``Camp`` table;
   - Removed unused option ``chan`` from
     :func:`.features.gestion_actions.open_action` and
     :func:`~.features.gestion_actions.close_action`;
+  - :func:`.blocs.tools.next_occurence` now relies on
+    :func:`~.blocs.tools.debut_pause` and :func:`~.blocs.tools.fin_pause`
+    functions instead of hard-coded pause times;
+  - Updated the *Configuration Assistant Tool* (``__main__.py``) with
+    some changes on Google Sheets script editor and other minor changes;
   - Splitted API Reference in several doc pages, and other global
     documentation and codestyle improvements (source code now almost
     entirely PEP8-compliant).
 
 ### Also removed
 
+  - ``!modifIA``: removed option to edit both triggers and response;
   - Made ``blocs.bdd.BaseActionsRoles`` private: use directly
     :attr:`.bdd.BaseAction.roles` and :attr:`.bdd.Role.base_actions`
     *many-to-many relationship* attributes);

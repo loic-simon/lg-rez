@@ -53,8 +53,8 @@ cd <your/code/folder>
 <your/venv>/bin/python -m lgrez
 ```
 
-This tool also creates a `bot.py` file containing the minimal code needed to
-run the bot (see *Usage* section below).
+This tool also creates a `start_bot.py` file containing the minimal code
+needed to run the bot (see *Usage* section below).
 
 
 ### Manual configuration
@@ -103,7 +103,7 @@ We also provide a direct way to customize some parameters of the game and
 of the Discord server through [`config`](lgrez/config.py) module:
 roles/channels/emoji names, date of season beginning, inscription
 customization... See
-[the doc](https://lg-rez.readthedocs.io/fr/2.0.0/api.html#module-lgrez.config)
+[the doc](https://lg-rez.readthedocs.io/fr/2.0.0/config.html)
 for full API usage information.
 
 See additional attributes and overriden methods on
@@ -172,7 +172,8 @@ bot = MyBot()
 bot.run()
 ```
 
-See [discord.py documentation](https://discordpy.readthedocs.io) for more ideas.
+See [discord.py documentation](https://discordpy.readthedocs.io) for more
+ideas.
 
 
 
@@ -186,7 +187,8 @@ Community contributions are not welcome for now. Get in touch with the authors
 ## License
 This work is shared under [the MIT license](LICENSE).
 
-© 2020 Loïc Simon, Tom Lacoma et al. – Club BD-Jeux × GRIs – ESPCI Paris - PSL
+© 2020 - 2021 Loïc Simon, Tom Lacoma et al. – Club BD-Jeux × GRIs –
+ESPCI Paris - PSL
 
 Reach us on Discord:
 [LaCarpe#1674](https://discordapp.com/users/264482202966818825),

@@ -13,6 +13,7 @@ from akinator.async_aki import Akinator
 
 from lgrez.blocs import tools
 from lgrez.bdd import Joueur
+from lgrez.features.sync import transtype
 
 
 class Annexe(commands.Cog):
@@ -52,10 +53,7 @@ class Annexe(commands.Cog):
                     r += f" {'-' if v < 0 else '+'} {abs(v)}"
             r += f" = {tools.emoji_chiffre(s, True)}"
         except Exception:
-            await ctx.send(
-                f"Pattern non reconu. Voir {tools.code('!help roll')} "
-                "pour plus d'informations."
-            )
+            raise commands.UserInputError(f"pattern non reconu")
         else:
             await tools.send_blocs(ctx, r[3:])
 
@@ -74,6 +72,9 @@ class Annexe(commands.Cog):
         """Envoie un ping au bot
 
         Pong
+
+        Warning:
+            Commande en bêta, non couverte par les tests unitaires.
         """
         ts_rec = datetime.datetime.utcnow()
         delta_rec = ts_rec - ctx.message.created_at
@@ -125,23 +126,21 @@ class Annexe(commands.Cog):
         if len(joueurs) == 1 and "=" in joueurs[0]:
             # Si critère : on remplace joueurs
             crit, _, filtre = joueurs[0].partition("=")
-            if hasattr(Joueur, crit):
-                joueurs = Joueur.query.filter_by(**{crit: filtre}).all()
+            crit = crit.strip()
+            if crit in Joueur.attrs:
+                col = Joueur.attrs[crit]
+                arg = transtype(filtre.strip(), col)
+                joueurs = Joueur.query.filter_by(**{crit: arg}).all()
             else:
-                await ctx.send(
-                    f"Critère \"{crit}\" incorrect. "
-                    f"!help {ctx.invoked_with} pour plus d'infos."
-                )
-                return
+                raise commands.UserInputError(f"critère '{crit}' incorrect")
         else:
             # Sinon, si noms / mentions
             joueurs = [await tools.boucle_query_joueur(ctx, cible)
                        for cible in joueurs]
 
         for joueur in joueurs:
-            member = ctx.guild.get_member(joueur.discord_id)
-            assert member, f"Member {joueur} introuvable"
-            await ctx.channel.set_permissions(member, read_messages=True,
+            await ctx.channel.set_permissions(joueur.member,
+                                              read_messages=True,
                                               send_messages=True)
             await ctx.send(f"{joueur.nom} ajouté")
 
@@ -175,6 +174,9 @@ class Annexe(commands.Cog):
         """J'ai glissé chef
 
         Implémentation directe de https://pypi.org/project/akinator.py
+
+        Warning:
+            Commande en bêta, non couverte par les tests unitaires.
         """
         # Un jour mettre ça dans des embeds avec les https://fr.akinator.com/
         # bundles/elokencesite/images/akitudes_670x1096/<akitude>.png croppées,
@@ -230,6 +232,9 @@ class Annexe(commands.Cog):
 
         Args:
             N: numéro du comic
+
+        Warning:
+            Commande en bêta, non couverte par les tests unitaires.
         """
         async with ctx.typing():
             r = requests.get(f"https://xkcd.com/{N}/info.0.json")

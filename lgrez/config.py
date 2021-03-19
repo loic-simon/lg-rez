@@ -33,9 +33,68 @@ chambre_mj = "[chambre MJ]"
 #: les 60 secondes. Ce n'est pas activé par défaut.
 output_liveness = False
 
-# Journée en cours (nom sheet)
 
-# STOP keywords
+#: str: :attr:`~.bdd.Role.slug` du rôle par défaut, attribué aux
+#: joueurs lors de l'inscription (renvoyé par :meth:`.bdd.Role.default`).
+#: Doit correspodre à un rôle existant (défini dans le GSheet *Rôles et
+#: actions*).
+default_role_slug = "nonattr"
+
+#: str: :attr:`~.bdd.Camp.slug` du camp par défaut, attribué aux
+#: joueurs lors de l'inscription (renvoyé par :meth:`.bdd.Camp.default`).
+#: Doit correspodre à un camp existant (défini dans le GSheet *Rôles et
+#: actions*).
+default_camp_slug = "nonattr"
+
+
+#: str: Nom de la feuille du *Tableau de bord* contenant l'état actuel
+#: des joueurs, sur laquelle sont effectuées les modifications.
+tdb_main_sheet = "Journée en cours"
+
+#: str: Nom de la feuille du *Tableau de bord* contenant les résultats
+#: des votes (après corrections manuelles éventuelles).
+tdb_votes_sheet = "Journée en cours"
+
+#: int: Numéro de la ligne de la :attr:`feuille principale <.tdb_main_sheet>`
+#: du *Tableau de bord* contenant les noms des colonnes (commençant de 1).
+tdb_header_row = 3
+
+#: str: Nom de la colonne de la :attr:`feuille principale <.tdb_main_sheet>`
+#: du *Tableau de bord* contenant les IDs Discord des joueurs.
+tdb_id_column = "A"
+
+#: tuple[str]: Noms de la première et de la dernière colonne de la zone de
+#: la feuille principale (:attr:`<.tdb_main_sheet>`) du *Tableau de bord*
+#: contenant les informations (colonnes de la BDD) des joueurs.
+tdb_main_columns = ("J", "Q")
+
+#: tuple[str]: Noms de la première et de la dernière colonne de la zone de
+#: la feuille principale (:attr:`<.tdb_main_sheet>`) du *Tableau de bord*
+#: contenant l'ancien état des informations des joueurs (avant ``!sync``).
+tdb_tampon_columns = ("B", "I")
+
+tdb_votecond_column = "CondamnéRéel"
+tdb_votantcond_column = "VotantCond"
+
+tdb_votemaire_column = "MaireRéel"
+tdb_votantmaire_column = "VotantMaire"
+
+
+db_votecond_sheet = "votecond_brut"
+db_votemaire_sheet = "votemaire_brut"
+db_voteloups_sheet = "voteloups_brut"
+db_actions_sheet = "actions_brut"
+
+
+# STOP keywords -- A IMPLEMENTER
+stop_keywords = ["stop", "!stop"]
+
+
+
+refills_full = ["weekends"]
+refills_one = ["forgeron", "rebouteux", "divin"]
+refills_divins = ["divin"]
+
 
 
 class Role(ready_check.ReadyCheck, check_type=discord.Role):
@@ -109,7 +168,7 @@ class Channel(ready_check.ReadyCheck, check_type=discord.TextChannel):
         debats: Salon de discussion principal (catégorie Place du village).
             Nom par défaut : "débats".
     """
-    roles = "roles"
+    roles = "rôles"
     logs = "logs"
     annonces = "annonces"
     haros = "haros"

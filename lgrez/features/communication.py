@@ -18,6 +18,7 @@ from lgrez.blocs import tools, env, gsheets
 from lgrez.bdd import (Joueur, Action, Camp, CandidHaro,
                        Statut, ActionTrigger, CandidHaroType)
 from lgrez.features import gestion_actions
+from lgrez.features.sync import transtype
 
 
 class Communication(commands.Cog):
@@ -29,6 +30,10 @@ class Communication(commands.Cog):
     @tools.mjs_only
     async def embed(self, ctx, key=None, *, val=None):
         """Prépare un embed (message riche) et l'envoie (COMMANDE MJ)
+
+        Warning:
+            Commande en bêta, non couverte par les tests unitaires
+            et souffrant de bugs connus (avec les fields notemment)
 
         Args:
             key: sous-commande (voir ci-dessous). Si omis, prévisualise
@@ -161,7 +166,7 @@ class Communication(commands.Cog):
 
             else:
                 if skey == "name":
-                    emb.set_field_at(i, name=val, value=emb.fields[i].name)
+                    emb.set_field_at(i, name=val, value=emb.fields[i].value)
                 elif skey == "value":
                     emb.set_field_at(i, name=emb.fields[i].name, value=val)
                 else:
@@ -252,7 +257,7 @@ class Communication(commands.Cog):
               ``Joueur.<crit> == <filtre>``. ``crit`` peut être ``"nom"``,
               ``"chambre"``, ``"statut"``, ``"role"``, ``"camp"``...
               L'ensemble doit être entouré de guillements si ``filtre``
-              contient un espace.
+              contient un espace. Les rôles/camps sont cherchés par slug.
             - *le nom d'un joueur*  (raccourci pour ``nom=X``, doit être
               entouré de guillements si nom + prénom)
 
@@ -284,26 +289,26 @@ class Communication(commands.Cog):
             - ``!send all Bonsoir à tous c'est Fanta``
             - ``!send vivants Attention {member.mention},
               derrière toi c'est affreux !``
-            - ``!send "role=Servante Dévouée" Ça va vous ?
-              Vous êtes bien {joueur.role} ?``
+            - ``!send "role=servante" Ça va vous ?
+              Vous êtes bien {joueur.role.nom} ?``
         """
         if cible == "all":
             joueurs = Joueur.query.all()
         elif cible == "vivants":
-            joueurs = Joueur.query.filter(Joueur.statut == Statut.vivant
-                                          | Joueur.statut == Statut.MV).all()
+            joueurs = Joueur.query.filter(
+                Joueur.statut.in_([Statut.vivant, Statut.MV])
+            ).all()
         elif cible == "morts":
-            joueurs = Joueur.query.filter_by(statut=Statut.morts).all()
+            joueurs = Joueur.query.filter_by(statut=Statut.mort).all()
         elif "=" in cible:
             crit, _, filtre = cible.partition("=")
-            if hasattr(Joueur, crit):
-                joueurs = Joueur.query.filter_by(**{crit: filtre}).all()
+            crit = crit.strip()
+            if crit in Joueur.attrs:
+                col = Joueur.attrs[crit]
+                arg = transtype(filtre.strip(), col)
+                joueurs = Joueur.query.filter_by(**{crit: arg}).all()
             else:
-                await ctx.send(
-                    f"Critère \"{crit}\" incorrect. "
-                    f"!help {ctx.invoked_with} pour plus d'infos."
-                )
-                return
+                raise commands.UserInputError(f"critère '{crit}' incorrect")
         else:
             joueurs = [await tools.boucle_query_joueur(ctx, cible, "À qui ?")]
 
@@ -313,11 +318,8 @@ class Communication(commands.Cog):
 
         await ctx.send(f"{len(joueurs)} trouvé(s), envoi...")
         for joueur in joueurs:
-            member = ctx.guild.get_member(joueur.discord_id)
-            chan = ctx.guild.get_channel(joueur.chan_id_)
-
-            assert member, f"!send : Member associé à {joueur} introuvable"
-            assert chan, f"!sed : Chan privé de {joueur} introuvable"
+            member = joueur.member
+            chan = joueur.private_chan
 
             evaluated_message = tools.eval_accols(message, locals_=locals())
             await chan.send(evaluated_message)
@@ -345,6 +347,9 @@ class Communication(commands.Cog):
     async def plot(self, ctx, type):
         """Trace le résultat du vote et l'envoie sur #annonces (COMMANDE MJ)
 
+        Warning:
+            Commande en bêta, non couverte par les tests unitaires
+
         Args:
             type: peut être
 
@@ -358,13 +363,41 @@ class Communication(commands.Cog):
         Si ``type == "cond"``, déclenche aussi les actions liées au mot
         des MJs (:attr:`bdd.ActionTrigger.mot_mjs`).
         """
-        class Cible():
+        # Différences plot cond / maire
+
+        if type == "cond":
+            ind_col_cible = gsheets.a_to_index(config.tdb_votecond_column)
+            ind_col_votants = gsheets.a_to_index(config.tdb_votantcond_column)
+            haro_candidature = CandidHaroType.haro
+            typo = "bûcher du jour"
+            mort_election = "Mort"
+            pour_contre = "contre"
+            emoji = "bucher"
+            couleur = 0x730000
+
+        elif type == "maire":
+            ind_col_cible = gsheets.a_to_index(config.tdb_votemaire_column)
+            ind_col_votants = gsheets.a_to_index(config.tdb_votantmaire_column)
+            haro_candidature = CandidHaroType.candidature
+            typo = "nouveau maire"
+            mort_election = "Élection"
+            pour_contre = "pour"
+            emoji = "maire"
+            couleur = 0xd4af37
+
+        else:
+            await ctx.send("`type` doit être `maire` ou `cond`")
+            return
+
+        # Classe utilitaire
+
+        class _Cible():
+            """Représente un joueur ciblé, pour usage dans !plot"""
             def __init__(self, nom, votes=0):
                 self.nom = nom
                 self.label = self.nom.replace(" ", "\n", 1)
 
                 self.votes = votes
-
                 self.votants = []
 
                 self.joueur = Joueur.query.filter_by(nom=nom).one()
@@ -378,13 +411,13 @@ class Communication(commands.Cog):
                 return f"{self.nom} ({self.votes})"
 
             def __eq__(self, other):
-                return isinstance(other, Cible) and self.nom == other.nom
+                return isinstance(other, type(self)) and self.nom == other.nom
 
             def set_votants(self, raw_votants):
                 votants = [rv or "zzz" for rv in raw_votants]
                 votants.sort()
-                self.votants = ["Corbeau" if nom == "zzz"
-                                else nom for nom in votants]
+                self.votants = ["Corbeau" if nom == "zzz" else nom
+                                for nom in votants]
                 # On trie par ordre alphabétique
                 # en mettant les corbeaux (= pas de votant) à la fin
 
@@ -396,55 +429,34 @@ class Communication(commands.Cog):
                 else:
                     return "gray"
 
-        if type == "cond":
-            colonne_cible = "CondamnéRéel"
-            colonne_votant = "VotantCond"
-            haro_candidature = CandidHaroType.haro
-            typo = "bûcher du jour"
-            mort_election = "Mort"
-            pour_contre = "contre"
-            emoji = "bucher"
-            couleur = 0x730000
-
-        elif type == "maire":
-            colonne_cible = "MaireRéel"
-            colonne_votant = "VotantMaire"
-            haro_candidature = CandidHaroType.candidature
-            typo = "nouveau maire"
-            mort_election = "Élection"
-            pour_contre = "pour"
-            emoji = "maire"
-            couleur = 0xd4af37
-
-        else:
-            await ctx.send("`type` doit être `maire` ou `cond`")
-            return
+        # Récupération votes
 
         await ctx.send("Récupération des votes...")
         async with ctx.typing():
             workbook = gsheets.connect(env.load("LGREZ_TDB_SHEET_ID"))
-            sheet = workbook.worksheet("Journée en cours")
+            sheet = workbook.worksheet(config.tdb_votes_sheet)
             values = sheet.get_all_values()
             # Liste de liste des valeurs des cellules
-            NL = len(values)
 
-            head = values[2]
-            # Ligne d'en-têtes (noms des colonnes) = 3e ligne du TDB
-            ind_col_cible = head.index(colonne_cible)
-            ind_col_votants = head.index(colonne_votant)
+            cibles_brutes = []
+            for lig in values[config.tdb_header_row:NL]:
+                val = lig[ind_col_cible]
+                if val:
+                    cibles_brutes.append(val)
 
-            cibles_brutes = [val for lig in range(3, NL)
-                             if (val := values[lig][ind_col_cible])]
             nb_votes = len(cibles_brutes)
 
-            cibles = [Cible(nom, votes)
+            cibles = [_Cible(nom, votes)
                       for (nom, votes) in Counter(cibles_brutes).most_common()]
             # Liste des cibles (vérifie l'éligibilité...)
             # triées du plus au moins votées
             for cible in cibles:        # Récupération votants
-                cible.set_votants([values[i][ind_col_votants]
-                                   for i in range(3, NL)
-                                   if values[i][ind_col_cible] == cible.nom])
+                votants = []
+                for lig in values[config.tdb_header_row:NL]:
+                    if lig[ind_col_cible] == cible.nom:
+                        votants.append(lig[ind_col_votants])
+
+        # Détermination cible
 
         choisi = None
         eligibles = [c for c in cibles if c.eligible]
@@ -477,6 +489,7 @@ class Communication(commands.Cog):
                     choisi = eligibles[0]
 
         # Paramètres plot
+
         discord_gray = '#2F3136'
         plt.figure(facecolor=discord_gray)
         plt.rcParams.update({'font.size': 16})
@@ -491,6 +504,7 @@ class Communication(commands.Cog):
         ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
         # Plot
+
         ax.bar(
             x=range(len(cibles)),
             height=[c.votes for c in cibles],
@@ -523,7 +537,7 @@ class Communication(commands.Cog):
                     await ctx.send("Rôle à afficher :")
                     role = (await tools.wait_for_message_here(ctx)).content
                     mess = await ctx.send("Camp :")
-                    camps = Camp.query.filter_by(visible=True).all()
+                    camps = Camp.query.filter_by(public=True).all()
                     emoji_camp = await tools.wait_for_react_clic(
                         mess,
                         [camp.emoji for camp in camps if camp.emoji]
@@ -611,7 +625,7 @@ class Communication(commands.Cog):
             await ctx.send("Rôle à afficher :")
             role = (await tools.wait_for_message_here(ctx)).content
             mess = await ctx.send("Camp :")
-            camps = Camp.query.filter_by(visible=True).all()
+            camps = Camp.query.filter_by(public=True).all()
             emoji_camp = await tools.wait_for_react_clic(
                 mess,
                 [camp.emoji for camp in camps if camp.emoji]

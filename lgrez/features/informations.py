@@ -36,7 +36,7 @@ class Informations(commands.Cog):
         else:
             camps = Camp.find_nearest(
                 filtre, col=Camp.nom,
-                sensi=0.6, filtre=Camp.visible.is_(True)
+                sensi=0.6, filtre=Camp.public.is_(True)
             )
 
             if camps:
@@ -55,6 +55,7 @@ class Informations(commands.Cog):
                 return
 
         await tools.send_blocs(
+            ctx,
             "Rôles trouvés :\n"
             + "\n".join([
                 str(role.camp.discord_emoji_or_none or "")
@@ -68,7 +69,7 @@ class Informations(commands.Cog):
 
     @commands.command()
     @tools.mjs_only
-    async def rolede(self, ctx, *, cible):
+    async def rolede(self, ctx, *, cible=None):
         """Donne le rôle d'un joueur (COMMANDE MJ)
 
         Args:
@@ -92,13 +93,14 @@ class Informations(commands.Cog):
         if roles:
             role = roles[0][0]
         else:
-            roles = await Role.find_nearest(nomrole, col=Role.nom)
+            roles = Role.find_nearest(nomrole, col=Role.nom)
             if roles:
                 role = roles[0][0]
             else:
                 await ctx.send("Connais pas")
+                return
 
-        joueurs = Joueur.query.filter_by(role=role.slug).filter(
+        joueurs = Joueur.query.filter_by(role=role).filter(
             Joueur.statut.in_([Statut.vivant, Statut.MV])
         ).all()
         await ctx.send(
@@ -143,7 +145,7 @@ class Informations(commands.Cog):
         if actions:
             for action in actions:
                 r += (f" - {config.Emoji.action}  Action en cours : "
-                      f"{tools.code(action.action)} (id {action.id}) – "
+                      f"{tools.code(action.base.slug)} (id {action.id}) – "
                       f"décision : {tools.code(action.decision_)}\n")
             reacts.append(config.Emoji.action)
         else:
@@ -169,19 +171,19 @@ class Informations(commands.Cog):
         """
         def disponible(action):
             """Description des conditions de déclenchement d'<action>"""
-            if action.trigger_debut == ActionTrigger.temporel:
-                dispo = (f"De {tools.time_to_heure(action.heure_debut)} "
-                         f"à {tools.time_to_heure(action.heure_fin)}")
-            elif action.trigger_debut == ActionTrigger.perma:
+            if action.base.trigger_debut == ActionTrigger.temporel:
+                dispo = (f"De {tools.time_to_heure(action.base.heure_debut)} "
+                         f"à {tools.time_to_heure(action.base.heure_fin)}")
+            elif action.base.trigger_debut == ActionTrigger.perma:
                 dispo = "N'importe quand"
-            elif action.trigger_debut == ActionTrigger.start:
+            elif action.base.trigger_debut == ActionTrigger.start:
                 dispo = "Au lancement de la partie"
-            elif action.trigger_debut == ActionTrigger.mort:
+            elif action.base.trigger_debut == ActionTrigger.mort:
                 dispo = "S'active à ta mort"
-            elif action.trigger_debut == ActionTrigger.mot_mjs:
+            elif action.base.trigger_debut == ActionTrigger.mot_mjs:
                 dispo = "S'active à l'annonce des résultats du vote"
-            elif "_" in action.trigger_debut.value:
-                quoi, qui = action.trigger_debut.split("_")
+            elif "_" in (name := action.base.trigger_debut.name):
+                quoi, qui = name.split("_")
                 d_quoi = {"open": "l'ouverture",
                           "close": "la fermeture"}
                 d_qui = {"cond": "du vote condamné",
@@ -192,7 +194,7 @@ class Informations(commands.Cog):
                 except KeyError:
                     dispo = f"S'active à {quoi}_{qui}"
             else:
-                dispo = action.trigger_debut
+                dispo = action.base.trigger_debut.name
 
             return dispo
 
@@ -202,13 +204,13 @@ class Informations(commands.Cog):
         r = ""
 
         r += f"Ton rôle actuel : {tools.bold(joueur.role.nom_complet)}\n"
-        r += tools.ital(f"({tools.code(f'!roles {joueur.role}')} pour "
-                        "tout savoir sur ce rôle)")
+        r += tools.ital(f"({tools.code(f'!roles {joueur.role.slug}')} "
+                        "pour tout savoir sur ce rôle)")
 
         if joueur.actions:
             r += "\n\nActions :"
             r += tools.code_bloc("\n".join([(
-                f" - {str(action.action).ljust(20)} "
+                f" - {action.base.slug.ljust(20)} "
                 + (f"Cooldown : {action.cooldown}" if action.cooldown
                    else disponible(action)).ljust(22)
                 + (f"   {action.charges} charge(s)"
@@ -234,6 +236,9 @@ class Informations(commands.Cog):
 
         Args:
             cible: le joueur dont on veut voir ou modifier les actions
+
+        Warning:
+            Commande expérimentale, non testée.
         """
         joueur = await tools.boucle_query_joueur(ctx, cible, "Qui ?")
         if not joueur:
@@ -255,13 +260,13 @@ class Informations(commands.Cog):
             + "\n".join([(
                 tools.emoji_chiffre(i + 1) + "  "
                 + str(action.id).ljust(5)
-                + str(action.action).ljust(25)
-                + str(action.heure_debut
-                      if action.trigger_debut == ActionTrigger.temporel
-                      else action.trigger_debut).ljust(10)
-                + str(action.heure_fin
-                      if action.trigger_fin == ActionTrigger.temporel
-                      else action.trigger_fin).ljust(10)
+                + action.base.slug.ljust(25)
+                + str(action.base.heure_debut
+                      if action.base.trigger_debut == ActionTrigger.temporel
+                      else action.base.trigger_debut).ljust(10)
+                + str(action.base.heure_fin
+                      if action.base.trigger_fin == ActionTrigger.temporel
+                      else action.base.trigger_fin).ljust(10)
                 + str(action.cooldown).ljust(5)
                 + str(action.charges).ljust(10)
                 + str(action.refill)
@@ -323,11 +328,11 @@ class Informations(commands.Cog):
                     ts = None
 
                 if modif == "début":
-                    action.trigger_debut = trigger
-                    action.heure_debut = ts
+                    action.base.trigger_debut = trigger
+                    action.base.heure_debut = ts
                 else:
-                    action.trigger_fin = trigger
-                    action.heure_fin = ts
+                    action.base.trigger_fin = trigger
+                    action.base.heure_fin = ts
 
             elif modif in ["cd", "cooldown"]:
                 await ctx.send("Combien ?")
@@ -378,7 +383,7 @@ class Informations(commands.Cog):
                 mess += f" {joueur.nom}\n"
 
         await tools.send_code_blocs(
-            mess, prefixe=f"Les {len(joueurs)} joueurs vivants sont :"
+            ctx, mess, prefixe=f"Les {len(joueurs)} joueurs vivants sont :"
         )
 
 
@@ -389,7 +394,7 @@ class Informations(commands.Cog):
         Aussi dite : « liste des joueurs qui mangent leurs morts »
         """
         joueurs = Joueur.query.filter_by(
-            statut=Statut.mort).order_by(Joueur.nom)
+            statut=Statut.mort).order_by(Joueur.nom).all()
 
         if joueurs:
             mess = ""
@@ -399,5 +404,5 @@ class Informations(commands.Cog):
             mess = "Toi (mais tu ne le sais pas encore)"
 
         await tools.send_code_blocs(
-            mess, prefixe=f"Les {len(joueurs) or ''} morts sont :"
+            ctx, mess, prefixe=f"Les {len(joueurs) or ''} morts sont :"
         )

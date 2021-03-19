@@ -14,6 +14,49 @@ from lgrez.bdd import Joueur, Action, CandidHaro, CandidHaroType
 from lgrez.features import gestion_actions
 
 
+def export_vote(vote, joueur):
+    """Enregistre un vote/les actions résolues dans le GSheet ad hoc.
+
+    Écrit dans le GSheet ``LGREZ_DATA_SHEET_ID``. Peut être écrasé
+    pour une autre implémentation.
+
+    Args:
+        vote (str): ```"cond"``, ```"maire"``, ```"loups"`` ou
+            ``"action"``.
+        joueur (.bdd.Joueur): le joueur ayant voté/agi.
+
+    Raises:
+        ValueError: si ``vote`` vaut une autre valeur.
+        RuntimeError: si la variable d'environnement ``LGREZ_DATA_SHEET_ID``
+            n'est pas définie.
+    """
+    if vote == "cond":
+        sheet_name = "votecond_brut"
+        data = [joueur.nom, joueur.vote_condamne_]
+    elif vote == "maire":
+        sheet_name = "votemaire_brut"
+        data = [joueur.nom, joueur.vote_maire_]
+    elif vote == "loups":
+        sheet_name = "voteloups_brut"
+        data = [joueur.nom, joueur.camp.slug, joueur.vote_loups_]
+    elif vote == "action":
+        sheet_name = "actions_brut"
+        recap = "\n+\n".join(f"{action.base.slug} : {action.decision_}"
+                             for action in joueur.actions
+                             if action.decision_ is not None)
+        data = [joueur.nom, joueur.role.slug, joueur.camp.slug, recap]
+    else:
+        raise ValueError(f"export_vote: valeur '{vote}' invalide pour 'vote'")
+
+    LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
+    sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet(sheet_name)
+    sheet.append_row([
+        datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        *data
+    ], value_input_option="USER_ENTERED")
+
+
+
 class VoterAgir(commands.Cog):
     """Commandes de vote et d'action de rôle"""
 
@@ -77,17 +120,10 @@ class VoterAgir(commands.Cog):
         async with ctx.typing():
             # Modification en base
             joueur.vote_condamne_ = cible.nom
-            config.session.commit()
+            joueur.update()
 
             # Écriture dans sheet Données brutes
-            LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
-            sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet(
-                "votecond_brut")
-            sheet.append_row([
-                datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                joueur.nom,
-                joueur.vote_condamne_
-            ], value_input_option="USER_ENTERED")
+            export_vote("cond", joueur)
 
         await ctx.send(
             f"Vote contre {tools.bold(cible.nom)} bien pris en compte.\n"
@@ -158,17 +194,10 @@ class VoterAgir(commands.Cog):
         async with ctx.typing():
             # Modification en base
             joueur.vote_maire_ = cible.nom
-            config.session.commit()
+            joueur.update()
 
             # Écriture dans sheet Données brutes
-            LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
-            sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet(
-                "votemaire_brut")
-            sheet.append_row([
-                datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                joueur.nom,
-                joueur.vote_maire_
-            ], value_input_option="USER_ENTERED")
+            export_vote("maire", joueur)
 
         await ctx.send(
             f"Vote pour {tools.bold(cible.nom)} bien pris en compte.\n"
@@ -221,18 +250,10 @@ class VoterAgir(commands.Cog):
         async with ctx.typing():
             # Modification en base
             joueur.vote_loups_ = cible.nom
-            config.session.commit()
+            joueur.update()
 
             # Écriture dans sheet Données brutes
-            LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
-            sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet(
-                "voteloups_brut")
-            sheet.append_row([
-                datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                joueur.nom,
-                joueur.camp,
-                joueur.vote_loups_
-            ], value_input_option="USER_ENTERED")
+            export_vote("loups", joueur)
 
         await ctx.send(
             f"Vote contre {tools.bold(cible.nom)} bien pris en compte."
@@ -265,9 +286,16 @@ class VoterAgir(commands.Cog):
         """
         joueur = Joueur.from_member(ctx.author)
 
+        # Vérification rôle actif
+        if not joueur.role_actif:
+            await ctx.send(
+                "Tu ne peux pas utiliser tes pouvoirs pour le moment !"
+            )
+            return
+
         # Détermine la/les actions en cours pour le joueur
         actions = Action.query.filter_by(joueur=joueur).filter(
-            Action.decision_.is_not(None)).all()
+            Action.decision_.isnot(None)).all()
         if not actions:
             await ctx.send("Aucune action en cours pour toi.")
             return
@@ -283,6 +311,7 @@ class VoterAgir(commands.Cog):
             message = await ctx.send(txt + "\nPour laquelle veux-tu agir ?")
             i = await tools.choice(message, N)
             action = actions[i-1]
+
         else:
             action = actions[0]
 
@@ -303,7 +332,7 @@ class VoterAgir(commands.Cog):
             return
 
         # Avertissement si action a conséquence instantanée (barbier...)
-        if action.instant:
+        if action.base.instant:
             message = await ctx.send(
                 "Attention : cette action a une conséquence instantanée ! "
                 "Si tu valides, tu ne pourras pas revenir en arrière.\n"
@@ -318,35 +347,11 @@ class VoterAgir(commands.Cog):
             action.decision_ = decision
 
             # Écriture dans sheet Données brutes
-            LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
-            sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet(
-                "actions_brut")
-            sheet.append_row([
-                datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                joueur.nom,
-                joueur.role,
-                joueur.camp,
-                "\n+\n".join([f"{action.base.slug} : {action.decision_}"
-                              for action in actions])
-            ], value_input_option="USER_ENTERED")
+            export_vote("action", joueur)
 
         # Conséquences si action instantanée
-        if action.instant:
-            async with ctx.typing():
-                deleted = False
-                if action.charges:
-                    action.charges = action.charges - 1
-                    pcs = (" pour cette semaine"
-                           if "weekends" in (action.base.refill or "").split()
-                           else "")
-                    await ctx.send(
-                        f"Il te reste {action.charges} charge(s){pcs}."
-                    )
-                    if action.charges == 0 and not action.base.refill:
-                        gestion_actions.delete_action(action)
-                        deleted = True
-                if not deleted:
-                    action.decision_ = None
+        if action.base.instant:
+            await gestion_actions.close_action(action)
 
             await ctx.send(tools.ital(
                 f"[Allô {config.Role.mj.mention}, "

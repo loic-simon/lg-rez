@@ -235,5 +235,5 @@ class GestionTaches(commands.Cog):
             await ctx.send("Mission aborted.")
             return
 
-        Tache.remove(*taches)
+        Tache.delete(*taches)
         await ctx.send("Tâche(s) annulée(s).")

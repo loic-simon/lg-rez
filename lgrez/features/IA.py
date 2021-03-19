@@ -39,8 +39,8 @@ async def _build_sequence(ctx):
             trigger_on_commands=True
         )
         if isinstance(ret, str):
-            if ret.startswith(ctx.bot.command_prefix):      # Commande
-                reponse += MARK_CMD + ret.lstrip(ctx.bot.command_prefix)
+            if ret.startswith(config.bot.command_prefix):   # Commande
+                reponse += MARK_CMD + ret.lstrip(config.bot.command_prefix)
             else:                                           # Texte / média
                 reponse += ret
         else:                                               # React
@@ -103,7 +103,7 @@ class GestionIA(commands.Cog):
                 forcer l'activation / la désactivation.
 
         Sans argument, la commande active les réactions si désactivées
-        et vice-versa.
+        et vice-versa ; avec un autre argument, elle le fait silencieusment.
 
         N'agit que sur les messages classiques envoyés dans le channel :
         les commandes restent reconnues.
@@ -112,24 +112,24 @@ class GestionIA(commands.Cog):
         """
         id = ctx.channel.id
 
-        if force in [None, "start", "on"] and id not in ctx.bot.in_stfu:
-            ctx.bot.in_stfu.append(id)
+        if force in [None, "start", "on"] and id not in config.bot.in_stfu:
+            config.bot.in_stfu.append(id)
             await ctx.send(
                 "Okay, je me tais ! Tape !stfu quand tu voudras de "
                 "nouveau de moi :cry:"
             )
 
-        elif force in [None, "stop", "off"] and id in ctx.bot.in_stfu:
-            ctx.bot.in_stfu.remove(id)
+        elif force in [None, "stop", "off"] and id in config.bot.in_stfu:
+            config.bot.in_stfu.remove(id)
             await ctx.send("Ahhh, ça fait plaisir de pouvoir reparler !")
 
-        else:
+        elif force not in ["start", "on", "stop", "off"]:
             # Quelque chose d'autre que start/stop précisé après !stfu :
             # bot discret
-            if id in ctx.bot.in_stfu:
-                ctx.bot.in_stfu.remove(id)
+            if id in config.bot.in_stfu:
+                config.bot.in_stfu.remove(id)
             else:
-                ctx.bot.in_stfu.append(id)
+                config.bot.in_stfu.append(id)
 
 
     @commands.command(aliases=["cancer", "214"])
@@ -150,23 +150,23 @@ class GestionIA(commands.Cog):
         """
         id = ctx.channel.id
 
-        if force in [None, "start", "on"] and id not in ctx.bot.in_fals:
-            ctx.bot.in_fals.append(id)
+        if force in [None, "start", "on"] and id not in config.bot.in_fals:
+            config.bot.in_fals.append(id)
             await ctx.send(
                 "https://tenor.com/view/saucisse-sausage-gif-5426973"
             )
 
-        elif force in [None, "stop", "off"] and id in ctx.bot.in_fals:
-            ctx.bot.in_fals.remove(id)
+        elif force in [None, "stop", "off"] and id in config.bot.in_fals:
+            config.bot.in_fals.remove(id)
             await ctx.send("T'as raison, faut pas abuser des bonnes choses")
 
-        else:
+        elif force not in ["start", "on", "stop", "off"]:
             # Quelque chose d'autre que start/stop précisé après !fals :
             # bot discret
-            if id in ctx.bot.in_fals:
-                ctx.bot.in_fals.remove(id)
+            if id in config.bot.in_fals:
+                config.bot.in_fals.remove(id)
             else:
-                ctx.bot.in_fals.append(id)
+                config.bot.in_fals.append(id)
 
 
     @commands.command(aliases=["r"])
@@ -185,7 +185,7 @@ class GestionIA(commands.Cog):
         oc = ctx.message.content
         ctx.message.content = trigger
         await process_IA(ctx.message,
-                         debug=(ctx.author.top_role.name == "MJ"))
+                         debug=(ctx.author.top_role == config.Role.mj))
         ctx.message.content = oc
         # On rétablit le message original pour ne pas qu'il trigger
         # l'IA 2 fois, le cas échéant
@@ -233,6 +233,8 @@ class GestionIA(commands.Cog):
 
         triggers = triggers.replace('\n', ';').split(';')
         triggers = [tools.remove_accents(s).lower().strip() for s in triggers]
+        triggers = list({trig for trig in triggers if trig})
+        # filtre doublons (accents et non accents...) et triggers vides
         await ctx.send(f"Triggers : `{'` – `'.join(triggers)}`")
 
         reponse = await _build_sequence(ctx)
@@ -255,6 +257,9 @@ class GestionIA(commands.Cog):
     @tools.mjs_et_redacteurs
     async def listIA(self, ctx, trigger=None, sensi=0.5):
         """Liste les règles d'IA reconnues par le bot (COMMANDE MJ/RÉDACTEURS)
+
+        Warning:
+            Commande en bêta, non couverte par les tests unitaires.
 
         Args
             trigger (optionnel): mot/expression permettant de filter et
@@ -344,7 +349,7 @@ class GestionIA(commands.Cog):
 
         displ_seq = (reac.reponse if reac.reponse.startswith('`')
                      else tools.code(reac.reponse))     # Pour affichage
-        trigs = reac.triggers
+        trigs = list(reac.triggers)
 
         await ctx.send(
             f"Triggers : `{'` – `'.join([trig.trigger for trig in trigs])}`\n"
@@ -352,14 +357,12 @@ class GestionIA(commands.Cog):
         )
 
         message = await ctx.send(
-            "Modifier : ⏩ triggers / ⏺ Réponse / "
-            "⏸ Les deux / 🚮 Supprimer ?"
+            "Modifier : ⏩ triggers / ⏺ Réponse / 🚮 Supprimer ?"
         )
-        MT, MR = await tools.wait_for_react_clic(
-            message, emojis={"⏩": (True, False), "⏺": (False, True),
-                             "⏸": (True, True), "🚮": (False, False)})
+        choix = await tools.wait_for_react_clic(
+            message, emojis={"⏩": 1, "⏺": 2, "🚮": 0})
 
-        if MT:                      # Modification des triggers
+        if choix == 1:              # Modification des triggers
             fini = False
             while not fini:
                 s = "Supprimer un trigger : \n"
@@ -397,14 +400,10 @@ class GestionIA(commands.Cog):
                 config.session.commit()
                 return
 
-        if MR:                  # Modification de la réponse
-            r = ""
-            if MT:      # Si ça fait longtemps, on remet la séquence
-                r += f"Séquence actuelle : {displ_seq}"
-
+        elif choix == 2:            # Modification de la réponse
             if any([mark in reac.reponse for mark in MARKS]):
                 # Séquence compliquée
-                r += (
+                await ctx.send(
                     "\nLa séquence-réponse peut être refaite manuellement "
                     "ou modifiée rapidement en envoyant directment la "
                     "séquence ci-dessus modifiée (avec les marqueurs : "
@@ -417,7 +416,7 @@ class GestionIA(commands.Cog):
             reponse = await _build_sequence(ctx)
             reac.reponse = reponse
 
-        if not (MT or MR):      # Suppression
+        else:                       # Suppression
             config.session.delete(reac)
             for trig in trigs:
                 config.session.delete(trig)
@@ -469,7 +468,7 @@ async def trigger_roles(message, sensi=0.8):
         role = roles[0][0]          # Meilleur trigger (score max)
         await message.channel.send(tools.code_bloc(
             f"{role.prefixe}{role.nom} – {role.description_courte} "
-            f"(camp : {role.camp})\n\n{role.description_longue}"
+            f"(camp : {role.camp.nom})\n\n{role.description_longue}"
         ))      # On envoie
         return True
 
@@ -556,7 +555,7 @@ async def trigger_sub_reactions(message, sensi=0.9, debug=False):
         for mot in sorted(mots, key=lambda m: -len(m)):
             # On parcourt les mots du plus long au plus court
             if len(mot) > 4:        # on élimine les mots de liaison
-                if await trigger_reactions(config.bot, message, chain=mot,
+                if await trigger_reactions(message, chain=mot,
                                            sensi=sensi, debug=debug):
                     # Si on trouve une sous-rect (à 0.9)
                     return True
@@ -630,6 +629,7 @@ async def trigger_mot_unique(message):
         - ``False`` -- sinon
     """
     if len(message.content.split()) == 1 and ":" not in message.content:
+        # : pour ne pas trigger aux liens
         rep = f"{message.content.capitalize()} ?"
         await message.channel.send(rep)
         return True

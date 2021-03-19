@@ -107,7 +107,7 @@ Camps
 
 
 Actions de base
-~~~~~~~~~~~~~~~~^^^^
+~~~~~~~~~~~~~~~~
 
 .. autoclass:: lgrez.bdd.BaseAction
     :members:

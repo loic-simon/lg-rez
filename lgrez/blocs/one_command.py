@@ -20,7 +20,7 @@ exempted = []
 class AlreadyInCommand(commands.CheckFailure):
     """Salon déjà occupé par une commande non finissable.
 
-    Exception levée lorsq'un membre veut lancer une commande dans un
+    Exception levée lorsqu'un membre veut lancer une commande dans un
     salon où une commande est déjà en cours d'exécution, et que cette
     commande n'a pas pu être arrêtée (ou pas assez rapidement) par
     un message ``"stop"``.

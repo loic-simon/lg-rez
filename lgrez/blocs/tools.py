@@ -526,8 +526,9 @@ async def wait_for_react_clic(message, emojis={}, *, process_text=False,
             ret = post_converter(mess) if post_converter else mess
             await message.clear_reactions()
 
-    finally:
+    except Exception:
         await message.clear_reactions()
+        raise
 
     return ret
 
@@ -769,7 +770,7 @@ def next_occurence(tps):
     """Renvoie la prochaine occurence temporelle d'une heure donnée.
 
     Renvoie le prochain timestamp arrivant DANS LES HORAIRES DU JEU :
-    du dimanche 19:00:00 au vendredi 18:59:59.
+    entre :func:`.tools.fin_pause` et :func:`.tools.debut_pause`.
 
     Args:
         tps (datetime.time): heure dont on veut connaître
@@ -778,27 +779,25 @@ def next_occurence(tps):
     Returns:
         :class:`datetime.datetime`
     """
-    pause = datetime.time(hour=19)
-
     now = datetime.datetime.now()
     jour = now.date()
-    if tps <= now.time():
+    if tps < now.time():
         # Si plus tôt dans la journée que l'heure actuelle,
         # on réfléchit comme si on était demain
         jour += datetime.timedelta(days=1)
 
-    wd = jour.weekday()         # Jour de la semaine, Lu = 0 ... Di = 6
+    test_dt = datetime.datetime.combine(jour, tps)
+    if test_dt < debut_pause():
+        # Prochaine occurence avant la pause : OK
+        return test_dt
 
-    if tps < pause:
-        if wd <= 4:                 # Avant 19h du lundi au vendredi : OK
-            pass
-        else:                       # Avant 19h mais on est samedi/dimanche
-            jour += datetime.timedelta(days=(7 - wd))
-    else:
-        if wd <= 3 or wd == 6:      # Après 19h du dimanche au jeudi : OK
-            pass
-        else:                       # Après 19h et on est vendredi/samedi
-            jour += datetime.timedelta(days=(6 - wd))
+    # Sinon, programmer après la pause
+    finp = fin_pause()
+    jour = finp.date()
+    if tps < finp.time():
+        # Si plus tôt dans la journée que l'heure de reprise,
+        # on réfléchit comme si on était le lendemain
+        jour += datetime.timedelta(days=1)
 
     return datetime.datetime.combine(jour, tps)
 
@@ -845,6 +844,18 @@ def fin_pause():
     # Jour décalé du nombre de jours avant vendredi
     reprise_jour = jour + datetime.timedelta(days=ddays)
     return datetime.datetime.combine(reprise_jour, reprise_time)
+
+
+def en_pause():
+    """Détermine si le jeu est actuellement en pause hebdomadaire.
+
+    Si il n'y a pas de pause (:func:`.fin_pause` = :func:`.debut_pause`),
+    renvoie toujours ``False``.
+
+    Returns:
+        :class:`bool`
+    """
+    return fin_pause() < debut_pause()
 
 
 # ---------------------------------------------------------------------------
@@ -931,6 +942,8 @@ async def send_code_blocs(messageable, mess, *, N=1990, sep='\n', rep='',
     Returns:
         list[discord.Message]: La liste des messages envoyés.
     """
+    mess = str(mess)
+
     if prefixe:
         prefixe = prefixe.rstrip() + "\n"
 

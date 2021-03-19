@@ -37,7 +37,7 @@ class TableMeta(declarative.api.DeclarativeMeta):
         - définit des méthodes et propriétés de classe simplifiant
           l'utilisation des tables.
     """
-    def __init__(cls, *args, comment=None, **kwargs):
+    def __init__(cls, name, bases, dic, comment=None, **kwargs):
         """Constructs the data class"""
         if cls.__name__ == "TableBase":
             # Ne pas documenter TableBase (pas une vraie table)
@@ -46,7 +46,12 @@ class TableMeta(declarative.api.DeclarativeMeta):
         cls.__tablename__ = cls.__name__.lower() + "s"
         if comment is None:
             comment = cls.__doc__
-        super().__init__(*args, comment=comment, **kwargs)
+        super().__init__(name, bases, dic, comment=comment, **kwargs)
+
+        cls._attrs = {n: k for n, k in dic.items() if isinstance(k, (
+            sqlalchemy.Column,
+            sqlalchemy.orm.relationships.RelationshipProperty,
+        ))}
 
         cls.__doc__ += f"""\n    Note:
         Cette classe est une *classe de données* (sous-classe de
@@ -73,10 +78,49 @@ class TableMeta(declarative.api.DeclarativeMeta):
 
     @property
     def columns(cls):
-        """Sequence[sqlalchemy.schema.Column]: Raccourci pour
-        ``Table.__table__.columns``.
+        """sqlalchemy.sql.base.ImmutableColumnCollection: Raccourci pour
+        ``Table.__table__.columns`` (pseudo-dictionnaire nom -> colonne).
+
+        Comportement global de dictionnaire :
+
+            - ``Table.columns["nom"]`` -> colonne associée ;
+            - ``Table.columns.keys()`` -> noms des colonnes ;
+            - ``Table.columns.values()`` -> objets Column ;
+            - ``Table.columns.items()`` -> tuples (nom, colonne) ;
+
+        MAIS itération sur les colonnes (valeurs du dictionnaire) :
+
+            - ``list(Table.columns)`` -> objets Column ;
+            - ``for col in Table.columns`` -> objets Column.
         """
         return cls.__table__.columns
+
+    @property
+    def attrs(cls):
+        """Mapping[str, :attr:`sqlalchemy.schema.Column` |
+        :attr:`sqlalchemy.orm.RelationshipProperty`]: Attributs de
+        données publics des instances (dictionnaire nom -> colonne
+        / relationship).
+        """
+        return cls._attrs
+
+    # @property
+    # def one_to_manys(cls):
+    #     """Mapping[str, sqlalchemy.sql.schema.ForeignKeyConstraint]:
+    #     Clés étrangères de la table, représentant les relations one-to-many
+    #     (dictionnaire nom -> constraint).
+    #     """
+    #     fks = cls.__table__.foreign_key_constraints
+    #     mapp = {}
+    #     for fk in fks:
+    #         if len(fk.columns) != 1:
+    #             raise ValueError(
+    #                 f"Foreign key {fk} is built on several columns, "
+    #                 "which is not supported by `table.one_to_manys`."
+    #             )
+    #         column = next(iter(fk.columns))
+    #         mapp[column.key] = fk
+    #     return mapp
 
     @property
     def primary_col(cls):
@@ -129,7 +173,7 @@ class TableMeta(declarative.api.DeclarativeMeta):
             décroissant (et ce même si un seul résultat).
 
         Raises:
-            KeyError: ``col`` inexistante ou pas de type textuel
+            ValueError: ``col`` inexistante ou pas de type textuel
             ~ready_check.NotReadyError: session non initialisée
                 (:attr:`.lgrez.config.session` vaut ``None``)
 
@@ -141,17 +185,19 @@ class TableMeta(declarative.api.DeclarativeMeta):
             l'accentuation ni de la casse.
         """
         if not col:
-            col = cls.primary_key
-        elif isinstance(col, sqlalchemy.Column):
-            col = col.key
+            col = cls.primary_col
+        elif isinstance(col, str):
+            if col not in cls.columns:
+                raise ValueError(
+                    f"{cls.__name__}.find_nearest: Colonne '{col}' invalide"
+                )
 
-        if col not in cls.columns_names:
-            raise KeyError(f"Colonne {col} invalide pour {cls}")
-        if not isinstance(cls.columns_types[col], sqlalchemy.String):
-            raise KeyError(f"Colonne {cls}.{col} pas de type textuel")
+        if not isinstance(col.type, sqlalchemy.String):
+            raise ValueError(f"{cls.__name__}.find_nearest: "
+                             f"Colonne {col.key} pas de type textuel")
 
         query = cls.query
-        if filtre:
+        if filtre is not None:
             query = query.filter(filtre)
 
         results = query.all()
@@ -163,7 +209,7 @@ class TableMeta(declarative.api.DeclarativeMeta):
 
         scores = []
         for entry in results:
-            slug2 = _remove_accents(getattr(entry, col)).lower()
+            slug2 = _remove_accents(getattr(entry, col.key)).lower()
 
             # On compare chaque élément à la cible (en non accentué)
             SM.set_seq2(slug2)
@@ -206,6 +252,19 @@ class TableBase:
 
     (construite par :func:`sqlalchemy.ext.declarative.declarative_base`)
     """
+    @property
+    def primary_key(self):
+        """Any: Clé primaire de l'instance (``id``, ``slug``...).
+
+        Raccourci pour ``getattr(inst, type(inst).primary_col.key)``.
+
+        Raises:
+            :exc:`ValueError`: Pas de colonne clé primaire pour la
+                table de cette instance, ou plusieurs.
+        """
+        key = type(self).primary_col.key
+        return getattr(self, key)
+
     @staticmethod
     def update():
         """Applique les modifications en attente en base (commit).
@@ -243,7 +302,8 @@ class TableBase:
             config.session.commit()
         """
         config.session.add(self)
-        config.session.add_all(other)
+        if other:
+            config.session.add_all(other)
 
         self.update()
 
@@ -307,7 +367,7 @@ def autodoc_Column(*args, doc="", comment=None, **kwargs):
         py_type_str = f"{py_type.__module__}.{py_type.__name__}"
     or_none = " | ``None``" if col.nullable else ""
     primary = " (clé primaire)" if col.primary_key else ""
-    autoinc = (" (auto-incrémental)" 
+    autoinc = (" (auto-incrémental)"
                if (col.autoincrement and primary
                    and isinstance(col.type, sqlalchemy.Integer))
                else "")

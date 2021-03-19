@@ -9,8 +9,19 @@ from lgrez.blocs import tools, env, gsheets
 from lgrez.bdd import Joueur, Role, Camp, Statut
 
 
-async def _new_channel(member):
-    """Crée un nouveau chan privé"""
+async def new_channel(member):
+    """Crée et renvoie un nouveau salon privé.
+
+    Peut être étendue, mais toujours appeller cette fonction pour
+    créer le chan en lui-même, au risque d'altérer le fonctionnement
+    normal du bot.
+
+    Args:
+        member (discord.Member): le membre pour qui créer le salon.
+
+    Returns:
+        :class:`discord.TextChannel`
+    """
     categ = tools.channel(config.private_chan_category_name)
     if len(categ.channels) >= 50:
         # Limitation Discord : 50 channels par catégorie
@@ -39,12 +50,98 @@ async def _new_channel(member):
     return chan
 
 
-# Routine d'inscription (fonction appellée par la commande !co)
-async def main(member):
-    """Exécute le processus d'inscription d'un joueur
+def register_on_tdb(joueur):
+    """Enregistre un joueur dans le Tableau de bord.
+
+    Peut être personnalisé à un autre système de gestion des joueurs.
 
     Args:
-        member (:class:`~discord.Member`): joueur à inscrire
+        joueur (.bdd.Joueur): le joueur à enregistrer.
+    """
+    SHEET_ID = env.load("LGREZ_TDB_SHEET_ID")
+    workbook = gsheets.connect(SHEET_ID)
+    sheet = workbook.worksheet(config.tdb_main_sheet)
+    values = sheet.get_all_values()         # Liste de listes
+
+    head = values[config.tdb_header_row - 1]
+    # Ligne d'en-têtes (noms des colonnes), - 1 car indexé à 0
+
+    id_index = gsheets.a_to_index(config.tdb_id_column)
+    pk = head[id_index]
+    if pk != Joueur.primary_col.key:
+        raise ValueError(
+            "Tableau de bord : la cellule "
+            "`config.tdb_id_column` / `config.tdb_header_row` = "
+            f"`{config.tdb_id_column}{config.tdb_header_row}` "
+            f"vaut `{pk}` au lieu de la clé primaire de la table "
+            f"`Joueur`, `{Joueur.primary_col.key}` !"
+        )
+
+    mstart, mstop = config.tdb_main_columns
+    main_indexes = range(gsheets.a_to_index(mstart),
+                         gsheets.a_to_index(mstop) + 1)
+    # Indices des colonnes à remplir
+    cols = {}
+    for index in main_indexes:
+        col = head[index]
+        if col in Joueur.attrs:
+            cols[col] = Joueur.attrs[col]
+        else:
+            raise ValueError(
+                f"Tableau de bord : l'index de la zone principale "
+                f"`{col}` n'est pas une colonne de la table `Joueur` !"
+                " (voir `lgrez.config.main_indexes` / "
+                "`lgrez.config.tdb_header_row`)"
+            )
+
+    tstart, tstop = config.tdb_tampon_columns
+    tampon_indexes = range(gsheets.a_to_index(tstart),
+                           gsheets.a_to_index(tstop) + 1)
+
+    TDB_tampon_index = {}
+    for index in tampon_indexes:
+        col = head[index].partition("_")[2]
+        if col in cols:
+            TDB_tampon_index[col] = index
+        else:
+            raise ValueError(
+                f"Tableau de bord : l'index de zone tampon `{head[index]}` "
+                f"réfère à la colonne `{col}` (partie suivant le premier "
+                f"underscore), qui n'est pas une colonne de la zone "
+                "principale ! (voir `lgrez.config.tampon_indexes` / "
+                "`lgrez.config.main_indexes`)"
+            )
+
+    plv = config.tdb_header_row         # Première Ligne Vide
+    # (si tableau vide, suit directement le header, - 1 pour l'indexage)
+    for i_row, row in enumerate(values):
+        # On parcourt les lignes du TDB
+        if i_row < config.tdb_header_row:
+            # Ligne avant le header / le header (car décalage de 1)
+            continue
+
+        if row[id_index].isdigit():
+            # Si il y a un vrai ID dans la colonne ID
+            plv = i_row + 1
+
+    modifs = [gsheets.Modif(plv, id_index, joueur.discord_id)]
+    for index in main_indexes:
+        val = getattr(joueur, head[index])
+        modifs.append(gsheets.Modif(plv, index, val))
+    for index in tampon_indexes:
+        val = getattr(joueur, head[index].partition("_")[2])
+        # Colonnes "tampon_<col>" ==> <col>
+        modifs.append(gsheets.Modif(plv, index, val))
+
+    gsheets.update(sheet, *modifs)
+
+
+# Routine d'inscription (fonction appellée par la commande !co)
+async def main(member):
+    """Routine d'inscription complète d'un joueur.
+
+    Args:
+        member (:class:`~discord.Member`): joueur à inscrire.
 
     Crée et paramètre le salon privé du joueur, lui pose des questions
     et l'inscrit en base.
@@ -79,7 +176,7 @@ async def main(member):
         )
 
     else:           # Pas d'inscription déjà en cours : création channel
-        chan = await _new_channel(member)
+        chan = await new_channel(member)
 
     # Récupération nom et renommages
 
@@ -164,7 +261,7 @@ async def main(member):
     )
 
     if config.demande_chambre:
-        await tools.sleep(chan, 5)
+        await tools.sleep(chan, 3)
         a_la_rez = await tools.yes_no(await chan.send(
             "Bien, dernière chose : habites-tu à la Rez ?"
         ))
@@ -172,7 +269,7 @@ async def main(member):
         if a_la_rez:
             def sortie_num_rez(m):
                 # Longueur de chambre de rez maximale
-                return len(m.content) < 200
+                return len(m.content) < Joueur.chambre.type.length
             mess = await tools.boucle_message(
                 chan, "Alors, quelle est ta chambre ?", sortie_num_rez,
                 rep_message=("Désolé, ce n'est pas un numéro de chambre "
@@ -192,58 +289,31 @@ async def main(member):
 
     # Indicateur d'écriture pour informer le joueur que le bot fait des trucs
     async with chan.typing():
-        # Ajout à la BDD
+        # Enregistrement en base
 
         joueur = Joueur(
-            discord_id=member.id, chan_id_=chan.id, nom=member.display_name,
-            chambre=chambre, statut=Statut.vivant, role=Role.default(),
-            camp=Camp.default(), votant_village=True, votant_loups=False,
-            role_actif=False
+            discord_id=member.id,
+            chan_id_=chan.id,
+            nom=member.display_name,
+            chambre=chambre,
+            statut=Statut.vivant,
+            role=Role.default(),
+            camp=Camp.default(),
+            votant_village=True,
+            votant_loups=False,
+            role_actif=False,
         )
-        config.session.add(joueur)
-        config.session.commit()
+        joueur.add()
 
-        # Ajout au TDB
+        # Ajout sur le TDB
 
-        cols = [col for col in Joueur.columns if not col.endswith('_')]
-        # On élimine les colonnes locales
-
-        SHEET_ID = env.load("LGREZ_TDB_SHEET_ID")
-
-        workbook = gsheets.connect(SHEET_ID)
-        sheet = workbook.worksheet("Journée en cours")
-        values = sheet.get_all_values()
-        # Liste de liste des valeurs des cellules
-        NL = len(values)
-
-        head = values[2]
-        # Ligne d'en-têtes (noms des colonnes) = 3e ligne du TDB
-        TDB_index = {col: head.index(col.key) for col in cols}
-        # Indices des colonnes GSheet pour chaque colonne de la table
-        TDB_tampon_index = {col: head.index(f"tampon_{col.key}")
-                            for col in cols if not col.primary_key}
-        # Idem pour la partie « tampon »
-
-        plv = 3     # Première Ligne Vide (si tableau vide, 4e ligne ==> 3)
-        for l in range(NL):
-            if values[l][TDB_index[Joueur.primary_col]].isdigit():
-                # Si il y a un vrai ID dans la colonne ID, ligne l
-                plv = l + 1
-
-        modifs = [gsheets.Modif(plv, TDB_index[col], getattr(joueur, col.key))
-                  for col in TDB_index]
-        tampon = [gsheets.Modif(plv, TDB_tampon_index[col],
-                                getattr(joueur, col.key))
-                  for col in TDB_tampon_index]
-        gsheets.update(sheet, *modifs, *tampon)
+        register_on_tdb(joueur)
 
         # Grant accès aux channels joueurs et information
 
         await member.add_roles(config.Role.joueur_en_vie)
-        await chan.edit(
-            topic="Ta conversation privée avec le bot, "
-                  "c'est ici que tout se passera !"
-        )
+        await chan.edit(topic="Ta conversation privée avec le bot, "
+                              "c'est ici que tout se passera !")
 
     # Conseiller d'ACTIVER TOUTES LES NOTIFS du chan
     # (et mentions only pour le reste, en activant @everyone)
@@ -257,7 +327,7 @@ async def main(member):
         "- Plein de commandes te sont d'ores et déjà accessibles ! "
         f"Découvre les toutes en tapant {tools.code('!help')} ;\n "
         "- Si tu as besoin d'aide, plus de bouton MJ ALED : mentionne "
-        f"simplement les MJs ({tools.code('@' + config.role.mj.name)}) "
+        f"simplement les MJs ({tools.code('@' + config.Role.mj.name)}) "
         "et on viendra voir ce qui se passe !\n "
         "- Si ce n'est pas le cas, je te conseille fortement d'installer "
         "Discord sur ton téléphone, "

@@ -18,6 +18,22 @@ from lgrez.blocs import tools, realshell, one_command
 from lgrez.bdd import *       # toutes les tables dans globals()
 
 
+async def _filter_runnables(commands):
+    """Retourne les commandes pouvant run parmis commands"""
+    runnables = []
+    with one_command.bypass(ctx):
+        # On désactive la limitation de une commande simultanée
+        # sinon can_run renvoie toujours False
+        for cmd in commands:
+            try:
+                runnable = await cmd.can_run(ctx)
+            except Exception:
+                runnable = False
+            if runnable:
+                runnables.append(cmd)
+    return runnables
+
+
 class Special(commands.Cog):
     """Commandes spéciales (méta-commandes et expérimentations)"""
 
@@ -54,16 +70,17 @@ class Special(commands.Cog):
         À utiliser avec parcimonie donc, et QUE pour du
         développement/debug !
         """
-        class Answer():
+        class Answer:
             rep = None
-        a = Answer()
+        _a = Answer()
 
         locs = globals()
         locs["ctx"] = ctx
-        exec(f"a.rep = {code}", locs)
-        if asyncio.iscoroutine(a.rep):
-            a.rep = await a.rep
-        await ctx.send(tools.code_bloc(a.rep))
+        locs["_a"] = _a
+        exec(f"_a.rep = {code}", locs)
+        if asyncio.iscoroutine(_a.rep):
+            _a.rep = await _a.rep
+        await ctx.send(tools.code_bloc(_a.rep))
 
 
     @commands.command()
@@ -80,7 +97,7 @@ class Special(commands.Cog):
         """
         locs = globals()
         locs["ctx"] = ctx
-        shell = realshell.RealShell(config.bot, ctx.channel, locs)
+        shell = realshell.RealShell(ctx.channel, locs)
         try:
             await shell.interact()
         except realshell.RealShellExit as exc:
@@ -127,8 +144,11 @@ class Special(commands.Cog):
         Example:
             ``!doas Vincent Croquette !vote Annie Colin``
         """
-        qui, _, quoi = qui_quoi.partition(" " + config.bot.command_prefix)
+        sep = " " + config.bot.command_prefix
+        qui, _, quoi = qui_quoi.partition(sep)
         # !doas <@!id> !vote R ==> qui = "<@!id>", quoi = "vote R"
+        if not quoi:
+            raise commands.UserInputError(f"'{sep}' not found in qui_quoi")
         joueur = await tools.boucle_query_joueur(ctx, qui.strip())
 
         ctx.message.content = config.bot.command_prefix + quoi
@@ -170,7 +190,7 @@ class Special(commands.Cog):
         """
         if ctx.channel.id in config.bot.in_command:
             config.bot.in_command.remove(ctx.channel.id)
-        ctx.send("Te voilà libre, camarade !")
+        await ctx.send("Te voilà libre, camarade !")
 
 
     @commands.command(aliases=["aide", "aled", "oskour"])
@@ -199,24 +219,9 @@ class Special(commands.Cog):
         if not command:
             # Pas d'argument ==> liste toutes les commandes
 
-            async def filter_runnables(commands):
-                """Retourne les commandes pouvant run parmis commands"""
-                runnables = []
-                with one_command.bypass(ctx):
-                    # On désactive la limitation de une commande simultanée
-                    # sinon can_run renvoie toujours False
-                    for cmd in commands:
-                        try:
-                            runnable = await cmd.can_run(ctx)
-                        except Exception:
-                            runnable = False
-                        if runnable:
-                            runnables.append(cmd)
-                return runnables
-
             r = f"{config.bot.description} (v{__version__})"
             for cog in cogs.values():
-                runnables = await filter_runnables(cog.get_commands())
+                runnables = await _filter_runnables(cog.get_commands())
                 if not runnables:
                     # pas de runnables dans le cog, on passe
                     continue
@@ -225,8 +230,9 @@ class Special(commands.Cog):
                 for cmd in runnables:       # pour chaque commande runnable
                     r += descr_command(cmd)
 
-            runnables_hors_cog = await filter_runnables(
-                cmd for cmd in config.bot.commands if not cmd.cog)
+            runnables_hors_cog = await _filter_runnables(
+                cmd for cmd in config.bot.commands if not cmd.cog
+            )
             if runnables_hors_cog:
                 r += "\n\nCommandes isolées :"
                 for cmd in runnables_hors_cog:
@@ -250,18 +256,59 @@ class Special(commands.Cog):
                 doc = cmd.help or ""
                 doc = doc.replace("``", "`")
                 doc = doc.replace("Args:", "Arguments :")
+                doc = doc.replace("Warning:", "Avertissement :")
                 doc = re.sub(r":\w+?:`[\.~!]*(.+?)`", r"`\1`", doc)
+                # enlève les :class: et consors
 
                 r = f"{pref}{command} {cmd.signature} – {doc}\n"
                 if cmd.aliases:         # Si la commande a des alias
                     r += f"\nAlias : {pref}" + f", {pref}".join(cmd.aliases)
 
             else:
-                r = (f"Commande <{command}> non trouvée.\n"
-                     f"Utilise <{pref}help> pour la liste des commandes.")
+                r = (f"Commande '{pref}{command}' non trouvée.\n"
+                     f"Utilise '{pref}help' pour la liste des commandes.")
 
         r += ("\nSi besoin, n'hésite pas à appeler un MJ "
               "en les mentionnant (@MJ).")
 
         await tools.send_code_blocs(ctx, r, sep="\n\n")
         # On envoie, en séparant enntre les cogs de préférence
+
+
+    @commands.command(aliases=["about", "copyright", "licence", "auteurs"])
+    async def apropos(self, ctx):
+        """Informations et mentions légales du projet
+
+        N'hésitez-pas à nous contacter pour en savoir plus !
+        """
+        embed = discord.Embed(
+            title=f"**LG-bot** - v{__version__}",
+            description=config.bot.description
+        ).set_author(
+            name="À propos de ce bot :",
+            icon_url=config.bot.user.avatar_url,
+        ).set_image(
+            url=("https://gist.githubusercontent.com/loic-simon/"
+                 "66c726053323017dba67f85d942495ef/raw/"
+                 "48f2607a61f3fc1b7285fd64873621035c6fbbdb/logo_espci.png"),
+        ).add_field(
+            name="Auteurs",
+            value="Loïc Simon\nTom Lacoma",
+            inline=True,
+        ).add_field(
+            name="Licence",
+            value="Projet open-source sous licence MIT\n"
+                  "https://opensource.org/licenses/MIT",
+            inline=True,
+        ).add_field(
+            name="Pour en savoir plus :",
+            value="https://github.com/loic-simon/lg-rez",
+            inline=False,
+        ).add_field(
+            name="Copyright :",
+            value=":copyright: 2021 Club BD-Jeux × GRIs – ESPCI Paris - PSL",
+            inline=False,
+        ).set_footer(
+            text="Retrouvez-nous sur Discord : LaCarpe#1674, TaupeOrAfk#3218",
+        )
+        await ctx.send(embed=embed)

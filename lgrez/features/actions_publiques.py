@@ -62,10 +62,10 @@ class ActionsPubliques(commands.Cog):
             description=f"**« {motif.content} »\n**",
             color=0xff0000
         )
-        emb.set_author(name=f"{ctx.author.display_name} en a gros 😡😡")
+        emb.set_author(name=f"{joueur.nom} en a gros 😡😡")
         emb.set_thumbnail(url=config.Emoji.bucher.url)
         emb.set_footer(
-            text=f"Utilise !vote {cible.nom} pour voter contre lui."
+            text=f"Utilise !vote {cible.nom} pour voter contre cette personne."
         )
 
         mess = await ctx.send("C'est tout bon ?", embed=emb)
@@ -119,24 +119,26 @@ class ActionsPubliques(commands.Cog):
 
         if CandidHaro.query.filter_by(joueur=joueur,
                                       type=CandidHaroType.candidature).all():
-            await ctx.send("Hola collègue, tout doux, tu t'es déjà présenté !")
+            await ctx.send(
+                "Hola collègue, tout doux, tu t'es déjà présenté(e) !"
+            )
             return
 
         await tools.send_blocs(ctx, "Quel est ton programme politique ?")
         motif = await tools.wait_for_message_here(ctx)
 
         emb = discord.Embed(
-            title=(f"**{config.Emoji.maire} {auteur.display_name} "
+            title=(f"**{config.Emoji.maire} {joueur.nom} "
                    "candidate à la Mairie !**"),
-            description=("Voici ce qu'il a à vous dire :\n"
+            description=("Voici son programme politique :\n"
                          + tools.bold(motif.content)),
             color=0xf1c40f
         )
-        emb.set_author(name=f"{auteur.display_name} vous a compris !")
+        emb.set_author(name=f"{joueur.nom} vous a compris !")
         emb.set_thumbnail(url=config.Emoji.maire.url)
         emb.set_footer(
             text=(f"Utilise !votemaire {auteur.display_name} "
-                  "pour voter pour lui.")
+                  "pour voter pour cette personne.")
         )
 
         mess = await ctx.send("C'est tout bon ?", embed=emb)
@@ -158,6 +160,9 @@ class ActionsPubliques(commands.Cog):
                 f"Allez, c'est parti ! ({config.Channel.haros.mention})"
             )
 
+        else:
+            await ctx.send("Mission aborted.")
+
 
     @commands.command()
     @tools.mjs_only
@@ -169,6 +174,8 @@ class ActionsPubliques(commands.Cog):
 
                 - ``haros`` : Supprimer les haros
                 - ``candids`` : Supprimer les candicatures
+
+        (commande non testée unitairement)
         """
         if quoi == "haros":
             cht = CandidHaroType.haro
@@ -183,8 +190,6 @@ class ActionsPubliques(commands.Cog):
             await ctx.send("Rien à faire")
             await tools.log(f"!wipe {quoi} : rien à faire")
         else:
-            for item in items:
-                config.session.delete(item)
-            config.session.commit()
+            CandidHaro.delete(*items)
             await ctx.send("Fait.")
             await tools.log(f"!wipe {quoi} : fait")

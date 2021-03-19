@@ -4,12 +4,17 @@ Connection, récupération de classeurs, modifications
 (implémentation de https://pypi.org/project/gspread)
 """
 
+import enum
 import json
 
-from lgrez.blocs import env
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
+from lgrez import bdd
+from lgrez.blocs import env
+
+
+WorksheetNotFound = gspread.exceptions.WorksheetNotFound
 
 class Modif():
     """Modification à appliquer à un Google Sheet.
@@ -28,6 +33,16 @@ class Modif():
     def __repr__(self):
         """Returns repr(self)"""
         return f"<gsheets.Modif: ({self.row}, {self.column}) = {self.val}>"
+
+    def __eq__(self, other):
+        """Returns self == other"""
+        return (self.row == other.row
+                and self.column == other.column
+                and self.val == other.val)
+
+    def __hash__(self):
+        return hash((self.row, self.column, self.val))
+
 
 
 def connect(key):
@@ -69,7 +84,8 @@ def update(sheet, *modifs):
 
     Les entiers trop grands pour être stockés sans perte de précision
     (IDs des joueurs par exemple) sont convertis en :class:`str`. Les
-    ``None`` sont convertis en ``''``.
+    ``None`` sont convertis en ``''``. Les membres d':class:`~enum.Enum`
+    sont stockés par leur **nom**.
     """
     # Bordures de la zone à modifier
     lm = max([modif.row for modif in modifs])
@@ -86,15 +102,45 @@ def update(sheet, *modifs):
                     if cell.col == modif.column + 1
                     and cell.row == modif.row + 1)
 
-        if isinstance(modif.val, int) and modif.val > 10**14:
+        val = modif.val
+
+        # Transformation objets complexes
+        if isinstance(val, enum.Enum):
+            # Enums : stocker le nom
+            val = val.name
+        elif isinstance(modif.val, bdd.base.TableBase):
+            # Instances : stocker la clé primaire
+            val = val.primary_key
+
+        # Adaptation types de base
+        if isinstance(val, int) and val > 10**14:
             # Entiers trop grands pour être stockés sans perte de
             # précision (IDs des joueurs par ex.): passage en str
-            cell.value = str(modif.val)
-        elif modif.val is None:
+            cell.value = str(val)
+        elif val is None:
             cell.value = ""
         else:
-            cell.value = modif.val
+            cell.value = val
 
         cells_to_update.append(cell)
 
     sheet.update_cells(cells_to_update)
+
+
+def a_to_index(column):
+    """Utilitaire : convertit une colonne ("A", "B"...) en indice.
+
+    Args:
+        column (str): nom de la colonne. Doit être composé de caractères
+            dans [a-z, A-Z] uniquement.
+
+    Returns:
+        int: L'indice de la colonne, **indexé à partir de 0** (cellules
+            considérées comme une liste de liste).
+
+    Raises:
+        gspread.exceptions.IncorrectCellLabel: valeur incorrecte.
+    """
+    a1 = column + "1"
+    row, col = gspread.utils.a1_to_rowcol(a1)
+    return col - 1      # a1_to_rowcol indexe à partir de 1
