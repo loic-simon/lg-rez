@@ -3,8 +3,9 @@
 [![PyPI](https://img.shields.io/pypi/v/lg-rez)](https://pypi.org/project/lg-rez)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/lg-rez)](https://pypi.org/project/lg-rez)
 [![PyPI - Wheel](https://img.shields.io/pypi/wheel/lg-rez)](https://pypi.org/project/lg-rez)
-[![Travis CI](https://img.shields.io/travis/loic-simon/lg-rez)](https://travis-ci.org/github/loic-simon/lg-rez)
 [![Read the Docs](https://img.shields.io/readthedocs/lg-rez)](https://lg-rez.readthedocs.io)
+[![Travis CI](https://img.shields.io/travis/loic-simon/lg-rez)](https://travis-ci.org/github/loic-simon/lg-rez)
+[![codecov](https://codecov.io/gh/loic-simon/lg-rez/branch/master/graph/badge.svg?token=N8DTGYKG0U)](https://codecov.io/gh/loic-simon/lg-rez)
 
 Discord bot for organizing boisterous Werewolf RP games ESPCI-style.
 
