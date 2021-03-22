@@ -14,6 +14,9 @@ class TestIAFunctions(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         mock_discord.mock_config()
 
+    def tearDown(self):
+        mock_discord.unmock_config()
+
     async def test__build_sequence(self):
         """Unit tests for IA._build_sequence function."""
         # async def _build_sequence(ctx)
@@ -570,6 +573,9 @@ class TestGestionIA(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         mock_discord.mock_config()
         self.cog = IA.GestionIA(config.bot)
+
+    def tearDown(self):
+        mock_discord.unmock_config()
 
 
     async def test_stfu(self):

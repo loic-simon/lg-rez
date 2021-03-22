@@ -13,6 +13,9 @@ class TestInformations(unittest.IsolatedAsyncioTestCase):
         mock_discord.mock_config()
         self.cog = informations.Informations(config.bot)
 
+    def tearDown(self):
+        mock_discord.unmock_config()
+
     @mock_bdd.patch_db      # Empty database for this method
     async def test_roles(self):
         """Unit tests for !roles command."""

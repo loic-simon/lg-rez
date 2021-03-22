@@ -55,44 +55,82 @@ tdb_main_sheet = "Journée en cours"
 #: des votes (après corrections manuelles éventuelles).
 tdb_votes_sheet = "Journée en cours"
 
-#: int: Numéro de la ligne de la :attr:`feuille principale <.tdb_main_sheet>`
+#: int: Numéro de la ligne de la feuille principale
+#: (:attr:`~lgrez.config.tdb_main_sheet`)
 #: du *Tableau de bord* contenant les noms des colonnes (commençant de 1).
 tdb_header_row = 3
 
-#: str: Nom de la colonne de la :attr:`feuille principale <.tdb_main_sheet>`
+#: str: Nom de la colonne de la feuille principale
+#: (:attr:`~lgrez.config.tdb_main_sheet`)
 #: du *Tableau de bord* contenant les IDs Discord des joueurs.
 tdb_id_column = "A"
 
 #: tuple[str]: Noms de la première et de la dernière colonne de la zone de
-#: la feuille principale (:attr:`<.tdb_main_sheet>`) du *Tableau de bord*
-#: contenant les informations (colonnes de la BDD) des joueurs.
+#: la feuille principale (:attr:`~lgrez.config.tdb_main_sheet`) du *Tableau
+#: de bord* contenant les informations (colonnes de la BDD) des joueurs.
 tdb_main_columns = ("J", "Q")
 
 #: tuple[str]: Noms de la première et de la dernière colonne de la zone de
-#: la feuille principale (:attr:`<.tdb_main_sheet>`) du *Tableau de bord*
-#: contenant l'ancien état des informations des joueurs (avant ``!sync``).
+#: la feuille principale (:attr:`~lgrez.config.tdb_main_sheet`) du *Tableau
+#: de bord* contenant l'ancien état des informations des joueurs
+#: (avant ``!sync``).
 tdb_tampon_columns = ("B", "I")
 
+
+#: str: Nom de l'intitulé de la colonne de la feuille des votes
+#: (:attr:`~lgrez.config.tdb_votes_sheet`) du *Tableau de bord*
+#: contenant les cibles des votes pour le condamné.
 tdb_votecond_column = "CondamnéRéel"
+
+#: str: Nom de l'intitulé de la colonne de la feuille des votes
+#: (:attr:`~lgrez.config.tdb_votes_sheet`) du *Tableau de bord*
+#: contenant les noms des votants pour le condamné.
 tdb_votantcond_column = "VotantCond"
 
+
+#: str: Nom de l'intitulé de la colonne de la feuille des votes
+#: (:attr:`~lgrez.config.tdb_votes_sheet`) du *Tableau de bord*
+#: contenant les cibles des votes pour le nouveau maire.
 tdb_votemaire_column = "MaireRéel"
+
+#: str: Nom de l'intitulé de la colonne de la feuille des votes
+#: (:attr:`~lgrez.config.tdb_votes_sheet`) du *Tableau de bord*
+#: contenant les noms des votants pour le nouveau maire.
 tdb_votantmaire_column = "VotantMaire"
 
 
+#: str: Nom de la feuille du GSheet *Données brûtes* où enregistrer
+#: les votes brutes pour le condamné du jour.
 db_votecond_sheet = "votecond_brut"
+
+#: str: Nom de la feuille du GSheet *Données brûtes* où enregistrer
+#: les votes brutes pour le nouveau maire.
 db_votemaire_sheet = "votemaire_brut"
+
+#: str: Nom de la feuille du GSheet *Données brûtes* où enregistrer
+#: les votes brutes pour le vote des loups.
 db_voteloups_sheet = "voteloups_brut"
+
+#: str: Nom de la feuille du GSheet *Données brûtes* où enregistrer
+#: les actions effectuées.
 db_actions_sheet = "actions_brut"
 
 
-# STOP keywords -- A IMPLEMENTER
+#: list[str]: Mots-clés (en minuscule) utilisables (quelque soit la casse)
+#: pour arrêter une commande en cours d'exécution.
 stop_keywords = ["stop", "!stop"]
 
 
-
+#: list[str]: Mots-clés de rechargement (dans :attr:`.bdd.BaseAction.refill`)
+#: permettant de recharger une action à son nombre de charges initial.
 refills_full = ["weekends"]
+
+#: list[str]: Mots-clés de rechargement (dans :attr:`.bdd.BaseAction.refill`)
+#: permettant de recharger une action de une charge.
 refills_one = ["forgeron", "rebouteux", "divin"]
+
+#: list[str]: Mots-clés de rechargement (dans :attr:`.bdd.BaseAction.refill`)
+#: à utiliser par le MJ pour ajouter une charge à une action.
 refills_divins = ["divin"]
 
 
@@ -100,9 +138,9 @@ refills_divins = ["divin"]
 class Role(ready_check.ReadyCheck, check_type=discord.Role):
     """Rôles Discord nécessaires au jeu
 
-    Cette classe dérive de :class:`ready_check.ReadyCheck` :
+    Cette classe dérive de :class:`.ready_check.ReadyCheck` :
     accéder aux attributs ci-dessous avant que le bot ne soit connecté
-    au serveur lève une :exc:`~ready_check.NotReadyError`.
+    au serveur lève une :exc:`~.ready_check.NotReadyError`.
 
     Plus précisément, :meth:`.LGBot.on_ready` remplace le nom du rôle
     par l'objet :class:`discord.Role` correspondant : si les noms des
@@ -142,9 +180,9 @@ class Role(ready_check.ReadyCheck, check_type=discord.Role):
 class Channel(ready_check.ReadyCheck, check_type=discord.TextChannel):
     """Salons Discord nécessaires au jeu
 
-    Cette classe dérive de :class:`ready_check.ReadyCheck` : accéder
+    Cette classe dérive de :class:`.ready_check.ReadyCheck` : accéder
     aux attributs ci-dessous avant que le bot ne soit connecté au
-    serveur lève une :exc:`~ready_check.NotReadyError`.
+    serveur lève une :exc:`~.ready_check.NotReadyError`.
 
     Plus précisément, :meth:`.LGBot.on_ready` remplace le nom du rôle
     par l'objet :class:`discord.TextChannel` correspondant : si les noms
@@ -178,9 +216,9 @@ class Channel(ready_check.ReadyCheck, check_type=discord.TextChannel):
 class Emoji(ready_check.ReadyCheck, check_type=discord.Emoji):
     """Emojis Discord nécessaires au jeu
 
-    Cette classe dérive de :class:`ready_check.ReadyCheck` : accéder
+    Cette classe dérive de :class:`.ready_check.ReadyCheck` : accéder
     aux attributs ci-dessous avant que le bot ne soit connecté au
-    serveur lève une :exc:`~ready_check.NotReadyError`.
+    serveur lève une :exc:`~.ready_check.NotReadyError`.
 
     Plus précisément, :meth:`.LGBot.on_ready` remplace le nom du rôle
     par l'objet :class:`discord.Emoji` correspondant : si les noms

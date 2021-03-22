@@ -152,4 +152,4 @@ class CandidHaro(base.TableBase):
 
     def __repr__(self):
         """Return repr(self)."""
-        return f"<CandidHaro #{self.id} ({self._joueur_id}/{self.type})>"
+        return f"<CandidHaro #{self.id} ({self.joueur}/{self.type})>"

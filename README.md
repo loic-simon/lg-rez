@@ -51,8 +51,7 @@ generate the `.env` file (which you can later `source` and delete if you wish).
 
 Run it simply with:
 ```bash
-cd <your/code/folder>
-<your/venv>/bin/python -m lgrez
+python -m lgrez
 ```
 
 This tool also creates a `start_bot.py` file containing the minimal code
@@ -88,10 +87,14 @@ bot.run()
 
 ### Bot usage
 
-Once the bot connected to your Discord server, send `!help` to see every available commands (note: some commands are only visible by specific roles; grant yourself the "`MJ`" AND "Joueur en vie" roles to see everything.) \
+Once the bot connected to your Discord server, send `!help` to see every
+available commands (note: some commands are only visible by specific roles;
+grant yourself the "MJ" AND "Joueur en vie" roles to see everything.) \
 Use `!help command` to get more information about a command.
 
-For precisions relative to non-command features (such as "IA" reactions to messages), look at the corresponding file in [`features`](lgrez/features) (commented and documented).
+For precisions relative to non-command features (such as "IA" reactions to
+messages), look at the corresponding
+[documentation](https://lg-rez.readthedocs.io/) section.
 
 
 ### Customization

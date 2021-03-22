@@ -259,22 +259,24 @@ async def wait_for_message(check, trigger_on_commands=False):
         :class:`discord.Message`
 
     Raises:
-        .CommandExit: si le message est ``"stop"`` ou ``"!stop"``
-            (ou autre casse), même si il respecte ``check``
+        .CommandExit: si le message est un des :attr:`.config.stop_keywords`
+            (insensible à la casse), même si il respecte ``check``
     """
+    stop_keywords = [kw.lower() for kw in stop_keywords]
+
     if trigger_on_commands:
         # on trigger en cas de STOP
         def trig_check(m):
-            return (check(m) or m.content.lower() in ["stop", "!stop"])
+            return (check(m) or m.content.lower() in stop_keywords)
     else:
         def trig_check(m):
             # on ne trigger pas sur les commandes et on trigger en cas de STOP
             return ((check(m)
                      and not m.content.startswith(config.bot.command_prefix))
-                    or m.content.lower() in ["stop", "!stop"])
+                    or m.content.lower() in stop_keywords)
 
     message = await config.bot.wait_for('message', check=trig_check)
-    if message.content.lower() in ["stop", "!stop"]:
+    if message.content.lower() in stop_keywords:
         if message.author == config.bot.user:
             raise CommandExit(ital("(Arrêt commande précédente)"))
         else:
@@ -496,7 +498,7 @@ async def wait_for_react_clic(message, emojis={}, *, process_text=False,
                         and text_filter(mess.content))
         else:
             # On process DANS TOUS LES CAS, mais juste pour détecter
-            # "stop" si process_text == False
+            # les stop_keywords si process_text == False
             def message_check(mess):
                 return False
 

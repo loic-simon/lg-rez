@@ -184,7 +184,7 @@ class Camp(base.TableBase):
                 "Camp par défaut (de slug "
                 f"lgrez.config.default_camp_slug = \"{slug}\") non "
                 "défini (dans le GSheet Rôles et actions) ou non "
-                f"chargé ({tools.code('!fillroles')}) !"
+                f"chargé (`!fillroles`) !"
             )
         return camp
 

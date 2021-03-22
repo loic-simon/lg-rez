@@ -17,6 +17,9 @@ class TestInscriptionFunctions(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         mock_discord.mock_config()
 
+    def tearDown(self):
+        mock_discord.unmock_config()
+
 
     @mock.patch("lgrez.blocs.tools.channel")
     async def test_new_channel(self, ch_patch):

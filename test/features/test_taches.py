@@ -17,6 +17,9 @@ class TestGestionTaches(unittest.IsolatedAsyncioTestCase):
         mock_discord.mock_config()
         self.cog = taches.GestionTaches(config.bot)
 
+    def tearDown(self):
+        mock_discord.unmock_config()
+
     @mock_bdd.patch_db      # Empty database for this method
     async def test_taches(self):
         """Unit tests for !taches command."""

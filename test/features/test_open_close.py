@@ -13,6 +13,9 @@ class TestOpenCloseFunctions(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         mock_discord.mock_config()
 
+    def tearDown(self):
+        mock_discord.unmock_config()
+
     @mock_bdd.patch_db      # Empty database for this method
     @mock.patch("lgrez.features.gestion_actions.get_actions")
     async def test_recup_joueurs(self, getact_patch):
@@ -322,6 +325,9 @@ class TestOpenClose(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         mock_discord.mock_config()
         self.cog = open_close.OpenClose(config.bot)
+
+    def tearDown(self):
+        mock_discord.unmock_config()
 
     @mock_bdd.patch_db      # Empty database for this method
     @mock_discord.interact()

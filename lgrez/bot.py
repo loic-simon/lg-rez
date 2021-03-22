@@ -27,9 +27,6 @@ default_descr = "LG-bot – Plateforme pour parties endiablées de Loup-Garou"
 async def _on_ready(bot):
     config.loop = bot.loop          # Enregistrement loop
 
-    if config.output_liveness:
-        bot.i_am_alive()            # Start liveness regular output
-
     guild = bot.get_guild(bot.GUILD_ID)
     if not guild:
         raise RuntimeError(f"on_ready : Serveur d'ID {bot.GUILD_ID} "
@@ -37,6 +34,9 @@ async def _on_ready(bot):
 
     print(f"      Connected to '{guild.name}'! "
           f"({len(guild.channels)} channels, {len(guild.members)} members)")
+
+    if config.output_liveness:
+        bot.i_am_alive()            # Start liveness regular output
 
     print("[3/3] Initialization (bot.on_ready)...")
 
@@ -84,11 +84,11 @@ async def _on_ready(bot):
         try:
             await tools.log(msg, code=True, prefixe=f"{atmj} ERREURS :")
         except ready_check.NotReadyError:
-            await tools.send_code_blocs(config.guild.text_channels[0],
-                                        msg,
-                                        prefixe=f"{atmj} ERREURS :")
+            config.Channel.logs = config.guild.text_channels[0]
+            msg += "\n-- Routing logs to this channel."
+            await tools.log(msg, code=True, prefixe=f"{atmj} ERREURS :")
 
-    await tools.log("Juste rebooted!")
+    await tools.log("Just rebooted!")
     await bot.change_presence(activity=discord.Activity(
         type=discord.ActivityType.listening,
         name="vos demandes (!help)"
@@ -143,7 +143,7 @@ async def _on_message(bot, message):
         return
 
     if (not message.webhook_id              # Pas un webhook
-        and message.author.top_role <= config.Role.everyone):
+        and message.author.top_role == config.Role.everyone):
         # Pas de rôle affecté : le bot te calcule même pas
         return
 
@@ -178,9 +178,8 @@ async def _on_raw_reaction_add(bot, payload):
         # Pas dans un chan privé
         return
 
-    try:
-        bdd.Joueur.from_member(reactor)
-    except ValueError:                              # Pas un joueur
+    if config.Role.joueur_en_vie not in reactor.roles:
+        # Pas un joueur en vie
         return
 
     if payload.emoji == config.Emoji.bucher:
@@ -289,13 +288,15 @@ async def _on_command_error(bot, ctx, exc):
             "Désolé, cette commande est réservée aux joueurs en vie !"
         )
 
-    elif (isinstance(exc, one_command.AlreadyInCommand)
-          and ctx.command.name not in ["addIA", "modifIA"]):
-        # addIA / modifIA : droit d'enregistrer les commandes, donc chut
+    elif isinstance(exc, one_command.AlreadyInCommand):
+        if ctx.command.name in ["addIA", "modifIA"]:
+            # addIA / modifIA : droit d'enregistrer les commandes, donc chut
+            return
         await ctx.send(
             f"Impossible d'utiliser une commande pendant "
             "un processus ! (vote...)\n"
-            f"Envoie {tools.code('stop')} pour arrêter le processus."
+            f"Envoie {tools.code(config.stop_keywords[0])} "
+            "pour arrêter le processus."
         )
 
     elif isinstance(exc, commands.CheckFailure):
@@ -364,16 +365,16 @@ class LGBot(commands.Bot):
 
         (Ceci est du aux objets de :mod:`.config`, contenant directement
         le bot, le serveur Discord, la session de connexion BDD... ;
-        c'est une orientation volontaire du module depuis la version 2.0
-        pour rendre plus agréable la manipulation des objects et
-        fonctions).
+        cette limitation résulte d'une orientation volontaire du module
+        depuis sa version 2.0 pour simplifier et optimiser la
+        manipulation des objects et fonctions).
 
     Attributes:
         bot (int): L'ID du serveur sur lequel tourne le bot (normalement
             toujours :attr:`config.guild` ``.id``).  Vaut ``None`` avant
             l'appel à :meth:`run`, puis la valeur de la variable
             d'environnement ``LGREZ_SERVER_ID``.
-        in_command (list[int    ]): IDs des salons dans lequels une
+        in_command (list[int]): IDs des salons dans lequels une
             commande est en cours d'exécution.
         in_stfu (list[int]): IDs des salons en mode STFU.
         in_fals (list[int]): IDs des salons en mode Foire à la saucisse.

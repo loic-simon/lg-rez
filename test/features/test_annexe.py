@@ -16,6 +16,9 @@ class TestAnnexe(unittest.IsolatedAsyncioTestCase):
         mock_discord.mock_config()
         self.cog = annexe.Annexe(config.bot)
 
+    def tearDown(self):
+        mock_discord.unmock_config()
+
 
     async def test_roll(self):
         """Unit tests for !roll command."""

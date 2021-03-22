@@ -52,7 +52,7 @@ async def not_in_command(ctx):
         return True         # Channel libre
 
     # On envoie (discrètement) l'ordre d'arrêter la commande précédente
-    await ctx.send("stop", delete_after=0)
+    await ctx.send(config.stop_keywords[0], delete_after=0)
     # On attend qu'il soit pris en compte
     await asyncio.sleep(1)
 

@@ -12,6 +12,9 @@ class TestVoterAgirFunctions(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         mock_discord.mock_config()
 
+    def tearDown(self):
+        mock_discord.unmock_config()
+
     @mock_bdd.patch_db      # Empty database for this method
     @mock_env.patch_env(LGREZ_DATA_SHEET_ID="uiz")
     @mock.patch("lgrez.blocs.gsheets.connect")
@@ -92,6 +95,9 @@ class TestVoterAgir(unittest.IsolatedAsyncioTestCase):
         mock_discord.mock_config()
         self.cog = voter_agir.VoterAgir(config.bot)
 
+    def tearDown(self):
+        mock_discord.unmock_config()
+        
 
     @mock_bdd.patch_db      # Empty database for this method
     @mock.patch("lgrez.features.voter_agir.export_vote")    # tested before

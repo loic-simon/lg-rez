@@ -38,6 +38,9 @@ class TestGestionActionsFunctions(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         mock_discord.mock_config()
 
+    def tearDown(self):
+        mock_discord.unmock_config()
+
 
     @mock_bdd.patch_db      # Empty database for this method
     def test_add_action(self):

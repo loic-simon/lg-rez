@@ -43,6 +43,9 @@ class TestSyncFunctions(unittest.IsolatedAsyncioTestCase):
         config.tdb_main_columns = ("L", "P")
         config.tdb_tampon_columns = ("E", "I")
 
+    def tearDown(self):
+        mock_discord.unmock_config()
+
     @mock_bdd.patch_db      # Empty database for this method
     def test_transtype(self):
         """Unit tests for sync.transtype function."""
@@ -783,6 +786,9 @@ class TestSync(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         mock_discord.mock_config()
         self.cog = sync.Sync(config.bot)
+
+    def tearDown(self):
+        mock_discord.unmock_config()
 
     @mock_bdd.patch_db      # Empty database for this method
     @mock.patch("lgrez.features.sync.get_sync")         # tested before

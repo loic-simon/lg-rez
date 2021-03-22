@@ -16,6 +16,9 @@ class TestSpecial(unittest.IsolatedAsyncioTestCase):
         mock_discord.mock_config()
         self.cog = special.Special(config.bot)
 
+    def tearDown(self):
+        mock_discord.unmock_config()
+
 
     async def test_panik(self):
         """Unit tests for !panik command."""

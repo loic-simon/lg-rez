@@ -95,7 +95,7 @@ class VoterAgir(commands.Cog):
             f"{tools.bold(joueur.vote_condamne_)})\n"
             f"(harotés : {', '.join(harotes) or 'aucun :pensive:'})\n"
             "*Écris simplement le nom du joueur ci-dessous "
-            f"({tools.code('stop')} pour annuler) :*"
+            f"({tools.code(config.stop_keywords[0])} pour annuler) :*"
         ))
 
         # Test si la cible est sous le coup d'un haro
@@ -169,7 +169,7 @@ class VoterAgir(commands.Cog):
             f"{tools.bold(joueur.vote_maire_)})\n"
             f"(candidats : {', '.join(candidats) or 'aucun :pensive:'})\n"
             f"*Écris simplement le nom du joueur ci-dessous "
-            "({tools.code('stop')} pour annuler) :*"
+            f"({tools.code(config.stop_keywords[0])} pour annuler) :*"
         ))
 
         # Test si la cible s'est présentée
@@ -238,7 +238,7 @@ class VoterAgir(commands.Cog):
             "Qui veux-tu manger ? (vote actuel : "
             f"{tools.bold(joueur.vote_loups_)})"
             "\n*Écris simplement le nom du joueur ci-dessous "
-            f"({tools.code('stop')} pour annuler) :*"
+            f"({tools.code(config.stop_keywords[0])} pour annuler) :*"
         ))
 
         if joueur.vote_loups_ is None:

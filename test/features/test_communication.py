@@ -15,6 +15,9 @@ class TestCommunication(unittest.IsolatedAsyncioTestCase):
         mock_discord.mock_config()
         self.cog = communication.Communication(config.bot)
 
+    def tearDown(self):
+        mock_discord.unmock_config()
+
 
     @unittest.SkipTest
     @mock_bdd.patch_db      # Empty database for this method

@@ -33,25 +33,43 @@ def _decorate_with_cm(func_or_class, context_manager):
     return newfunc
 
 
+backup = {
+    rc_class.__name__: {attr: rc_class.get_raw(attr) for attr in rc_class}
+    for rc_class in [config.Role, config.Channel, config.Emoji]
+}
+
+def _prepare_attributes(rc_class, discord_type):
+    """Rend prêts les attributs d'une classe ReadyCheck"""
+    for attr in rc_class:
+        raw = rc_class.get_raw(attr)
+        name = raw if isinstance(raw, str) else raw.name
+        ready = mock.MagicMock(discord_type, name=name)
+        ready.configure_mock(name=name)
+        setattr(rc_class, attr, ready)
+        backup[rc_class.__name__][attr] = name
+
+def _unprepare_attributes(rc_class):
+    """Rend non-prêts les attributs d'une classe ReadyCheck"""
+    for attr in rc_class:
+        setattr(rc_class, attr, backup[rc_class.__name__][attr])
+
+
 def mock_config():
     config.bot = mock.MagicMock(LGBot(), command_prefix="!")
     config.session = mock.Mock(sqlalchemy.orm.session.Session)
     config.engine = mock.Mock(sqlalchemy.engine.Engine)
     config.guild = mock.NonCallableMagicMock(discord.Guild)
     config.loop = mock.NonCallableMock()
+    _prepare_attributes(config.Role, discord.Role)
+    _prepare_attributes(config.Channel, discord.TextChannel)
+    _prepare_attributes(config.Emoji, discord.Emoji)
 
-    def prepare_attributes(rc_class, discord_type):
-        """Rend prêt les attributs d'une classe ReadyCheck"""
-        for attr in rc_class:
-            raw = rc_class.get_raw(attr)
-            name = raw if isinstance(raw, str) else raw.name
-            ready = mock.MagicMock(discord_type, name=name)
-            ready.configure_mock(name=name)
-            setattr(rc_class, attr, ready)
+def unmock_config():
+    del config.bot, config.session, config.engine, config.guild, config.loop
+    _unprepare_attributes(config.Role)
+    _unprepare_attributes(config.Channel)
+    _unprepare_attributes(config.Emoji)
 
-    prepare_attributes(config.Role, discord.Role)
-    prepare_attributes(config.Channel, discord.TextChannel)
-    prepare_attributes(config.Emoji, discord.Emoji)
 
 
 class TypingMock(mock.AsyncMock):
@@ -73,7 +91,7 @@ def get_ctx(_command=None, *args, _caller_id=None, **kwargs):
         args=args,
         kwargs=kwargs,
         prefix=config.bot.command_prefix,
-        _command=_command,
+        command=_command,
         cog=_command.cog if _command else None,
         guild=config.guild,
         invoked_with=ctx,
@@ -171,8 +189,8 @@ def assert_sent(chan, *msgs):
         if isinstance(msg, str):
             msg = [msg]
         for smsg in msg:
-            assert smsg in call, (f"chan.send: excepted message '{smsg}' "
-                                  f"not found in '{call}'")
+            assert str(smsg) in call, (f"chan.send: excepted message '{smsg}' "
+                                       f"not found in '{call}'")
 
 
 def assert_not_sent(chan, *msgs):
@@ -196,7 +214,7 @@ def assert_not_sent(chan, *msgs):
             if msg != "[end]":
                 msg = f"*{msg if isinstance(msg, str) else '*'.join(msg)}*"
             called = call.replace("\n", "\\n")
-            table += f"     {msg.ljust(24)} | {called} \n"
+            table += f"     NOT {msg.ljust(20)} | {called} \n"
 
         raise AssertionError(f"chan.send called {ncalls} times - "
                              f"expecting {nmsgs} calls. Details:\n{table}")
@@ -205,8 +223,8 @@ def assert_not_sent(chan, *msgs):
         if isinstance(msg, str):
             msg = [msg]
         for smsg in msg:
-            assert smsg not in call, (f"ctx.send: unexcepted message '{smsg}' "
-                                      f"found in '{call}'")
+            assert str(smsg) not in call, (f"ctx.send: unexcepted message "
+                                           f"'{smsg}' found in '{call}'")
 
 
 def get_member(joueur):

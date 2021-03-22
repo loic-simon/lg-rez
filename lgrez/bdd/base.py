@@ -39,11 +39,11 @@ class TableMeta(declarative.api.DeclarativeMeta):
     """
     def __init__(cls, name, bases, dic, comment=None, **kwargs):
         """Constructs the data class"""
-        if cls.__name__ == "TableBase":
+        if name == "TableBase":
             # Ne pas documenter TableBase (pas une vraie table)
             return
 
-        cls.__tablename__ = cls.__name__.lower() + "s"
+        cls.__tablename__ = name.lower() + "s"
         if comment is None:
             comment = cls.__doc__
         super().__init__(name, bases, dic, comment=comment, **kwargs)
@@ -103,24 +103,6 @@ class TableMeta(declarative.api.DeclarativeMeta):
         / relationship).
         """
         return cls._attrs
-
-    # @property
-    # def one_to_manys(cls):
-    #     """Mapping[str, sqlalchemy.sql.schema.ForeignKeyConstraint]:
-    #     Clés étrangères de la table, représentant les relations one-to-many
-    #     (dictionnaire nom -> constraint).
-    #     """
-    #     fks = cls.__table__.foreign_key_constraints
-    #     mapp = {}
-    #     for fk in fks:
-    #         if len(fk.columns) != 1:
-    #             raise ValueError(
-    #                 f"Foreign key {fk} is built on several columns, "
-    #                 "which is not supported by `table.one_to_manys`."
-    #             )
-    #         column = next(iter(fk.columns))
-    #         mapp[column.key] = fk
-    #     return mapp
 
     @property
     def primary_col(cls):
@@ -187,10 +169,12 @@ class TableMeta(declarative.api.DeclarativeMeta):
         if not col:
             col = cls.primary_col
         elif isinstance(col, str):
-            if col not in cls.columns:
+            try:
+                col = cls.columns[col]
+            except LookupError:
                 raise ValueError(
                     f"{cls.__name__}.find_nearest: Colonne '{col}' invalide"
-                )
+                ) from None
 
         if not isinstance(col.type, sqlalchemy.String):
             raise ValueError(f"{cls.__name__}.find_nearest: "
@@ -297,7 +281,7 @@ class TableBase:
         Globlament équivalent à::
 
             config.session.add(self)
-            config.session.add_all(others)
+            config.session.add_all(other)
 
             config.session.commit()
         """

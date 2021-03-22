@@ -13,6 +13,8 @@ class TestActionsPubliques(unittest.IsolatedAsyncioTestCase):
         mock_discord.mock_config()
         self.cog = actions_publiques.ActionsPubliques(config.bot)
 
+    def tearDown(self):
+        mock_discord.unmock_config()
 
     @mock_bdd.patch_db      # Empty database for this method
     @mock.patch("lgrez.config.Channel.haros.send")

@@ -99,7 +99,10 @@ class Tache(base.TableBase):
 
     @handler.deleter
     def handler(self):
-        del config.bot.tasks[self.id]
+        try:
+            del config.bot.tasks[self.id]
+        except KeyError:
+            pass
 
     def execute(self):
         """Exécute la tâche planifiée (méthode appellée par la loop).
