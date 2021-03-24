@@ -240,8 +240,8 @@ async def _on_command_error(bot, ctx, exc):
         prefixe = ("Oups ! Un problème est survenu à l'exécution de "
                    "la commande  :grimacing: :")
 
-        if ctx.author.top_role >= config.Role.mj:
-            # MJ : affiche le traceback complet
+        if ctx.message.webhook_id or ctx.author.top_role >= config.Role.mj:
+            # MJ / webhook : affiche le traceback complet
             e = traceback.format_exception(type(exc.original), exc.original,
                                            exc.original.__traceback__)
             await tools.send_code_blocs(ctx, "".join(e), prefixe=prefixe)

@@ -250,7 +250,7 @@ class TestAnnexe(unittest.IsolatedAsyncioTestCase):
         with mock_discord.interact(("yes_no", True)):
             await ctx.invoke()
         ctx.assert_sent("Supprimer les 15")
-        ctx.channel.purge.assert_called_once_with(limit=15)
+        ctx.channel.purge.assert_called_once_with(limit=17)
 
 
     @unittest.SkipTest

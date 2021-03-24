@@ -70,7 +70,8 @@ class Tache(base.TableBase):
     commande = autodoc_Column(sqlalchemy.String(2000), nullable=False,
         doc="Texte à envoyer via le webhook (généralement une commande)")
 
-    _action_id = sqlalchemy.Column(sqlalchemy.ForeignKey("actions.id"))
+    _action_id = sqlalchemy.Column(sqlalchemy.ForeignKey("actions.id"),
+        nullable=True)
     action = autodoc_ManyToOne("Action", back_populates="taches",
         doc="Si la tâche est liée à une action, action concernée")
 
@@ -95,6 +96,8 @@ class Tache(base.TableBase):
 
     @handler.setter
     def handler(self, value):
+        if self.id is None:
+            raise RuntimeError("Tache.handler: Tache.id non défini (commit ?)")
         config.bot.tasks[self.id] = value
 
     @handler.deleter
@@ -146,9 +149,13 @@ class Tache(base.TableBase):
 
         Si la tâche a déjà été exécutée, ne fait que nettoyer le handler.
         """
-        self.handler.cancel()           # Annule la task (objet TimerHandle)
-        # (pas d'effet si la tâche a déjà été exécutée)
-        del self.handler
+        try:
+            self.handler.cancel()       # Annule la task (objet TimerHandle)
+            # (pas d'effet si la tâche a déjà été exécutée)
+        except RuntimeError:            # Tache non enregistrée
+            pass
+        else:
+            del self.handler
 
     def add(self, *other):
         """Enregistre la tâche sur le bot et en base.
@@ -161,11 +168,12 @@ class Tache(base.TableBase):
             \*other: autres instances à ajouter dans le même commit,
                 éventuellement.
         """
+        super().add(*other)             # Enregistre tout en base
+
         self.register()                 # Enregistre sur le bot
         for item in other:              # Les autres aussi
             item.register()
 
-        super().add(*other)             # Enregistre tout en base
 
     def delete(self, *other):
         """Annule la tâche planifiée et la supprime en base.

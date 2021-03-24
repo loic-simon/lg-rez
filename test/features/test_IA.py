@@ -868,12 +868,49 @@ class TestGestionIA(unittest.IsolatedAsyncioTestCase):
         bs_patch.reset_mock()
 
 
-    @unittest.SkipTest
     @mock_bdd.patch_db
     async def test_listIA(self):
         """Unit tests for !listIA command."""
-        # async def listIA(self, ctx, *, trigger=None, sensi=0.5)
+        # async def listIA(self, ctx, trigger=None, sensi=0.5)
         listIA = self.cog.listIA
+
+        reacs = [
+            bdd.Reaction(reponse="s1quenZ"),
+            bdd.Reaction(reponse="s€quenZ2"),
+            bdd.Reaction(reponse="s€qu3enZ"),
+            bdd.Reaction(reponse="s€4quenZ"),
+            bdd.Reaction(reponse="s€que5nZ"*1000),
+        ]
+        triggers = [
+            bdd.Trigger(trigger="trigz1", reaction=reacs[0]),
+            bdd.Trigger(trigger="tr1gZ2", reaction=reacs[0]),
+            bdd.Trigger(trigger="tr!Gz3", reaction=reacs[0]),
+            bdd.Trigger(trigger="tr!Gz4", reaction=reacs[1]),
+            bdd.Trigger(trigger="tr!Gz5", reaction=reacs[1]),
+            bdd.Trigger(trigger="tr!Gz6", reaction=reacs[2]),
+            bdd.Trigger(trigger="tr!Gz7", reaction=reacs[3]),
+            bdd.Trigger(trigger="tr!G88", reaction=reacs[4]),
+        ]
+        bdd.Reaction.add(*reacs, *triggers)
+
+        # list all
+        ctx = mock_discord.get_ctx(listIA)
+        await ctx.invoke()
+        ctx.assert_sent([reac.reponse[:10] for reac in reacs]
+                        + [trig.trigger for trig in triggers] + ["[...]"])
+        ctx.assert_not_sent("s€que5nZ"*1000)
+
+        # filter
+        ctx = mock_discord.get_ctx(listIA, "1gZ2")
+        await ctx.invoke()
+        ctx.assert_sent(["tr1gZ2", "s1quenZ"])
+        ctx.assert_not_sent(["s€quenZ2", "s€qu3enZ", "s€4quenZ", "s€que5nZ"])
+
+        # filter & sensi
+        ctx = mock_discord.get_ctx(listIA, "1gZ2", sensi=0.3)
+        await ctx.invoke()
+        ctx.assert_sent(["s1quenZ", "s€quenZ2", "s€qu3enZ", "s€4quenZ"])
+        ctx.assert_not_sent("s€que5nZ")
 
 
     @mock_bdd.patch_db

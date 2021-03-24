@@ -9,6 +9,28 @@ from test import mock_discord
 
 
 
+class TestSpecialFunctions(unittest.IsolatedAsyncioTestCase):
+    """Unit tests for lgrez.features.special functions."""
+
+    @mock.patch("lgrez.blocs.one_command.bypass")
+    async def test__filter_runnables(self, bp_patch):
+        """Unit tests for _filter_runnables function."""
+        # async def _filter_runnables(commands, ctx)
+        _filter_runnables = special._filter_runnables
+
+        commands = [
+            mock.Mock(can_run=mock.AsyncMock(return_value=True)),
+            mock.Mock(can_run=mock.AsyncMock(return_value=False)),
+            mock.Mock(can_run=mock.AsyncMock(side_effect=RuntimeError)),
+        ]
+        ctx = mock.Mock()
+        res = await _filter_runnables(commands, ctx)
+        bp_patch.assert_called_once_with(ctx)
+        bp_patch.return_value.__enter__.assert_called_once()
+        self.assertEqual(res, [commands[0]])
+
+
+
 class TestSpecial(unittest.IsolatedAsyncioTestCase):
     """Unit tests for lgrez.features.special commands."""
 

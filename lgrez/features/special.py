@@ -18,7 +18,7 @@ from lgrez.blocs import tools, realshell, one_command
 from lgrez.bdd import *       # toutes les tables dans globals()
 
 
-async def _filter_runnables(commands):
+async def _filter_runnables(commands, ctx):
     """Retourne les commandes pouvant run parmis commands"""
     runnables = []
     with one_command.bypass(ctx):
@@ -80,7 +80,7 @@ class Special(commands.Cog):
         exec(f"_a.rep = {code}", locs)
         if asyncio.iscoroutine(_a.rep):
             _a.rep = await _a.rep
-        await ctx.send(tools.code_bloc(_a.rep))
+        await tools.send_code_blocs(ctx, str(_a.rep))
 
 
     @commands.command()
@@ -221,7 +221,7 @@ class Special(commands.Cog):
 
             r = f"{config.bot.description} (v{__version__})"
             for cog in cogs.values():
-                runnables = await _filter_runnables(cog.get_commands())
+                runnables = await _filter_runnables(cog.get_commands(), ctx)
                 if not runnables:
                     # pas de runnables dans le cog, on passe
                     continue
@@ -231,7 +231,7 @@ class Special(commands.Cog):
                     r += descr_command(cmd)
 
             runnables_hors_cog = await _filter_runnables(
-                cmd for cmd in config.bot.commands if not cmd.cog
+                (cmd for cmd in config.bot.commands if not cmd.cog), ctx
             )
             if runnables_hors_cog:
                 r += "\n\nCommandes isolées :"

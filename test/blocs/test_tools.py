@@ -849,6 +849,8 @@ class TestToolsPlayerInteractors(unittest.IsolatedAsyncioTestCase):
         # interlude: check checks
         message.id = 15
         config.bot.user.id = 33
+        coeur = mock.Mock(discord.PartialEmoji)
+        coeur.configure_mock(name="❤")
         self.assertFalse(react_check(mock.Mock(message_id=11, user_id=31,
                                                emoji=config.Emoji.maire)))
         self.assertFalse(react_check(mock.Mock(message_id=11, user_id=33,
@@ -858,13 +860,13 @@ class TestToolsPlayerInteractors(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(react_check(mock.Mock(message_id=15, user_id=33,
                                                emoji=config.Emoji.maire)))
         self.assertFalse(react_check(mock.Mock(message_id=11, user_id=31,
-                                               emoji="❤", custom_emoji=False)))
+                                               emoji=coeur)))
         self.assertFalse(react_check(mock.Mock(message_id=11, user_id=33,
-                                               emoji="❤", custom_emoji=False)))
+                                               emoji=coeur)))
         self.assertTrue(react_check(mock.Mock(message_id=15, user_id=31,
-                                               emoji="❤", custom_emoji=False)))
+                                               emoji=coeur)))
         self.assertFalse(react_check(mock.Mock(message_id=15, user_id=33,
-                                               emoji="❤", custom_emoji=False)))
+                                               emoji=coeur)))
         self.assertFalse(react_check(mock.Mock(message_id=11, user_id=31,
                                                emoji=config.Emoji.lune)))
         self.assertFalse(react_check(mock.Mock(message_id=11, user_id=33,
@@ -1036,6 +1038,8 @@ class TestToolsPlayerInteractors(unittest.IsolatedAsyncioTestCase):
         # interlude: check checks
         message.id = 15
         config.bot.user.id = 33
+        coeur = mock.Mock(discord.PartialEmoji)
+        coeur.configure_mock(name="❤")
         self.assertFalse(react_check(mock.Mock(message_id=11, user_id=31,
                                                emoji=config.Emoji.maire)))
         self.assertFalse(react_check(mock.Mock(message_id=11, user_id=33,
@@ -1045,13 +1049,13 @@ class TestToolsPlayerInteractors(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(react_check(mock.Mock(message_id=15, user_id=33,
                                                emoji=config.Emoji.maire)))
         self.assertFalse(react_check(mock.Mock(message_id=11, user_id=31,
-                                               emoji="❤", custom_emoji=False)))
+                                               emoji=coeur)))
         self.assertFalse(react_check(mock.Mock(message_id=11, user_id=33,
-                                               emoji="❤", custom_emoji=False)))
+                                               emoji=coeur)))
         self.assertTrue(react_check(mock.Mock(message_id=15, user_id=31,
-                                               emoji="❤", custom_emoji=False)))
+                                               emoji=coeur)))
         self.assertFalse(react_check(mock.Mock(message_id=15, user_id=33,
-                                               emoji="❤", custom_emoji=False)))
+                                               emoji=coeur)))
         self.assertFalse(react_check(mock.Mock(message_id=11, user_id=31,
                                                emoji=config.Emoji.lune)))
         self.assertFalse(react_check(mock.Mock(message_id=11, user_id=33,

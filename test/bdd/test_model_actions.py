@@ -57,6 +57,8 @@ class TestTache(unittest.IsolatedAsyncioTestCase):
         value = mock.Mock()
         handler.fset(slf, value)
         self.assertEqual(config.bot.tasks.get(12), value)
+        with self.assertRaises(RuntimeError):
+            handler.fset(mock.Mock(model_actions.Tache, id=None), value)
         # Deleter - Enregistrée
         handler.fdel(slf)
         self.assertNotIn(12, config.bot.tasks)
@@ -136,6 +138,12 @@ class TestTache(unittest.IsolatedAsyncioTestCase):
         cancel(slf)
         self.assertFalse(hasattr(slf, "handler"))
         self.assertTrue(EffectSaver.called)
+
+        # no handler
+        slf = mock.Mock(model_actions.Tache)
+        slf.handler.cancel.side_effect = RuntimeError
+        cancel(slf)
+        self.assertTrue(hasattr(slf, "handler"))
 
 
     @mock.patch("lgrez.bdd.base.TableBase.add")

@@ -482,7 +482,7 @@ async def wait_for_react_clic(message, emojis={}, *, process_text=False,
 
         def react_check(react):
             # Check REACT : bon message, bon emoji, et pas react du bot
-            name = react.emoji.name if react.custom_emoji else react.emoji
+            name = react.emoji.name
             return (react.message_id == message.id
                     and react.user_id != config.bot.user.id
                     and (trigger_all_reacts or name in emojis_names))
@@ -511,6 +511,8 @@ async def wait_for_react_clic(message, emojis={}, *, process_text=False,
         done, pending = await asyncio.wait([react_task, mess_task],
                                            return_when=asyncio.FIRST_COMPLETED)
         # Le bot attend ici qu'une des deux tâches aboutisse
+        for task in pending:
+            task.cancel()
         done_task = next(iter(done))        # done = tâche aboutie
 
         if done_task == react_task:         # Réaction

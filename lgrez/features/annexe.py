@@ -160,13 +160,13 @@ class Annexe(commands.Cog):
         if N:
             mess = await ctx.send(
                 f"Supprimer les {N} messages les plus récents de ce chan ? "
-                "(celui-ci inclus)"
+                "(sans compter le `!purge` et ce message)"
             )
         else:
             mess = await ctx.send("Supprimer tous les messages de ce chan ?")
 
         if await tools.yes_no(mess):
-            await ctx.channel.purge(limit=int(N) if N else None)
+            await ctx.channel.purge(limit=int(N) + 2 if N else None)
 
 
     @commands.command()

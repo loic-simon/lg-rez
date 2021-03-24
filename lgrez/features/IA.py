@@ -184,8 +184,9 @@ class GestionIA(commands.Cog):
         """
         oc = ctx.message.content
         ctx.message.content = trigger
-        await process_IA(ctx.message,
-                         debug=(ctx.author.top_role == config.Role.mj))
+        debug = (ctx.message.webhook_id
+                 or ctx.author.top_role == config.Role.mj)
+        await process_IA(ctx.message, debug=debug)
         ctx.message.content = oc
         # On rétablit le message original pour ne pas qu'il trigger
         # l'IA 2 fois, le cas échéant
@@ -258,9 +259,6 @@ class GestionIA(commands.Cog):
     async def listIA(self, ctx, trigger=None, sensi=0.5):
         """Liste les règles d'IA reconnues par le bot (COMMANDE MJ/RÉDACTEURS)
 
-        Warning:
-            Commande en bêta, non couverte par les tests unitaires.
-
         Args
             trigger (optionnel): mot/expression permettant de filter et
                 trier les résultats. SI ``trigger`` FAIT PLUS D'UN MOT,
@@ -315,7 +313,7 @@ class GestionIA(commands.Cog):
 
             rep += "\nPour modifier une réaction, utiliser !modifIA <trigger>."
 
-        await tools.send_code_blocs(ctx, r)
+        await tools.send_code_blocs(ctx, rep)
         # On envoie, en séparant en blocs de 2000 caractères max
 
 
