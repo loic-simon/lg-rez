@@ -1,6 +1,8 @@
+import enum
 import unittest
 from unittest import mock
 
+from lgrez import bdd
 from lgrez.blocs import gsheets
 from test import mock_env
 
@@ -93,3 +95,90 @@ class TestGsheetsFunctions(unittest.IsolatedAsyncioTestCase):
         client = auth_patch.return_value
         client.open_by_key.assert_called_once_with(key)
         self.assertEqual(wb, client.open_by_key.return_value)
+
+
+    def test_update(self):
+        """Unit tests for gsheets.update function."""
+        # def update(sheet, *modifs)
+        update = gsheets.update
+
+        # 1 modif - str
+        sheet = mock.Mock()
+        cell = mock.Mock(row=4, col=6)
+        sheet.range.return_value = [cell]
+        update(sheet, gsheets.Modif(3, 5, "vàl"))
+        sheet.range.assert_called_once_with(1, 1, 4, 6)
+        self.assertEqual(cell.value, "vàl")
+        sheet.update_cells.assert_called_once_with([cell])
+
+        # 1 modif - None
+        sheet = mock.Mock()
+        cell = mock.Mock(row=4, col=6)
+        sheet.range.return_value = [cell]
+        update(sheet, gsheets.Modif(3, 5, None))
+        sheet.range.assert_called_once_with(1, 1, 4, 6)
+        self.assertEqual(cell.value, "")
+        sheet.update_cells.assert_called_once_with([cell])
+
+        # 1 modif - int
+        sheet = mock.Mock()
+        cell = mock.Mock(row=4, col=6)
+        sheet.range.return_value = [cell]
+        update(sheet, gsheets.Modif(3, 5, 5328))
+        sheet.range.assert_called_once_with(1, 1, 4, 6)
+        self.assertEqual(cell.value, 5328)
+        sheet.update_cells.assert_called_once_with([cell])
+
+        # 1 modif - large int
+        sheet = mock.Mock()
+        cell = mock.Mock(row=4, col=6)
+        sheet.range.return_value = [cell]
+        update(sheet, gsheets.Modif(3, 5, 452136988741234))
+        sheet.range.assert_called_once_with(1, 1, 4, 6)
+        self.assertEqual(cell.value, "452136988741234")
+        sheet.update_cells.assert_called_once_with([cell])
+
+        # 1 modif - enum
+        class MonEnum(enum.Enum):
+            akk = "voui"
+        sheet = mock.Mock()
+        cell = mock.Mock(row=4, col=6)
+        sheet.range.return_value = [cell]
+        update(sheet, gsheets.Modif(3, 5, MonEnum.akk))
+        sheet.range.assert_called_once_with(1, 1, 4, 6)
+        self.assertEqual(cell.value, "akk")
+        sheet.update_cells.assert_called_once_with([cell])
+
+        # 1 modif - entrée de BDD
+        entree = mock.Mock(bdd.Joueur, primary_key="flebl")
+        sheet = mock.Mock()
+        cell = mock.Mock(row=4, col=6)
+        sheet.range.return_value = [cell]
+        update(sheet, gsheets.Modif(3, 5, entree))
+        sheet.range.assert_called_once_with(1, 1, 4, 6)
+        self.assertEqual(cell.value, "flebl")
+        sheet.update_cells.assert_called_once_with([cell])
+
+        # several modifs
+        sheet = mock.Mock()
+        cells = [mock.Mock(row=4, col=6), mock.Mock(row=4, col=7),
+                 mock.Mock(row=1, col=3), mock.Mock(row=8, col=2),]
+        sheet.range.return_value = cells
+        update(sheet, gsheets.Modif(3, 5, "azz"), gsheets.Modif(3, 6, "bzz"),
+               gsheets.Modif(0, 2, "czz"), gsheets.Modif(7, 1, "dzz"))
+        sheet.range.assert_called_once_with(1, 1, 8, 7)
+        self.assertEqual([cell.value for cell in cells],
+                         ["azz", "bzz", "czz", "dzz"])
+        sheet.update_cells.assert_called_once_with(cells)
+
+
+    @mock.patch("gspread.utils.a1_to_rowcol")
+    def test_a_to_index(self, gsu_patch):
+        """Unit tests for gsheets.a_to_index function."""
+        # def a_to_index(column)
+        a_to_index = gsheets.a_to_index
+
+        gsu_patch.return_value = (173, 254)
+        col = a_to_index("TEST")
+        gsu_patch.assert_called_once_with("TEST1")
+        self.assertEqual(col, 253)
