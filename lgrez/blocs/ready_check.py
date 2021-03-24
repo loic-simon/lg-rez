@@ -15,8 +15,8 @@ class NotReadyError(RuntimeError):
 
 
 class _RCDict(dict):
-    def __init__(self, *args, _is_ready=None, _class=None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, _is_ready=None, _class=None, **kwargs):
+        super().__init__(**kwargs)
         if _is_ready is None:
             def _is_ready(item):
                 return (item is not None)
@@ -54,14 +54,15 @@ class _RCMeta(type):
         _pub_dict = {name: dict[name] for name in dict
                      if not name.startswith('_')}
         super().__init__(name, bases, _prv_dict)
+        _is_ready = check
         if check_type:
             if check:
-                def check(item):
+                def _is_ready(item):
                     return isinstance(item, check_type) and check(item)
             else:
-                def check(item):
+                def _is_ready(item):
                     return isinstance(item, check_type)
-        cls._rc_dict = _RCDict(_is_ready=check, _class=cls, **_pub_dict)
+        cls._rc_dict = _RCDict(_is_ready=_is_ready, _class=cls, **_pub_dict)
 
     def __getattr__(cls, name):
         if name.startswith('_'):
@@ -76,9 +77,9 @@ class _RCMeta(type):
             cls._rc_dict[name] = value
 
     def __delattr__(cls, name):
-        try:
+        if name.startswith('_'):
             super().__delattr__(name)
-        except AttributeError:
+        else:
             del cls._rc_dict[name]
 
     def __iter__(cls):

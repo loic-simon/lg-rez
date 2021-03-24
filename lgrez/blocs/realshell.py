@@ -132,7 +132,7 @@ class RealShell(asyncode.AsyncInteractiveConsole):
                 await self.write("", refresh=True)
         if command is RSCommand.UNTAB:          # Unindent
             if self.indent > 0:
-                self.indent -= max(times, self.indent)
+                self.indent -= min(times, self.indent)
                 await self.write("", refresh=True)
         elif command is RSCommand.TAB:          # Indent
             self.indent += times
@@ -145,19 +145,11 @@ class RealShell(asyncode.AsyncInteractiveConsole):
 
         return None
 
-    async def get_order(self):
-        """Waits for an order (message or reaction) from a member.
+    async def _check_reacts(self):
+        """Preliminar step of self.get_order().
 
-        Add reactions if not present (new message) and waits for
-        an interaction.
-
-        Returns:
-            - ``None`` -- if further instructions are needed.
-            - :class:`str` -- if instruction is complete (push this into
-              the shell!)
-
-        Raises:
-            .RealShellExit: if asked to stop shell (EOF).
+        Returns (True, <value to be returned>) if a react has been
+        anticipated, else False.
         """
         reacts = self.message.reactions     # Réactons déjà présentes
         if not reacts:
@@ -180,7 +172,28 @@ class RealShell(asyncode.AsyncInteractiveConsole):
                         break
                 command = RSCommand(react.emoji.name)
                 # Et on applique la commande
-                return (await self.control(command))
+                control_ret = await self.control(command)
+                return (True, control_ret)
+
+        return False
+
+    async def get_order(self):
+        """Waits for an order (message or reaction) from a member.
+
+        Add reactions if not present (new message) and waits for
+        an interaction.
+
+        Returns:
+            - ``None`` -- if further instructions are needed.
+            - :class:`str` -- if instruction is complete (push this into
+              the shell!)
+
+        Raises:
+            .RealShellExit: if asked to stop shell (EOF).
+        """
+        res = await self._check_reacts()
+        if res:         # Réaction anticipée, control effectué
+            return res[1]
 
         def react_check(payload):
             # Check REACT : bon message et pas react du bot
@@ -245,6 +258,11 @@ class RealShell(asyncode.AsyncInteractiveConsole):
                 cursor position (‸); implies that the shell is not
                 ready for further instructions.
         """
+        if not hasattr(sys, "ps1"):
+            sys.ps1 = '>>> '
+        if not hasattr(sys, "ps2"):
+            sys.ps2 = '... '
+
         if refresh or data.endswith(sys.ps1) or data.endswith(sys.ps2):
             # Prompt / refresh demandé
             data = self.rsbuffer + data       # On vide le buffer

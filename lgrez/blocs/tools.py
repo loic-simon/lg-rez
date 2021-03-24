@@ -178,7 +178,7 @@ class CommandExit(RuntimeError):
 #: ou un webhook (tâche planifiée)
 mjs_only = commands.check_any(
     commands.check(lambda ctx: ctx.message.webhook_id),
-    commands.has_role(config.Role.get_raw("mj"))
+    commands.has_role(config.Role.get_raw("mj"))        # nom du rôle
 )
 
 #: Décorateur pour commandes d'IA (:func:`discord.ext.commands.check`) :
@@ -262,7 +262,7 @@ async def wait_for_message(check, trigger_on_commands=False):
         .CommandExit: si le message est un des :attr:`.config.stop_keywords`
             (insensible à la casse), même si il respecte ``check``
     """
-    stop_keywords = [kw.lower() for kw in stop_keywords]
+    stop_keywords = [kw.lower() for kw in config.stop_keywords]
 
     if trigger_on_commands:
         # on trigger en cas de STOP
@@ -337,7 +337,8 @@ async def boucle_message(chan, in_message, condition_sortie, rep_message=None):
         # Message envoyé pas par le bot et dans le bon chan
         return m.channel == chan and m.author != config.bot.user
 
-    await chan.send(in_message)
+    if in_message:
+        await chan.send(in_message)
     rep = await wait_for_message(check_chan)
     while not condition_sortie(rep):
         await chan.send(rep_message)
@@ -374,7 +375,7 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
             rep = cible
         else:
             mess = await wait_for_message_here(ctx)
-            rep = mess.content.strip("()[]{}<>")
+            rep = mess.content.strip("()[]{}<>")    # dézèlificateur
 
         # Détection directe par ID / nom exact
         mem = member(rep, must_be_found=False)
@@ -409,11 +410,11 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
                     "sont les suivants : \n")
             for i, (joueur, score) in enumerate(nearest[:10]):
                 text += f"{emoji_chiffre(i + 1)}. {joueur.nom} \n"
-            m = await ctx.send(
+            mess = await ctx.send(
                 text + ital("Tu peux les choisir en réagissant à ce"
                             "message, ou en répondant au clavier.")
             )
-            n = await choice(ctx.bot, m, min(10, len(nearest)))
+            n = await choice(ctx.bot, mess, min(10, len(nearest)))
             return nearest[n - 1][0]
 
     await ctx.send("Et puis non, tiens !\nhttps://giphy.com/gifs/fuck-you-"
@@ -481,10 +482,10 @@ async def wait_for_react_clic(message, emojis={}, *, process_text=False,
 
         def react_check(react):
             # Check REACT : bon message, bon emoji, et pas react du bot
+            name = react.emoji.name if react.custom_emoji else react.emoji
             return (react.message_id == message.id
                     and react.user_id != config.bot.user.id
-                    and (trigger_all_reacts
-                         or react.emoji.name in emojis_names))
+                    and (trigger_all_reacts or name in emojis_names))
 
         react_task = asyncio.create_task(
             config.bot.wait_for('raw_reaction_add', check=react_check)
@@ -503,7 +504,8 @@ async def wait_for_react_clic(message, emojis={}, *, process_text=False,
                 return False
 
         mess_task = asyncio.create_task(
-            wait_for_message(check=message_check, trigger_on_commands=True)
+            wait_for_message(check=message_check,
+                             trigger_on_commands=trigger_on_commands)
         )
 
         done, pending = await asyncio.wait([react_task, mess_task],
@@ -559,7 +561,8 @@ async def yes_no(message):
     return await wait_for_react_clic(
         message, emojis={"✅": True, "❎": False}, process_text=True,
         text_filter=lambda s: s.lower() in yes_no_words,
-        post_converter=lambda s: s.lower() in yes_words)
+        post_converter=lambda s: s.lower() in yes_words,
+    )
 
 
 async def choice(message, N, start=1, *, additionnal={}):
@@ -589,7 +592,8 @@ async def choice(message, N, start=1, *, additionnal={}):
     return await wait_for_react_clic(
         message, emojis=emojis, process_text=True,
         text_filter=lambda s: s.isdigit() and start <= int(s) <= N,
-        post_converter=int)
+        post_converter=int,
+    )
 
 
 async def sleep(chan, tps):
@@ -633,6 +637,9 @@ def montre(heure=None):
         heure = now.hour % 12
         minute = now.minute
 
+    if minute >= 45:
+        heure = (heure + 1) % 12
+
     if 15 < minute < 45:        # Demi heure
         L = ["\N{CLOCK FACE TWELVE-THIRTY}",    "\N{CLOCK FACE ONE-THIRTY}",
              "\N{CLOCK FACE TWO-THIRTY}",       "\N{CLOCK FACE THREE-THIRTY}",
@@ -647,7 +654,7 @@ def montre(heure=None):
              "\N{CLOCK FACE SIX OCLOCK}",       "\N{CLOCK FACE SEVEN OCLOCK}",
              "\N{CLOCK FACE EIGHT OCLOCK}",     "\N{CLOCK FACE NINE OCLOCK}",
              "\N{CLOCK FACE TEN OCLOCK}",       "\N{CLOCK FACE ELEVEN OCLOCK}"]
-    return L[heure] if minute < 45 else L[(heure + 1) % 12]
+    return L[heure]
 
 
 def emoji_chiffre(chiffre, multi=False):
@@ -732,6 +739,9 @@ def heure_to_time(heure):
 
     Returns:
         :class:`datetime.time`
+
+    Raises:
+        ValueError: conversion impossible (mauvais format)
     """
     try:
         if "h" in heure:
@@ -789,7 +799,7 @@ def next_occurence(tps):
         jour += datetime.timedelta(days=1)
 
     test_dt = datetime.datetime.combine(jour, tps)
-    if test_dt < debut_pause():
+    if test_dt < debut_pause() and not en_pause():
         # Prochaine occurence avant la pause : OK
         return test_dt
 
@@ -815,7 +825,7 @@ def debut_pause():
 
     now = datetime.datetime.now()
     jour = now.date()
-    if pause_time <= now.time():
+    if pause_time < now.time():
         # Si plus tôt dans la journée que l'heure actuelle,
         # on réfléchit comme si on était demain
         jour += datetime.timedelta(days=1)
@@ -837,7 +847,7 @@ def fin_pause():
 
     now = datetime.datetime.now()
     jour = now.date()
-    if reprise_time <= now.time():
+    if reprise_time < now.time():
         # Si plus tôt dans la journée que l'heure actuelle,
         # on réfléchit comme si on était demain
         jour += datetime.timedelta(days=1)
@@ -897,7 +907,7 @@ def smooth_split(mess, N=1990, sep='\n', rep=''):
             LM.append(mess[psl: i] + rep)
             psl = i + 1     # on élimine le \n
         else:
-            LM.append(mess[psl: psl + N])
+            LM.append(mess[psl: psl + N] + rep)
             psl += N
 
     if psl < L:
@@ -915,7 +925,7 @@ async def send_blocs(messageable, mess, *, N=1990, sep='\n', rep=''):
         messageable (discord.abc.Messageable): objet où envoyer le
             message (:class:`~discord.ext.commands.Context` ou
             :class:`~discord.TextChannel`).
-        mess (str): message à envoyer0
+        mess (str): message à envoyer
         N, sep, rep: passé à :func:`.smooth_split`.
 
     Returns:

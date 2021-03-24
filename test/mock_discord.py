@@ -105,6 +105,7 @@ def get_ctx(_command=None, *args, _caller_id=None, **kwargs):
         guild=ctx.guild,
         channel=ctx.channel,
         author=ctx.author,
+        webhook_id=None,
     )
     ctx.channel.configure_mock(
         guild=ctx.guild,
@@ -113,7 +114,7 @@ def get_ctx(_command=None, *args, _caller_id=None, **kwargs):
     )
     ctx.author.configure_mock(
         guild=ctx.guild,
-        id=_caller_id or -1
+        id=_caller_id or -1,
     )
     ctx.new_message = functools.partial(message, ctx)
     ctx.invoke = functools.partial(call, _command, ctx)
@@ -296,10 +297,11 @@ class _Interact:
         self.expected = list(args)
         self.side_effects = iter(args)
         # Itérateur de tuples (func, call) attendus
-        self.patchs = {}
+        self._patchs = {}   # objets _patchs
+        self.patchs = {}    # mocks créés à l'enter
         for (mod, func) in self.funcs:
             # Patch de chaque fonction d'interaction
-            self.patchs[func] = mock.patch(
+            self._patchs[func] = mock.patch(
                 f"{mod}.{func}", new_callable=mock.AsyncMock,
                 side_effect=functools.partial(self._side_effect, func),
             )
@@ -335,8 +337,9 @@ class _Interact:
     def __enter__(self):
         self.stack = ExitStack()
         self.calls = []
-        for patch in self.patchs.values():
-            self.stack.enter_context(patch)
+        for func in self._patchs:
+            mk = self.stack.enter_context(self._patchs[func])
+            self.patchs[func] = mk
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

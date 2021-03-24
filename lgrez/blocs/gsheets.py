@@ -8,7 +8,7 @@ import enum
 import json
 
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from oauth2client import service_account
 
 from lgrez import bdd
 from lgrez.blocs import env
@@ -32,10 +32,12 @@ class Modif():
 
     def __repr__(self):
         """Returns repr(self)"""
-        return f"<gsheets.Modif: ({self.row}, {self.column}) = {self.val}>"
+        return f"<gsheets.Modif: ({self.row}, {self.column}) = {self.val!r}>"
 
     def __eq__(self, other):
         """Returns self == other"""
+        if not isinstance(other, self.__class__):
+            return NotImplemented
         return (self.row == other.row
                 and self.column == other.column
                 and self.val == other.val)
@@ -60,7 +62,7 @@ def connect(key):
     LGREZ_GCP_CREDENTIALS = env.load("LGREZ_GCP_CREDENTIALS")
 
     scope = ['https://spreadsheets.google.com/feeds']
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(
+    creds = service_account.ServiceAccountCredentials.from_json_keyfile_dict(
         json.loads(LGREZ_GCP_CREDENTIALS),
         scope)
     client = gspread.authorize(creds)

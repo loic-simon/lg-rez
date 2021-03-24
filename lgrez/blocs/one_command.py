@@ -48,7 +48,7 @@ async def not_in_command(ctx):
     """
     if ctx.command in exempted:
         return True         # Commandes exemptées
-    if ctx.channel.id not in ctx.bot.in_command:
+    if ctx.channel.id not in config.bot.in_command:
         return True         # Channel libre
 
     # On envoie (discrètement) l'ordre d'arrêter la commande précédente
@@ -56,7 +56,7 @@ async def not_in_command(ctx):
     # On attend qu'il soit pris en compte
     await asyncio.sleep(1)
 
-    if ctx.channel.id in ctx.bot.in_command:    # Si ça n'a pas suffit
+    if ctx.channel.id in config.bot.in_command:    # Si ça n'a pas suffit
         raise AlreadyInCommand()                    # on raise l'erreur
 
     return True
@@ -70,14 +70,14 @@ async def add_to_in_command(ctx):
     (enregistrer avec :meth:`~discord.ext.commands.Bot.before_invoke`)
 
     Elle est appellée seulement si les checks sont OK, donc pas si le
-    salon est déjà dans :attr:`ctx.bot.in_command <.LGBot.in_command>`.
+    salon est déjà dans :attr:`config.bot.in_command <.LGBot.in_command>`.
 
     Args:
         ctx (discord.ext.commands.Context): contexte d'invocation de
             la commande.
     """
     if ctx.command not in exempted and not ctx.message.webhook_id:
-        ctx.bot.in_command.append(ctx.channel.id)
+        config.bot.in_command.append(ctx.channel.id)
 
 
 # @bot.after_invoke
@@ -97,10 +97,10 @@ async def remove_from_in_command(ctx):
             la commande.
     """
     await asyncio.sleep(0.1)        # On attend un peu
-    if (ctx.channel.id in ctx.bot.in_command
+    if (ctx.channel.id in config.bot.in_command
         and ctx.command not in exempted):
 
-        ctx.bot.in_command.remove(ctx.channel.id)
+        config.bot.in_command.remove(ctx.channel.id)
 
 
 class _Bypasser():
@@ -109,6 +109,7 @@ class _Bypasser():
 
     def __enter__(self):
         config.bot.in_command.remove(self.ctx.channel.id)
+        return self
 
     def __exit__(self, exc_type, exc, tb):
         config.bot.in_command.append(self.ctx.channel.id)

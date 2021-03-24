@@ -4,7 +4,7 @@
 
 """
 
-from discord_webhook import DiscordWebhook
+import discord_webhook
 
 
 _last_time = None       # Temps (time.time) du derner envoi de webhook
@@ -24,7 +24,7 @@ def send(message, url):
     Note:
         Seuls les webhooks textuels sont pris en charge.
     """
-    webhook = DiscordWebhook(url=url, content=message)
+    webhook = discord_webhook.DiscordWebhook(url=url, content=message)
 
     response = webhook.execute()
 
