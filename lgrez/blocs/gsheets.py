@@ -1,17 +1,56 @@
 """lg-rez / blocs / Interfaçage Google Sheets
 
-Connection, récupération de classeurs, modifications (implémentation de https://pypi.org/project/gspread)
+Connection, récupération de classeurs, modifications
+(implémentation de https://pypi.org/project/gspread)
 """
 
+import enum
 import json
 
-from lgrez.blocs import env
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from oauth2client import service_account
+
+from lgrez import bdd
+from lgrez.blocs import env
+
+
+WorksheetNotFound = gspread.exceptions.WorksheetNotFound
+
+class Modif():
+    """Modification à appliquer à un Google Sheet.
+
+    Attributes:
+        row (int): Numéro de la ligne (0 = ligne 1)
+        column (int): Numéro de la colonne (0 = colonne A)
+        val (Any): Nouvelle valeur
+    """
+    def __init__(self, row, column, val):
+        """Initializes self."""
+        self.row = row
+        self.column = column
+        self.val = val
+
+    def __repr__(self):
+        """Returns repr(self)"""
+        return f"<gsheets.Modif: ({self.row}, {self.column}) = {self.val!r}>"
+
+    def __eq__(self, other):
+        """Returns self == other"""
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return (self.row == other.row
+                and self.column == other.column
+                and self.val == other.val)
+
+    def __hash__(self):
+        return hash((self.row, self.column, self.val))
+
 
 
 def connect(key):
-    """Charge les credentials GSheets (variable d'environment ``LGREZ_GCP_CREDENTIALS``) et renvoie le classeur demandé
+    """Charge les credentials GSheets et renvoie le classeur demandé.
+
+    Nécessite la variable d'environment ``LGREZ_GCP_CREDENTIALS``.
 
     Args:
         key (str): ID du classeur à charger (25 caractères)
@@ -23,7 +62,9 @@ def connect(key):
     LGREZ_GCP_CREDENTIALS = env.load("LGREZ_GCP_CREDENTIALS")
 
     scope = ['https://spreadsheets.google.com/feeds']
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(json.loads(LGREZ_GCP_CREDENTIALS), scope)
+    creds = service_account.ServiceAccountCredentials.from_json_keyfile_dict(
+        json.loads(LGREZ_GCP_CREDENTIALS),
+        scope)
     client = gspread.authorize(creds)
 
     # Open the workbook
@@ -32,32 +73,76 @@ def connect(key):
     return workbook
 
 
-def update(sheet, modifs):
-    """Met à jour une feuille GSheets avec les modifications demandées
+def update(sheet, *modifs):
+    """Met à jour une feuille GSheets avec les modifications demandées.
 
     Args:
-        sheet (:class:`gspread.models.Worksheet`): la feuille à modifier
-        modifs (:class:`list`\[\(:class:`int`, :class:`int`, :class:`object`\)\]): liste de tuples ``(ligne, colonne, valeur)``
+        sheet (gspread.models.Worksheet): La feuille à modifier
+        *modifs (list[.Modif]): Modification(s) à apporter
 
-    Les IDs sont indexés à partir de ``0`` (cellule ``A1`` en ``(0, 0)``.
+    Le type de la nouvelle valeur sera interpreté par ``gspread`` pour
+    donner le type GSheets adéquat à la cellule (texte, numérique,
+    temporel...)
 
-    Le type de la nouvelle valeur sera interpreté par ``gspread`` pour donner le type GSheets adéquat à la cellule (texte, numérique, temporel...)
+    Les entiers trop grands pour être stockés sans perte de précision
+    (IDs des joueurs par exemple) sont convertis en :class:`str`. Les
+    ``None`` sont convertis en ``''``. Les membres d':class:`~enum.Enum`
+    sont stockés par leur **nom**.
     """
-    lm = max([l for (l, c, v) in modifs])       # ligne max de la zone à modifier
-    cm = max([c for (l, c, v) in modifs])       # colonne max de la zone à modifier
+    # Bordures de la zone à modifier
+    lm = max([modif.row for modif in modifs])
+    cm = max([modif.column for modif in modifs])
 
     # Récupère toutes les valeurs sous forme de cellules gspread
-    cells = sheet.range(1, 1, lm+1, cm+1)   # gspread indexe à partir de 1 (comme les gsheets)
+    cells = sheet.range(1, 1, lm + 1, cm + 1)
+    # gspread indexe à partir de 1 (comme les gsheets)
 
     cells_to_update = []
-    for (l, c, v) in modifs:
-        cell = [cell for cell in cells if cell.col == c+1 and cell.row == l+1][0]    # on récup l'objet Cell correspondant aux coords à modifier
-        if isinstance(v, int) and v > 10**14:
-            cell.value = str(v)
-        elif v is None:
+    for modif in modifs:
+        # On récupère l'objet Cell correspondant aux coords à modifier
+        cell = next(cell for cell in cells
+                    if cell.col == modif.column + 1
+                    and cell.row == modif.row + 1)
+
+        val = modif.val
+
+        # Transformation objets complexes
+        if isinstance(val, enum.Enum):
+            # Enums : stocker le nom
+            val = val.name
+        elif isinstance(modif.val, bdd.base.TableBase):
+            # Instances : stocker la clé primaire
+            val = val.primary_key
+
+        # Adaptation types de base
+        if isinstance(val, int) and val > 10**14:
+            # Entiers trop grands pour être stockés sans perte de
+            # précision (IDs des joueurs par ex.): passage en str
+            cell.value = str(val)
+        elif val is None:
             cell.value = ""
         else:
-            cell.value = v              # cells : ([<L1C1>, <L1C2>, ..., <L1Ccm>, <L2C1>, <L2C2>, ..., <LlmCcm>]
+            cell.value = val
+
         cells_to_update.append(cell)
 
     sheet.update_cells(cells_to_update)
+
+
+def a_to_index(column):
+    """Utilitaire : convertit une colonne ("A", "B"...) en indice.
+
+    Args:
+        column (str): nom de la colonne. Doit être composé de caractères
+            dans [a-z, A-Z] uniquement.
+
+    Returns:
+        int: L'indice de la colonne, **indexé à partir de 0** (cellules
+            considérées comme une liste de liste).
+
+    Raises:
+        gspread.exceptions.IncorrectCellLabel: valeur incorrecte.
+    """
+    a1 = column + "1"
+    row, col = gspread.utils.a1_to_rowcol(a1)
+    return col - 1      # a1_to_rowcol indexe à partir de 1
