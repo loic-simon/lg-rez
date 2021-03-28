@@ -12,7 +12,8 @@ import sqlalchemy
 from lgrez import config
 from lgrez.bdd import base, ActionTrigger
 from lgrez.bdd.base import (autodoc_Column, autodoc_ManyToOne,
-                            autodoc_OneToMany)
+                            autodoc_OneToMany, autodoc_DynamicOneToMany)
+from lgrez.bdd.enums import UtilEtat
 from lgrez.blocs import env, webhook
 
 
@@ -22,8 +23,8 @@ class Action(base.TableBase):
     """Table de données des actions attribuées (liées à un joueur).
 
     Les instances doivent être enregistrées via
-    :func:`.gestion_actions.open_action` et supprimées via
-    :func:`.gestion_actions.close_action`.
+    :func:`.gestion_actions.add_action` et supprimées via
+    :func:`.gestion_actions.delete_action`.
     """
     id = autodoc_Column(sqlalchemy.Integer(), primary_key=True,
         doc="Identifiant unique de l'action, sans signification")
@@ -52,9 +53,99 @@ class Action(base.TableBase):
     taches = autodoc_OneToMany("Tache", back_populates="action",
         doc="Tâches liées à cette action")
 
+    utilisations = autodoc_DynamicOneToMany("Utilisation",
+        back_populates="action",
+        doc="Utilisations de cette action")
+
     def __repr__(self):
         """Return repr(self)."""
         return f"<Action #{self.id} ({self.base}/{self.joueur})>"
+
+
+class Utilisation(base.TableBase):
+    """Table de données des utilisations des actions.
+
+    Les instances sont enregistrées via :meth:`\!open
+    <.open_close.OpenClose.OpenClose.open.callback>` ;
+    elles n'ont pas vocation à être supprimées.
+    """
+    id = autodoc_Column(sqlalchemy.BigInteger(), primary_key=True,
+        doc="Identifiant unique de l'utilisation, sans signification")
+
+    _action_id = sqlalchemy.Column(sqlalchemy.ForeignKey("actions.id"),
+        nullable=False)
+    action = autodoc_ManyToOne("Action", back_populates="utilisations",
+        doc="Action utilisée")
+
+    etat = autodoc_Column(sqlalchemy.Enum(UtilEtat), nullable=False,
+        default=UtilEtat.ouverte,
+        doc="État de l'utilisation")
+
+    ts_open = autodoc_Column(sqlalchemy.DateTime(),
+        doc="Timestamp d'ouverture de l'utilisation")
+    ts_close = autodoc_Column(sqlalchemy.DateTime(),
+        doc="Timestamp de fermeture de l'utilisation")
+    ts_decision = autodoc_Column(sqlalchemy.DateTime(),
+        doc="Timestamp du dernier remplissage de l'utilisation")
+
+    # One-to-manys
+    taches = autodoc_OneToMany("Tache", back_populates="utilisation",
+        doc="Tâches liées à cette utilisation")
+    ciblages = autodoc_OneToMany("Ciblage", back_populates="utilisation",
+        doc="Cibles désignées dans cette utilisation")
+
+    def __repr__(self):
+        """Return repr(self)."""
+        return f"<Utilisation #{self.id} ({self.action})>"
+
+
+class Ciblage(base.TableBase):
+    """Table de données des cibles désignées dans les utilisations d'actions.
+
+    Les instances sont enregistrées via :meth:`\!action
+    <.voter_agir.VoterAgir.VoterAgir.action.callback>` ;
+    elles n'ont pas vocation à être supprimées.
+    """
+    id = autodoc_Column(sqlalchemy.Integer(), primary_key=True,
+        doc="Identifiant unique du ciblage, sans signification")
+
+    _base_id = sqlalchemy.Column(sqlalchemy.ForeignKey("baseciblages.id"),
+        nullable=False)
+    base = autodoc_ManyToOne("BaseCiblage", back_populates="ciblages",
+        doc="Modèle de ciblage (lié au modèle d'action)")
+
+    _utilisation_id = sqlalchemy.Column(sqlalchemy.ForeignKey(
+        "utilisations.id"), nullable=False)
+    utilisation = autodoc_ManyToOne("Utilisation", back_populates="ciblages",
+        doc="Utilisation où ce ciblage a été fait")
+
+    _joueur_id = sqlalchemy.Column(sqlalchemy.ForeignKey(
+        "joueurs.discord_id"), nullable=True)
+    joueur = autodoc_ManyToOne("Joueur", back_populates="ciblages",
+        nullable=True, doc="Joueur désigné, si ``base.type`` vaut "
+        ":attr:`~.bdd.CibleType.joueur`, :attr:`~.bdd.CibleType.vivant` "
+        "ou :attr:`~.bdd.CibleType.mort`")
+
+    _role_slug = sqlalchemy.Column(sqlalchemy.ForeignKey(
+        "roles.slug"), nullable=True)
+    role = autodoc_ManyToOne("Role", back_populates="ciblages",
+        nullable=True, doc="Rôle désigné, si ``base.type`` vaut "
+        ":attr:`~.bdd.CibleType.role`")
+
+    _camp_slug = sqlalchemy.Column(sqlalchemy.ForeignKey(
+        "camps.slug"), nullable=True)
+    camp = autodoc_ManyToOne("Camp", back_populates="ciblages",
+        nullable=True, doc="Camp désigné, si ``base.type`` vaut "
+        ":attr:`~.bdd.CibleType.camp`")
+
+    booleen = autodoc_Column(sqlalchemy.Boolean(),
+        doc="Valeur, si ``base.type`` vaut :attr:`~.bdd.CibleType.booleen`")
+    texte = autodoc_Column(sqlalchemy.String(1000),
+        doc="Valeur, si ``base.type`` vaut :attr:`~.bdd.CibleType.texte`")
+
+    def __repr__(self):
+        """Return repr(self)."""
+        return f"<Ciblage #{self.id} ({self.base}/{self.utilisation})>"
 
 
 class Tache(base.TableBase):
@@ -73,7 +164,14 @@ class Tache(base.TableBase):
     _action_id = sqlalchemy.Column(sqlalchemy.ForeignKey("actions.id"),
         nullable=True)
     action = autodoc_ManyToOne("Action", back_populates="taches",
+        nullable=True,
         doc="Si la tâche est liée à une action, action concernée")
+
+    _utilisation_id = sqlalchemy.Column(sqlalchemy.ForeignKey(
+        "utilisations.id"), nullable=True)
+    utilisation = autodoc_ManyToOne("Utilisation", back_populates="taches",
+        nullable=True,
+        doc="Si la tâche est liée à une utilisation, utilisation concernée")
 
     def __repr__(self):
         """Return repr(self)."""

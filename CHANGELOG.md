@@ -9,9 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+  - Extended Data model with New Actions System (NAS) data classes
+    (:class:`.bdd.Utilisation`, :class:`.bdd.BaseCiblage` and
+    :class:`.bdd.Ciblage`) and enums (:class:`.bdd.CibleType` and
+    :class:`.bdd.UtilEtat`);
+  - New convenience function :func:`.bdd.base.autodoc_DynamicOneToMany`
+    for documenting dynamicly loaded one-to-many relationships;
+
 ### Changed
 
+  - Updated existing data classes attributes to link to new tables;
+  - New option ``nullable`` for :func:`.bdd.base.autodoc_DynamicOneToMany`.
+
 ### Fixed
+
+  - Documentation errors & typos.
 
 
 

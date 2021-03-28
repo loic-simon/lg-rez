@@ -9,8 +9,9 @@ import sqlalchemy
 from lgrez import config
 from lgrez.bdd import base
 from lgrez.bdd.base import (autodoc_Column, autodoc_ManyToOne,
-                            autodoc_OneToMany, autodoc_ManyToMany)
-from lgrez.bdd.enums import ActionTrigger
+                            autodoc_OneToMany, autodoc_DynamicOneToMany,
+                            autodoc_ManyToMany)
+from lgrez.bdd.enums import ActionTrigger, CibleType
 
 
 # Tables de jonction (pour many-to-manys)
@@ -56,6 +57,8 @@ class Role(base.TableBase):
     # to-manys
     joueurs = autodoc_OneToMany("Joueur", back_populates="role",
         doc="Joueurs ayant ce rôle")
+    ciblages = autodoc_DynamicOneToMany("Ciblage", back_populates="role",
+        doc="Ciblages prenant ce rôle pour cible")
     base_actions = autodoc_ManyToMany("BaseAction", secondary=_baseaction_role,
         back_populates="roles",
         doc="Modèles d'actions associées")
@@ -125,6 +128,8 @@ class Camp(base.TableBase):
         doc="Joueurs appartenant à ce camp")
     roles = autodoc_OneToMany("Role", back_populates="camp",
         doc="Rôles affiliés à ce camp de base")
+    ciblages = autodoc_DynamicOneToMany("Ciblage", back_populates="camp",
+        doc="Ciblages prenant ce camp pour cible")
 
     def __repr__(self):
         """Return repr(self)."""
@@ -248,6 +253,9 @@ class BaseAction(base.TableBase):
     # -to-manys
     actions = autodoc_OneToMany("Action", back_populates="base",
         doc="Actions déroulant de cette base")
+    base_ciblages = autodoc_OneToMany("BaseCiblage",
+        back_populates="base_action",
+        doc="Ciblages de ce modèle d'action")
     roles = autodoc_ManyToMany("Role", secondary=_baseaction_role,
         back_populates="base_actions",
         doc="Rôles ayant cette action de base")
@@ -255,3 +263,55 @@ class BaseAction(base.TableBase):
     def __repr__(self):
         """Return repr(self)."""
         return f"<BaseAction '{self.slug}'>"
+
+
+class BaseCiblage(base.TableBase):
+    """Table de données des modèles de ciblages des actions de base.
+
+    [TODO] Cette table est remplie automatiquement à partir du Google Sheet
+    "Rôles et actions" par la commande :meth:`\!fillroles
+    <.remplissage_bdd.RemplissageBDD.RemplissageBDD.fillroles.callback>`.
+    """
+    id = autodoc_Column(sqlalchemy.Integer(), primary_key=True,
+        doc="Identifiant unique du modèle de ciblage, sans signification")
+
+    _baseaction_slug = sqlalchemy.Column(sqlalchemy.ForeignKey(
+        "baseactions.slug"), nullable=True)
+    base_action = autodoc_ManyToOne("BaseAction",
+        back_populates="base_ciblages",
+        doc="Modèle d'action définissant ce ciblage")
+
+    slug = autodoc_Column(sqlalchemy.String(32), nullable=False,
+        default="unique",
+        doc="Identifiant de la cible dans le modèle d'action")
+    type = autodoc_Column(sqlalchemy.Enum(CibleType), nullable=False,
+        default=CibleType.texte,
+        doc="Message d'interaction au joueur au moment de choisir la cible")
+
+    prio = autodoc_Column(sqlalchemy.Integer(), nullable=False, default=1,
+        doc="Ordre d'apparition du ciblage lors du ``!action`` "
+        "(de ``1`` à ``Ncibles`` pour une action)\n\nSi deux ciblages "
+        "ont la même priorité, ils seront considérés comme ayant une "
+        "signification symmétrique (notamment, si :attr:`doit_changer` "
+        "vaut ``True``, tous les membres du groupe devront changer).")
+
+    phrase = autodoc_Column(sqlalchemy.String(1000), nullable=False,
+        default="Cible ?",
+        doc="Message d'interaction au joueur au moment de choisir la cible")
+
+    obligatoire = autodoc_Column(sqlalchemy.Boolean(), nullable=False,
+        default=True,
+        doc="Si le ciblage doit obligatoirement être renseigné")
+    doit_changer = autodoc_Column(sqlalchemy.Boolean(), nullable=False,
+        default=False,
+        doc="Si la cible doit changer d'une utilisation à l'autre.\n\n"
+        "Si la dernière utilisation est ignorée ou contrée, il n'y a "
+        "pas de contrainte.")
+
+    # one-to-manys
+    ciblages = autodoc_DynamicOneToMany("Ciblage", back_populates="base",
+        doc="Ciblages déroulant de cette base")
+
+    def __repr__(self):
+        """Return repr(self)."""
+        return f"<BaseCiblage #{self.id} ({self.base_action}/{self.slug})>"

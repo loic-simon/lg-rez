@@ -58,6 +58,8 @@ différentes tables du modèle de données :
 .. autoclass:: lgrez.bdd.Statut
 .. autoclass:: lgrez.bdd.ActionTrigger
 .. autoclass:: lgrez.bdd.CandidHaroType
+.. autoclass:: lgrez.bdd.UtilEtat
+.. autoclass:: lgrez.bdd.CibleType
 
 
 Modèle de données - Joueurs
@@ -114,6 +116,14 @@ Actions de base
     :member-order: bysource
 
 
+Ciblages de base
+~~~~~~~~~~~~~~~~
+
+.. autoclass:: lgrez.bdd.BaseCiblage
+    :members:
+    :member-order: bysource
+
+
 Modèle de données - Actions
 -----------------------------------------
 
@@ -125,6 +135,22 @@ Actions
 ~~~~~~~~~~~~~~~~
 
 .. autoclass:: lgrez.bdd.Action
+    :members:
+    :member-order: bysource
+
+
+Utilisations
+~~~~~~~~~~~~~~~~
+
+.. autoclass:: lgrez.bdd.Utilisation
+    :members:
+    :member-order: bysource
+
+
+Ciblages
+~~~~~~~~~~~~~~~~
+
+.. autoclass:: lgrez.bdd.Ciblage
     :members:
     :member-order: bysource
 

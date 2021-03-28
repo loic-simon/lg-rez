@@ -9,7 +9,7 @@ import sqlalchemy
 from lgrez import config
 from lgrez.bdd import base
 from lgrez.bdd.base import (autodoc_Column, autodoc_ManyToOne,
-                            autodoc_OneToMany)
+                            autodoc_OneToMany, autodoc_DynamicOneToMany)
 from lgrez.bdd.enums import Statut, CandidHaroType
 
 
@@ -70,6 +70,8 @@ class Joueur(base.TableBase):
         doc="Actions pour ce joueur")
     candidharos = autodoc_OneToMany("CandidHaro", back_populates="joueur",
         doc="Candidatures et haros de/contre ce joueur")
+    ciblages = autodoc_DynamicOneToMany("Ciblage", back_populates="joueur",
+        doc="Ciblages prenant ce joueur pour cible")
 
     def __repr__(self):
         """Return repr(self)."""
@@ -132,7 +134,7 @@ class Joueur(base.TableBase):
 class CandidHaro(base.TableBase):
     """Table de données des candidatures et haros en cours #PhilippeCandidHaro.
 
-    Les instances doivent être enregistrées via :meth:`\!haro
+    Les instances sont enregistrées via :meth:`\!haro
     <.actions_publiques.ActionsPubliques.ActionsPubliques.haro.callback>`
     / :meth:`\!candid
     <.actions_publiques.ActionsPubliques.ActionsPubliques.candid.callback>`
