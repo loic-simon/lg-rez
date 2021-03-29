@@ -15,7 +15,7 @@ import sqlalchemy
 
 from lgrez import config, bdd
 from lgrez.blocs import tools, env, gsheets
-from lgrez.bdd import (Joueur, Action, Role, Camp, BaseAction,
+from lgrez.bdd import (Joueur, Action, Role, Camp, BaseAction, BaseCiblage,
                        Statut, ActionTrigger)
 from lgrez.features import gestion_actions
 
@@ -540,10 +540,10 @@ class Sync(commands.Cog):
     async def fillroles(self, ctx):
         """Remplit les tables et #roles depuis le GSheet ad hoc (COMMANDE MJ)
 
-        - Remplit les tables :class:`.bdd.Camp`, :class:`.bdd.Role` et
-          :class:`.bdd.BaseAction` avec les informations du Google Sheets
-          "Rôles et actions" (variable d'environnement
-          ``LGREZ_ROLES_SHEET_ID``) ;
+        - Remplit les tables :class:`.bdd.Camp`, :class:`.bdd.Role`,
+          :class:`.bdd.BaseAction` et :class:`.bdd.BaseCiblage` avec les
+          informations du Google Sheets "Rôles et actions" (variable
+          d'environnement ``LGREZ_ROLES_SHEET_ID``) ;
         - Vide le chan ``#roles`` puis le remplit avec les descriptifs
           de chaque rôle.
 
@@ -577,6 +577,20 @@ class Sync(commands.Cog):
                         if not col.startswith("_")}
                 if table == Role:
                     cols["camp"] = Role.attrs["camp"]
+                elif table == BaseAction:
+                    # BaseCiblages : au bout de la feuille
+                    bc_cols = BaseCiblage.columns
+                    bc_cols = {col: bc_cols[col]
+                               for col in bc_cols.keys()
+                               if not col.startswith("_")}
+                    bc_cols_for_ith = []
+                    for i in range(config.max_ciblages_per_action):
+                        prefix = f"c{i + 1}_"
+                        bc_cols_for_ith.append({
+                            # colonne -> nom dans la table pour le ièmme
+                            col: f"{prefix}{col}" for col in bc_cols
+                        })
+
                 primary_key = table.primary_col.key
 
                 # Indices des colonnes GSheet pour chaque colonne de la table
@@ -585,7 +599,15 @@ class Sync(commands.Cog):
                     for key in cols.keys():
                         cols_index[key] = values[0].index(key)
                     if table == BaseAction:
-                        roles_idx = values[0].index("roles")
+                        key = "roles"
+                        roles_idx = values[0].index(key)
+                        # BaseCiblages : au bout de la feuille
+                        ciblages_idx = []
+                        for bc_cols_names in bc_cols_for_ith:
+                            idx = {}
+                            for col, key in bc_cols_names.items():
+                                idx[col] = values[0].index(key)
+                            ciblages_idx.append(idx)
                 except ValueError:
                     raise ValueError(
                         f"!fillroles : colonne '{key}' non trouvée dans "
@@ -604,6 +626,14 @@ class Sync(commands.Cog):
                         args["roles"] = [transtype(slug.strip(), Role)
                                          for slug in row[roles_idx].split(",")
                                          if slug]
+                        # BaseCiblages
+                        bcs = []
+                        for idx in ciblages_idx:
+                            if row[idx["slug"]]:        # ciblage défini
+                                bcargs = {key: transtype(row[idx[key]], col)
+                                          for key, col in bc_cols.items()}
+                                bcs.append(BaseCiblage(**bcargs))
+                        args["base_ciblages"] = bcs
 
                     id = args[primary_key]
                     if id in existants:
@@ -614,6 +644,10 @@ class Sync(commands.Cog):
                             # Many-to-many BaseAction <-> Rôle
                             if existants[id].roles != args["roles"]:
                                 existants[id].roles = args["roles"]
+                            # BaseCiblages
+                            existants[id].base_ciblages = args["base_ciblages"]
+                            # on remplace les BaseCiblages à chaque fois
+                            # (les anciens seront drop automatiquement)
                     else:
                         config.session.add(table(**args))
 
@@ -645,7 +679,8 @@ class Sync(commands.Cog):
 
                 emoji = camp.discord_emoji_or_none
                 await chan_roles.send(
-                    embed=Embed(title=f"Camp : {camp.nom}").set_image(
+                    embed=Embed(title=f"Camp : {camp.nom}",
+                                description=camp.description).set_image(
                         url=emoji.url if emoji else None
                     )
                 )

@@ -109,7 +109,7 @@ class Ciblage(base.TableBase):
     id = autodoc_Column(sqlalchemy.Integer(), primary_key=True,
         doc="Identifiant unique du ciblage, sans signification")
 
-    _base_id = sqlalchemy.Column(sqlalchemy.ForeignKey("baseciblages.id"),
+    _base_id = sqlalchemy.Column(sqlalchemy.ForeignKey("baseciblages._id"),
         nullable=False)
     base = autodoc_ManyToOne("BaseCiblage", back_populates="ciblages",
         doc="Modèle de ciblage (lié au modèle d'action)")

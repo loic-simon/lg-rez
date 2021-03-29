@@ -112,7 +112,7 @@ class Camp(base.TableBase):
 
     nom = autodoc_Column(sqlalchemy.String(32), nullable=False,
         doc="Nom (affiché) du camp")
-    description = autodoc_Column(sqlalchemy.String(140), nullable=False,
+    description = autodoc_Column(sqlalchemy.String(1000), nullable=False,
         default="",
         doc="Description (courte) du camp")
 
@@ -254,7 +254,7 @@ class BaseAction(base.TableBase):
     actions = autodoc_OneToMany("Action", back_populates="base",
         doc="Actions déroulant de cette base")
     base_ciblages = autodoc_OneToMany("BaseCiblage",
-        back_populates="base_action",
+        back_populates="base_action", cascade="all, delete-orphan",
         doc="Ciblages de ce modèle d'action")
     roles = autodoc_ManyToMany("Role", secondary=_baseaction_role,
         back_populates="base_actions",
@@ -272,11 +272,11 @@ class BaseCiblage(base.TableBase):
     "Rôles et actions" par la commande :meth:`\!fillroles
     <.remplissage_bdd.RemplissageBDD.RemplissageBDD.fillroles.callback>`.
     """
-    id = autodoc_Column(sqlalchemy.Integer(), primary_key=True,
+    _id = autodoc_Column(sqlalchemy.Integer(), primary_key=True,
         doc="Identifiant unique du modèle de ciblage, sans signification")
 
     _baseaction_slug = sqlalchemy.Column(sqlalchemy.ForeignKey(
-        "baseactions.slug"), nullable=True)
+        "baseactions.slug"), nullable=False)
     base_action = autodoc_ManyToOne("BaseAction",
         back_populates="base_ciblages",
         doc="Modèle d'action définissant ce ciblage")
@@ -289,11 +289,12 @@ class BaseCiblage(base.TableBase):
         doc="Message d'interaction au joueur au moment de choisir la cible")
 
     prio = autodoc_Column(sqlalchemy.Integer(), nullable=False, default=1,
-        doc="Ordre d'apparition du ciblage lors du ``!action`` "
-        "(de ``1`` à ``Ncibles`` pour une action)\n\nSi deux ciblages "
-        "ont la même priorité, ils seront considérés comme ayant une "
-        "signification symmétrique (notamment, si :attr:`doit_changer` "
-        "vaut ``True``, tous les membres du groupe devront changer).")
+        doc="Ordre (relatif) d'apparition du ciblage lors du ``!action`` "
+        "\n\nSi deux ciblages ont la même priorité, ils seront considérés "
+        "comme ayant une signification symmétrique (notamment, si "
+        ":attr:`doit_changer` vaut ``True``, tous les membres du groupe "
+        "devront changer) ; l'ordre d'apparition dépend alors de leur "
+        ":attr:`slug`, par ordre alphabétique (``cible1`` < ``cible2``).")
 
     phrase = autodoc_Column(sqlalchemy.String(1000), nullable=False,
         default="Cible ?",
@@ -314,4 +315,4 @@ class BaseCiblage(base.TableBase):
 
     def __repr__(self):
         """Return repr(self)."""
-        return f"<BaseCiblage #{self.id} ({self.base_action}/{self.slug})>"
+        return f"<BaseCiblage #{self._id} ({self.base_action}/{self.slug})>"

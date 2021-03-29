@@ -32,7 +32,8 @@
 
 .. automodule:: lgrez.bdd.base
    :members: autodoc_Column, autodoc_ManyToOne,
-             autodoc_OneToMany, autodoc_ManyToMany, TableMeta
+             autodoc_OneToMany, autodoc_DynamicOneToMany, autodoc_ManyToMany,
+             TableMeta
 
 
 Table de base

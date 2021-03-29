@@ -77,6 +77,12 @@ tdb_main_columns = ("J", "Q")
 tdb_tampon_columns = ("B", "I")
 
 
+#: int: Nombre maximal de modèles de ciblages (:class:`.bdd.BaseCiblage`)
+#: renseignés pour chaque modèle d'action (:class:`.bdd.BaseAction`), à
+#: droite de la feuille ``baseactions`` du GSheet *Rôles et actions*.
+max_ciblages_per_action = 2
+
+
 #: str: Nom de l'intitulé de la colonne de la feuille des votes
 #: (:attr:`~lgrez.config.tdb_votes_sheet`) du *Tableau de bord*
 #: contenant les cibles des votes pour le condamné.
