@@ -56,6 +56,18 @@ class ActionTrigger(enum.Enum):
     open_loups = enum.auto()
     close_loups = enum.auto()
 
+    @classmethod
+    def open(cls, vote):
+        if not isinstance(vote, Vote):
+            vote = Vote[vote]
+        return cls[f"open_{vote.name}"]
+
+    @classmethod
+    def close(cls, vote):
+        if not isinstance(vote, Vote):
+            vote = Vote[vote]
+        return cls[f"close_{vote.name}"]
+
 
 class CandidHaroType(enum.Enum):
     """:class:`~enum.Enum` pour distinguer un haro d'une candidature.
@@ -66,6 +78,19 @@ class CandidHaroType(enum.Enum):
     """
     candidature = enum.auto()
     haro = enum.auto()
+
+
+class Vote(enum.Enum):
+    """:class:`~enum.Enum` représentant les différents votes possibles.
+
+    Attributes:
+        cond: Vote pour le condamné du jour
+        maire: Vote pour le nouveau maire
+        loups: Vote pour la victime des loups
+    """
+    cond = enum.auto()
+    maire = enum.auto()
+    loups = enum.auto()
 
 
 class UtilEtat(enum.Enum):
@@ -80,7 +105,7 @@ class UtilEtat(enum.Enum):
     """
     ouverte = enum.auto()
     remplie = enum.auto()
-    fermee = enum.auto()
+    validee = enum.auto()
     ignoree = enum.auto()
     contree = enum.auto()
 

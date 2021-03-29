@@ -255,7 +255,8 @@ class BaseAction(base.TableBase):
         doc="Actions déroulant de cette base")
     base_ciblages = autodoc_OneToMany("BaseCiblage",
         back_populates="base_action", cascade="all, delete-orphan",
-        doc="Ciblages de ce modèle d'action")
+        order_by="BaseCiblage.prio",
+        doc="Ciblages de ce modèle d'action (triés par priorité)")
     roles = autodoc_ManyToMany("Role", secondary=_baseaction_role,
         back_populates="base_actions",
         doc="Rôles ayant cette action de base")

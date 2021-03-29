@@ -10,7 +10,7 @@ from lgrez import config
 from lgrez.bdd import base
 from lgrez.bdd.base import (autodoc_Column, autodoc_ManyToOne,
                             autodoc_OneToMany, autodoc_DynamicOneToMany)
-from lgrez.bdd.enums import Statut, CandidHaroType
+from lgrez.bdd.enums import Statut, CandidHaroType, Vote
 
 
 # Tables de données
@@ -129,6 +129,26 @@ class Joueur(base.TableBase):
                              f"pas de joueur en base pour `{member}` !")
 
         return joueur
+
+    def action_vote(self, vote):
+        """Retourne l'"action de vote" voulue pour ce joueur.
+
+        Args:
+            vote (.bdd.Vote): vote pour lequel récupérer l'action
+
+        Returns:
+            :class:`~bdd.Action`
+
+        Raises:
+            RuntimeError: action non existante
+        """
+        if not isinstance(vote, Vote):
+            vote = Vote[vote]
+        try:
+            return next(act for act in self.actions if act.vote == vote)
+        except StopIteration:
+            raise RuntimeError(f"{self} : pas d'action de vote {vote.name} ! "
+                               "!cparti a bien été appelé ?") from None
 
 
 class CandidHaro(base.TableBase):

@@ -8,12 +8,13 @@ import datetime
 import time
 
 import sqlalchemy
+from sqlalchemy.ext.hybrid import hybrid_property
 
 from lgrez import config
 from lgrez.bdd import base, ActionTrigger
 from lgrez.bdd.base import (autodoc_Column, autodoc_ManyToOne,
                             autodoc_OneToMany, autodoc_DynamicOneToMany)
-from lgrez.bdd.enums import UtilEtat
+from lgrez.bdd.enums import UtilEtat, Vote
 from lgrez.blocs import env, webhook
 
 
@@ -34,10 +35,16 @@ class Action(base.TableBase):
     joueur = autodoc_ManyToOne("Joueur", back_populates="actions",
         doc="Joueur concerné")
 
-    _base_slug = sqlalchemy.Column(sqlalchemy.ForeignKey("baseactions.slug"),
-        nullable=False)
+    _base_slug = sqlalchemy.Column(sqlalchemy.ForeignKey("baseactions.slug"))
     base = autodoc_ManyToOne("BaseAction", back_populates="actions",
-        doc="Action de base")
+        nullable=True,
+        doc="Action de base (``None`` si action de vote)")
+
+    vote = autodoc_Column(sqlalchemy.Enum(Vote),
+        doc="Si action de vote, vote concerné")
+
+    active = autodoc_Column(sqlalchemy.Boolean(), nullable=False, default=True,
+        doc="Si l'action est actuellement utilisable (False = archives)")
 
     cooldown = autodoc_Column(sqlalchemy.Integer(), nullable=False, default=0,
         doc="Nombre d'ouvertures avant disponiblité de l'action")
@@ -59,7 +66,107 @@ class Action(base.TableBase):
 
     def __repr__(self):
         """Return repr(self)."""
-        return f"<Action #{self.id} ({self.base}/{self.joueur})>"
+        return f"<Action #{self.id} ({self.base or self.vote}/{self.joueur})>"
+
+    @property
+    def utilisation_ouverte(self):
+        """:class:`~bdd.Utilisation` | ``None``: Utilisation de l'action
+        actuellement ouverte.
+
+        Vaut ``None`` si aucune action n'a actuellement l'état
+        :attr:`~bdd.UtilEtat.ouverte` ou :attr:`~bdd.UtilEtat.remplie`.
+
+        Raises:
+            RuntimeError: plus d'une action a actuellement l'état
+            :attr:`~bdd.UtilEtat.ouverte` ou :attr:`~bdd.UtilEtat.remplie`.
+        """
+        filtre = Utilisation.etat.in_([UtilEtat.ouverte, UtilEtat.remplie])
+        try:
+            return self.utilisations.filter(filtre).one_or_none()
+        except sqlalchemy.orm.exc.MultipleResultsFound:
+            raise ValueError(
+                f"Plusieurs utilisations ouvertes pour `{self}` !"
+            )
+
+    @hybrid_property
+    def is_open(self):
+        """:class:`bool` (instance)
+        / :class:`sqlalchemy.sql.selectable.Exists` (classe):
+        L'action est ouverte (l'utilisateur peut interagir) ?
+
+        *I.e.* l'action a au moins une utilisation
+        :attr:`~.bdd.UtilEtat.ouverte` ou :attr:`~.bdd.UtilEtat.remplie`.
+
+
+        Propriété hybride (:class:`sqlalchemy.ext.hybrid.hybrid_property`) :
+
+            - Sur l'instance, renvoie directement la valeur booléenne ;
+            - Sur la classe, renvoie la clause permettant de déterminer
+              si l'action est en attente.
+
+        Examples::
+
+            action.is_open          # bool
+            Joueur.query.filter(Joueur.actions.any(Action.is_open)).all()
+        """
+        return bool(self.utilisations.filter(
+            Utilisation.etat.in_([UtilEtat.ouverte, UtilEtat.remplie])
+        ).all())
+
+    @is_open.expression
+    def is_open(cls):
+        return cls.utilisations.any(
+            Utilisation.etat.in_([UtilEtat.ouverte, UtilEtat.remplie])
+        )
+
+    @hybrid_property
+    def is_waiting(cls):
+        """:class:`bool` (instance)
+        / :class:`sqlalchemy.sql.selectable.Exists` (classe):
+        L'action est ouverte et aucune décision n'a été prise ?
+
+        *I.e.* la clause a au moins une utilisation
+        :attr:`~.bdd.UtilEtat.ouverte`.
+
+        Propriété hybride (:class:`sqlalchemy.ext.hybrid.hybrid_property`) :
+
+            - Sur l'instance, renvoie directement la valeur booléenne ;
+            - Sur la classe, renvoie la clause permettant de déterminer
+              si l'action est en attente.
+
+        Examples::
+
+            action.is_waiting       # bool
+            Joueur.query.filter(Joueur.actions.any(Action.is_waiting)).all()
+        """
+        return bool(self.utilisations.filter_by(etat=UtilEtat.ouverte).all())
+
+    @is_waiting.expression
+    def is_waiting(cls):
+        return cls.utilisations.any(etat=UtilEtat.ouverte)
+
+    @property
+    def decision(self):
+        """str: Description de la décision de la dernière utilisation.
+
+        Considère l'utilisation ouverte le cas échéant, sinon la
+        dernière utilisation par timestamp de fermeture descendant.
+
+        Vaut ``"rien"`` si la dernière utilisation n'a pas de ciblages
+        ou qu'il n'y a aucune utilisation de cette action.
+
+        Raises:
+            RuntimeError: plus d'une action a actuellement l'état
+            :attr:`~bdd.UtilEtat.ouverte` ou :attr:`~bdd.UtilEtat.remplie`.
+        """
+        util = (
+            self.utilisation_ouverte
+            or self.utilisations.order_by(Utilisation.ts_close.desc()).first()
+        )
+        if not util:
+            return "rien"
+
+        return util.decision
 
 
 class Utilisation(base.TableBase):
@@ -92,11 +199,64 @@ class Utilisation(base.TableBase):
     taches = autodoc_OneToMany("Tache", back_populates="utilisation",
         doc="Tâches liées à cette utilisation")
     ciblages = autodoc_OneToMany("Ciblage", back_populates="utilisation",
-        doc="Cibles désignées dans cette utilisation")
+        order_by="Ciblage._base_id",
+        doc="Cibles désignées dans cette utilisation (triées par priorité)")
 
     def __repr__(self):
         """Return repr(self)."""
-        return f"<Utilisation #{self.id} ({self.action})>"
+        return f"<Utilisation #{self.id} ({self.action}/{self.etat.name})>"
+
+    @property
+    def cible(self):
+        """:class:`~bdd.Joueur` | ``None``: Joueur ciblé par l'utilisation,
+        si applicable.
+
+        Cet attribut n'est défini que si l'utilisation est d'un vote
+        ou d'une action définissant un et une seul ciblage de type
+        :attr:`~bdd.CibleType.joueur`, :attr:`~bdd.CibleType.vivant`
+        ou :attr:`~bdd.CibleType.mort`.
+
+        Vaut ``None`` si l'utilisation a l'état
+        :attr:`~bdd.UtilEtat.ouverte` ou :attr:`~bdd.UtilEtat.ignoree`.
+
+        Raises:
+            ValueError: l'action ne remplit pas les critères évoqués
+            ci-dessus
+        """
+        if self.action.vote:
+            # vote : un BaseCiblage implicite de type CibleType.vivants
+            return self.ciblages[0].joueur if self.ciblages else None
+        else:
+            base_ciblages = utilisation.action.base.base_ciblages
+            bc_joueurs = [bc for bc in base_ciblages
+                          if bc.type in [CibleType.joueur, CibleType.vivant,
+                                         CibleType.mort]]
+            if len(bc_joueurs) != 1:
+                raise ValueError (f"L'utilisation {self} n'a pas une et "
+                                  "une seule cible de type joueur")
+
+            ciblages = bc_joueurs[0]
+            try:
+                ciblage = next(cib for cib in self.ciblages
+                               if cib.base == base_ciblage)
+            except StopIteration:
+                return None         # Pas de ciblage fait
+
+            return ciblage.joueur
+
+    @property
+    def decision(self):
+        """str: Description de la décision de cette utilisation.
+
+        Vaut ``"rien"`` si l'utilisation n'a pas de ciblages.
+        """
+        if not self.ciblages:
+            return "rien"
+
+        return ", ".join(
+            f"{cib.base.slug if cib.base else 'cible'} : {cib.valeur_descr}"
+            for cib in self.ciblages
+        )
 
 
 class Ciblage(base.TableBase):
@@ -109,10 +269,11 @@ class Ciblage(base.TableBase):
     id = autodoc_Column(sqlalchemy.Integer(), primary_key=True,
         doc="Identifiant unique du ciblage, sans signification")
 
-    _base_id = sqlalchemy.Column(sqlalchemy.ForeignKey("baseciblages._id"),
-        nullable=False)
+    _base_id = sqlalchemy.Column(sqlalchemy.ForeignKey("baseciblages._id"))
     base = autodoc_ManyToOne("BaseCiblage", back_populates="ciblages",
-        doc="Modèle de ciblage (lié au modèle d'action)")
+        nullable=True,
+        doc="Modèle de ciblage (lié au modèle d'action). Vaut ``None`` pour "
+            "un ciblage de vote")
 
     _utilisation_id = sqlalchemy.Column(sqlalchemy.ForeignKey(
         "utilisations.id"), nullable=False)
@@ -146,6 +307,53 @@ class Ciblage(base.TableBase):
     def __repr__(self):
         """Return repr(self)."""
         return f"<Ciblage #{self.id} ({self.base}/{self.utilisation})>"
+
+    @property
+    def valeur(self):
+        """:class:`~bdd.Joueur` | :class:`~bdd.Role`| :class:`~bdd.Camp`
+        | :class:`bool` | :class:`str`: Valeur du ciblage, selon son type.
+
+        Raises:
+            ValueError: ciblage de type inconnu
+        """
+        if (not self.base       # vote
+            or self.base.type in {CibleType.joueur, CibleType.vivant,
+                                  CibleType.mort}):
+            return self.joueur
+        elif self.base.type == CibleType.role:
+            return self.role
+        elif self.base.type == CibleType.camp:
+            return self.camp
+        elif self.base.type == CibleType.booleen:
+            return self.booleen
+        elif self.base.type == CibleType.texte:
+            return self.texte
+        else:
+            raise ValueError(f"Ciblage de type inconnu : {self.base.type}")
+
+    @property
+    def valeur_descr(self):
+        """str: Description de la valeur du ciblage.
+
+        Si :attr:`valeur` vaut ``None``, renvoie ``<N/A>``
+
+        Raises:
+            ValueError: ciblage de type inconnu
+        """
+        if (not self.base       # vote
+            or self.base.type in {CibleType.joueur, CibleType.vivant,
+                                  CibleType.mort}):
+            return self.joueur.nom if self.joueur else "<N/A>"
+        elif self.base.type == CibleType.role:
+            return self.role.nom_complet if self.role else "<N/A>"
+        elif self.base.type == CibleType.camp:
+            return self.camp.nom if self.camp else "<N/A>"
+        elif self.base.type == CibleType.booleen:
+            return {True: "Oui", False: "Non", None: "<N/A>"}[self.booleen]
+        elif self.base.type == CibleType.texte:
+            return self.texte if self.texte is not None else "<N/A>"
+        else:
+            raise ValueError(f"Ciblage de type inconnu : {self.base.type}")
 
 
 class Tache(base.TableBase):

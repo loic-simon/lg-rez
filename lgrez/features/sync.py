@@ -680,14 +680,14 @@ class Sync(commands.Cog):
                 emoji = camp.discord_emoji_or_none
                 await chan_roles.send(
                     embed=Embed(title=f"Camp : {camp.nom}",
-                                description=camp.description).set_image(
+                                description=camp.description).set_thumbnail(
                         url=emoji.url if emoji else None
                     )
                 )
                 await chan_roles.send("——————————————————————————")
                 for role in camp.roles:
                     await chan_roles.send(
-                        f"{emoji or ''} {tools.bold(role.nom_complet)} "
+                        f"{emoji or ''}  {tools.bold(role.nom_complet)} "
                         f"– {role.description_courte} (camp : {camp.nom})\n\n"
                         f"{role.description_longue}\n\n"
                         "——————————————————————————"
