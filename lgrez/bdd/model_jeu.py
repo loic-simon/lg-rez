@@ -50,7 +50,7 @@ class Role(base.TableBase):
     description_courte = autodoc_Column(sqlalchemy.String(140), nullable=False,
         default="",
         doc="Description du rôle en une ligne")
-    description_longue = autodoc_Column(sqlalchemy.String(2000),
+    description_longue = autodoc_Column(sqlalchemy.String(1800),
         nullable=False, default="",
         doc="Règles et background complets du rôle")
 
@@ -66,6 +66,10 @@ class Role(base.TableBase):
     def __repr__(self):
         """Return repr(self)."""
         return f"<Role '{self.slug}' ({self.prefixe}{self.nom})>"
+
+    def __str__(self):
+        """Return str(self)."""
+        return self.nom_complet
 
     @property
     def nom_complet(self):
@@ -134,6 +138,10 @@ class Camp(base.TableBase):
     def __repr__(self):
         """Return repr(self)."""
         return f"<Camp '{self.slug}' ({self.nom})>"
+
+    def __str__(self):
+        """Return str(self)."""
+        return str(self.nom)
 
     @property
     def discord_emoji(self):
@@ -250,6 +258,12 @@ class BaseAction(base.TableBase):
         doc="*Attribut informatif, non exploité dans la version actuelle "
             "(si la cible doit changer entre deux utilisations consécutives)*")
 
+    decision_format = autodoc_Column(sqlalchemy.String(200),
+        nullable=False, default="",
+        doc="Description des utilisations de ces action, sous forme de "
+            "texte formaté avec les noms des :attr:`.BaseCiblage.slug` "
+            "entre accolades (exemple : ``Tuer {cible}``)")
+
     # -to-manys
     actions = autodoc_OneToMany("Action", back_populates="base",
         doc="Actions déroulant de cette base")
@@ -264,6 +278,10 @@ class BaseAction(base.TableBase):
     def __repr__(self):
         """Return repr(self)."""
         return f"<BaseAction '{self.slug}'>"
+
+    def __str__(self):
+        """Return str(self)."""
+        return str(self.slug)
 
 
 class BaseCiblage(base.TableBase):

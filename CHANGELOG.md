@@ -15,7 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     :class:`.bdd.UtilEtat` and :class:`.bdd.Vote`);
   - Updated ``!fillroles`` to fill BaseCiblages too (new config option
     :attr:`config.max_ciblages_per_action`);
+  - New column :attr:`.bdd.BaseAction.decision_format`;
   - ``!cparti`` now add "vote actions" to all players;
+  - New function :func:`.features.voter_agir.get_cible`, used by ``!vote``,
+    ``!votemaire``, ``!voteloups`` et ``!action`` to handle user inputs;
+  - New function :func:`.blocs.tools.boucle_query` for generic database
+    instance lookup interactions;
+  - :func:`.blocs.tools.wait_for_react_clic` and :func:`.blocs.tools.yes_no`:
+    new kwarg ``first_text`` for pre-asking text response;
   - New convenience function :func:`.bdd.base.autodoc_DynamicOneToMany`
     for documenting dynamicly loaded one-to-many relationships;
 
@@ -23,22 +30,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   - Updated existing data classes attributes to link to new tables;
   - Made :attr:`.bdd.Action.base` nullable and added :attr:`.bdd.Action.vote`
-    optionnal attributes to handle votes in a cleaner way; also added
-    :attr:`.bdd.Action.active` attribute to keep track;
+    optionnal attributes to handle votes in a cleaner way (with instance
+    initialization integrity check); also added :attr:`.bdd.Action.active`
+    attribute to keep track;
   - New properties :attr:`.bdd.Action.utilisation_ouverte`,
-    :attr:`.bdd.Action.decision`, :attr:`.bdd.Action.is_open` (hybrid)
-    and :attr:`.bdd.Action.is_waiting` (hybrid);
+    :attr:`.bdd.Action.derniere_utilisation`, :attr:`.bdd.Action.decision`,
+    and :attr:`.bdd.Action.is_open` / :attr:`.bdd.Action.is_waiting` (hybrid);
   - New method :meth:`.bdd.Joueur.action_vote`;
+  - New hybrid properties :attr:`.bdd.Joueur.est_vivant` and
+    :attr:`.bdd.Joueur.est_mort`;
   - Updated :meth:`.features.open_close.recup_joueurs`, ``!open``,
     ``!close`` and ``!remind``;
+  - :func:`.features.gestion_actions.delete_action` now updates
+    :attr:`.bdd.Action.active` insteade of deleting the instance;
   - New option ``nullable`` for :func:`.bdd.base.autodoc_ManyToOne`;
-  - New class methods for :class:`.bdd.ActionTrigger` enum to get
-    vote-related triggers from :class:`.bdd.Vote` enum ;
-  - ``!fillroles`` now post camps descriptions in roles channel;
-  - Extended :attr:`.bdd.model_jeu.Camp.description` max length to 1000.
+  - New class methods :meth:`.bdd.ActionTrigger.open` and
+    :meth:`.bdd.ActionTrigger.close` ;
+  - :func:`.features.voter_agir.export_vote` signature changed;
+  - ``!fillroles`` now synchronise :class:`.bdd.BaseCiblage` too (see
+    :attr:`.config.max_ciblages_per_action` and post camps descriptions in
+    roles channel;
+  - Updated some string columns max lengths;
+  - ``__str__`` specific implementation for :class:`.bdd.Role`,
+    :class:`.bdd.Camp`, :class:`.bdd.BaseAction` and :class:`.bdd.Joueur`.
 
 ### Fixed
 
+  - :func:`features.voter_agir.export_vote` (``!vote*`` et ``!action``):
+    used hard-written sheet names istead of :attr:`config.db_votecond_sheet`,
+    :attr:`config.db_votemaire_sheet`, :attr:`config.db_voteloups_sheet`
+    and :attr:`config.db_actions_sheet`;
   - Documentation errors & typos.
 
 

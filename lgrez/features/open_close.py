@@ -90,6 +90,8 @@ async def recup_joueurs(quoi, qui, heure=None):
         action = Action.query.get(int(qui))
         if not action:
             raise commands.BadArgument(f"Pas d'action d'ID = {qui}")
+        if not action.active:
+            raise commands.BadArgument(f"Action d'ID = {qui} inactive")
 
         # Appel direct action par son numéro (perma : rappel seulement)
         if ((quoi == "open" and (
@@ -215,15 +217,15 @@ class OpenClose(commands.Cog):
             + str_joueurs
         )
 
-
         # Création utilisations & envoi messages
         for joueur in joueurs:
             chan = joueur.private_chan
 
             if isinstance(qui, Vote):
                 action = joueur.action_vote(qui)
-                Utilisation(action=action, etat=UtilEtat.ouverte,
-                            ts_open=datetime.datetime.now()).add()
+                util = Utilisation(action=action)
+                util.add()
+                util.open()
 
             if qui == Vote.cond:
                 message = await chan.send(
@@ -382,10 +384,7 @@ class OpenClose(commands.Cog):
                 util = joueur.action_vote(qui).utilisation_ouverte
                 nom_cible = util.cible.nom if util.cible else "*non défini*"
 
-                util.etat = (UtilEtat.validee if util.etat == UtilEtat.remplie
-                             else UtilEtat.ignoree)
-                util.ts_close = datetime.datetime.now()
-                util.update()       # update direct pour empêcher de voter
+                util.close()        # update direct pour empêcher de voter
 
             if qui == Vote.cond:
                 await chan.send(
@@ -671,7 +670,7 @@ class OpenClose(commands.Cog):
         await tools.log(r, code=True)
 
         # Drop (éventuel) et (re-)création actions de vote
-        Action.query.filter_by(joueur=joueur, base=None).delete()
+        Action.query.filter_by(base=None).delete()
         actions = []
         for joueur in Joueur.query.all():
             for vote in Vote:

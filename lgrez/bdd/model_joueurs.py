@@ -5,6 +5,7 @@ Déclaration de toutes les tables et leurs colonnes
 """
 
 import sqlalchemy
+from sqlalchemy.ext.hybrid import hybrid_property
 
 from lgrez import config
 from lgrez.bdd import base
@@ -77,6 +78,10 @@ class Joueur(base.TableBase):
         """Return repr(self)."""
         return f"<Joueur #{self.discord_id} ({self.nom})>"
 
+    def __str__(self):
+        """Return str(self)."""
+        return str(self.nom)
+
     @property
     def member(self):
         """discord.Member: Membre Discord correspondant à ce Joueur.
@@ -107,6 +112,35 @@ class Joueur(base.TableBase):
                              f"pas de chan pour `{self}` !")
 
         return result
+
+    @hybrid_property
+    def est_vivant(self):
+        """:class:`bool` (instance)
+        / :class:`sqlalchemy.sql.selectable.Exists` (classe):
+        Le joueur est en vie ou MVtisé ?
+
+        Raccourci pour
+        ``joueur.statut in {Statut.vivant, Statut.MV}``
+
+        Propriété hybride (voir :attr:`.Action.is_open` pour plus d'infos)
+        """
+        return (self.statut in {Statut.vivant, Statut.MV})
+
+    @est_vivant.expression
+    def est_vivant(cls):
+        return cls.statut.in_({Statut.vivant, Statut.MV})
+
+    @hybrid_property
+    def est_mort(self):
+        """:class:`bool` (instance)
+        / :class:`sqlalchemy.sql.selectable.Exists` (classe):
+        Le joueur est mort ?
+
+        Raccourci pour ``joueur.statut == Statut.mort``
+
+        Propriété hybride (voir :attr:`.Action.is_open` pour plus d'infos)
+        """
+        return (self.statut == Statut.mort)
 
     @classmethod
     def from_member(cls, member):

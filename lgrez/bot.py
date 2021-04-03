@@ -261,12 +261,13 @@ async def _on_command_error(bot, ctx, exc):
 
     elif isinstance(exc, (commands.ConversionError, commands.UserInputError)):
         await ctx.send(
-            f"Hmm, ce n'est pas comme ça qu'on utilise cette commande !"
-            f"Petit rappel : {tools.code(_showexc(exc))}"
+            f"Hmm, ce n'est pas comme ça qu'on utilise cette commande ! "
+            f"({tools.code(_showexc(exc))})\n*Tape "
+            f"`!help {ctx.invoked_with}` pour plus d'informations.*"
         )
-        ctx.message.content = f"!help {ctx.command.name}"
-        ctx = await bot.get_context(ctx.message)
-        await ctx.reinvoke()
+        # ctx.message.content = f"!help {ctx.command.name}"
+        # ctx = await bot.get_context(ctx.message)
+        # await ctx.reinvoke()
 
     elif isinstance(exc, commands.CheckAnyFailure):
         # Normalement raise que par @tools.mjs_only

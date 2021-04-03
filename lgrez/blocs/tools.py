@@ -347,24 +347,33 @@ async def boucle_message(chan, in_message, condition_sortie, rep_message=None):
     return rep
 
 
-async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
-    """Retourne un joueur (entrée de BDD) d'après son nom.
+async def boucle_query(ctx, table, col=None, cible=None, filtre=None,
+                       sensi=0.5, direct_detector=None, message=None):
+    """Fait trouver à l'utilisateur une entrée de BDD d'après son nom.
 
     Args:
         ctx (discord.ext.commands.Context): contexte d'une commande.
+        table (.bdd.TableMeta): table dans laquelle rechercher.
+        col (.bdd.TableMeta): colonne dans laquelle rechercher
+            (passé à :meth:`~.bdd.TableMeta.find_nearest`).
         cible (str): premier essai de cible (donnée par le joueur dans
             l'appel à une commande, par exemple).
-        message (str): si défini (et ``cible`` non défini), message à
-            envoyer avant la boucle.
+        filtre: passé à :meth:`~.bdd.TableMeta.find_nearest`.
         sensi (float): sensibilité de la recherche (voir
             :meth:`~.bdd.TableMeta.find_nearest`).
+        direct_detector (Callable[str] -> :attr:`table` | ``None``):
+            pré-détecteur éventuel, appellé sur l'entrée utilisateur
+            avant :meth:`~.bdd.TableMeta.find_nearest` ; si cette
+            fonction renvoie un résultat, il est immédiatement renvoyé.
+        message (str): si défini (et ``cible`` non défini), message à
+            envoyer avant la boucle.
 
     Returns:
-        :class:`.bdd.Joueur`
+        Instance de :attr:`table` sélectionnée
 
-    Attend que le joueur entre un nom de joueur, et boucle 5 fois au
-    max (avant de l'insulter et de raise une erreur) pour chercher le
-    plus proche joueur dans la table :class:`.bdd.Joueur`.
+    Attend que le joueur entre un nom, et boucle 5 fois au max
+    (avant de l'insulter et de raise une erreur) pour chercher
+    l'entrée la plus proche.
     """
     if message and not cible:
         await ctx.send(message)
@@ -377,44 +386,42 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
             mess = await wait_for_message_here(ctx)
             rep = mess.content.strip("()[]{}<>")    # dézèlificateur
 
-        # Détection directe par ID / nom exact
-        mem = member(rep, must_be_found=False)
-        if mem:
-            try:                    # Récupération du joueur
-                return Joueur.from_member(mem)
-            except ValueError:          # pas inscrit en base
-                pass
+        # Détection directe
+        if direct_detector:
+            dir = direct_detector(rep)
+            if dir:
+                return dir
 
         # Sinon, recherche au plus proche
-        nearest = Joueur.find_nearest(rep, col=Joueur.nom, sensi=sensi,
-                                      solo_si_parfait=False,
-                                      match_first_word=True)
+        nearest = table.find_nearest(rep, col=col, sensi=sensi, filtre=filtre,
+                                     solo_si_parfait=False,
+                                     match_first_word=True)
 
         if not nearest:
             await ctx.send("Aucune entrée trouvée, merci de réessayer :")
 
         elif len(nearest) == 1:         # Une seule correspondance
-            joueur, score = nearest[0]
+            result, score = nearest[0]
             if score == 1:          # parfait
-                return joueur
+                return result
 
             mess = await ctx.send("Je n'ai trouvé qu'une correspondance : "
-                                  f"{bold(joueur.nom)}.\nÇa part ?")
+                                  f"{bold(result)}.\nÇa part ?")
             if await yes_no(mess):
-                return joueur
+                return result
             else:
                 await ctx.send("Bon d'accord, alors qui ?")
 
         else:
-            text = ("Les joueurs les plus proches de ton entrée "
+            text = ("Les résultats les plus proches de ton entrée "
                     "sont les suivants : \n")
-            for i, (joueur, score) in enumerate(nearest[:10]):
-                text += f"{emoji_chiffre(i + 1)}. {joueur.nom} \n"
+            for i, (result, score) in enumerate(nearest[:10]):
+                text += f"{emoji_chiffre(i + 1)}. {result} \n"
             mess = await ctx.send(
                 text + ital("Tu peux les choisir en réagissant à ce"
                             "message, ou en répondant au clavier.")
             )
-            n = await choice(ctx.bot, mess, min(10, len(nearest)))
+            n = await choice(mess, min(10, len(nearest)))
             return nearest[n - 1][0]
 
     await ctx.send("Et puis non, tiens !\nhttps://giphy.com/gifs/fuck-you-"
@@ -422,9 +429,49 @@ async def boucle_query_joueur(ctx, cible=None, message=None, sensi=0.5):
     raise RuntimeError("Le joueur est trop con, je peux rien faire")
 
 
+async def boucle_query_joueur(ctx, cible=None, filtre=None, sensi=0.5,
+                              message=None):
+    """Retourne un joueur (entrée de BDD) d'après son nom.
+
+    Args:
+        ctx (discord.ext.commands.Context): contexte d'une commande.
+        cible (str): premier essai de cible (donnée par le joueur dans
+            l'appel à une commande, par exemple).
+        message (str): si défini (et ``cible`` non défini), message à
+            envoyer avant la boucle.
+        filtre: passé à :meth:`~.bdd.TableMeta.find_nearest`.
+        sensi (float): sensibilité de la recherche (voir
+            :meth:`~.bdd.TableMeta.find_nearest`).
+
+    Returns:
+        :class:`.bdd.Joueur`
+
+    Attend que le joueur entre un nom de joueur, et boucle 5 fois au
+    max (avant de l'insulter et de raise une erreur) pour chercher le
+    plus proche joueur dans la table :class:`.bdd.Joueur`.
+    """
+    # Détection directe par ID / nom exact
+    def direct_detector(rep):
+        mem = member(rep, must_be_found=False)
+        if mem:
+            try:                    # Récupération du joueur
+                return Joueur.from_member(mem)
+            except ValueError:          # pas inscrit en base
+                pass
+
+        return None
+
+    res = await boucle_query(ctx, Joueur, col=Joueur.nom, cible=cible,
+                             sensi=sensi, filtre=filtre,
+                             direct_detector=direct_detector,
+                             message=message)
+    return res
+
+
 # Récupère un input par réaction
 async def wait_for_react_clic(message, emojis={}, *, process_text=False,
-                              text_filter=None, post_converter=None,
+                              text_filter=None, first_text=None,
+                              post_converter=None,
                               trigger_all_reacts=False,
                               trigger_on_commands=False):
     """Ajoute des reacts à un message et attend une interaction.
@@ -435,10 +482,14 @@ async def wait_for_react_clic(message, emojis={}, *, process_text=False,
             éventuellement associés à une valeur qui sera retournée
             si clic sur l'emoji.
         process_text (bool): si ``True``, détecte aussi la réponse par
-            message et retourne ledit message (défaut : ``False``).
+            message et retourne le texte du message (défaut : ``False``).
         text_filter (Callable[:class:`str` -> :class:`bool`]): si
             ``process_text``, ne réagit qu'aux messages pour lesquels
             ``text_filter(message)`` renvoie ``True`` (défaut : tous).
+        first_text (str): si ``process_text``, texte considéré comme la
+            première réponse textuelle reçue (si il vérifie
+            ``text_filter``, les emojis ne sont pas ajoutés et cette
+            fonction retourne directement).
         post_converter (Callable[:class:`str` -> Any]): si
             ``process_text`` et que l'argument est défini, le message
             détecté est passé dans cette fonction avant d'être renvoyé.
@@ -470,6 +521,10 @@ async def wait_for_react_clic(message, emojis={}, *, process_text=False,
     if text_filter is None:
         def text_filter(text):
             return True
+
+    if process_text and first_text:
+        if text_filter(first_text):     # passe le filtre
+            return post_converter(first_text) if post_converter else first_text
 
     try:
         # Si une erreur dans ce bloc, on supprime les emojis
@@ -539,7 +594,7 @@ async def wait_for_react_clic(message, emojis={}, *, process_text=False,
     return ret
 
 
-async def yes_no(message):
+async def yes_no(message, first_text=None):
     """Demande une confirmation / question fermée à l'utilisateur.
 
     Surcouche de :func:`wait_for_react_clic` : ajoute les reacts
@@ -548,6 +603,7 @@ async def yes_no(message):
 
     Args:
         message (discord.Message): message où ajouter les réactions.
+        first_text (str): passé à :func:`wait_for_react_clic`.
 
     Réponses textuelles reconnues :
         - Pour ``True`` : ``["oui", "o", "yes", "y", "1", "true"]``
@@ -562,9 +618,12 @@ async def yes_no(message):
     yes_no_words = yes_words + ["non", "n", "no", "n", "0", "false"]
     return await wait_for_react_clic(
         message, emojis={"✅": True, "❎": False}, process_text=True,
+        first_text=first_text,
         text_filter=lambda s: s.lower() in yes_no_words,
         post_converter=lambda s: s.lower() in yes_words,
     )
+
+yes_no_maybe_i_dont_know_can_you_repeat_the_question = yes_no
 
 
 async def choice(message, N, start=1, *, additionnal={}):
