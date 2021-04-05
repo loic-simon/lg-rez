@@ -47,9 +47,8 @@ def export_vote(vote, utilisation):
         sheet_name = config.db_actions_sheet
         recap = "\n+\n".join(
             f"{action.base.slug}({last_util.decision})"
-            for action in joueur.actions
-            if (action.base             # pas les actions de vote
-                and (last_util := action.derniere_utilisation)
+            for action in joueur.actions_actives
+            if ((last_util := action.derniere_utilisation)
                 and last_util.is_filled         # action effectuée
                 and last_util.ts_decision.date() == datetime.date.today())
                 # Et dernière décision aujourd'hui ==> on met dans le TDB
@@ -407,7 +406,7 @@ class VoterAgir(commands.Cog):
             return
 
         # Détermine la/les actions en cours pour le joueur
-        actions = [ac for ac in joueur.actions if ac.base and ac.is_open]
+        actions = [ac for ac in joueur.actions_actives if ac.is_open]
         if not actions:
             await ctx.send("Aucune action en cours pour toi.")
             return

@@ -9,7 +9,7 @@ from discord.ext import commands
 
 from lgrez import config
 from lgrez.blocs import tools
-from lgrez.bdd import Joueur, Role, Camp, Statut, ActionTrigger
+from lgrez.bdd import Joueur, Role, Camp, ActionTrigger, Vote
 
 
 class Informations(commands.Cog):
@@ -100,9 +100,8 @@ class Informations(commands.Cog):
                 await ctx.send("Connais pas")
                 return
 
-        joueurs = Joueur.query.filter_by(role=role).filter(
-            Joueur.statut.in_([Statut.vivant, Statut.MV])
-        ).all()
+        joueurs = Joueur.query.filter_by(role=role).\
+                               filter(Joueur.est_vivant).all()
         await ctx.send(
             f"{role.nom_complet} : "
             + (", ".join(joueur.nom for joueur in joueurs)
@@ -125,28 +124,33 @@ class Informations(commands.Cog):
         reacts = []
         r = "––– MENU –––\n\n"
 
-        if joueur.vote_condamne_:
+        vaction = joueur.action_vote(Vote.cond)
+        if vaction.is_open:
             r += (f" - {config.Emoji.bucher}  Vote pour le bûcher en cours – "
-                  f"vote actuel : {tools.code(joueur.vote_condamne_)}\n")
+                  f"vote actuel : {tools.code(vaction.decision)}\n")
             reacts.append(config.Emoji.bucher)
-        if joueur.vote_maire_:
+
+        vaction = joueur.action_vote(Vote.maire)
+        if vaction.is_open:
             r += (f" - {config.Emoji.maire}  Vote pour le maire en cours – "
-                  f"vote actuel : {tools.code(joueur.vote_maire_)}\n")
+                  f"vote actuel : {tools.code(vaction.decision)}\n")
             reacts.append(config.Emoji.maire)
-        if joueur.vote_loups_:
+
+        vaction = joueur.action_vote(Vote.loups)
+        if vaction.is_open:
             r += (f" - {config.Emoji.lune}  Vote des loups en cours – "
-                  f"vote actuel : {tools.code(joueur.vote_loups_)}\n")
+                  f"vote actuel : {tools.code(vaction.decision)}\n")
             reacts.append(config.Emoji.lune)
 
         if not reacts:
             r += "Aucun vote en cours.\n"
 
-        actions = [action for action in joueur.actions if action.decision_]
+        actions = [ac for ac in joueur.actions_actives if ac.is_open]
         if actions:
             for action in actions:
                 r += (f" - {config.Emoji.action}  Action en cours : "
                       f"{tools.code(action.base.slug)} (id {action.id}) – "
-                      f"décision : {tools.code(action.decision_)}\n")
+                      f"décision : {tools.code(action.decision)}\n")
             reacts.append(config.Emoji.action)
         else:
             r += "Aucune action en cours.\n"
@@ -207,7 +211,7 @@ class Informations(commands.Cog):
         r += tools.ital(f"({tools.code(f'!roles {joueur.role.slug}')} "
                         "pour tout savoir sur ce rôle)")
 
-        if joueur.actions:
+        if joueur.actions_actives:
             r += "\n\nActions :"
             r += tools.code_bloc("\n".join([(
                 f" - {action.base.slug.ljust(20)} "
@@ -218,7 +222,7 @@ class Informations(commands.Cog):
                         if (action.refill and "weekends" in action.refill)
                         else "")
                     if isinstance(action.charges, int) else "Illimitée")
-            ) for action in joueur.actions]))
+            ) for action in joueur.actions_actives]))
             # Vraiment désolé pour cette immondice j'ai la flemme
         else:
             r += "\n\nAucune action disponible."
@@ -241,25 +245,25 @@ class Informations(commands.Cog):
             Commande expérimentale, non testée.
         """
         joueur = await tools.boucle_query_joueur(ctx, cible, "Qui ?")
-        if not joueur:
-            return
+        actions = [ac for ac in joueur.actions if not ac.vote]
 
         r = f"Rôle : {joueur.role.nom_complet or joueur.role}\n"
 
-        if not joueur.actions:
+        if not actions:
             r += "Aucune action pour ce joueur."
             await ctx.send(r)
             return
 
         r += "Actions :"
         r += tools.code_bloc(
-            "#️⃣  id   action                   début"
+            "#️⃣  id   active  action                   début"
             "     fin       cd   charges   refill     \n"
             "-----------------------------------------"
             "-----------------------------------------\n"
             + "\n".join([(
                 tools.emoji_chiffre(i + 1) + "  "
                 + str(action.id).ljust(5)
+                + str(action.active).ljust(8)
                 + action.base.slug.ljust(25)
                 + str(action.base.heure_debut
                       if action.base.trigger_debut == ActionTrigger.temporel
@@ -270,11 +274,11 @@ class Informations(commands.Cog):
                 + str(action.cooldown).ljust(5)
                 + str(action.charges).ljust(10)
                 + str(action.refill)
-            ) for i, action in enumerate(joueur.actions)])
+            ) for i, action in enumerate(actions)])
         )
         r += "Modifier/ajouter/stop :"
         message = await ctx.send(r)
-        i = await tools.choice(message, len(joueur.actions),
+        i = await tools.choice(message, len(actions),
                                additionnal={"⏺": -1, "⏹": 0})
 
         if i < 0:     # ajouter
@@ -286,7 +290,7 @@ class Informations(commands.Cog):
             return
 
         # Modifier
-        action = joueur.actions[i - 1]
+        action = actions[i - 1]
         stop = False
         while not stop:
             await ctx.send(
@@ -370,8 +374,8 @@ class Informations(commands.Cog):
 
         Aussi dite : « liste des joueurs qui seront bientôt morts »
         """
-        joueurs = Joueur.query.filter(
-            Joueur.statut != Statut.mort).order_by(Joueur.nom).all()
+        joueurs = Joueur.query.filter(Joueur.est_vivant).\
+                               order_by(Joueur.nom).all()
 
         mess = " Joueur                     en chambre\n"
         mess += "––––––––––––––––––––––––––––––––––––––––––––––\n"
@@ -393,8 +397,8 @@ class Informations(commands.Cog):
 
         Aussi dite : « liste des joueurs qui mangent leurs morts »
         """
-        joueurs = Joueur.query.filter_by(
-            statut=Statut.mort).order_by(Joueur.nom).all()
+        joueurs = Joueur.query.filter(Joueur.est_mort).\
+                               order_by(Joueur.nom).all()
 
         if joueurs:
             mess = ""

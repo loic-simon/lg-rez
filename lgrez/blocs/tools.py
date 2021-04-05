@@ -429,8 +429,8 @@ async def boucle_query(ctx, table, col=None, cible=None, filtre=None,
     raise RuntimeError("Le joueur est trop con, je peux rien faire")
 
 
-async def boucle_query_joueur(ctx, cible=None, filtre=None, sensi=0.5,
-                              message=None):
+async def boucle_query_joueur(ctx, cible=None, message=None,
+                              sensi=0.5, filtre=None):
     """Retourne un joueur (entrée de BDD) d'après son nom.
 
     Args:
@@ -439,9 +439,9 @@ async def boucle_query_joueur(ctx, cible=None, filtre=None, sensi=0.5,
             l'appel à une commande, par exemple).
         message (str): si défini (et ``cible`` non défini), message à
             envoyer avant la boucle.
-        filtre: passé à :meth:`~.bdd.TableMeta.find_nearest`.
         sensi (float): sensibilité de la recherche (voir
             :meth:`~.bdd.TableMeta.find_nearest`).
+        filtre: passé à :meth:`~.bdd.TableMeta.find_nearest`.
 
     Returns:
         :class:`.bdd.Joueur`
@@ -530,7 +530,10 @@ async def wait_for_react_clic(message, emojis={}, *, process_text=False,
         # Si une erreur dans ce bloc, on supprime les emojis
         # du message (sinon c'est moche)
         for emoji in emojis:
-            await message.add_reaction(emoji)
+            try:
+                await message.add_reaction(emoji)
+            except discord.errors.HTTPException:
+                await message.channel.send(f"*Emoji {emoji} inconnu, ignoré*")
 
         emojis_names = {emoji.name if hasattr(emoji, "name")
                         else emoji: emoji for emoji in emojis}

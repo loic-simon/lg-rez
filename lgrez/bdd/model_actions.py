@@ -51,11 +51,6 @@ class Action(base.TableBase):
     charges = autodoc_Column(sqlalchemy.Integer(),
         doc="Nombre de charges restantes (``None`` si illimité)")
 
-    decision_ = autodoc_Column(sqlalchemy.String(200),
-        doc="Décision prise par le joueur pour l'action actuelle (``None`` "
-            "si action pas en cours). *(le ``_`` final n'indique rien de "
-            "très pertinent, vivement que ça dégage)*")
-
     # One-to-manys
     taches = autodoc_OneToMany("Tache", back_populates="action",
         doc="Tâches liées à cette action")
@@ -240,6 +235,26 @@ class Utilisation(base.TableBase):
             self.etat = UtilEtat.ignoree
         self.ts_close = datetime.datetime.now()
         self.update()
+
+    def ciblage(self, slug):
+        """Renvoie le ciblage de base de slug voulu.
+
+        Args:
+            slug (str): Doit correspondre à un des slugs des bases
+                des :attr:`ciblages` de l'utilisation.
+
+        Returns:
+            :class:`.bdd.Ciblage`
+
+        Raises:
+            ValueError: slug non trouvé dans les :attr:`ciblages`
+        """
+        try:
+            return next(cib for cib in self.ciblages if cib.base.slug == slug)
+        except StopIteration:
+            raise ValueError(
+                f"{self} : pas de ciblage de slug '{slug}'"
+            ) from None
 
     @property
     def cible(self):

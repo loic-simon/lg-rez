@@ -289,12 +289,9 @@ def get_actions(quoi, trigger, heure=None):
     Args:
         quoi (str): Type d'opération en cours :
 
-          - ``"open"`` : ouverture, ``Action.decision_`` doit être
-            ``None``;
-          - ``"close"`` :  fermeture, ``Action.decision_`` ne doit pas
-            être None;
-          - ``"remind"`` : rappel, ``Action.decision_`` doit être
-            ``"rien"``
+          - ``"open"`` : ouverture, :attr:`Action.is_open` doit être faux;
+          - ``"close"`` :  fermeture, :attr:`Action.is_open` doit être vrai;
+          - ``"remind"`` : rappel, :attr:`Action.is_waiting` doit être vrai.
 
         trigger (bdd.ActionTrigger): valeur de ``Action.trigger_debut/fin``
             à détecter.

@@ -53,19 +53,6 @@ class Joueur(base.TableBase):
     role_actif = autodoc_Column(sqlalchemy.Boolean(), nullable=False,
         default=True, doc="Le joueur peut agir ? (pas chatgarouté...)")
 
-    vote_condamne_ = autodoc_Column(sqlalchemy.String(200),
-        doc="Vote actuel au vote condamné ( si pas de vote en cours). "
-            "*(le ``_`` final indique que ce champ n'est pas synchnisé "
-            "avec le Tableau de bord)*")
-    vote_maire_ = autodoc_Column(sqlalchemy.String(200),
-        doc="Vote actuel au vote condamné (``None`` si pas de vote en cours). "
-            "*(le ``_`` final indique que ce champ n'est pas synchnisé "
-            "avec le Tableau de bord)*")
-    vote_loups_ = autodoc_Column(sqlalchemy.String(200),
-        doc="Vote actuel au vote loups (``None`` si pas de vote en cours). "
-            "*(le ``_`` final indique que ce champ n'est pas synchnisé "
-            "avec le Tableau de bord)*")
-
     # One-to-manys
     actions = autodoc_OneToMany("Action", back_populates="joueur",
         doc="Actions pour ce joueur")
@@ -112,6 +99,15 @@ class Joueur(base.TableBase):
                              f"pas de chan pour `{self}` !")
 
         return result
+
+    @property
+    def actions_actives(self):
+        """Sequence[.bdd.Action]: Sous-ensemble de :attr:`actions` restreint
+        aux actions actives.
+
+        Élimine aussi les actions de vote (sans base).
+        """
+        return [ac for ac in self.actions if ac.active and not ac.vote]
 
     @hybrid_property
     def est_vivant(self):

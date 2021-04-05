@@ -83,26 +83,17 @@ tdb_tampon_columns = ("B", "I")
 max_ciblages_per_action = 2
 
 
-#: str: Nom de l'intitulé de la colonne de la feuille des votes
-#: (:attr:`~lgrez.config.tdb_votes_sheet`) du *Tableau de bord*
-#: contenant les cibles des votes pour le condamné.
-tdb_votecond_column = "CondamnéRéel"
+#: str: :attr:`.bdd.BaseAction.slug` de l'action de base permettant
+#: de modifier un vote (rôle de l'*Intigant* dans le jeu PCéen).
+#: Cette baseaction doit avoir deux ciblages de slugs "cible" et "vote".
+modif_vote_baseaction = "modification-vote"
 
-#: str: Nom de l'intitulé de la colonne de la feuille des votes
-#: (:attr:`~lgrez.config.tdb_votes_sheet`) du *Tableau de bord*
-#: contenant les noms des votants pour le condamné.
-tdb_votantcond_column = "VotantCond"
+#: str: :attr:`.bdd.BaseAction.slug` de l'action de base permettant
+#: d'ajouter un/des vote(s) (rôle du *Corbeau* dans le jeu PCéen).
+ajout_vote_baseaction = "ajout-vote"
 
-
-#: str: Nom de l'intitulé de la colonne de la feuille des votes
-#: (:attr:`~lgrez.config.tdb_votes_sheet`) du *Tableau de bord*
-#: contenant les cibles des votes pour le nouveau maire.
-tdb_votemaire_column = "MaireRéel"
-
-#: str: Nom de l'intitulé de la colonne de la feuille des votes
-#: (:attr:`~lgrez.config.tdb_votes_sheet`) du *Tableau de bord*
-#: contenant les noms des votants pour le nouveau maire.
-tdb_votantmaire_column = "VotantMaire"
+#: int: Nombre de votes ajoutés par l'action :attr:`ajout_vote_baseaction`.
+n_ajouts_votes = 2
 
 
 #: str: Nom de la feuille du GSheet *Données brûtes* où enregistrer

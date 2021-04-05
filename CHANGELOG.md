@@ -47,6 +47,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New class methods :meth:`.bdd.ActionTrigger.open` and
     :meth:`.bdd.ActionTrigger.close` ;
   - :func:`.features.voter_agir.export_vote` signature changed;
+  - ``!plot`` now uses new actions system instead of loading votes from
+    the Gsheet:
+      - removed config options ``tdb_votecond_column``,
+        ``tdb_votantcond_column``, ``tdb_votemaire_column``,
+        ``tdb_votantmaire_column``;
+      - it now automatically computes votes additions and modifications
+        (Corbeau / Intrigant), using new config options
+        :attr:`config.ajout_vote_baseaction`, :attr:`config.n_ajouts_votes`,
+        :attr:`config.modif_vote_baseaction`;
   - ``!fillroles`` now synchronise :class:`.bdd.BaseCiblage` too (see
     :attr:`.config.max_ciblages_per_action` and post camps descriptions in
     roles channel;

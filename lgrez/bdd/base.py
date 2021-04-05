@@ -347,6 +347,8 @@ def autodoc_Column(*args, doc="", comment=None, **kwargs):
     py_type = col.type.python_type
     if py_type.__module__ in ("builtins", "lgrez.bdd.enums"):
         py_type_str = py_type.__name__
+    elif py_type.__module__.startswith("lgrez.bdd.model_"):
+        py_type_str = f"lgrez.bdd.{py_type.__name__}"
     else:
         py_type_str = f"{py_type.__module__}.{py_type.__name__}"
     or_none = " | ``None``" if col.nullable else ""

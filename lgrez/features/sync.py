@@ -119,6 +119,7 @@ class _ComparaisonResults():
 
 
 def _compare_items(existants, new, table, cols, primary_key, bc_cols=None):
+    """Utility function for !fillroles: compare table items and dicts"""
     res = _ComparaisonResults()
     if table == BaseAction:
         res.sub_results = _ComparaisonResults()
@@ -507,7 +508,7 @@ async def modif_joueur(joueur_id, modifs, silent=False):
                               "Ça arrive même aux meilleurs, en espérant "
                               "que ta mort ait été belle !\n")
                 # Actions à la mort
-                for action in joueur.actions:
+                for action in joueur.actions_actives:
                     if action.base.trigger_debut == ActionTrigger.mort:
                         await gestion_actions.open_action(action)
 
@@ -527,7 +528,7 @@ async def modif_joueur(joueur_id, modifs, silent=False):
 
         elif modif.col == "role":                       # Modification rôle
             new_role = modif.val
-            for action in joueur.actions:
+            for action in joueur.actions_actives:
                 if action.base in joueur.role.base_actions:
                     # Suppression anciennes actions de rôle
                     gestion_actions.delete_action(action)
