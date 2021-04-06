@@ -4,6 +4,7 @@ Déclaration de toutes les tables et leurs colonnes
 
 """
 
+import discord
 import sqlalchemy
 
 from lgrez import config
@@ -75,6 +76,20 @@ class Role(base.TableBase):
     def nom_complet(self):
         """str: Préfixe + nom du rôle"""
         return f"{self.prefixe}{self.nom}"
+
+    @property
+    def embed(self):
+        """discord.Embed: Embed Discord présentant le rôle et ses actions."""
+        emb = discord.Embed(
+            title=f"**{self.nom_complet}** – {self.description_courte}",
+            description=self.description_longue
+        )
+        if (emoji := self.camp.discord_emoji_or_none):
+            emb.set_thumbnail(url=emoji.url)
+        for ba in self.base_actions:
+            emb.add_field(name=f"{config.Emoji.action} Action : {ba.slug}",
+                          value=ba.temporalite)
+        return emb
 
     @classmethod
     def default(cls):
@@ -282,6 +297,69 @@ class BaseAction(base.TableBase):
     def __str__(self):
         """Return str(self)."""
         return str(self.slug)
+
+    @property
+    def temporalite(self):
+        """str: Phrase décrivant le mode d'utilisation / timing de l'action."""
+        def _time_to_heure(tps):
+            if not tps:
+                return ""
+            if tps.hour == 0:
+                return f"{tps.minute} min"
+            if tps.minute > 0:
+                return f"{tps.hour}h{tps.minute:02}"
+            return f"{tps.hour}h"
+
+        rep = ""
+        # Périodicté
+        if self.trigger_debut == ActionTrigger.perma:
+            rep += "N'importe quand"
+        elif self.trigger_debut == ActionTrigger.start:
+            rep += "Au lancement de la partie"
+        elif self.trigger_debut == ActionTrigger.mort:
+            rep += "À la mort"
+        else:
+            if self.base_cooldown:
+                rep += f"Tous les {self.base_cooldown + 1} jours "
+            else:
+                rep += "Tous les jours "
+
+            # Fenêtre
+            if self.trigger_debut == ActionTrigger.mot_mjs:
+                rep += "à l'annonce des résultats du vote"
+            elif self.trigger_debut == ActionTrigger.open_cond:
+                rep += "pendant le vote condamné"
+            elif self.trigger_debut == ActionTrigger.open_maire:
+                rep += "pendant le vote pour le maire"
+            elif self.trigger_debut == ActionTrigger.open_loups:
+                rep += "pendant le vote des loups"
+            elif self.trigger_debut == ActionTrigger.close_cond:
+                rep += "à la fermeture du vote condamné"
+            elif self.trigger_debut == ActionTrigger.close_maire:
+                rep += "à la fermeture du vote pour le maire"
+            elif self.trigger_debut == ActionTrigger.close_loups:
+                rep += "à la fermeture du vote des loups"
+            elif self.trigger_debut == ActionTrigger.temporel:
+                if self.trigger_fin == ActionTrigger.temporel:
+                    rep += f"de {_time_to_heure(self.heure_debut)}"
+                else:
+                    rep += f"à {_time_to_heure(self.heure_debut)}"
+
+        # Fermeture
+        if self.trigger_fin == ActionTrigger.delta:
+            rep += f" – {_time_to_heure(self.heure_fin)} pour agir"
+        elif self.trigger_fin == ActionTrigger.temporel:
+            rep += f" à {_time_to_heure(self.heure_fin)}"
+
+        # Autres caractères
+        if self.instant:
+            rep += f" (conséquence instantanée)"
+        if self.base_charges:
+            rep += f" – {self.base_charges} fois"
+        if "weekends" in self.refill:
+            rep += f" par semaine"
+
+        return rep
 
 
 class BaseCiblage(base.TableBase):

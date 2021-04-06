@@ -814,21 +814,16 @@ class Sync(commands.Cog):
                 if not camp.roles:
                     continue
 
-                emoji = camp.discord_emoji_or_none
-                await chan_roles.send(
-                    embed=Embed(title=f"Camp : {camp.nom}",
-                                description=camp.description).set_thumbnail(
-                        url=emoji.url if emoji else None
-                    )
-                )
+                embed = Embed(title=f"Camp : {camp.nom}",
+                              description=camp.description,
+                              color=0x64b9e9)
+                if (emoji := camp.discord_emoji_or_none):
+                    embed.set_thumbnail(url=emoji.url)
+                await chan_roles.send(embed=embed)
+
                 await chan_roles.send("——————————————————————————")
                 for role in camp.roles:
-                    await chan_roles.send(
-                        f"{emoji or ''}  {tools.bold(role.nom_complet)} "
-                        f"– {role.description_courte} (camp : {camp.nom})\n\n"
-                        f"{role.description_longue}\n\n"
-                        "——————————————————————————"
-                    )
+                    await chan_roles.send(embed=role.embed)
 
         rt = time.time() - t0
         await ctx.send(f"{chan_roles.mention} rempli ! (en {rt:.4} secondes)")

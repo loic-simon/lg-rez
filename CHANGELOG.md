@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated ``!fillroles`` to fill BaseCiblages too (new config option
     :attr:`config.max_ciblages_per_action`);
   - New column :attr:`.bdd.BaseAction.decision_format`;
+  - New properties :attr:`.bdd.BaseAction.temporalite` and
+    :attr:`.bdd.Role.embed` to describe a role, used in ``!role``,
+    ``!fillroles`` and :func:`.features.IA.trigger_roles`;
   - ``!cparti`` now add "vote actions" to all players;
   - New function :func:`.features.voter_agir.get_cible`, used by ``!vote``,
     ``!votemaire``, ``!voteloups`` et ``!action`` to handle user inputs;

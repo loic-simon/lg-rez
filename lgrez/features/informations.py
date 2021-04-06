@@ -47,11 +47,7 @@ class Informations(commands.Cog):
                     await ctx.send(f"Rôle / camp \"{filtre}\" non trouvé.")
                     return
 
-                role = roles[0][0]
-                await ctx.send(tools.code_bloc(
-                    f"{role.prefixe}{role.nom} – {role.description_courte} "
-                    f"(camp : {role.camp.nom})\n\n{role.description_longue}"
-                ))
+                await ctx.send(embed=roles[0][0].embed)
                 return
 
         await tools.send_blocs(

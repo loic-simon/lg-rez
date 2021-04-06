@@ -463,11 +463,7 @@ async def trigger_roles(message, sensi=0.8):
     roles = Role.find_nearest(message.content, col=Role.nom, sensi=sensi)
 
     if roles:       # Au moins un trigger trouvé à cette sensi
-        role = roles[0][0]          # Meilleur trigger (score max)
-        await message.channel.send(tools.code_bloc(
-            f"{role.prefixe}{role.nom} – {role.description_courte} "
-            f"(camp : {role.camp.nom})\n\n{role.description_longue}"
-        ))      # On envoie
+        await message.channel.send(embed=roles[0][0].embed)
         return True
 
     return False
