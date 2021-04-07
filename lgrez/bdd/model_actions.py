@@ -4,6 +4,7 @@ Déclaration de toutes les tables et leurs colonnes
 
 """
 
+import asyncio
 import datetime
 import time
 
@@ -15,7 +16,6 @@ from lgrez.bdd import base, ActionTrigger
 from lgrez.bdd.base import (autodoc_Column, autodoc_ManyToOne,
                             autodoc_OneToMany, autodoc_DynamicOneToMany)
 from lgrez.bdd.enums import UtilEtat, CibleType, Vote
-from lgrez.blocs import env, webhook
 
 
 # Tables de données
@@ -528,34 +528,49 @@ class Tache(base.TableBase):
         except KeyError:
             pass
 
-    def execute(self):
+    async def send_webhook(self, tries=0):
+        """Exécute la tâche (coroutine programmée par :meth:`execute`).
+
+        Envoie un webhook (:attr:`.config.webhook`) de contenu
+        :attr:`commande`.
+
+        Si une exception quelconque est levée par l'envoi du webhook,
+        re-programme l'exécution de la tâche (:meth:`execute`) 2 secondes
+        après ; ce jusqu'à 5 fois, après quoi un message d'alerte est
+        envoyé dans :attr:`.config.Channel.logs`.
+
+        Si aucune exception n'est levée (succès), supprime la tâche.
+
+        Args:
+            tries (int): Numéro de l'essai d'envoi actuellement en cours
+        """
+        try:
+            await config.webhook.send(self.commande)
+        except Exception as exc:
+            if tries < 5:
+                # On réessaie
+                config.loop.call_later(2, self.execute, tries + 1)
+            else:
+                await config.Channel.logs.send(
+                    f"{config.Role.mj.mention} ALERT: impossible  "
+                    f"d'envoyer un webhook (5 essais, erreur : "
+                    f"```{type(exc).__name__}: {exc})```\n"
+                    f"Commande non envoyée : `{self.commande}`"
+                )
+        else:
+            self.delete()
+
+    def execute(self, tries=0):
         """Exécute la tâche planifiée (méthode appellée par la loop).
 
-        Envoie un webhook (variable d'environnement ``LGREZ_WEBHOOK_URL``)
-        avec comme message :attr:`.commande`, puis
+        Programme :meth:`send_webhook` pour exécution immédiate.
 
-          - si l'envoi est un succès, supprime la tâche (et son handler);
-          - sinon, se ré-appelle dans 2 secondes.
-
-        Limitation interne de 2 secondes minimum entre deux appels
-        (ré-appelle si appelée trop tôt), pour se conformer à la rate
-        limit Discord (30 messages / minute) et ne pas engoncer la loop.
+        Args:
+            tries (int): Numéro de l'essai d'envoi actuellement en cours,
+                passé à :meth:`send_webhook`.
         """
-        if webhook._last_time and (time.time() - webhook._last_time) < 2:
-            # Moins de deux secondes depuis le dernier envoi :
-            # on interdit l'envoi du webhook
-            config.loop.call_later(2, self.execute)
-            return
-
-        webhook._last_time = time.time()
-
-        LGREZ_WEBHOOK_URL = env.load("LGREZ_WEBHOOK_URL")
-        if webhook.send(self.commande, url=LGREZ_WEBHOOK_URL):
-            # Envoi webhook OK
-            self.delete()
-        else:
-            # Problème d'envoi : on réessaie dans 2 secondes
-            config.loop.call_later(2, self.execute)
+        asyncio.create_task(self.send_webhook(tries=tries))
+        # programme la coroutine pour exécution immédiate
 
     def register(self):
         """Programme l'exécution de la tâche dans la loop du bot."""

@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     ``!votemaire``, ``!voteloups`` et ``!action`` to handle user inputs;
   - New function :func:`.blocs.tools.boucle_query` for generic database
     instance lookup interactions;
+  - Task postponing now uses Discord-py webhooks:
+      - dropped requirement for `discord-webhook` module;
+      - tasks now use `.config.webhook`, created by :meth:`.LGBot.on_ready`
+        if not existing (posting to :attr:`config.Channel.logs`);
+      - new method :meth:`.bdd.Tache.send_webhook`;
+      - deleted ``blocs.webhook`` module and usage of ``LGREZ_WEBHOOK_URL``
+        environnement variable;
   - :func:`.blocs.tools.wait_for_react_clic` and :func:`.blocs.tools.yes_no`:
     new kwarg ``first_text`` for pre-asking text response;
   - New convenience function :func:`.bdd.base.autodoc_DynamicOneToMany`
@@ -65,6 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated some string columns max lengths;
   - ``__str__`` specific implementation for :class:`.bdd.Role`,
     :class:`.bdd.Camp`, :class:`.bdd.BaseAction` and :class:`.bdd.Joueur`.
+
+### Removed
+
+  - ``blocs.webhook`` module.
 
 ### Fixed
 

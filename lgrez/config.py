@@ -256,6 +256,8 @@ class _ModuleGlobals(ready_check.ReadyCheck):
     engine = None
     session = None
 
+    webhook = None
+
 
 # Called when module attribute not found: try to look in _ModuleGlobals
 def __getattr__(attr):

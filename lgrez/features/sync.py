@@ -800,15 +800,12 @@ class Sync(commands.Cog):
             await chan_roles.purge(limit=1000)
 
         camps = Camp.query.filter_by(public=True).all()
-        est = sum(len(camp.roles) + 2 for camp in camps) + 2
+        est = sum(len(camp.roles) + 1 for camp in camps) + 1
         await ctx.send(f"Remplissage... (temps estimé : {est} secondes)")
 
         t0 = time.time()
-        await chan_roles.send(
-            "Voici la liste des rôles : (accessible en faisant "
-            f"{tools.code('!roles')}, mais on l'a mis là parce que "
-            "pourquoi pas)\n\n——————————————————————————"
-        )
+        await chan_roles.send("Voici la liste des rôles "
+                              f"(voir aussi {tools.code('!roles')}) :")
         async with ctx.typing():
             for camp in camps:
                 if not camp.roles:
@@ -818,10 +815,10 @@ class Sync(commands.Cog):
                               description=camp.description,
                               color=0x64b9e9)
                 if (emoji := camp.discord_emoji_or_none):
-                    embed.set_thumbnail(url=emoji.url)
-                await chan_roles.send(embed=embed)
+                    embed.set_image(url=emoji.url)
+                await chan_roles.send("——————————————————————————",
+                                      embed=embed)
 
-                await chan_roles.send("——————————————————————————")
                 for role in camp.roles:
                     await chan_roles.send(embed=role.embed)
 

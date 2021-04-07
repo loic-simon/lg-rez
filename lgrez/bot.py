@@ -94,6 +94,18 @@ async def _on_ready(bot):
         name="vos demandes (!help)"
     ))
 
+    # Webhooks
+    existing = await config.Channel.logs.webhooks()
+
+    if existing:
+        config.webhook = existing[0]
+    else:           # Création du webhook
+        config.webhook = await config.Channel.logs.create_webhook(
+            name=bot.user.name,
+            avatar=await bot.user.avatar_url.read()
+        )
+        await tools.log(f"Webhook de tâches planifiées créé")
+
     # Tâches planifiées
     taches = bdd.Tache.query.all()
     for tache in taches:
