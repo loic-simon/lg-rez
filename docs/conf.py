@@ -231,6 +231,8 @@ intersphinx_mapping = {
 # Use the following pseudo-directive to autodocument a cog:
 # .. --autocog--:module.Cog: {}
 
+import discord
+
 import lgrez
 
 
@@ -255,6 +257,7 @@ def replace(match):
 
     indent_in = indent + "    "
     indent_in_in = indent_in + "    "
+    indent_in_in_in = indent_in_in + "    "
     cog = eval(cogname)
 
     txt = (f"{indent}.. --autocog--:{cogname}: {{ \n"
@@ -285,6 +288,31 @@ def replace(match):
                 f"{aliastext}\N{NO-BREAK SPACE}:\n"
                 f"{indent_in_in}.. automethod:: "
                 f"{cogname}.{command.callback.__name__}.callback\n")
+
+        if isinstance(command, discord.ext.commands.Group):
+            txt += (f"\n{indent_in_in}.. include:: groupnote.rst\n\n")
+
+            options = sorted(command.commands, key=lambda sc: sc.name)
+            for i, opt in enumerate(options):
+                # Aliases
+                aliastext = ""
+                if opt.aliases:
+                    aliases = ", ".join(f"``{sals}``" for sals in opt.aliases)
+                    aliastext = f" (alias {aliases})"
+
+                # Anchor (:ref: links)
+                txt += (f"{indent_in_in_in if i else indent_in_in}"
+                        f".. _{command.name}_{opt.name}:\n")
+                if i == 0:
+                    txt += "\n"
+
+                # Option
+                txt += (f"{indent_in_in}- :Option ``!{command.name} "
+                        f"{opt.name}`` {aliastext}\N{NO-BREAK SPACE}:\n"
+                        f"{indent_in_in_in}.. automethod:: "
+                        f"{cogname}.{opt.callback.__name__}.callback\n")
+
+            txt += "\n"
 
     txt += f"\n{indent}.. }}"
     return txt

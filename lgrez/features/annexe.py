@@ -13,7 +13,6 @@ from akinator.async_aki import Akinator
 
 from lgrez.blocs import tools
 from lgrez.bdd import Joueur
-from lgrez.features.sync import transtype
 
 
 class Annexe(commands.Cog):
@@ -107,66 +106,6 @@ class Annexe(commands.Cog):
             f"——————————————————————\n"
             f" Total :     {delta_tot.total_seconds()*1000:4.0f} ms"
         ))
-
-
-    @commands.command()
-    @tools.mjs_only
-    async def addhere(self, ctx, *joueurs):
-        """Ajoute les membres au chan courant (COMMANDE MJ)
-
-        Args:
-            *joueurs: membres à ajouter, chacun entouré par des
-                guillemets si nom + prénom
-
-        Si ``*joueurs`` est un seul élément, il peut être de la forme
-        ``<crit>=<filtre>`` tel que décrit dans l'aide de ``!send``.
-        """
-        ts_debut = ctx.message.created_at - datetime.timedelta(microseconds=1)
-
-        if len(joueurs) == 1 and "=" in joueurs[0]:
-            # Si critère : on remplace joueurs
-            crit, _, filtre = joueurs[0].partition("=")
-            crit = crit.strip()
-            if crit in Joueur.attrs:
-                col = Joueur.attrs[crit]
-                arg = transtype(filtre.strip(), col)
-                joueurs = Joueur.query.filter_by(**{crit: arg}).all()
-            else:
-                raise commands.UserInputError(f"critère '{crit}' incorrect")
-        else:
-            # Sinon, si noms / mentions
-            joueurs = [await tools.boucle_query_joueur(ctx, cible)
-                       for cible in joueurs]
-
-        for joueur in joueurs:
-            await ctx.channel.set_permissions(joueur.member,
-                                              read_messages=True,
-                                              send_messages=True)
-            await ctx.send(f"{joueur.nom} ajouté")
-
-        mess = await ctx.send("Fini, purge les messages ?")
-        if await tools.yes_no(mess):
-            await ctx.channel.purge(after=ts_debut)
-
-
-    @commands.command()
-    @tools.mjs_only
-    async def purge(self, ctx, N=None):
-        """Supprime tous les messages de ce chan (COMMANDE MJ)
-
-        Args:
-            N: nombre de messages à supprimer (défaut : tous)
-        """
-        if N:
-            mess = await ctx.send(
-                f"Supprimer les {N} messages les plus récents de ce chan ? "
-                "(sans compter le `!purge` et ce message)"
-            )
-        else:
-            mess = await ctx.send("Supprimer tous les messages de ce chan ?")
-
-        if await tools.yes_no(mess):
-            await ctx.channel.purge(limit=int(N) + 2 if N else None)
 
 
     @commands.command()

@@ -260,15 +260,28 @@ class Special(commands.Cog):
                 doc = re.sub(r":\w+?:`[\.~!]*(.+?)`", r"`\1`", doc)
                 # enlève les :class: et consors
 
-                r = f"{pref}{command} {cmd.signature} – {doc}\n"
+                if isinstance(cmd, commands.Group):
+                    r = (f"{pref}{command} <option> [args...] – {doc}\n\n"
+                         "Options :\n")
+
+                    scommands = sorted(cmd.commands, key=lambda cmd: cmd.name)
+                    options = [f"{scmd.name} {scmd.signature}"
+                               for scmd in scommands]
+                    slen_max = max(len(opt) for opt in options)
+                    r += "\n".join(f"    - {pref}{command} "
+                                   f"{opt.ljust(slen_max)}  {scmd.short_doc}"
+                                   for scmd, opt in zip(scommands, options))
+                else:
+                    r = f"{pref}{command} {cmd.signature} – {doc}"
+
                 if cmd.aliases:         # Si la commande a des alias
-                    r += f"\nAlias : {pref}" + f", {pref}".join(cmd.aliases)
+                    r += f"\n\nAlias : {pref}" + f", {pref}".join(cmd.aliases)
 
             else:
                 r = (f"Commande '{pref}{command}' non trouvée.\n"
                      f"Utilise '{pref}help' pour la liste des commandes.")
 
-        r += ("\nSi besoin, n'hésite pas à appeler un MJ "
+        r += ("\n\nSi besoin, n'hésite pas à appeler un MJ "
               "en les mentionnant (@MJ).")
 
         await tools.send_code_blocs(ctx, r, sep="\n\n")

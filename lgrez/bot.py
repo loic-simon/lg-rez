@@ -71,6 +71,12 @@ async def _on_ready(bot):
         errors.append(f"catégorie config.private_chan_category_name = "
                       f"\"{config.private_chan_category_name}\" non trouvée")
 
+    try:
+        tools.channel(config.boudoirs_category_name)
+    except ValueError:
+        errors.append(f"catégorie config.boudoirs_category_name = "
+                      f"\"{config.boudoirs_category_name}\" non trouvée")
+
     if errors:
         msg = (f"LGBot.on_ready: {len(errors)} errors:\n - "
                + "\n - ".join(errors))
@@ -443,6 +449,7 @@ class LGBot(commands.Bot):
         # Commandes mixtes : comportement de l'IA et trucs divers
         self.add_cog(IA.GestionIA(self))
         self.add_cog(annexe.Annexe(self))
+        self.add_cog(chans.GestionChans(self))
         # Commandes spéciales, méta-commandes...
         self.remove_command("help")
         self.add_cog(special.Special(self))

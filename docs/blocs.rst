@@ -56,11 +56,3 @@
 .. automodule:: lgrez.blocs.tools
    :members:
    :member-order: bysource
-
-
-``.webhook``
-----------------------------------------------------------------------
-
-.. automodule:: lgrez.blocs.webhook
-  :members:
-  :member-order: bysource

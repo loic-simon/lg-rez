@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-  - Extended Data model with New Actions System (NAS) data classes
+  - Extended Data model with New Actions System (NAS) tables
     (:class:`.bdd.Utilisation`, :class:`.bdd.BaseCiblage` and
     :class:`.bdd.Ciblage`) and enums (:class:`.bdd.CibleType`,
     :class:`.bdd.UtilEtat` and :class:`.bdd.Vote`);
@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       - new method :meth:`.bdd.Tache.send_webhook`;
       - deleted ``blocs.webhook`` module and usage of ``LGREZ_WEBHOOK_URL``
         environnement variable;
+  - New boudoirs management system:
+      - New tables :class:`.bdd.Boudoir` and :class:`.bdd.Bouderie`;
+      - New group command ``!boudoir`` (with 8 subcommands) in new module
+        :mod:`.features.chans`;
+      - New configuration option :attr:`.config.boudoirs_category_name`,
+        loaded by :meth:`.LGBot.on_ready`,
+      - Updated ``!help`` and doc tools to handle group commands;
   - :func:`.blocs.tools.wait_for_react_clic` and :func:`.blocs.tools.yes_no`:
     new kwarg ``first_text`` for pre-asking text response;
   - New convenience function :func:`.bdd.base.autodoc_DynamicOneToMany`
@@ -69,6 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ``!fillroles`` now synchronise :class:`.bdd.BaseCiblage` too (see
     :attr:`.config.max_ciblages_per_action` and post camps descriptions in
     roles channel;
+  - Moved ``!addhere`` and ``!purge`` from :mod:`.features.annexe` to
+    new module :mod:`.features.chans`;
   - Updated some string columns max lengths;
   - ``__str__`` specific implementation for :class:`.bdd.Role`,
     :class:`.bdd.Camp`, :class:`.bdd.BaseAction` and :class:`.bdd.Joueur`.

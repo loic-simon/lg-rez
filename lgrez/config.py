@@ -16,6 +16,10 @@ private_chan_prefix = "conv-bot-"
 #: (sera éventuellement suivi de 2, 3... si plus de 50 joueurs).
 private_chan_category_name = "CONVERSATION BOT"
 
+#: str: Nom de la catégorie des boudoirs
+#: (sera éventuellement suivi de 2, 3... si plus de 50 boudoirs).
+boudoirs_category_name = "BOUDOIRS"
+
 
 #: str: Date de début de saison (pour information lors de l'inscription).
 debut_saison = "32 plopembre"

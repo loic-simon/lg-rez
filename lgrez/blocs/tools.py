@@ -214,7 +214,7 @@ def private(callback):
 
     Ce décorateur n'est utilisable que sur une commande définie dans un
     Cog. Si le joueur ayant utilisé la commande n'a pas de chan privé
-    (pas en base), raise une :exc:`RuntimeError`.
+    (pas en base), raise une :exc:`ValueError`.
 
     Utilisable en combinaison avec :func:`.joueurs_only` et
     :func:`.vivants_only` (pas avec les autres attention, vu que seuls
