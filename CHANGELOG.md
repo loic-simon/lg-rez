@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       - New configuration option :attr:`.config.boudoirs_category_name`,
         loaded by :meth:`.LGBot.on_ready`,
       - Updated ``!help`` and doc tools to handle group commands;
+  - New command ``!lore`` using new Google Docs connection function
+    :func:`.blocs.gsheets.get_doc_content`;
   - :func:`.blocs.tools.wait_for_react_clic` and :func:`.blocs.tools.yes_no`:
     new kwarg ``first_text`` for pre-asking text response;
   - New convenience function :func:`.bdd.base.autodoc_DynamicOneToMany`
@@ -84,7 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-  - ``blocs.webhook`` module.
+  - Tables columns :attr:`.bdd.Joueur._vote_condamne`, 
+    :attr:`.bdd.Joueur._vote_maire`, :attr:`.bdd.Joueur._vote_loups`,
+    :attr:`.bdd.Action._decision`, :attr:`.bdd.BaseAction.changement_cible`;
+  - ``.blocs.webhook`` module.
 
 ### Fixed
 

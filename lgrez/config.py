@@ -84,7 +84,7 @@ tdb_tampon_columns = ("B", "I")
 #: int: Nombre maximal de modèles de ciblages (:class:`.bdd.BaseCiblage`)
 #: renseignés pour chaque modèle d'action (:class:`.bdd.BaseAction`), à
 #: droite de la feuille ``baseactions`` du GSheet *Rôles et actions*.
-max_ciblages_per_action = 2
+max_ciblages_per_action = 3
 
 
 #: str: :attr:`.bdd.BaseAction.slug` de l'action de base permettant

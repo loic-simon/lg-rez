@@ -3,10 +3,10 @@
 Envoi de messages, d'embeds...
 
 """
-
-import os
 import datetime
 import functools
+import os
+import re
 
 import discord
 from discord.ext import commands
@@ -14,11 +14,31 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from lgrez import config
-from lgrez.blocs import tools
+from lgrez.blocs import tools, gsheets
 from lgrez.bdd import (Joueur, Action, Camp, BaseAction, Utilisation,
                        Statut, ActionTrigger, CandidHaroType, UtilEtat, Vote)
 from lgrez.features import gestion_actions
 from lgrez.features.sync import transtype
+
+
+def _mention_repl(mtch):
+    """Remplace @(Prénom Nom) par la mention du joueur, si possible"""
+    nearest = Joueur.find_nearest(mtch.group(1),
+                                  col=Joueur.nom, sensi=0.8)
+    if nearest:
+        joueur = nearest[0][0]
+        try:
+            return joueur.member.mention
+        except ValueError:
+            pass
+    return mtch.group(1)
+
+def _emoji_repl(mtch):
+    """Remplace :(emoji): par la représentation de l'emoji, si possible"""
+    emo = tools.emoji(mtch.group(1), must_be_found=False)
+    if emo:
+        return str(emo)
+    return mtch.group()
 
 
 class Communication(commands.Cog):
@@ -493,7 +513,7 @@ class Communication(commands.Cog):
 
         # Récupération votes
         cibles = [_Cible(jr, vts) for (jr, vts) in cibles.items()]
-        cibles.sort()   # par nb de votes, puis ordre alphabétique si égalité
+        cibles.sort(reverse=True)       # par nb de votes, puis ordre alpha
         log += f"\n  - Cibles : {cibles}"
 
         # Détermination cible
@@ -711,3 +731,93 @@ class Communication(commands.Cog):
         else:
             await ctx.send("Mission aborted.")
             self.current_embed = embed
+
+
+
+    @commands.command()
+    @tools.mjs_only
+    async def lore(self, ctx, doc_id):
+        """Récupère et poste un lore depuis un Google Docs (COMMANDE MJ)
+
+        Convertit les formats et éléments suivants vers Discord :
+            - Gras, italique, souligné, barré;
+            - Petites majuscules (-> majuscules);
+            - Polices à chasse fixe (Consolas / Courier New) (-> code);
+            - Liens hypertextes;
+            - Listes à puces;
+            - Mentions de joueurs, sous la forme `@Prénom Nom`;
+            - Emojis, sous la forme `:nom:`.
+
+        Permet soit de poster directement dans #annonces, soit de
+        récupérer la version formatée du texte (pour copier-coller).
+
+        Args:
+            doc_id: ID ou URL du document (doit être public ou dans le
+                Drive partagé avec le compte de service)
+        """
+        if len(doc_id) < 44:
+            raise commands.BadArgument("'doc_id' doit être l'ID ou l'URL "
+                                       "d'un document Google Docs")
+        elif len(doc_id) > 44:      # URL fournie (pas que l'ID)
+            mtch = re.search(r"/d/(\w{44})(\W|$)", doc_id)
+            if mtch:
+                doc_id = mtch.group(1)
+            else:
+                raise commands.BadArgument("'doc_id' doit être l'ID ou l'URL "
+                                           "d'un document Google Docs")
+
+        await ctx.send("Récupération du document...")
+        async with ctx.typing():
+            content = gsheets.get_doc_content(doc_id)
+
+        formatted_text = ""
+        for (_text, style) in content:
+            _text = _text.replace("\v", "\n").replace("\f", "\n")
+            # Espaces/newlines à la fin de _text ==> à part
+            text = _text.rstrip()
+            len_rest = len(_text) - len(text)
+            rest = _text[-len_rest:] if len_rest else ""
+
+            if not text:    # espcaes/newlines uniquement
+                formatted_text += rest
+                continue
+
+            # Remplacement des mentions
+            text = re.sub(r"@([\w-]+ [\w-]+)", _mention_repl, text)
+            text = re.sub(r":(\w+):", _emoji_repl, text)
+
+            if style.get("bold"):
+                text = tools.bold(text)
+            if style.get("italic"):
+                text = tools.ital(text)
+            if style.get("strikethrough"):
+                input(style.get("strikethrough"))
+                text = tools.strike(text)
+            if style.get("smallCaps"):
+                text = text.upper()
+            if (wff := style.get("weightedFontFamily")):
+                if wff["fontFamily"] in ["Consolas", "Courier New"] :
+                    text = tools.code(text)
+            if (link := style.get("link")):
+                if (url := link.get("url")):
+                    if not "://" in text:
+                        text = text + f" (<{url}>)"
+            elif style.get("underline"):    # ne pas souligner si lien
+                text = tools.soul(text)
+
+            formatted_text += text + rest
+
+        await ctx.send("————————————————————")
+        await tools.send_blocs(ctx, formatted_text)
+        mess = await ctx.send("————————————————————\nPublier sur "
+                              f"{config.Channel.annonces.mention} / "
+                              "Récupérer la version formatée / Stop ?")
+        r = await tools.wait_for_react_clic(mess, {"📣": 1, "📝": 2, "⏹": 0})
+
+        if r == 1:
+            await tools.send_blocs(config.Channel.annonces, formatted_text)
+            await ctx.send("Fait !")
+        elif r == 2:
+            await tools.send_code_blocs(ctx, formatted_text)
+        else:
+            await ctx.send("Mission aborted.")

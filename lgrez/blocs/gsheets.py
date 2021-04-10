@@ -9,6 +9,7 @@ import json
 
 import gspread
 from oauth2client import service_account
+from googleapiclient.discovery import build
 
 from lgrez import bdd
 from lgrez.blocs import env
@@ -146,3 +147,56 @@ def a_to_index(column):
     a1 = column + "1"
     row, col = gspread.utils.a1_to_rowcol(a1)
     return col - 1      # a1_to_rowcol indexe à partir de 1
+
+
+def get_doc_content(doc_id):
+    """Récupère le contenu d'un document Google Docs.
+
+    Transforme le document pour ne garder que les fragments de
+    texte et leur mise en forme. Les paragraphes de listes à
+    points sont transformés en ajoutant un fragment ``    -  ``
+    à l'endroit adéquat ; les autres options de mise en forme des
+    paragraphes et les autres objets GDocs sont ignorés.
+
+    Args:
+        doc_id (str): ID du document à récupérer (doit être public
+            ou dans le Drive partagé avec le compte de service).
+
+    Returns:
+        list[tuple(str, dict)]: Les différents fragments de texte
+            du document et leur formattage (référence : https://developers.\
+            google.com/docs/api/reference/rest/v1/documents#TextStyle)
+
+    Raises:
+        googleapiclient.errors.HttpError: ID incorrect ou document non
+        accessible.
+    """
+    LGREZ_GCP_CREDENTIALS = env.load("LGREZ_GCP_CREDENTIALS")
+
+    scope = ['https://www.googleapis.com/auth/documents.readonly']
+    creds = service_account.ServiceAccountCredentials.from_json_keyfile_dict(
+        json.loads(LGREZ_GCP_CREDENTIALS), scope
+    )
+    service = build('docs', 'v1', credentials=creds)
+
+    # Retrieve the documents contents from the Docs service.
+    document = service.documents().get(documentId=doc_id).execute()
+
+    content = []
+    blocs = document["body"]["content"]
+    for bloc in blocs:
+        paragraph = bloc.get("paragraph")
+        if not paragraph:
+            continue
+
+        bullet = paragraph.get("bullet")
+        if bullet:
+            content.append(("    -  ", bullet["textStyle"]))
+
+        elements = paragraph["elements"]
+        for element in elements:
+            run = element.get("textRun")
+            if run:     # bout de texte
+                content.append((run["content"], run["textStyle"]))
+
+    return content

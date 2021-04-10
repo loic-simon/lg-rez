@@ -269,9 +269,6 @@ class BaseAction(base.TableBase):
     mage = autodoc_Column(sqlalchemy.String(100),
         doc="*Attribut informatif, non exploité dans la version actuelle "
             "(Oui/Non/Changement de cible/...)*")
-    changement_cible = autodoc_Column(sqlalchemy.Boolean(),
-        doc="*Attribut informatif, non exploité dans la version actuelle "
-            "(si la cible doit changer entre deux utilisations consécutives)*")
 
     decision_format = autodoc_Column(sqlalchemy.String(200),
         nullable=False, default="",

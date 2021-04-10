@@ -78,13 +78,13 @@ async def get_cible(ctx, action, base_ciblage, first=None):
             ctx, cible=first, message=(f"{phrase}\n\n*Écris simplement le "
                                        f"nom du joueur ci-dessous {stop} :*")
         )
-    if base_ciblage.type == CibleType.vivant:
+    elif base_ciblage.type == CibleType.vivant:
         res = await tools.boucle_query_joueur(
             ctx, cible=first, filtre=Joueur.est_vivant,
             message=(f"{phrase}\n\n*Écris simplement le nom du joueur "
                      f"(vivant) ci-dessous {stop} :*")
         )
-    if base_ciblage.type == CibleType.mort:
+    elif base_ciblage.type == CibleType.mort:
         res = await tools.boucle_query_joueur(
             ctx, cible=first, filtre=Joueur.est_mort,
             message=(f"{phrase}\n\n*Écris simplement le nom du mort "

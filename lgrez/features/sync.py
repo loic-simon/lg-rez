@@ -800,13 +800,14 @@ class Sync(commands.Cog):
             await chan_roles.purge(limit=1000)
 
         camps = Camp.query.filter_by(public=True).all()
-        est = sum(len(camp.roles) + 1 for camp in camps) + 1
+        est = sum(len(camp.roles) + 2 for camp in camps) + 2
         await ctx.send(f"Remplissage... (temps estimé : {est} secondes)")
 
         t0 = time.time()
         await chan_roles.send("Voici la liste des rôles "
                               f"(voir aussi {tools.code('!roles')}) :")
         async with ctx.typing():
+            shortcuts = []
             for camp in camps:
                 if not camp.roles:
                     continue
@@ -816,11 +817,15 @@ class Sync(commands.Cog):
                               color=0x64b9e9)
                 if (emoji := camp.discord_emoji_or_none):
                     embed.set_image(url=emoji.url)
-                await chan_roles.send("——————————————————————————",
-                                      embed=embed)
+                mess = await chan_roles.send(camp.nom, embed=embed)
+                shortcuts.append(mess)
 
                 for role in camp.roles:
                     await chan_roles.send(embed=role.embed)
+
+            await chan_roles.send("Accès rapide :")
+            for mess in shortcuts:
+                await mess.reply("\N{UPWARDS BLACK ARROW}")
 
         rt = time.time() - t0
         await ctx.send(f"{chan_roles.mention} rempli ! (en {rt:.4} secondes)")
