@@ -80,7 +80,7 @@ class Joueur(base.TableBase):
         Raises:
             ValueError: pas de membre correspondant
             ~ready_check.NotReadyError: bot non connecté
-                (:attr:`.config.guild` vaut ``None``)
+                (:obj:`.config.guild` vaut ``None``)
         """
         result = config.guild.get_member(self.discord_id)
         if not result:
@@ -95,7 +95,7 @@ class Joueur(base.TableBase):
         Raises:
             ValueError: pas de channel correspondant
             ~ready_check.NotReadyError: bot non connecté
-                (:attr:`.config.guild` vaut ``None``)
+                (:obj:`.config.guild` vaut ``None``)
         """
         result = config.guild.get_channel(self.chan_id_)
         if not result:
@@ -160,7 +160,7 @@ class Joueur(base.TableBase):
         Raises:
             ValueError: membre introuvable en base
             ~ready_check.NotReadyError: session non initialisée
-                (:attr:`.config.session` vaut ``None``)
+                (:obj:`.config.session` vaut ``None``)
         """
         joueur = cls.query.get(member.id)
         if not joueur:
@@ -245,7 +245,7 @@ class Boudoir(base.TableBase):
         Raises:
             ValueError: pas de membre correspondant
             ~ready_check.NotReadyError: bot non connecté
-                (:attr:`.config.guild` vaut ``None``)
+                (:obj:`.config.guild` vaut ``None``)
         """
         result = config.guild.get_channel(self.chan_id)
         if not result:
@@ -311,7 +311,7 @@ class Boudoir(base.TableBase):
         Raises:
             ValueError: boudoir introuvable en base
             ~ready_check.NotReadyError: session non initialisée
-                (:attr:`.config.session` vaut ``None``)
+                (:obj:`.config.session` vaut ``None``)
         """
         boudoir = cls.query.get(channel.id)
         if not boudoir:

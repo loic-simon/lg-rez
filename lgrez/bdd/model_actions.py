@@ -355,7 +355,7 @@ class Utilisation(base.TableBase):
 
         Raccourci pour
         ``utilisation.etat in {UtilEtat.remplie, UtilEtat.validee,
-                               UtilEtat.contree}``
+        UtilEtat.contree}``
 
         Propriété hybride (voir :attr:`.Action.is_open` pour plus d'infos)
         """
@@ -531,7 +531,7 @@ class Tache(base.TableBase):
     async def send_webhook(self, tries=0):
         """Exécute la tâche (coroutine programmée par :meth:`execute`).
 
-        Envoie un webhook (:attr:`.config.webhook`) de contenu
+        Envoie un webhook (:obj:`.config.webhook`) de contenu
         :attr:`commande`.
 
         Si une exception quelconque est levée par l'envoi du webhook,

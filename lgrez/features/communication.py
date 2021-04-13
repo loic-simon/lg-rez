@@ -290,7 +290,7 @@ class Communication(commands.Cog):
 
             - ``joueur`` :  objet BDD du joueur recevant le message
               ==> ``joueur.nom``, ``joueur.role``...
-            - ``member`` :  objet discord.Member associé
+            - ``member`` :  objet :class:`discord.Member` associé
               ==> ``member.mention``
             - ``chan`` :    objet :class:`discord.TextChannel` du
               chan privé du joueur
@@ -384,7 +384,7 @@ class Communication(commands.Cog):
         l'envoie sur le chan ``#annonces``.
 
         Si ``quoi == "cond"``, déclenche aussi les actions liées au mot
-        des MJs (:attr:`bdd.ActionTrigger.mot_mjs`).
+        des MJs (:attr:`.bdd.ActionTrigger.mot_mjs`).
         """
         # Différences plot cond / maire
         if quoi == "cond":
@@ -745,8 +745,8 @@ class Communication(commands.Cog):
             - Polices à chasse fixe (Consolas / Courier New) (-> code);
             - Liens hypertextes;
             - Listes à puces;
-            - Mentions de joueurs, sous la forme `@Prénom Nom`;
-            - Emojis, sous la forme `:nom:`.
+            - Mentions de joueurs, sous la forme ``@Prénom Nom``;
+            - Emojis, sous la forme ``:nom:``.
 
         Permet soit de poster directement dans #annonces, soit de
         récupérer la version formatée du texte (pour copier-coller).

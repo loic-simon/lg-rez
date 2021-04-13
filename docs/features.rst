@@ -148,7 +148,7 @@
     - :Commande ``!boudoir``  (alias ``!boudoirs``) :
         .. automethod:: lgrez.features.chans.GestionChans.boudoir.callback
 
-            .. include:: groupnote.rst
+        .. include:: groupnote.rst
 
         .. _boudoir_create:
 
@@ -220,6 +220,9 @@
         .. _annoncemort:
     - :Commande ``!annoncemort``  :
         .. automethod:: lgrez.features.communication.Communication.annoncemort.callback
+        .. _lore:
+    - :Commande ``!lore``  :
+        .. automethod:: lgrez.features.communication.Communication.lore.callback
 
 .. }
 

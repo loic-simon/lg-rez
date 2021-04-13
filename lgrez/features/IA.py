@@ -450,7 +450,7 @@ async def trigger_roles(message, sensi=0.8):
     Args:
         message (~discord.Message): message auquel réagir.
         sensi (float): sensibilité de la recherche
-            (voir :func:`.bdd.TableMeta.find_nearest`).
+            (voir :meth:`.bdd.base.TableMeta.find_nearest`).
 
     Trouve l'entrée la plus proche de ``message.content`` dans la table
     :class:`.bdd.Role`.
@@ -460,7 +460,8 @@ async def trigger_roles(message, sensi=0.8):
           et qu'une réponse a été envoyée
         - ``False`` -- sinon
     """
-    roles = Role.find_nearest(message.content, col=Role.nom, sensi=sensi)
+    roles = Role.find_nearest(message.content, col=Role.nom,
+                              filtre=(Role.actif.is_(True)), sensi=sensi)
 
     if roles:       # Au moins un trigger trouvé à cette sensi
         await message.channel.send(embed=roles[0][0].embed)
@@ -477,7 +478,7 @@ async def trigger_reactions(message, chain=None, sensi=0.7, debug=False):
         chain (str): contenu auquel réagir (défaut : contenu de
             ``message``).
         sensi (float): sensibilité de la recherche (cf
-            :func:`.bdd.TableMeta.find_nearest`).
+            :meth:`.bdd.base.TableMeta.find_nearest`).
         debug (bool): si ``True``, affiche les erreurs lors de
             l'évaluation des messages (voir :func:`.tools.eval_accols`).
 
@@ -535,7 +536,7 @@ async def trigger_sub_reactions(message, sensi=0.9, debug=False):
     Args:
         message (~discord.Message`): message auquel réagir.
         sensi (float): sensibilité de la recherche (cf
-            :func:`.bdd.TableMeta.find_nearest`).
+            :meth:`.bdd.base.TableMeta.find_nearest`).
         debug (bool): si ``True``, affiche les erreurs lors de
             l'évaluation des messages (voir :func:`.tools.eval_accols`).
 

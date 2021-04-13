@@ -297,7 +297,7 @@ def replace(match):
                 # Aliases
                 aliastext = ""
                 if opt.aliases:
-                    aliases = ", ".join(f"``{sals}``" for sals in opt.aliases)
+                    aliases = ", ".join(f"``!{sals}``" for sals in opt.aliases)
                     aliastext = f" (alias {aliases})"
 
                 # Anchor (:ref: links)

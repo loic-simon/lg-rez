@@ -139,7 +139,8 @@ def mention_MJ(arg):
         - Sinon, renvoie son nom (pour ne pas rameuter tout le monde).
 
     Args:
-        arg (:class:`~discord.Member`|:class:`~discord.ext.commands.Context`):
+        arg (:class:`~discord.Member` |\
+            :class:`~discord.ext.commands.Context`):
             membre ou contexte d'un message envoyé par un membre
 
     Returns:
@@ -259,7 +260,7 @@ async def wait_for_message(check, trigger_on_commands=False):
         :class:`discord.Message`
 
     Raises:
-        .CommandExit: si le message est un des :attr:`.config.stop_keywords`
+        .CommandExit: si le message est un des :obj:`.config.stop_keywords`
             (insensible à la casse), même si il respecte ``check``
     """
     stop_keywords = [kw.lower() for kw in config.stop_keywords]
@@ -353,12 +354,12 @@ async def boucle_query(ctx, table, col=None, cible=None, filtre=None,
 
     Args:
         ctx (discord.ext.commands.Context): contexte d'une commande.
-        table (.bdd.TableMeta): table dans laquelle rechercher.
-        col (.bdd.TableMeta): colonne dans laquelle rechercher
-            (passé à :meth:`~.bdd.TableMeta.find_nearest`).
+        table (.bdd.base.TableMeta): table dans laquelle rechercher.
+        col (~sqlalchemy.schema.Column): colonne dans laquelle rechercher
+            (passé à :meth:`~.bdd.base.TableMeta.find_nearest`).
         cible (str): premier essai de cible (donnée par le joueur dans
             l'appel à une commande, par exemple).
-        filtre: passé à :meth:`~.bdd.TableMeta.find_nearest`.
+        filtre: passé à :meth:`~.bdd.base.TableMeta.find_nearest`.
         sensi (float): sensibilité de la recherche (voir
             :meth:`~.bdd.TableMeta.find_nearest`).
         direct_detector (Callable[str] -> :attr:`table` | ``None``):
@@ -418,7 +419,7 @@ async def boucle_query(ctx, table, col=None, cible=None, filtre=None,
             for i, (result, score) in enumerate(nearest[:10]):
                 text += f"{emoji_chiffre(i + 1)}. {result} \n"
             mess = await ctx.send(
-                text + ital("Tu peux les choisir en réagissant à ce"
+                text + ital("Tu peux les choisir en réagissant à ce "
                             "message, ou en répondant au clavier.")
             )
             n = await choice(mess, min(10, len(nearest)))
@@ -649,7 +650,7 @@ async def choice(message, N, start=1, *, additionnal={}):
 
     Returns:
         :class:`int` (ou la valeur associée si emoji choisi dans
-            ``additionnal``)
+        ``additionnal``)
     """
     emojis = {emoji_chiffre(i): i for i in range(start, N + 1)}
     emojis.update(additionnal)

@@ -164,12 +164,12 @@ def get_doc_content(doc_id):
 
     Returns:
         list[tuple(str, dict)]: Les différents fragments de texte
-            du document et leur formattage (référence : https://developers.\
-            google.com/docs/api/reference/rest/v1/documents#TextStyle)
+        du document et leur formattage (référence : https://developers.\
+        google.com/docs/api/reference/rest/v1/documents#TextStyle)
 
     Raises:
         googleapiclient.errors.HttpError: ID incorrect ou document non
-        accessible.
+            accessible.
     """
     LGREZ_GCP_CREDENTIALS = env.load("LGREZ_GCP_CREDENTIALS")
 

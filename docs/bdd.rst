@@ -11,7 +11,7 @@
         par :func:`sqlalchemy.ext.declarative.declarative_base` (via le
         paramètre ``class_registry``).
 
-        :type: :class:`dict`\[:class:`str`, :class:`TableBase` subclass\]
+        :type: :class:`dict`\[:class:`str`, :class:`base.TableBase` subclass\]
 
     .. exception:: SQLAlchemyError
 
@@ -59,6 +59,7 @@ différentes tables du modèle de données :
 .. autoclass:: lgrez.bdd.Statut
 .. autoclass:: lgrez.bdd.ActionTrigger
 .. autoclass:: lgrez.bdd.CandidHaroType
+.. autoclass:: lgrez.bdd.Vote
 .. autoclass:: lgrez.bdd.UtilEtat
 .. autoclass:: lgrez.bdd.CibleType
 
@@ -82,6 +83,22 @@ CandidHaros
 ~~~~~~~~~~~~~~~~
 
 .. autoclass:: lgrez.bdd.CandidHaro
+    :members:
+    :member-order: bysource
+
+
+Boudoirs
+~~~~~~~~~~~~~~~~
+
+.. autoclass:: lgrez.bdd.Boudoir
+    :members:
+    :member-order: bysource
+
+
+Bouderies
+~~~~~~~~~~~~~~~~
+
+.. autoclass:: lgrez.bdd.Bouderie
     :members:
     :member-order: bysource
 

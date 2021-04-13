@@ -48,6 +48,9 @@ class Role(base.TableBase):
         doc="Camp auquel ce rôle est affilié à l'origine\n\n (On peut avoir "
             "``joueur.camp != joueur.role.camp`` si damnation, passage MV...)")
 
+    actif = autodoc_Column(sqlalchemy.Boolean(), nullable=False, default=True,
+        doc="Rôle actif ? (affiché dans la liste des rôles, etc)")
+
     description_courte = autodoc_Column(sqlalchemy.String(140), nullable=False,
         default="",
         doc="Description du rôle en une ligne")
@@ -96,7 +99,7 @@ class Role(base.TableBase):
         """Retourne le rôle par défaut (celui avant attribution).
 
         Warning:
-            Un rôle de :attr:`.slug` :attr:`.config.default_role_slug`
+            Un rôle de :attr:`.slug` :obj:`.config.default_role_slug`
             doit être défini en base.
 
         Returns:
@@ -105,7 +108,7 @@ class Role(base.TableBase):
         Raises:
             ValueError: rôle introuvable en base
             RuntimeError: session non initialisée
-                (:attr:`.config.session` vaut ``None``)
+                (:obj:`.config.session` vaut ``None``)
         """
         slug = config.default_role_slug
         role = cls.query.get(slug)
@@ -165,7 +168,7 @@ class Camp(base.TableBase):
         Raises:
             ValueError: :attr:`.emoji` non défini ou manquant sur le serveur
             ~ready_check.NotReadyError: bot non connecté
-                (:attr:`.config.guild` vaut ``None``)
+                (:obj:`.config.guild` vaut ``None``)
         """
         if not self.emoji:
             raise ValueError(f"{self}.emoji non défini !")
@@ -182,7 +185,7 @@ class Camp(base.TableBase):
 
         Raises:
             ~ready_check.NotReadyError: bot non connecté
-                (:attr:`.config.guild` vaut ``None``)
+                (:obj:`.config.guild` vaut ``None``)
         """
         try:
             return self.discord_emoji
@@ -194,7 +197,7 @@ class Camp(base.TableBase):
         """Retourne le camp par défaut (celui avant attribution).
 
         Warning:
-            Un camp de :attr:`.slug` :attr:`.config.default_camp_slug`
+            Un camp de :attr:`.slug` :obj:`.config.default_camp_slug`
             doit être défini en base.
 
         Returns:
@@ -203,7 +206,7 @@ class Camp(base.TableBase):
         Raises:
             ValueError: camp introuvable en base
             RuntimeError: session non initialisée
-                (:attr:`.config.session` vaut ``None``)
+                (:obj:`.config.session` vaut ``None``)
         """
         slug = config.default_camp_slug
         camp = cls.query.get(slug)

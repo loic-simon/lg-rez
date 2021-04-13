@@ -72,7 +72,7 @@ class TableMeta(declarative.api.DeclarativeMeta):
 
         Raises:
             :exc:`ready_check.NotReadyError`: session non initialisée
-                (:attr:`.config.session` vaut ``None``)
+                (:obj:`.config.session` vaut ``None``)
         """
         return config.session.query(cls)
 
@@ -97,8 +97,8 @@ class TableMeta(declarative.api.DeclarativeMeta):
 
     @property
     def attrs(cls):
-        """Mapping[str, :attr:`sqlalchemy.schema.Column` |
-        :attr:`sqlalchemy.orm.RelationshipProperty`]: Attributs de
+        """Mapping[:class:`str`, :class:`sqlalchemy.schema.Column` |\
+        :class:`sqlalchemy.orm.RelationshipProperty`]: Attributs de
         données publics des instances (dictionnaire nom -> colonne
         / relationship).
         """
@@ -138,7 +138,7 @@ class TableMeta(declarative.api.DeclarativeMeta):
             solo_si_parfait (bool): si ``True`` (défaut), renvoie
                 uniquement le premier élément de score\* ``1`` trouvé
                 s'il existe (ignore les autres éléments, même si
-                ``>= sensi``ou même ``1``)
+                ``>= sensi`` ou même ``1``)
             parfaits_only (bool): si ``True`` (défaut), ne renvoie que
                 les éléments de score\* ``1`` si on en trouve au moins
                 un (ignore les autres éléments, même si ``>= sensi`` ;
@@ -390,7 +390,7 @@ def autodoc_ManyToOne(tablename, *args, doc="", nullable=False, **kwargs):
     """
     first, sep, rest = doc.partition("\n")
     or_none = " | ``None``" if nullable else ""
-    doc = (f":class:`~bdd.{tablename}`{or_none}: {first} "
+    doc = (f":class:`~.bdd.{tablename}`{or_none}: {first} "
            "*(many-to-one relationship)*")
     if not nullable:
         doc += " (NOT NULL)"
@@ -495,7 +495,7 @@ def connect():
 
     - Utilise la variable d'environment ``LGREZ_DATABASE_URI``
     - Crée les tables si nécessaire
-    - Prépare :attr:`.config.engine` et :attr:`.config.session`
+    - Prépare :obj:`.config.engine` et :obj:`.config.session`
     """
     LGREZ_DATABASE_URI = env.load("LGREZ_DATABASE_URI")
     # Moteur SQL : connexion avec le serveur

@@ -206,7 +206,7 @@ def transtype(value, cst):
     Returns:
         L'objet Python correspondant au type de la colonne / table liée
         (:class:`str`, :class:`int`, :class:`bool`, :class:`datetime.time`,
-        :class:`enum.Enum`, :class:`.bdd.TableBase`) ou ``None``
+        :class:`enum.Enum`, :class:`.bdd.base.TableBase`) ou ``None``
 
     Raises:
         ValueError: la conversion n'est pas possible (ou ``value`` est
@@ -453,7 +453,7 @@ async def modif_joueur(joueur_id, modifs, silent=False):
 
     Returns:
         (list[.TDBModif], str): La liste des modifications appliquées
-            et le changelog textuel associé (pour log global).
+        et le changelog textuel associé (pour log global).
 
     Raises:
         ValueError: pas de joueur d'ID ``joueur_id`` en base
@@ -800,7 +800,7 @@ class Sync(commands.Cog):
             await chan_roles.purge(limit=1000)
 
         camps = Camp.query.filter_by(public=True).all()
-        est = sum(len(camp.roles) + 2 for camp in camps) + 2
+        est = sum(len(camp.roles) + 2 for camp in camps) + 1
         await ctx.send(f"Remplissage... (temps estimé : {est} secondes)")
 
         t0 = time.time()
@@ -821,11 +821,12 @@ class Sync(commands.Cog):
                 shortcuts.append(mess)
 
                 for role in camp.roles:
-                    await chan_roles.send(embed=role.embed)
+                    if role.actif:
+                        await chan_roles.send(embed=role.embed)
 
-            await chan_roles.send("Accès rapide :")
             for mess in shortcuts:
-                await mess.reply("\N{UPWARDS BLACK ARROW}")
+                await mess.reply("Accès rapide :             "
+                                 "\N{UPWARDS BLACK ARROW}")
 
         rt = time.time() - t0
         await ctx.send(f"{chan_roles.mention} rempli ! (en {rt:.4} secondes)")

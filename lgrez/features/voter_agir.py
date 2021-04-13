@@ -62,7 +62,22 @@ def export_vote(vote, utilisation):
 
 
 async def get_cible(ctx, action, base_ciblage, first=None):
-    """"""
+    """Demande une cible à l'utilisateur.
+
+    Args:
+        ctx (~discord.ext.commands.Context): le contexte de commande.
+        action: (.bdd.Action): action pour laquelle on cherche une cible.
+        base_ciblage (.bdd.BaseCiblage): ciblage à demander.
+        first (str): proposition initale du joueur (passée comme argument
+            d'une commande).
+
+    Returns:
+        Union[.bdd.Joueur, .bdd.Role, .bdd.Camp, bool, str]: La
+        cible sélectionnée, selon le type de ciblage.
+
+    Réalise les interactions adéquates en fonction du type du base_ciblage,
+    vérifie le changement de cible le cas échéant.
+    """
     phrase = base_ciblage.phrase.rstrip()
 
     # ou_vide = ("" if base_ciblage.obligatoire
@@ -173,7 +188,11 @@ class VoterAgir(commands.Cog):
         de cible tant que le vote est en cours.
         """
         joueur = Joueur.from_member(ctx.author)
-        vaction = joueur.action_vote(Vote.cond)
+        try:
+            vaction = joueur.action_vote(Vote.cond)
+        except RuntimeError:
+            await ctx.send("Minute papillon, le jeu n'est pas encore lancé !")
+            return
 
         # Vérification vote en cours
         if not joueur.votant_village:
@@ -251,7 +270,11 @@ class VoterAgir(commands.Cog):
         cible tant que le vote est en cours.
         """
         joueur = Joueur.from_member(ctx.author)
-        vaction = joueur.action_vote(Vote.maire)
+        try:
+            vaction = joueur.action_vote(Vote.maire)
+        except RuntimeError:
+            await ctx.send("Minute papillon, le jeu n'est pas encore lancé !")
+            return
 
         # Vérification vote en cours
         if not joueur.votant_village:
@@ -330,7 +353,11 @@ class VoterAgir(commands.Cog):
         de cible tant que le vote est en cours.
         """
         joueur = Joueur.from_member(ctx.author)
-        vaction = joueur.action_vote(Vote.loups)
+        try:
+            vaction = joueur.action_vote(Vote.loups)
+        except RuntimeError:
+            await ctx.send("Minute papillon, le jeu n'est pas encore lancé !")
+            return
 
         # Vérification vote en cours
         if not joueur.votant_loups:

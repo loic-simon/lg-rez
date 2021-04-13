@@ -32,6 +32,23 @@ demande_chambre = True
 #: str: Nom par défaut de la :attr:`~.bdd.Joueur.chambre` des joueurs.
 chambre_mj = "[chambre MJ]"
 
+async def additional_inscription_step(member, chan):
+    """Coroutine permettant d'ajouter des étapes au processus d'inscription.
+
+    Cette coroutine est appelée par :func:`.features.inscription.main`
+    juste avant l'inscription en base. Si elle renvoie `False`,
+    l'inscription est annulée ; si elle ne renvoie rien ou une autre
+    valeur, elle continue selon le processus habituel.
+
+    Args:
+        member (discord.Member): membre en cours d'inscription.
+        chan (discord.TextChannel): chan perso créé pour l'inscription.
+
+    Returns:
+        Si ``False``, annule l'inscription.
+    """
+    pass
+
 
 #: bool: Si ``True``, le bot appellera :meth:`.LGBot.i_am_alive` toutes
 #: les 60 secondes. Ce n'est pas activé par défaut.
@@ -261,6 +278,10 @@ class _ModuleGlobals(ready_check.ReadyCheck):
     session = None
 
     webhook = None
+
+
+# Variable interne, pour suivi des objets manquants (ne pas changer)
+_missing_objects = 0
 
 
 # Called when module attribute not found: try to look in _ModuleGlobals
