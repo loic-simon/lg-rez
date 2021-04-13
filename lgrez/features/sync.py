@@ -15,7 +15,7 @@ import sqlalchemy
 
 from lgrez import config, bdd
 from lgrez.blocs import tools, env, gsheets
-from lgrez.bdd import (Joueur, Action, Role, Camp, BaseAction,
+from lgrez.bdd import (Joueur, Action, Role, Camp, BaseAction, BaseCiblage,
                        Statut, ActionTrigger)
 from lgrez.features import gestion_actions
 
@@ -50,6 +50,135 @@ class TDBModif(gsheets.Modif):
                 and self.col == other.col)
 
 
+class _ComparaisonResults():
+    def __init__(self):
+        self.n_id = 0
+        self.upd = []
+        self.add = []
+        self.suppr = []
+        self.sub_results = None
+
+    @property
+    def n_upd(self):
+        return len(self.upd)
+
+    @property
+    def n_tot_attr_upd(self):
+        return sum(len(up) for up in self.upd)
+
+    @property
+    def n_add(self):
+        return len(self.add)
+
+    @property
+    def n_suppr(self):
+        return len(self.suppr)
+
+    def __iadd__(self, other):
+        if isinstance(other, type(self)):
+            self.n_id += other.n_id
+            self.upd += other.upd
+            self.add += other.add
+            self.suppr += other.suppr
+            if self.sub_results:
+                self.sub_results += other.sub_results
+            elif other.sub_results:
+                self.sub_results = other.sub_results
+            else:
+                self.sub_results = None
+            return self
+        else:
+            return NotImplemented
+
+    def __add__(self, other):
+        if isinstance(other, type(self)):
+            new = type(self)()
+            new += self
+            new += other
+            return new
+        else:
+            return NotImplemented
+
+    @property
+    def log(self):
+        r = f"- {self.n_id} entrées identiques\n"
+        if self.add:
+            r += f"- Nouvelles entrées ({self.n_add}) : {self.add}\n"
+        if self.upd:
+            r += (f"- Entrées modifiées ({self.n_upd}, total attrs "
+                  f"{self.n_tot_attr_upd}) : {self.upd}\n")
+        if self.suppr:
+            r += f"- Entrées supprimées ({self.n_suppr}) : {self.suppr}\n"
+        return r
+
+    @property
+    def bilan(self):
+        return (f"({self.n_id} entrées identiques - {self.n_upd} mises "
+                f"à jour ({self.n_tot_attr_upd} attributs au total), "
+                f"{self.n_add} ajouts, {self.n_suppr} suppressions")
+
+
+def _compare_items(existants, new, table, cols, primary_key, bc_cols=None):
+    """Utility function for !fillroles: compare table items and dicts"""
+    res = _ComparaisonResults()
+    if table == BaseAction:
+        res.sub_results = _ComparaisonResults()
+
+    # --- 5 : Pour chaque ligne : Mise à jour / Ajout
+    for pk, args in new.items():
+        pk = args[primary_key]
+        if pk in existants:
+            # Instance existante
+            actual = existants[pk]
+            attr_upd = []
+            for col in cols.keys():
+                if getattr(actual, col) != args[col]:
+                    setattr(actual, col, args[col])
+                    attr_upd.append(col)
+
+            if table == BaseAction:
+                # Many-to-many BaseAction <-> Rôle
+                if set(actual.roles) != set(args["roles"]):
+                    actual.roles = args["roles"]
+                    attr_upd.append("roles")
+
+                # BaseCiblages : on compare avec ceux existants !
+                bcs = args["base_ciblages"]
+                for bc_args in bcs:
+                    bc_args["base_action"] = actual     # si création
+
+                bc_existants = {bc.slug: bc for bc in actual.base_ciblages}
+                new_bcs = {bc["slug"]: bc for bc in bcs}
+                sub_res = _compare_items(bc_existants, new_bcs, BaseCiblage,
+                                         cols=bc_cols, primary_key="slug")
+                res.sub_results += sub_res
+
+            if attr_upd:
+                res.upd.append({actual: attr_upd})
+            else:
+                res.n_id += 1
+
+        else:
+            # Créer l'instance
+            if table == BaseAction:     # BaseCiblages
+                bcs = [BaseCiblage(**bc_args)
+                       for bc_args in args["base_ciblages"]]
+                args["base_ciblages"] = bcs
+                res.sub_results.add.extend(bcs)
+            inst = table(**args)
+            inst.add()
+            res.add.append(inst)
+
+    # --- 6 : Drop anciennes instances
+    for pk, act in existants.items():
+        if pk not in new:
+            config.session.delete(act)
+            # pas .delete(), pour ne pas commit
+            res.suppr.append(act.primary_key)
+
+    return res
+
+
 def transtype(value, cst):
     """Utilitaire : caste une donnée brute d'un GSheet selon sa colonne.
 
@@ -77,7 +206,7 @@ def transtype(value, cst):
     Returns:
         L'objet Python correspondant au type de la colonne / table liée
         (:class:`str`, :class:`int`, :class:`bool`, :class:`datetime.time`,
-        :class:`enum.Enum`, :class:`.bdd.TableBase`) ou ``None``
+        :class:`enum.Enum`, :class:`.bdd.base.TableBase`) ou ``None``
 
     Raises:
         ValueError: la conversion n'est pas possible (ou ``value`` est
@@ -324,7 +453,7 @@ async def modif_joueur(joueur_id, modifs, silent=False):
 
     Returns:
         (list[.TDBModif], str): La liste des modifications appliquées
-            et le changelog textuel associé (pour log global).
+        et le changelog textuel associé (pour log global).
 
     Raises:
         ValueError: pas de joueur d'ID ``joueur_id`` en base
@@ -379,7 +508,7 @@ async def modif_joueur(joueur_id, modifs, silent=False):
                               "Ça arrive même aux meilleurs, en espérant "
                               "que ta mort ait été belle !\n")
                 # Actions à la mort
-                for action in joueur.actions:
+                for action in joueur.actions_actives:
                     if action.base.trigger_debut == ActionTrigger.mort:
                         await gestion_actions.open_action(action)
 
@@ -399,7 +528,7 @@ async def modif_joueur(joueur_id, modifs, silent=False):
 
         elif modif.col == "role":                       # Modification rôle
             new_role = modif.val
-            for action in joueur.actions:
+            for action in joueur.actions_actives:
                 if action.base in joueur.role.base_actions:
                     # Suppression anciennes actions de rôle
                     gestion_actions.delete_action(action)
@@ -540,17 +669,18 @@ class Sync(commands.Cog):
     async def fillroles(self, ctx):
         """Remplit les tables et #roles depuis le GSheet ad hoc (COMMANDE MJ)
 
-        - Remplit les tables :class:`.bdd.Camp`, :class:`.bdd.Role` et
-          :class:`.bdd.BaseAction` avec les informations du Google Sheets
-          "Rôles et actions" (variable d'environnement
-          ``LGREZ_ROLES_SHEET_ID``) ;
+        - Remplit les tables :class:`.bdd.Camp`, :class:`.bdd.Role`,
+          :class:`.bdd.BaseAction` et :class:`.bdd.BaseCiblage` avec les
+          informations du Google Sheets "Rôles et actions" (variable
+          d'environnement ``LGREZ_ROLES_SHEET_ID``) ;
         - Vide le chan ``#roles`` puis le remplit avec les descriptifs
-          de chaque rôle.
+          de chaque rôle et camp.
 
         Utile à chaque début de saison / changement dans les rôles/actions.
-        Écrase toutes les entrées déjà en base, mais ne supprime pas
-        celles obsolètes.
+        Met à jour les entrées déjà en base, créé les nouvelles,
+        supprime celles obsolètes.
         """
+        # ==== Mise à jour tables ===
         SHEET_ID = env.load("LGREZ_ROLES_SHEET_ID")
         workbook = gsheets.connect(SHEET_ID)    # Rôles et actions
 
@@ -558,6 +688,7 @@ class Sync(commands.Cog):
             await ctx.send(
                 f"Remplissage de la table {tools.code(table.__name__)}..."
             )
+            # --- 1 : Récupération des valeurs
             async with ctx.typing():
                 try:
                     sheet = workbook.worksheet(table.__tablename__)
@@ -571,92 +702,131 @@ class Sync(commands.Cog):
                 values = sheet.get_all_values()
                 # Liste de liste des valeurs des cellules
 
-                cols = table.columns   # "dictionnaire" nom -> colonne
-                cols = {col: cols[col]
-                        for col in cols.keys()
-                        if not col.startswith("_")}
-                if table == Role:
-                    cols["camp"] = Role.attrs["camp"]
-                primary_key = table.primary_col.key
+            # --- 2 : Détermination colonnes à récupérer
+            cols = table.columns        # "dictionnaire" nom -> colonne
+            cols = {col: cols[col] for col in cols.keys()
+                    if not col.startswith("_")}     # Colonnes publiques
+            if table == Role:
+                cols["camp"] = Role.attrs["camp"]
+            elif table == BaseAction:
+                # BaseCiblages : au bout de la feuille
+                bc_cols = BaseCiblage.columns
+                bc_cols = {col: bc_cols[col]
+                           for col in bc_cols.keys()
+                           if not col.startswith("_")}
+                bc_cols_for_ith = []
+                for i in range(config.max_ciblages_per_action):
+                    prefix = f"c{i + 1}_"
+                    bc_cols_for_ith.append({
+                        # colonne -> nom dans la table pour le ièmme
+                        col: f"{prefix}{col}" for col in bc_cols
+                    })
+            primary_key = table.primary_col.key
 
-                # Indices des colonnes GSheet pour chaque colonne de la table
-                cols_index = {}
-                try:
-                    for key in cols.keys():
-                        cols_index[key] = values[0].index(key)
-                    if table == BaseAction:
-                        roles_idx = values[0].index("roles")
-                except ValueError:
-                    raise ValueError(
-                        f"!fillroles : colonne '{key}' non trouvée dans "
-                        f"la feuille '{table.__tablename__}' du GSheet "
-                        "*Rôles et actions* (`LGREZ_ROLES_SHEET_ID`)"
-                    ) from None
+            # --- 3 : Localisation des colonnes (indices GSheet)
+            cols_index = {}
+            try:
+                for key in cols.keys():
+                    cols_index[key] = values[0].index(key)
+                if table == BaseAction:
+                    key = "roles"
+                    roles_idx = values[0].index(key)
+                    # BaseCiblages : au bout de la feuille
+                    ciblages_idx = []
+                    for bc_cols_names in bc_cols_for_ith:
+                        idx = {}
+                        for col, key in bc_cols_names.items():
+                            idx[col] = values[0].index(key)
+                        ciblages_idx.append(idx)
+            except ValueError:
+                raise ValueError(
+                    f"!fillroles : colonne '{key}' non trouvée dans "
+                    f"la feuille '{table.__tablename__}' du GSheet "
+                    "*Rôles et actions* (`LGREZ_ROLES_SHEET_ID`)"
+                ) from None
 
-                existants = {getattr(item, primary_key): item
-                             for item in table.query.all()}
+            # --- 4 : Constrution dictionnaires de comparaison
+            existants = {item.primary_key: item for item in table.query.all()}
+            new = {}
+            for row in values[1:]:
+                args = {key: transtype(row[cols_index[key]], col)
+                        for key, col in cols.items()}
 
-                for row in values[1:]:
-                    args = {key: transtype(row[cols_index[key]], col)
-                            for key, col in cols.items()}
-                    if table == BaseAction:
-                        # Many-to-many BaseAction <-> Rôle
-                        args["roles"] = [transtype(slug.strip(), Role)
-                                         for slug in row[roles_idx].split(",")
-                                         if slug]
-
-                    id = args[primary_key]
-                    if id in existants:
-                        for col in cols.keys():
-                            if getattr(existants[id], col) != args[col]:
-                                setattr(existants[id], col, args[col])
-                        if table == BaseAction:
-                            # Many-to-many BaseAction <-> Rôle
-                            if existants[id].roles != args["roles"]:
-                                existants[id].roles = args["roles"]
+                if table == BaseAction:
+                    # Many-to-many BaseAction <-> Rôle
+                    roles = row[roles_idx].strip()
+                    if roles.startswith("#"):
+                        args["roles"] = []
                     else:
-                        config.session.add(table(**args))
+                        args["roles"] = [transtype(slug.strip(), Role)
+                                         for slug in roles.split(",")
+                                         if slug]
+                    # BaseCiblages
+                    new_bcs = []
+                    for idx in ciblages_idx:
+                        if row[idx["slug"]]:        # ciblage défini
+                            bc_args = {key: transtype(row[idx[key]], col)
+                                       for key, col in bc_cols.items()}
+                            new_bcs.append(bc_args)
+                    args["base_ciblages"] = new_bcs
 
-                config.session.commit()
+                new[args[primary_key]] = args
 
-            await ctx.send(f"Table {tools.code(table.__name__)} remplie !")
-            await tools.log(f"Table {tools.code(table.__name__)} remplie !")
+            # --- 5 : Comparaison et MAJ
+            res = _compare_items(
+                existants, new, table, cols, primary_key,
+                bc_cols=bc_cols if table == BaseAction else None
+            )
+            config.session.commit()
 
+            await ctx.send(f"> Table {tools.code(table.__name__)} remplie ! "
+                           + res.bilan)
+            await tools.log(f"`!fillroles` > {table.__name__}:\n{res.log}")
+            if table == BaseAction:
+                sub_res = res.sub_results
+                await ctx.send(f"> Table {tools.code('BaseCiblage')} remplie "
+                               "simultanément " + sub_res.bilan)
+                await tools.log(f"`!fillroles` > BaseCiblage:\n{sub_res.log}")
+
+        # ==== Remplissage #rôles ===
         chan_roles = config.Channel.roles
+        mess = await ctx.send(f"Purger et re-remplir {chan_roles.mention} ?")
+        if not await tools.yes_no(mess):
+            await ctx.send(f"Fini (voir {config.Channel.logs.mention}).")
+            return
 
         await ctx.send(f"Vidage de {chan_roles.mention}...")
         async with ctx.typing():
             await chan_roles.purge(limit=1000)
 
         camps = Camp.query.filter_by(public=True).all()
-        est = sum(len(camp.roles) + 2 for camp in camps) + 2
+        est = sum(len(camp.roles) + 2 for camp in camps) + 1
         await ctx.send(f"Remplissage... (temps estimé : {est} secondes)")
 
         t0 = time.time()
-        await chan_roles.send(
-            "Voici la liste des rôles : (accessible en faisant "
-            f"{tools.code('!roles')}, mais on l'a mis là parce que "
-            "pourquoi pas)\n\n——————————————————————————"
-        )
+        await chan_roles.send("Voici la liste des rôles "
+                              f"(voir aussi {tools.code('!roles')}) :")
         async with ctx.typing():
+            shortcuts = []
             for camp in camps:
                 if not camp.roles:
                     continue
 
-                emoji = camp.discord_emoji_or_none
-                await chan_roles.send(
-                    embed=Embed(title=f"Camp : {camp.nom}").set_image(
-                        url=emoji.url if emoji else None
-                    )
-                )
-                await chan_roles.send("——————————————————————————")
+                embed = Embed(title=f"Camp : {camp.nom}",
+                              description=camp.description,
+                              color=0x64b9e9)
+                if (emoji := camp.discord_emoji_or_none):
+                    embed.set_image(url=emoji.url)
+                mess = await chan_roles.send(camp.nom, embed=embed)
+                shortcuts.append(mess)
+
                 for role in camp.roles:
-                    await chan_roles.send(
-                        f"{emoji or ''} {tools.bold(role.nom_complet)} "
-                        f"– {role.description_courte} (camp : {camp.nom})\n\n"
-                        f"{role.description_longue}\n\n"
-                        "——————————————————————————"
-                    )
+                    if role.actif:
+                        await chan_roles.send(embed=role.embed)
+
+            for mess in shortcuts:
+                await mess.reply("Accès rapide :             "
+                                 "\N{UPWARDS BLACK ARROW}")
 
         rt = time.time() - t0
         await ctx.send(f"{chan_roles.mention} rempli ! (en {rt:.4} secondes)")

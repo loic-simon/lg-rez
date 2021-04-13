@@ -146,8 +146,9 @@ async def main(member):
     Crée et paramètre le salon privé du joueur, lui pose des questions
     et l'inscrit en base.
 
-    Personalisation voir :attr:`config.demande_chambre`,
-    :attr:`config.chambre_mj` et :attr:`config.debut_saison`.
+    Personalisation : voir :obj:`.config.demande_chambre`,
+    :obj:`.config.chambre_mj`, :func:`.config.additional_inscription_step`
+    et :obj:`.config.debut_saison`.
 
     Commande appellée à l'arrivée sur le serveur, utiliser
     :meth:`\!co <.bot.Special.Special.co.callback>` pour trigger cette
@@ -282,6 +283,10 @@ async def main(member):
         await chan.send(
             f"{nom}, en chambre {chambre}... Je t'inscris en base !"
         )
+
+    res = await config.additional_inscription_step(member, chan)
+    if res is False:
+        return
 
     else:
         chambre = None

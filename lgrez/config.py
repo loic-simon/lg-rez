@@ -16,6 +16,10 @@ private_chan_prefix = "conv-bot-"
 #: (sera éventuellement suivi de 2, 3... si plus de 50 joueurs).
 private_chan_category_name = "CONVERSATION BOT"
 
+#: str: Nom de la catégorie des boudoirs
+#: (sera éventuellement suivi de 2, 3... si plus de 50 boudoirs).
+boudoirs_category_name = "BOUDOIRS"
+
 
 #: str: Date de début de saison (pour information lors de l'inscription).
 debut_saison = "32 plopembre"
@@ -27,6 +31,23 @@ demande_chambre = True
 
 #: str: Nom par défaut de la :attr:`~.bdd.Joueur.chambre` des joueurs.
 chambre_mj = "[chambre MJ]"
+
+async def additional_inscription_step(member, chan):
+    """Coroutine permettant d'ajouter des étapes au processus d'inscription.
+
+    Cette coroutine est appelée par :func:`.features.inscription.main`
+    juste avant l'inscription en base. Si elle renvoie `False`,
+    l'inscription est annulée ; si elle ne renvoie rien ou une autre
+    valeur, elle continue selon le processus habituel.
+
+    Args:
+        member (discord.Member): membre en cours d'inscription.
+        chan (discord.TextChannel): chan perso créé pour l'inscription.
+
+    Returns:
+        Si ``False``, annule l'inscription.
+    """
+    pass
 
 
 #: bool: Si ``True``, le bot appellera :meth:`.LGBot.i_am_alive` toutes
@@ -77,26 +98,23 @@ tdb_main_columns = ("J", "Q")
 tdb_tampon_columns = ("B", "I")
 
 
-#: str: Nom de l'intitulé de la colonne de la feuille des votes
-#: (:attr:`~lgrez.config.tdb_votes_sheet`) du *Tableau de bord*
-#: contenant les cibles des votes pour le condamné.
-tdb_votecond_column = "CondamnéRéel"
-
-#: str: Nom de l'intitulé de la colonne de la feuille des votes
-#: (:attr:`~lgrez.config.tdb_votes_sheet`) du *Tableau de bord*
-#: contenant les noms des votants pour le condamné.
-tdb_votantcond_column = "VotantCond"
+#: int: Nombre maximal de modèles de ciblages (:class:`.bdd.BaseCiblage`)
+#: renseignés pour chaque modèle d'action (:class:`.bdd.BaseAction`), à
+#: droite de la feuille ``baseactions`` du GSheet *Rôles et actions*.
+max_ciblages_per_action = 3
 
 
-#: str: Nom de l'intitulé de la colonne de la feuille des votes
-#: (:attr:`~lgrez.config.tdb_votes_sheet`) du *Tableau de bord*
-#: contenant les cibles des votes pour le nouveau maire.
-tdb_votemaire_column = "MaireRéel"
+#: str: :attr:`.bdd.BaseAction.slug` de l'action de base permettant
+#: de modifier un vote (rôle de l'*Intigant* dans le jeu PCéen).
+#: Cette baseaction doit avoir deux ciblages de slugs "cible" et "vote".
+modif_vote_baseaction = "modification-vote"
 
-#: str: Nom de l'intitulé de la colonne de la feuille des votes
-#: (:attr:`~lgrez.config.tdb_votes_sheet`) du *Tableau de bord*
-#: contenant les noms des votants pour le nouveau maire.
-tdb_votantmaire_column = "VotantMaire"
+#: str: :attr:`.bdd.BaseAction.slug` de l'action de base permettant
+#: d'ajouter un/des vote(s) (rôle du *Corbeau* dans le jeu PCéen).
+ajout_vote_baseaction = "ajout-vote"
+
+#: int: Nombre de votes ajoutés par l'action :attr:`ajout_vote_baseaction`.
+n_ajouts_votes = 2
 
 
 #: str: Nom de la feuille du GSheet *Données brûtes* où enregistrer
@@ -258,6 +276,12 @@ class _ModuleGlobals(ready_check.ReadyCheck):
     loop = None
     engine = None
     session = None
+
+    webhook = None
+
+
+# Variable interne, pour suivi des objets manquants (ne pas changer)
+_missing_objects = 0
 
 
 # Called when module attribute not found: try to look in _ModuleGlobals

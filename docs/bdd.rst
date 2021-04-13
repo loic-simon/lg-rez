@@ -11,7 +11,7 @@
         par :func:`sqlalchemy.ext.declarative.declarative_base` (via le
         paramètre ``class_registry``).
 
-        :type: :class:`dict`\[:class:`str`, :class:`TableBase` subclass\]
+        :type: :class:`dict`\[:class:`str`, :class:`base.TableBase` subclass\]
 
     .. exception:: SQLAlchemyError
 
@@ -32,7 +32,8 @@
 
 .. automodule:: lgrez.bdd.base
    :members: autodoc_Column, autodoc_ManyToOne,
-             autodoc_OneToMany, autodoc_ManyToMany, TableMeta
+             autodoc_OneToMany, autodoc_DynamicOneToMany, autodoc_ManyToMany,
+             TableMeta
 
 
 Table de base
@@ -58,6 +59,9 @@ différentes tables du modèle de données :
 .. autoclass:: lgrez.bdd.Statut
 .. autoclass:: lgrez.bdd.ActionTrigger
 .. autoclass:: lgrez.bdd.CandidHaroType
+.. autoclass:: lgrez.bdd.Vote
+.. autoclass:: lgrez.bdd.UtilEtat
+.. autoclass:: lgrez.bdd.CibleType
 
 
 Modèle de données - Joueurs
@@ -79,6 +83,22 @@ CandidHaros
 ~~~~~~~~~~~~~~~~
 
 .. autoclass:: lgrez.bdd.CandidHaro
+    :members:
+    :member-order: bysource
+
+
+Boudoirs
+~~~~~~~~~~~~~~~~
+
+.. autoclass:: lgrez.bdd.Boudoir
+    :members:
+    :member-order: bysource
+
+
+Bouderies
+~~~~~~~~~~~~~~~~
+
+.. autoclass:: lgrez.bdd.Bouderie
     :members:
     :member-order: bysource
 
@@ -114,6 +134,14 @@ Actions de base
     :member-order: bysource
 
 
+Ciblages de base
+~~~~~~~~~~~~~~~~
+
+.. autoclass:: lgrez.bdd.BaseCiblage
+    :members:
+    :member-order: bysource
+
+
 Modèle de données - Actions
 -----------------------------------------
 
@@ -125,6 +153,22 @@ Actions
 ~~~~~~~~~~~~~~~~
 
 .. autoclass:: lgrez.bdd.Action
+    :members:
+    :member-order: bysource
+
+
+Utilisations
+~~~~~~~~~~~~~~~~
+
+.. autoclass:: lgrez.bdd.Utilisation
+    :members:
+    :member-order: bysource
+
+
+Ciblages
+~~~~~~~~~~~~~~~~
+
+.. autoclass:: lgrez.bdd.Ciblage
     :members:
     :member-order: bysource
 

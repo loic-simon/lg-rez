@@ -5,6 +5,113 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## 2.1.0 - 2021-04-13
+
+### Added
+
+  - New Actions System:
+      - Extended Data model with tables :class:`.bdd.Utilisation`,
+        :class:`.bdd.BaseCiblage`, :class:`.bdd.Ciblage` and enums
+        :class:`.bdd.CibleType`, :class:`.bdd.UtilEtat`, :class:`.bdd.Vote`;
+      - New columns :attr:`.bdd.BaseAction.decision_format` and
+        :attr:`.bdd.Action.active`;
+      - New properties :attr:`.bdd.BaseAction.temporalite` and
+        :attr:`.bdd.Role.embed` to describe a role, used in ``!role``,
+        ``!fillroles`` and :func:`.features.IA.trigger_roles`;
+
+      - New properties :attr:`.bdd.Action.utilisation_ouverte`,
+        :attr:`.bdd.Action.derniere_utilisation`, :attr:`.bdd.Action.decision`,
+        and :attr:`.bdd.Action.is_open` / :attr:`.bdd.Action.is_waiting`
+        (hybrid);
+      - New method :meth:`.bdd.Joueur.action_vote`;
+      - New hybrid properties :attr:`.bdd.Joueur.est_vivant` and
+        :attr:`.bdd.Joueur.est_mort`;
+      - New class methods :meth:`.bdd.ActionTrigger.open` and
+        :meth:`.bdd.ActionTrigger.close`;
+
+      - New function :func:`.features.voter_agir.get_cible`, used by ``!vote``,
+        ``!votemaire``, ``!voteloups`` et ``!action`` to handle user inputs;
+      - ``!cparti`` now add "vote actions" to all players;
+
+  - Task postponing now uses Discord-py webhooks:
+      - dropped requirement for `discord-webhook` module;
+      - tasks now use :obj:`.config.webhook`, created by
+        :meth:`.LGBot.on_ready` if not existing;
+      - new method :meth:`.bdd.Tache.send_webhook`;
+      - deleted ``blocs.webhook`` module and usage of ``LGREZ_WEBHOOK_URL``
+        environnement variable;
+
+  - New boudoirs management system:
+      - New tables :class:`.bdd.Boudoir` and :class:`.bdd.Bouderie`;
+      - New group command ``!boudoir`` (with 8 subcommands) in new module
+        :mod:`.features.chans`;
+      - New configuration option :attr:`.config.boudoirs_category_name`,
+        loaded by :meth:`.LGBot.on_ready`,
+      - Updated ``!help`` and doc tools to handle group commands;
+
+  - New command ``!lore`` using new Google Docs connection function
+    :func:`.blocs.gsheets.get_doc_content`;
+
+  - Miscellaneous:
+      - New function :func:`.blocs.tools.boucle_query` for generic database
+        instance lookup interactions;
+      - New method :func:`.LGBot.check_and_prepare_objects` (originally
+        directly in :func:`.LGBot.on_ready`), called by Discord events
+        concerning roles, channels, emojis and webhooks ;
+      - New customizable function :func:`.config.additional_inscription_step`;
+      - :func:`.blocs.tools.wait_for_react_clic` and
+        :func:`.blocs.tools.yes_no`: new kwarg ``first_text``;
+      - New column :attr:`.bdd.Role.actif`, ``!roles``, ``!fillroles`` and IA
+        now restricts to roles with ``actif = True``;
+      - New convenience function :func:`.bdd.base.autodoc_DynamicOneToMany`
+        for documenting dynamicly loaded one-to-many relationships;
+      - New option ``nullable`` for :func:`.bdd.base.autodoc_ManyToOne`;
+
+### Changed
+
+  - Updated existing data classes attributes to link to new tables;
+  - Made :attr:`.bdd.Action.base` nullable and added :attr:`.bdd.Action.vote`
+    optionnal attributes to handle votes in a cleaner way (with instance
+    initialization integrity check);
+  - Updated :meth:`.features.open_close.recup_joueurs`, ``!open``,
+    ``!close`` and ``!remind``;
+  - :func:`.features.gestion_actions.delete_action` now updates
+    :attr:`.bdd.Action.active` insteade of deleting the instance;
+  - :func:`.features.voter_agir.export_vote` signature changed;
+  - ``!plot`` now uses new actions system instead of loading votes from
+    the Gsheet:
+      - removed config options ``tdb_votecond_column``,
+        ``tdb_votantcond_column``, ``tdb_votemaire_column`` and
+        ``tdb_votantmaire_column``;
+      - it now automatically computes votes additions and modifications
+        (Corbeau / Intrigant), using new config options
+        :attr:`config.ajout_vote_baseaction`, :attr:`config.n_ajouts_votes`,
+        :attr:`config.modif_vote_baseaction`;
+  - ``!fillroles`` now synchronise :class:`.bdd.BaseCiblage` too (see
+    :attr:`.config.max_ciblages_per_action`) and post camps descriptions;
+  - Moved ``!addhere`` and ``!purge`` from :mod:`.features.annexe` to
+    new module :mod:`.features.chans`;
+  - Updated some string columns max lengths;
+  - Made ``__str__`` implementation specific for :class:`.bdd.Role`,
+    :class:`.bdd.Camp`, :class:`.bdd.BaseAction` and :class:`.bdd.Joueur`.
+
+### Removed
+
+  - Tables columns :attr:`.bdd.Joueur._vote_condamne`,
+    :attr:`.bdd.Joueur._vote_maire`, :attr:`.bdd.Joueur._vote_loups`,
+    :attr:`.bdd.Action._decision`, :attr:`.bdd.BaseAction.changement_cible`;
+  - ``.blocs.webhook`` module.
+
+### Fixed
+
+  - :func:`features.voter_agir.export_vote` (``!vote*`` et ``!action``):
+    used hard-written sheet names istead of :attr:`config.db_votecond_sheet`,
+    :attr:`config.db_votemaire_sheet`, :attr:`config.db_voteloups_sheet`
+    and :attr:`config.db_actions_sheet`;
+  - Documentation errors & typos.
+
+
+
 ## 2.0.0 - 2021-03-24
 
 ### Major refactorings

@@ -969,6 +969,7 @@ class TestSync(unittest.IsolatedAsyncioTestCase):
     async def test_fillroles(self, gconnect_patch):
         """Unit tests for !fillroles command."""
         # async def fillroles(self, ctx)
+        config.max_ciblages_per_action = 0
         fillroles = self.cog.fillroles
         camps, roles = mock_bdd.add_campsroles(10, 10)
         baseactions = [bdd.BaseAction(slug=f"ba{n}", roles=[roles[n]])

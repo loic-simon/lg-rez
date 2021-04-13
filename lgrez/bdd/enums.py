@@ -56,6 +56,18 @@ class ActionTrigger(enum.Enum):
     open_loups = enum.auto()
     close_loups = enum.auto()
 
+    @classmethod
+    def open(cls, vote):
+        if not isinstance(vote, Vote):
+            vote = Vote[vote]
+        return cls[f"open_{vote.name}"]
+
+    @classmethod
+    def close(cls, vote):
+        if not isinstance(vote, Vote):
+            vote = Vote[vote]
+        return cls[f"close_{vote.name}"]
+
 
 class CandidHaroType(enum.Enum):
     """:class:`~enum.Enum` pour distinguer un haro d'une candidature.
@@ -66,3 +78,54 @@ class CandidHaroType(enum.Enum):
     """
     candidature = enum.auto()
     haro = enum.auto()
+
+
+class Vote(enum.Enum):
+    """:class:`~enum.Enum` représentant les différents votes possibles.
+
+    Attributes:
+        cond: Vote pour le condamné du jour
+        maire: Vote pour le nouveau maire
+        loups: Vote pour la victime des loups
+    """
+    cond = enum.auto()
+    maire = enum.auto()
+    loups = enum.auto()
+
+
+class UtilEtat(enum.Enum):
+    """:class:`~enum.Enum` représentant l'état d'une utilisation d'action.
+
+    Attributes:
+        ouverte: Action utilisable, pas de décision prise
+        remplie: Décision prise, encore possibilité de changer
+        validee: Décision prise et bloquée (créneau pour agir fini)
+        ignoree: Créneau pour agir fini sans qu'une décision soit prise
+        contree: Utilisation validée, mais contrée par un évènement externe
+    """
+    ouverte = enum.auto()
+    remplie = enum.auto()
+    validee = enum.auto()
+    ignoree = enum.auto()
+    contree = enum.auto()
+
+
+class CibleType(enum.Enum):
+    """:class:`~enum.Enum` représentant le type de cible d'une action.
+
+    Attributes:
+        joueur: La cible doit être un joueur, vivant ou mort
+        vivant: La cible doit être un joueur vivant
+        mort: La cible doit être un joueur mort
+        role: La cible doit être un rôle existant
+        camp: La cible doit être un camp (public) existant
+        booleen: Oui/non : sert à ue action sans paramètres, à une option...
+        texte: Permet d'entrer un texte libre
+    """
+    joueur = enum.auto()
+    vivant = enum.auto()
+    mort = enum.auto()
+    role = enum.auto()
+    camp = enum.auto()
+    booleen = enum.auto()
+    texte = enum.auto()

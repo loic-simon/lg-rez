@@ -3,10 +3,10 @@
 Envoi de messages, d'embeds...
 
 """
-
-import os
 import datetime
-from collections import Counter
+import functools
+import os
+import re
 
 import discord
 from discord.ext import commands
@@ -14,11 +14,31 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from lgrez import config
-from lgrez.blocs import tools, env, gsheets
-from lgrez.bdd import (Joueur, Action, Camp, CandidHaro,
-                       Statut, ActionTrigger, CandidHaroType)
+from lgrez.blocs import tools, gsheets
+from lgrez.bdd import (Joueur, Action, Camp, BaseAction, Utilisation,
+                       Statut, ActionTrigger, CandidHaroType, UtilEtat, Vote)
 from lgrez.features import gestion_actions
 from lgrez.features.sync import transtype
+
+
+def _mention_repl(mtch):
+    """Remplace @(Prénom Nom) par la mention du joueur, si possible"""
+    nearest = Joueur.find_nearest(mtch.group(1),
+                                  col=Joueur.nom, sensi=0.8)
+    if nearest:
+        joueur = nearest[0][0]
+        try:
+            return joueur.member.mention
+        except ValueError:
+            pass
+    return mtch.group(1)
+
+def _emoji_repl(mtch):
+    """Remplace :(emoji): par la représentation de l'emoji, si possible"""
+    emo = tools.emoji(mtch.group(1), must_be_found=False)
+    if emo:
+        return str(emo)
+    return mtch.group()
 
 
 class Communication(commands.Cog):
@@ -270,7 +290,7 @@ class Communication(commands.Cog):
 
             - ``joueur`` :  objet BDD du joueur recevant le message
               ==> ``joueur.nom``, ``joueur.role``...
-            - ``member`` :  objet discord.Member associé
+            - ``member`` :  objet :class:`discord.Member` associé
               ==> ``member.mention``
             - ``chan`` :    objet :class:`discord.TextChannel` du
               chan privé du joueur
@@ -295,11 +315,9 @@ class Communication(commands.Cog):
         if cible == "all":
             joueurs = Joueur.query.all()
         elif cible == "vivants":
-            joueurs = Joueur.query.filter(
-                Joueur.statut.in_([Statut.vivant, Statut.MV])
-            ).all()
+            joueurs = Joueur.query.filter(Joueur.est_vivant).all()
         elif cible == "morts":
-            joueurs = Joueur.query.filter_by(statut=Statut.mort).all()
+            joueurs = Joueur.query.filter(Joueur.est_mort).all()
         elif "=" in cible:
             crit, _, filtre = cible.partition("=")
             crit = crit.strip()
@@ -344,82 +362,146 @@ class Communication(commands.Cog):
 
     @commands.command()
     @tools.mjs_only
-    async def plot(self, ctx, type):
+    async def plot(self, ctx, quoi, depuis=None):
         """Trace le résultat du vote et l'envoie sur #annonces (COMMANDE MJ)
 
         Warning:
             Commande en bêta, non couverte par les tests unitaires
 
         Args:
-            type: peut être
+            quoi: peut être
 
                 - ``cond``   pour le vote pour le condamné
                 - ``maire``  pour l'élection à la Mairie
+
+            depuis: heure éventuelle à partir de laquelle compter les
+                votes (si plusieurs votes dans la journée), compte tous
+                les votes du jour par défaut. Si plus tard que l'heure
+                actuelle, compte les votes de la veille.
 
         Trace les votes sous forme d'histogramme à partir du Tableau de
         bord, en fait un embed en présisant les résultats détaillés et
         l'envoie sur le chan ``#annonces``.
 
-        Si ``type == "cond"``, déclenche aussi les actions liées au mot
-        des MJs (:attr:`bdd.ActionTrigger.mot_mjs`).
+        Si ``quoi == "cond"``, déclenche aussi les actions liées au mot
+        des MJs (:attr:`.bdd.ActionTrigger.mot_mjs`).
         """
         # Différences plot cond / maire
-
-        if type == "cond":
-            ind_col_cible = gsheets.a_to_index(config.tdb_votecond_column)
-            ind_col_votants = gsheets.a_to_index(config.tdb_votantcond_column)
+        if quoi == "cond":
+            vote_enum = Vote.cond
             haro_candidature = CandidHaroType.haro
             typo = "bûcher du jour"
             mort_election = "Mort"
             pour_contre = "contre"
-            emoji = "bucher"
+            emoji = config.Emoji.bucher
             couleur = 0x730000
 
-        elif type == "maire":
-            ind_col_cible = gsheets.a_to_index(config.tdb_votemaire_column)
-            ind_col_votants = gsheets.a_to_index(config.tdb_votantmaire_column)
+        elif quoi == "maire":
+            vote_enum = Vote.maire
             haro_candidature = CandidHaroType.candidature
             typo = "nouveau maire"
             mort_election = "Élection"
             pour_contre = "pour"
-            emoji = "maire"
+            emoji = config.Emoji.maire
             couleur = 0xd4af37
 
         else:
-            await ctx.send("`type` doit être `maire` ou `cond`")
-            return
+            raise commands.BadArgument("`quoi` doit être `maire` ou `cond`")
+
+        if depuis:
+            tps = tools.heure_to_time(depuis)
+        else:
+            tps = datetime.time(0, 0)
+
+        ts = datetime.datetime.combine(datetime.date.today(), tps)
+        if ts > datetime.datetime.now():        # hier
+            ts -= datetime.timedelta(days=1)
+
+        log = f"!plot {quoi} (> {ts}) :"
+        query = Utilisation.query.filter(
+            Utilisation.etat == UtilEtat.validee,
+            Utilisation.ts_decision > ts,
+            Utilisation.action.has(active=True),
+        )
+        cibles = {}
+
+        # Get votes
+        utils = query.filter(Utilisation.action.has(vote=vote_enum)).all()
+        votes = {util.action.joueur: util.cible for util in utils}
+        votelog = " / ".join(f'{v.nom} -> {c.nom}' for v, c in votes.items())
+        log += f"\n  - Votes : {votelog}"
+
+        for votant, vote in votes.items():
+            cibles.setdefault(vote, [])
+            cibles[vote].append(votant.nom)
+
+        # Get intriguants
+        intba = BaseAction.query.get(config.modif_vote_baseaction)
+        if intba:
+            log += "\n  - Intrigant(s) : "
+            for util in query.filter(Utilisation.action.has(base=intba)).all():
+
+                votant = util.ciblage("cible").valeur
+                vote = util.ciblage("vote").valeur
+                log += (f"{util.action.joueur.nom} : "
+                        f"{votant.nom} -> {vote.nom} / ")
+
+                initial_vote = votes.get(votant)
+                if initial_vote:
+                    cibles[initial_vote].remove(votant.nom)
+                    if not cibles[initial_vote]:    # plus de votes
+                        del cibles[initial_vote]
+                votes[votant] = vote
+                cibles.setdefault(vote, [])
+                cibles[vote].append(votant.nom)
+
+        # Tri des votants
+        for votants in cibles.values():
+            votants.sort()      # ordre alphabétique
+
+        # Get corbeaux, après tri -> à la fin
+        corba = BaseAction.query.get(config.ajout_vote_baseaction)
+        if corba:
+            log += "\n  - Corbeau(x) : "
+            for util in query.filter(Utilisation.action.has(base=corba)).all():
+                log += f"{util.action.joueur.nom} -> {util.cible} / "
+                cibles.setdefault(util.cible, [])
+                cibles[util.cible].extend(
+                    [util.action.joueur.role.nom]*config.n_ajouts_votes
+                )
 
         # Classe utilitaire
-
+        @functools.total_ordering
         class _Cible():
             """Représente un joueur ciblé, pour usage dans !plot"""
-            def __init__(self, nom, votes=0):
-                self.nom = nom
-                self.label = self.nom.replace(" ", "\n", 1)
-
-                self.votes = votes
-                self.votants = []
-
-                self.joueur = Joueur.query.filter_by(nom=nom).one()
-                if not self.joueur:
-                    raise ValueError(f"Joueur \"{nom}\" non trouvé en base")
-
-                self.eligible = bool(CandidHaro.query.filter_by(
-                    joueur=self.joueur, type=haro_candidature).all())
+            def __init__(self, joueur, votants):
+                self.joueur = joueur
+                self.votants = votants
 
             def __repr__(self):
-                return f"{self.nom} ({self.votes})"
+                return f"{self.joueur.nom} ({self.votes})"
 
             def __eq__(self, other):
-                return isinstance(other, type(self)) and self.nom == other.nom
+                if not isinstance(other, type(self)):
+                    return NotImplemented
+                return (self.joueur.nom == other.joueur.nom
+                        and self.votes == other.votes)
 
-            def set_votants(self, raw_votants):
-                votants = [rv or "zzz" for rv in raw_votants]
-                votants.sort()
-                self.votants = ["Corbeau" if nom == "zzz" else nom
-                                for nom in votants]
-                # On trie par ordre alphabétique
-                # en mettant les corbeaux (= pas de votant) à la fin
+            def __lt__(self, other):
+                if not isinstance(other, type(self)):
+                    return NotImplemented
+                if self.votes == other.votes:
+                    return (self.joueur.nom < other.joueur.nom)
+                return (self.votes < other.votes)
+
+            @property
+            def votes(self):
+                return len(self.votants)
+
+            @property
+            def eligible(self):
+                return any(ch.type == haro_candidature
+                           for ch in self.joueur.candidharos)
 
             def couleur(self, choisi):
                 if self == choisi:
@@ -430,36 +512,14 @@ class Communication(commands.Cog):
                     return "gray"
 
         # Récupération votes
-
-        await ctx.send("Récupération des votes...")
-        async with ctx.typing():
-            workbook = gsheets.connect(env.load("LGREZ_TDB_SHEET_ID"))
-            sheet = workbook.worksheet(config.tdb_votes_sheet)
-            values = sheet.get_all_values()
-            # Liste de liste des valeurs des cellules
-
-            cibles_brutes = []
-            for lig in values[config.tdb_header_row:NL]:
-                val = lig[ind_col_cible]
-                if val:
-                    cibles_brutes.append(val)
-
-            nb_votes = len(cibles_brutes)
-
-            cibles = [_Cible(nom, votes)
-                      for (nom, votes) in Counter(cibles_brutes).most_common()]
-            # Liste des cibles (vérifie l'éligibilité...)
-            # triées du plus au moins votées
-            for cible in cibles:        # Récupération votants
-                votants = []
-                for lig in values[config.tdb_header_row:NL]:
-                    if lig[ind_col_cible] == cible.nom:
-                        votants.append(lig[ind_col_votants])
+        cibles = [_Cible(jr, vts) for (jr, vts) in cibles.items()]
+        cibles.sort(reverse=True)       # par nb de votes, puis ordre alpha
+        log += f"\n  - Cibles : {cibles}"
 
         # Détermination cible
-
         choisi = None
         eligibles = [c for c in cibles if c.eligible]
+        log += f"\n  - Éligibles : {eligibles}"
 
         if eligibles:
             maxvotes = eligibles[0].votes
@@ -468,7 +528,7 @@ class Communication(commands.Cog):
             if len(egalites) > 1:       # Égalité
                 mess = await ctx.send(
                     "Égalité entre\n"
-                    + "\n".join(f"{tools.emoji_chiffre(i+1)} {c.nom}"
+                    + "\n".join(f"{tools.emoji_chiffre(i+1)} {c.joueur.nom}"
                                 for i, c in enumerate(egalites))
                     + "\nQui meurt / est élu ? (regarder vote du maire, "
                     "0️⃣ pour personne / si le vainqueur est garde-loupé, "
@@ -481,15 +541,17 @@ class Communication(commands.Cog):
             else:
                 mess = await ctx.send(
                     "Joueur éligible le plus voté : "
-                    + tools.bold(eligibles[0].nom)
+                    + tools.bold(eligibles[0].joueur.nom)
                     + " \nÇa meurt / est élu ? (pas garde-loupé, "
                     "inéligible ou autre)"
                 )
                 if await tools.yes_no(mess):
                     choisi = eligibles[0]
 
-        # Paramètres plot
+        log += f"\n  - Choisi : {choisi or '[aucun]'}"
+        await tools.log(log)
 
+        # Paramètres plot
         discord_gray = '#2F3136'
         plt.figure(facecolor=discord_gray)
         plt.rcParams.update({'font.size': 16})
@@ -504,11 +566,10 @@ class Communication(commands.Cog):
         ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
         # Plot
-
         ax.bar(
             x=range(len(cibles)),
             height=[c.votes for c in cibles],
-            tick_label=[c.label for c in cibles],
+            tick_label=[c.joueur.nom.replace(" ", "\n", 1) for c in cibles],
             color=[c.couleur(choisi) for c in cibles],
         )
         plt.grid(axis="y")
@@ -517,7 +578,7 @@ class Communication(commands.Cog):
             os.mkdir("figures")
 
         now = datetime.datetime.now().strftime("%Y-%m-%d--%H")
-        image_path = f"figures/hist_{now}_{type}.png"
+        image_path = f"figures/hist_{now}_{quoi}.png"
         plt.savefig(image_path, bbox_inches="tight")
 
         # --------------- Partie Discord ---------------
@@ -525,10 +586,10 @@ class Communication(commands.Cog):
         # Détermination rôle et camp
         emoji_camp = None
         if choisi:
-            if type == "cond":
+            if quoi == "cond":
                 role = choisi.joueur.role.nom_complet
                 mess = await ctx.send(
-                    f"Rôle à afficher pour {choisi.nom} = {role} ? "
+                    f"Rôle à afficher pour {choisi.joueur.nom} = {role} ? "
                     "(Pas double peau ou autre)"
                 )
                 if await tools.yes_no(mess):
@@ -540,31 +601,31 @@ class Communication(commands.Cog):
                     camps = Camp.query.filter_by(public=True).all()
                     emoji_camp = await tools.wait_for_react_clic(
                         mess,
-                        [camp.emoji for camp in camps if camp.emoji]
+                        [camp.discord_emoji for camp in camps if camp.emoji]
                     )
 
-                nometrole = f"{tools.bold(choisi.nom)}, {role}"
+                nometrole = f"{tools.bold(choisi.joueur.nom)}, {role}"
             else:
                 # Maire : ne pas annoncer le rôle
-                nometrole = f"{tools.bold(choisi.nom)}"
+                nometrole = f"{tools.bold(choisi.joueur.nom)}"
         else:
             nometrole = "personne, bande de tocards"
 
         # Création embed
         embed = discord.Embed(
             title=f"{mort_election} de {nometrole}",
-            description=f"{nb_votes} votes au total",
+            description=f"{len(votes)} votes au total",
             color=couleur
         )
         embed.set_author(name=f"Résultats du vote pour le {typo}",
-                         icon_url=tools.emoji(emoji).url)
+                         icon_url=emoji.url)
 
         if emoji_camp:
             embed.set_thumbnail(url=emoji_camp.url)
 
         embed.set_footer(text="\n".join(
             ("A" if cible.votes == 1 else "Ont")
-            + f" voté {pour_contre} {cible.nom} : "
+            + f" voté {pour_contre} {cible.joueur.nom} : "
             + ", ".join(cible.votants)
             for cible in cibles
         ))
@@ -588,10 +649,10 @@ class Communication(commands.Cog):
                 f"Et c'est parti dans {config.Channel.annonces.mention} !"
             )
 
-            if type == "cond":
+            if quoi == "cond":
                 # Actions au mot des MJs
-                for action in Action.query.filter_by(
-                        trigger_debut=ActionTrigger.mot_mjs).all():
+                for action in Action.query.filter(Action.base.has(
+                        trigger_debut=ActionTrigger.mot_mjs)).all():
                     await gestion_actions.open_action(action)
 
                 await ctx.send("(actions liées au mot MJ ouvertes)")
@@ -628,7 +689,7 @@ class Communication(commands.Cog):
             camps = Camp.query.filter_by(public=True).all()
             emoji_camp = await tools.wait_for_react_clic(
                 mess,
-                [camp.emoji for camp in camps if camp.emoji]
+                [camp.discord_emoji for camp in camps if camp.emoji]
             )
 
         if joueur.statut == Statut.MV:
@@ -670,3 +731,93 @@ class Communication(commands.Cog):
         else:
             await ctx.send("Mission aborted.")
             self.current_embed = embed
+
+
+
+    @commands.command()
+    @tools.mjs_only
+    async def lore(self, ctx, doc_id):
+        """Récupère et poste un lore depuis un Google Docs (COMMANDE MJ)
+
+        Convertit les formats et éléments suivants vers Discord :
+            - Gras, italique, souligné, barré;
+            - Petites majuscules (-> majuscules);
+            - Polices à chasse fixe (Consolas / Courier New) (-> code);
+            - Liens hypertextes;
+            - Listes à puces;
+            - Mentions de joueurs, sous la forme ``@Prénom Nom``;
+            - Emojis, sous la forme ``:nom:``.
+
+        Permet soit de poster directement dans #annonces, soit de
+        récupérer la version formatée du texte (pour copier-coller).
+
+        Args:
+            doc_id: ID ou URL du document (doit être public ou dans le
+                Drive partagé avec le compte de service)
+        """
+        if len(doc_id) < 44:
+            raise commands.BadArgument("'doc_id' doit être l'ID ou l'URL "
+                                       "d'un document Google Docs")
+        elif len(doc_id) > 44:      # URL fournie (pas que l'ID)
+            mtch = re.search(r"/d/(\w{44})(\W|$)", doc_id)
+            if mtch:
+                doc_id = mtch.group(1)
+            else:
+                raise commands.BadArgument("'doc_id' doit être l'ID ou l'URL "
+                                           "d'un document Google Docs")
+
+        await ctx.send("Récupération du document...")
+        async with ctx.typing():
+            content = gsheets.get_doc_content(doc_id)
+
+        formatted_text = ""
+        for (_text, style) in content:
+            _text = _text.replace("\v", "\n").replace("\f", "\n")
+            # Espaces/newlines à la fin de _text ==> à part
+            text = _text.rstrip()
+            len_rest = len(_text) - len(text)
+            rest = _text[-len_rest:] if len_rest else ""
+
+            if not text:    # espcaes/newlines uniquement
+                formatted_text += rest
+                continue
+
+            # Remplacement des mentions
+            text = re.sub(r"@([\w-]+ [\w-]+)", _mention_repl, text)
+            text = re.sub(r":(\w+):", _emoji_repl, text)
+
+            if style.get("bold"):
+                text = tools.bold(text)
+            if style.get("italic"):
+                text = tools.ital(text)
+            if style.get("strikethrough"):
+                input(style.get("strikethrough"))
+                text = tools.strike(text)
+            if style.get("smallCaps"):
+                text = text.upper()
+            if (wff := style.get("weightedFontFamily")):
+                if wff["fontFamily"] in ["Consolas", "Courier New"] :
+                    text = tools.code(text)
+            if (link := style.get("link")):
+                if (url := link.get("url")):
+                    if not "://" in text:
+                        text = text + f" (<{url}>)"
+            elif style.get("underline"):    # ne pas souligner si lien
+                text = tools.soul(text)
+
+            formatted_text += text + rest
+
+        await ctx.send("————————————————————")
+        await tools.send_blocs(ctx, formatted_text)
+        mess = await ctx.send("————————————————————\nPublier sur "
+                              f"{config.Channel.annonces.mention} / "
+                              "Récupérer la version formatée / Stop ?")
+        r = await tools.wait_for_react_clic(mess, {"📣": 1, "📝": 2, "⏹": 0})
+
+        if r == 1:
+            await tools.send_blocs(config.Channel.annonces, formatted_text)
+            await ctx.send("Fait !")
+        elif r == 2:
+            await tools.send_code_blocs(ctx, formatted_text)
+        else:
+            await ctx.send("Mission aborted.")

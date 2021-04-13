@@ -39,7 +39,7 @@ schema will be created by the bot the first time it runs. Your database URI
 variable**.
 
 
-### Step 2-4: Discord application, server and scheduled tasks webhook
+### Step 2-4: Discord application and server
 
 #### First use
 
@@ -75,11 +75,6 @@ variable**.
       and clic "Authorize".
 * Go back to Discord and give the "Bot" role to the bot account. That will
   grant him every needed permissions.
-* This bot supports task postponing. This feature requires a "webhook" (a
-  protocol to post messages externally to a channel), called at scheduled time
-  to trigger bot reaction. Create a new webhook (Server settings / Integrations /
-  Webhooks) posting on the `#logs` channel and copy its URL into
-  **`LGREZ_WEBHOOK_URL` variable**.
 
 (For your first tests, note that the bot ignore every messages posted by
 member without any role! Assign yourself the "MJ" role to get every

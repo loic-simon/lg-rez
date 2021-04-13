@@ -63,25 +63,22 @@ if exists:
     if (LGREZ_SERVER_ID := os.getenv("LGREZ_SERVER_ID")):
         step = 3
         print("    step 3 ok")
-    if (LGREZ_WEBHOOK_URL := os.getenv("LGREZ_WEBHOOK_URL")):
-        step = 4
-        print("    step 4 ok")
 
     if (LGREZ_GCP_CREDENTIALS := os.getenv("LGREZ_GCP_CREDENTIALS")):
-        step = 5
-        print("    step 5 ok")
+        step = 4
+        print("    step 4 ok")
     if ((LGREZ_TDB_SHEET_ID := os.getenv("LGREZ_TDB_SHEET_ID"))
         and (LGREZ_ROLES_SHEET_ID := os.getenv("LGREZ_ROLES_SHEET_ID"))
         and (LGREZ_DATA_SHEET_ID := os.getenv("LGREZ_DATA_SHEET_ID"))):
 
+        step = 5
+        print("    step 5 ok")
+
+    if (LGREZ_CONFIG_STATUS := os.getenv("LGREZ_CONFIG_STATUS")):
         step = 6
         print("    step 6 ok")
 
-    if (LGREZ_CONFIG_STATUS := os.getenv("LGREZ_CONFIG_STATUS")):
-        step = 7
-        print("    step 7 ok")
-
-    if step == 7:
+    if step == 6:
         print(
             "\nInstallation already complete in this folder.\n"
             "To create a fresh installation, delete the .env file;\n"
@@ -90,7 +87,7 @@ if exists:
         exit(0)
 
     input(
-        f"Found ongoing installation on step {step + 1}/7. "
+        f"Found ongoing installation on step {step + 1}/6. "
         "Press Enter to continue installation."
     )
 
@@ -250,44 +247,9 @@ ONCE THE BOT IS SHOWN IN YOUR SERVER MEMBERS, press Enter to continue.""")
 
     step = 3
 
+
 if step < 4:
-    print("""\n\n------ STEP 4 : scheduled tasks webhook ------
-
-This bot supports task postponing. This feature requires a "webhook"
-(a protocol to post messages externally to a channel), called at
-scheduled time to trigger bot reaction. Create a new webhook
-(Server settings / Integrations / Webhooks) posting on the '#logs'
-channel.
-""")
-
-    ok = False
-    while not ok:
-        LGREZ_WEBHOOK_URL = input("Webhook URL: ")
-
-        print("Testing webhook...")
-        try:
-            webhook = discord_webhook.DiscordWebhook(
-                url=LGREZ_WEBHOOK_URL,
-                content="Test Webhook!"
-            )
-            response = webhook.execute()
-            if not response:
-                raise RuntimeError(f"Bad response: {response}")
-        except Exception as e:
-            report_error(e)
-        else:
-            print("OK!")
-            ok = True
-            time.sleep(1)
-
-
-    with open(".env", "a") as fich:
-        fich.write(export("LGREZ_WEBHOOK_URL"))
-    step = 4
-
-
-if step < 5:
-    print("""\n\n------ STEP 5 : GCP connection ------
+    print("""\n\n------ STEP 4 : GCP connection ------
 
 The bot needs a "special" Google account to access Google Sheets files.
 If not already done, create a new projet on Google Cloud Platform :
@@ -329,10 +291,10 @@ Open the JSON file, copy its contents and delete it.
             "\n\n# -- Google Sheets\n\n" + export("LGREZ_GCP_CREDENTIALS")
         )
 
-    step = 5
+    step = 4
 
-if step < 6:
-    print("""\n\n------ STEP 6 : Sheets IDs ------
+if step < 5:
+    print("""\n\n------ STEP 5 : Sheets IDs ------
 
 This bot works with Google Sheets worksheets to gather players orders
 and resolve play situations. We provide a readonly Google Drive folder
@@ -401,10 +363,10 @@ project.
 # Reminder: the sheets need to be shared with GCP_CREDENTIALS["client_email"]
 # (as an Editor) to grant the bot read and write rights.\n\n"""
         )
-    step = 6
+    step = 5
 
-if step < 7:
-    input("""\n\n------ STEP 7 : dashboard setup ------
+if step < 6:
+    input("""\n\n------ STEP 6 : dashboard setup ------
 
 In the "Tableau de bord" sheet, under "Journée en cours" worksheet, edit
 the AN1 and BH1 cells to put the full URLs of the "Données brutes" and
@@ -437,7 +399,7 @@ Press Enter when done.""")
             "is functionnal\n\n"
             + export("LGREZ_CONFIG_STATUS")
         )        # Fin de l'installation
-    step = 7
+    step = 6
 
 
 # Création de start_bot.py

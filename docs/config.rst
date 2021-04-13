@@ -51,3 +51,13 @@
         :func:`.bdd.connect` (inclus dans :meth:`.LGBot.run`).
 
         :type: :class:`sqlalchemy.orm.session.Session`
+
+    .. data:: webhook
+
+        Le webhook utilisé par les tâches planifiées.
+        Poste dans :attr:`.config.Channel.logs`.
+
+        Lève une :exc:`~.ready_check.NotReadyError` avant l'appel de
+        :meth:`.LGBot.on_ready`.
+
+        :type: :class:`discord.Webhook`

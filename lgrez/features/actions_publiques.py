@@ -9,7 +9,7 @@ from discord.ext import commands
 
 from lgrez import config
 from lgrez.blocs import tools
-from lgrez.bdd import Joueur, CandidHaro, Statut, CandidHaroType
+from lgrez.bdd import Joueur, CandidHaro, Statut, CandidHaroType, Vote
 
 
 class ActionsPubliques(commands.Cog):
@@ -29,9 +29,14 @@ class ActionsPubliques(commands.Cog):
         """
         auteur = ctx.author
         joueur = Joueur.from_member(auteur)
+        try:
+            vaction = joueur.action_vote(Vote.cond)
+        except RuntimeError:
+            await ctx.send("Minute papillon, le jeu n'est pas encore lancé !")
+            return
 
-        if joueur.vote_condamne_ is None:
-            await ctx.send("Pas de vote pour le condamné de jour en cours !")
+        if not vaction.is_open:
+            await ctx.send("Pas de vote pour le condamné du jour en cours !")
             return
 
         cible = await tools.boucle_query_joueur(
@@ -112,8 +117,13 @@ class ActionsPubliques(commands.Cog):
         """
         auteur = ctx.author
         joueur = Joueur.from_member(auteur)
+        try:
+            vaction = joueur.action_vote(Vote.maire)
+        except RuntimeError:
+            await ctx.send("Minute papillon, le jeu n'est pas encore lancé !")
+            return
 
-        if joueur.vote_maire_ is None:
+        if not vaction.is_open:
             await ctx.send("Pas de vote pour le nouveau maire en cours !")
             return
 

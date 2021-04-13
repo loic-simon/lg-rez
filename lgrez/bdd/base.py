@@ -72,7 +72,7 @@ class TableMeta(declarative.api.DeclarativeMeta):
 
         Raises:
             :exc:`ready_check.NotReadyError`: session non initialisée
-                (:attr:`.config.session` vaut ``None``)
+                (:obj:`.config.session` vaut ``None``)
         """
         return config.session.query(cls)
 
@@ -97,8 +97,8 @@ class TableMeta(declarative.api.DeclarativeMeta):
 
     @property
     def attrs(cls):
-        """Mapping[str, :attr:`sqlalchemy.schema.Column` |
-        :attr:`sqlalchemy.orm.RelationshipProperty`]: Attributs de
+        """Mapping[:class:`str`, :class:`sqlalchemy.schema.Column` |\
+        :class:`sqlalchemy.orm.RelationshipProperty`]: Attributs de
         données publics des instances (dictionnaire nom -> colonne
         / relationship).
         """
@@ -138,7 +138,7 @@ class TableMeta(declarative.api.DeclarativeMeta):
             solo_si_parfait (bool): si ``True`` (défaut), renvoie
                 uniquement le premier élément de score\* ``1`` trouvé
                 s'il existe (ignore les autres éléments, même si
-                ``>= sensi``ou même ``1``)
+                ``>= sensi`` ou même ``1``)
             parfaits_only (bool): si ``True`` (défaut), ne renvoie que
                 les éléments de score\* ``1`` si on en trouve au moins
                 un (ignore les autres éléments, même si ``>= sensi`` ;
@@ -345,8 +345,10 @@ def autodoc_Column(*args, doc="", comment=None, **kwargs):
     sa_type = (f":class:`{col.type!r} "
                f"<sqlalchemy.types.{type(col.type).__name__}>`")
     py_type = col.type.python_type
-    if py_type.__module__ in ("builtins", "lgrez.bdd.model"):
+    if py_type.__module__ in ("builtins", "lgrez.bdd.enums"):
         py_type_str = py_type.__name__
+    elif py_type.__module__.startswith("lgrez.bdd.model_"):
+        py_type_str = f"lgrez.bdd.{py_type.__name__}"
     else:
         py_type_str = f"{py_type.__module__}.{py_type.__name__}"
     or_none = " | ``None``" if col.nullable else ""
@@ -363,7 +365,7 @@ def autodoc_Column(*args, doc="", comment=None, **kwargs):
     return col
 
 
-def autodoc_ManyToOne(tablename, *args, doc="", **kwargs):
+def autodoc_ManyToOne(tablename, *args, doc="", nullable=False, **kwargs):
     """Returns Python-side well documented many-to-one relationship.
 
     Represents a relationship where each element in this table is
@@ -373,18 +375,25 @@ def autodoc_ManyToOne(tablename, *args, doc="", **kwargs):
     Example: ``Book.editor`` (each book has an editor, an editor
     publishes several books)
 
-    Use exactly as :func:`sqlalchemy.orm.relationship`.
+    Use exactly as :func:`sqlalchemy.orm.relationship`, plus the
+    keyword argument :attr:`nullable` (see below).
 
     Args:
         \*args, \*\*kwargs: passed to :class:`sqlalchemy.orm.relationship`.
         doc (str): relationship description, enhanced with class name
             and relationship type.
+        nullable (bool): indicates whether the relationship can be
+            omitted (impacts docs only, default ``False``).
 
     Returns:
         :class:`sqlalchemy.orm.RelationshipProperty`
     """
     first, sep, rest = doc.partition("\n")
-    doc = f"~bdd.{tablename}: {first} *(many-to-one relationship)*"
+    or_none = " | ``None``" if nullable else ""
+    doc = (f":class:`~.bdd.{tablename}`{or_none}: {first} "
+           "*(many-to-one relationship)*")
+    if not nullable:
+        doc += " (NOT NULL)"
     if rest:
         doc += sep + rest
 
@@ -417,6 +426,38 @@ def autodoc_OneToMany(tablename, *args, doc="", **kwargs):
         doc += sep + rest
 
     return sqlalchemy.orm.relationship(tablename, *args, doc=doc, **kwargs)
+
+
+def autodoc_DynamicOneToMany(tablename, *args, doc="", **kwargs):
+    """Returns Python-side well documented dynamic one-to-many relationship.
+
+    Represents a relationship where each element in this table is
+    linked to **a lot of elements** in ``tablename``, itself back-
+    refering to **one element** in this table.
+
+    The difference with :func:`~.autodoc_OneToMany` is that items are NOT
+    accessible directly through class attribute, which returns a query
+    that but must be fetched first:
+
+    Examples: ``Editor.books.all()``, ``Editor.books.filter_by(...).one()``
+
+    Use exactly as :func:`sqlalchemy.orm.dynamic_loader`.
+
+    Args:
+        \*args, \*\*kwargs: passed to :class:`sqlalchemy.orm.dynamic_loader`.
+        doc (str): relationship description, enhanced with class name
+            and relationship type.
+
+    Returns:
+        :class:`sqlalchemy.orm.RelationshipProperty`
+    """
+    first, sep, rest = doc.partition("\n")
+    doc = (f"~sqlalchemy.orm.query.Query[~bdd.{tablename}]: {first} "
+           "*(dynamic one-to-many relationship)*")
+    if rest:
+        doc += sep + rest
+
+    return sqlalchemy.orm.dynamic_loader(tablename, *args, doc=doc, **kwargs)
 
 
 def autodoc_ManyToMany(tablename, *args, doc="", **kwargs):
@@ -454,7 +495,7 @@ def connect():
 
     - Utilise la variable d'environment ``LGREZ_DATABASE_URI``
     - Crée les tables si nécessaire
-    - Prépare :attr:`.config.engine` et :attr:`.config.session`
+    - Prépare :obj:`.config.engine` et :obj:`.config.session`
     """
     LGREZ_DATABASE_URI = env.load("LGREZ_DATABASE_URI")
     # Moteur SQL : connexion avec le serveur

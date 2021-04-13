@@ -9,7 +9,8 @@ from discord.ext import commands
 
 from lgrez import config
 from lgrez.blocs import tools
-from lgrez.bdd import Joueur, Role, Camp, Statut, ActionTrigger
+from lgrez.bdd import (Joueur, Role, Camp, Action, BaseAction,
+                       ActionTrigger, Vote)
 
 
 class Informations(commands.Cog):
@@ -32,7 +33,7 @@ class Informations(commands.Cog):
             filtre = filtre.strip("<>[](){}")
 
         if not filtre:
-            roles = Role.query.order_by(Role.nom).all()
+            roles = Role.query.filter_by(actif=True).order_by(Role.nom).all()
         else:
             camps = Camp.find_nearest(
                 filtre, col=Camp.nom,
@@ -47,11 +48,7 @@ class Informations(commands.Cog):
                     await ctx.send(f"Rôle / camp \"{filtre}\" non trouvé.")
                     return
 
-                role = roles[0][0]
-                await ctx.send(tools.code_bloc(
-                    f"{role.prefixe}{role.nom} – {role.description_courte} "
-                    f"(camp : {role.camp.nom})\n\n{role.description_longue}"
-                ))
+                await ctx.send(embed=roles[0][0].embed)
                 return
 
         await tools.send_blocs(
@@ -100,9 +97,8 @@ class Informations(commands.Cog):
                 await ctx.send("Connais pas")
                 return
 
-        joueurs = Joueur.query.filter_by(role=role).filter(
-            Joueur.statut.in_([Statut.vivant, Statut.MV])
-        ).all()
+        joueurs = Joueur.query.filter_by(role=role).\
+                               filter(Joueur.est_vivant).all()
         await ctx.send(
             f"{role.nom_complet} : "
             + (", ".join(joueur.nom for joueur in joueurs)
@@ -125,28 +121,33 @@ class Informations(commands.Cog):
         reacts = []
         r = "––– MENU –––\n\n"
 
-        if joueur.vote_condamne_:
+        vaction = joueur.action_vote(Vote.cond)
+        if vaction.is_open:
             r += (f" - {config.Emoji.bucher}  Vote pour le bûcher en cours – "
-                  f"vote actuel : {tools.code(joueur.vote_condamne_)}\n")
+                  f"vote actuel : {tools.code(vaction.decision)}\n")
             reacts.append(config.Emoji.bucher)
-        if joueur.vote_maire_:
+
+        vaction = joueur.action_vote(Vote.maire)
+        if vaction.is_open:
             r += (f" - {config.Emoji.maire}  Vote pour le maire en cours – "
-                  f"vote actuel : {tools.code(joueur.vote_maire_)}\n")
+                  f"vote actuel : {tools.code(vaction.decision)}\n")
             reacts.append(config.Emoji.maire)
-        if joueur.vote_loups_:
+
+        vaction = joueur.action_vote(Vote.loups)
+        if vaction.is_open:
             r += (f" - {config.Emoji.lune}  Vote des loups en cours – "
-                  f"vote actuel : {tools.code(joueur.vote_loups_)}\n")
+                  f"vote actuel : {tools.code(vaction.decision)}\n")
             reacts.append(config.Emoji.lune)
 
         if not reacts:
             r += "Aucun vote en cours.\n"
 
-        actions = [action for action in joueur.actions if action.decision_]
+        actions = [ac for ac in joueur.actions_actives if ac.is_open]
         if actions:
             for action in actions:
                 r += (f" - {config.Emoji.action}  Action en cours : "
                       f"{tools.code(action.base.slug)} (id {action.id}) – "
-                      f"décision : {tools.code(action.decision_)}\n")
+                      f"décision : {tools.code(action.decision)}\n")
             reacts.append(config.Emoji.action)
         else:
             r += "Aucune action en cours.\n"
@@ -169,36 +170,6 @@ class Informations(commands.Cog):
         indiquées, même celles que tu ne peux pas utiliser pour
         l'instant (plus de charges, déclenchées automatiquement...)
         """
-        def disponible(action):
-            """Description des conditions de déclenchement d'<action>"""
-            if action.base.trigger_debut == ActionTrigger.temporel:
-                dispo = (f"De {tools.time_to_heure(action.base.heure_debut)} "
-                         f"à {tools.time_to_heure(action.base.heure_fin)}")
-            elif action.base.trigger_debut == ActionTrigger.perma:
-                dispo = "N'importe quand"
-            elif action.base.trigger_debut == ActionTrigger.start:
-                dispo = "Au lancement de la partie"
-            elif action.base.trigger_debut == ActionTrigger.mort:
-                dispo = "S'active à ta mort"
-            elif action.base.trigger_debut == ActionTrigger.mot_mjs:
-                dispo = "S'active à l'annonce des résultats du vote"
-            elif "_" in (name := action.base.trigger_debut.name):
-                quoi, qui = name.split("_")
-                d_quoi = {"open": "l'ouverture",
-                          "close": "la fermeture"}
-                d_qui = {"cond": "du vote condamné",
-                         "maire": "du vote pour la mairie",
-                         "loups": "du vote pour les loups"}
-                try:
-                    dispo = f"S'active à {d_quoi[quoi]} {d_qui[qui]}"
-                except KeyError:
-                    dispo = f"S'active à {quoi}_{qui}"
-            else:
-                dispo = action.base.trigger_debut.name
-
-            return dispo
-
-
         member = ctx.author
         joueur = Joueur.from_member(member)
         r = ""
@@ -207,18 +178,18 @@ class Informations(commands.Cog):
         r += tools.ital(f"({tools.code(f'!roles {joueur.role.slug}')} "
                         "pour tout savoir sur ce rôle)")
 
-        if joueur.actions:
+        if joueur.actions_actives:
             r += "\n\nActions :"
-            r += tools.code_bloc("\n".join([(
+            r += tools.code_bloc("\n".join((
                 f" - {action.base.slug.ljust(20)} "
                 + (f"Cooldown : {action.cooldown}" if action.cooldown
-                   else disponible(action)).ljust(22)
+                   else action.base.temporalite).ljust(22)
                 + (f"   {action.charges} charge(s)"
                     + (" pour cette semaine"
                         if (action.refill and "weekends" in action.refill)
                         else "")
                     if isinstance(action.charges, int) else "Illimitée")
-            ) for action in joueur.actions]))
+            ) for action in joueur.actions_actives))
             # Vraiment désolé pour cette immondice j'ai la flemme
         else:
             r += "\n\nAucune action disponible."
@@ -231,7 +202,7 @@ class Informations(commands.Cog):
 
     @commands.command()
     @tools.mjs_only
-    async def actions(self, ctx, *, cible):
+    async def actions(self, ctx, *, cible=None):
         """Affiche et modifie les actions d'un joueur (COMMANDE MJ)
 
         Args:
@@ -241,25 +212,25 @@ class Informations(commands.Cog):
             Commande expérimentale, non testée.
         """
         joueur = await tools.boucle_query_joueur(ctx, cible, "Qui ?")
-        if not joueur:
-            return
+        actions = [ac for ac in joueur.actions if not ac.vote]
 
         r = f"Rôle : {joueur.role.nom_complet or joueur.role}\n"
 
-        if not joueur.actions:
-            r += "Aucune action pour ce joueur."
-            await ctx.send(r)
-            return
+        # if not actions:
+        #     r += "Aucune action pour ce joueur."
+        #     await ctx.send(r)
+        #     return
 
         r += "Actions :"
         r += tools.code_bloc(
-            "#️⃣  id   action                   début"
+            "#️⃣  id   active  baseaction               début"
             "     fin       cd   charges   refill     \n"
-            "-----------------------------------------"
-            "-----------------------------------------\n"
+            "---------------------------------------------"
+            "---------------------------------------------\n"
             + "\n".join([(
                 tools.emoji_chiffre(i + 1) + "  "
                 + str(action.id).ljust(5)
+                + str(action.active).ljust(8)
                 + action.base.slug.ljust(25)
                 + str(action.base.heure_debut
                       if action.base.trigger_debut == ActionTrigger.temporel
@@ -269,16 +240,31 @@ class Informations(commands.Cog):
                       else action.base.trigger_fin).ljust(10)
                 + str(action.cooldown).ljust(5)
                 + str(action.charges).ljust(10)
-                + str(action.refill)
-            ) for i, action in enumerate(joueur.actions)])
+                + str(action.base.refill)
+            ) for i, action in enumerate(actions)])
         )
         r += "Modifier/ajouter/stop :"
         message = await ctx.send(r)
-        i = await tools.choice(message, len(joueur.actions),
-                               additionnal={"⏺": -1, "⏹": 0})
+        i = await tools.choice(message, len(actions),
+                               additionnal={"🆕": -1, "⏹": 0})
 
         if i < 0:     # ajouter
-            await ctx.send("Pas encore codé, pas de chance")
+            await ctx.send("Slug de la baseaction à ajouter ? "
+                           "(voir Gsheet Rôles et actions)")
+            base = await tools.boucle_query(ctx, BaseAction)
+
+            await ctx.send("Cooldown ? (nombre entier)")
+            mess = await tools.wait_for_message_here(ctx)
+            cooldown = int(mess.content)
+
+            await ctx.send(f"Charges ? ({tools.code('None')} pour illimité)")
+            mess = await tools.wait_for_message_here(ctx)
+            charges = int(mess.content) if mess.content.isdigit() else None
+
+            action = Action(joueur=joueur, base=base, cooldown=cooldown,
+                            charges=charges)
+            action.add()
+            await ctx.send(f"Action ajoutée (id {action.id}).")
             return
 
         elif i == 0:
@@ -286,79 +272,46 @@ class Informations(commands.Cog):
             return
 
         # Modifier
-        action = joueur.actions[i - 1]
+        action = actions[i - 1]
         stop = False
         while not stop:
             await ctx.send(
-                "Modifier : (parmi "
-                + tools.code("début, fin, cd, charges, refill")
-                + f")\n{tools.code('valider')} pour finir\n"
-                + f"(Utiliser {tools.code('!open id')}/"
-                + f"{tools.code('!close id')} pour ouvrir/fermer)"
+                "Modifier : (parmi `active, cd, charges`}) ; `valider` pour "
+                "finir ; `supprimer` pour supprimer l'action.\n(Pour modifier "
+                "les attributs de la baseaction, modifier le Gsheet et "
+                "utiliser `!fillroles` ; pour ouvrir/fermer l'action, "
+                f"utiliser `!open {action.id}` / `!close {action.id}`.)"
             )
-            modif = (await tools.wait_for_message_here(ctx)).content.lower()
+            mess = await tools.wait_for_message_here(ctx)
+            modif = mess.content.lower()
 
-            if modif in ["début", "fin"]:
-                trigs = ", ".join(at.name for at in ActionTrigger)
-                await ctx.send(
-                    f"Trigger (parmi {tools.code(trigs)}) ou heure direct "
-                    f"si {tools.code(ActionTrigger.temporel.name)} :"
-                )
-                mess = await tools.wait_for_message_here(ctx)
-                trigger = mess.content.lower()
-                heure = None
-                if ":" in trigger or "h" in trigger:
-                    heure = trigger
-                    trigger = ActionTrigger.temporel
-                else:
-                    try:
-                        trigger = ActionTrigger(trigger)
-                    except ValueError:
-                        await ctx.send("Valeur incorrecte")
-
-                if trigger in [ActionTrigger.temporel, ActionTrigger.delta]:
-                    if not heure:
-                        await ctx.send(
-                            f"Heure / delta {tools.code('HHhMM ou HH:MM')} :"
-                        )
-                        mess = await tools.wait_for_message_here(ctx)
-                        heure = mess.content
-                    ts = tools.heure_to_time(heure)
-                else:
-                    ts = None
-
-                if modif == "début":
-                    action.base.trigger_debut = trigger
-                    action.base.heure_debut = ts
-                else:
-                    action.base.trigger_fin = trigger
-                    action.base.heure_fin = ts
+            if modif == "active":
+                mess = await ctx.send("Action active ?")
+                action.active = await tools.yes_no(mess)
 
             elif modif in ["cd", "cooldown"]:
                 await ctx.send("Combien ?")
-                cd = int((await tools.wait_for_message_here(ctx)).content)
-                action.cooldown = cd
+                mess = await tools.wait_for_message_here(ctx)
+                action.cooldown = int(mess.content)
 
             elif modif == "charges":
-                await ctx.send(
-                    f"Combien ? ({tools.code('None')} pour illimité)"
-                )
-                entry = (await tools.wait_for_message_here(ctx)).content
-                charges = None if entry.lower() == "none" else int(entry)
-                action.charges = charges
-
-            elif modif == "refill":
-                await ctx.send(
-                    f"Quoi ? ({tools.code('rebouteux / forgeron / weekends')} "
-                    f"séparés par des {tools.code(', ')})"
-                )
+                await ctx.send("Combien ? (`None` pour illimité)")
                 mess = await tools.wait_for_message_here(ctx)
-                refill = mess.content.lower()
-                action.refill = refill
+                action.charges = (int(mess.content)
+                                  if mess.content.isdigit() else None)
 
             elif modif == "valider":
-                config.session.commit()
+                action.update()
                 await ctx.send("Fait.")
+                stop = True
+
+            elif modif == "supprimer":
+                mess = await ctx.send("Supprimer l'action ? (privilégier "
+                                      "l'archivage  `active = False`)")
+                if await tools.yes_no(mess):
+                    action.delete()
+                    await ctx.send("Fait.")
+                    stop = True
 
             else:
                 await ctx.send("Valeur incorrecte")
@@ -370,8 +323,8 @@ class Informations(commands.Cog):
 
         Aussi dite : « liste des joueurs qui seront bientôt morts »
         """
-        joueurs = Joueur.query.filter(
-            Joueur.statut != Statut.mort).order_by(Joueur.nom).all()
+        joueurs = Joueur.query.filter(Joueur.est_vivant).\
+                               order_by(Joueur.nom).all()
 
         mess = " Joueur                     en chambre\n"
         mess += "––––––––––––––––––––––––––––––––––––––––––––––\n"
@@ -393,8 +346,8 @@ class Informations(commands.Cog):
 
         Aussi dite : « liste des joueurs qui mangent leurs morts »
         """
-        joueurs = Joueur.query.filter_by(
-            statut=Statut.mort).order_by(Joueur.nom).all()
+        joueurs = Joueur.query.filter(Joueur.est_mort).\
+                               order_by(Joueur.nom).all()
 
         if joueurs:
             mess = ""

@@ -10,7 +10,7 @@ from discord.ext import commands
 
 from lgrez import config
 from lgrez.blocs import tools
-from lgrez.bdd import Action, BaseAction, Tache, ActionTrigger
+from lgrez.bdd import Action, BaseAction, Tache, Utilisation, ActionTrigger
 
 
 def add_action(action):
@@ -19,6 +19,8 @@ def add_action(action):
     Args:
         action (.bdd.Action): l'action à enregistrer
     """
+    if not action.active:
+        action.active = True
     action.add()
 
     # Ajout tâche ouverture
@@ -36,7 +38,10 @@ def add_action(action):
 
 
 def delete_action(action):
-    """Supprime une action et annule les tâches en cours liées.
+    """Archive une action et annule les tâches en cours liées.
+
+    Depuis la version 2.1, l'action n'est plus supprimée mais est
+    passée à :attr:`~.bdd.Action.active` = ``False``.
 
     Args:
         action (.bdd.Action): l'action à supprimer
@@ -44,7 +49,13 @@ def delete_action(action):
     # Suppression tâches liées à l'action
     if action.taches:
         Tache.delete(*action.taches)
-    action.delete()
+
+    if action.is_open:
+        action.utilisation_ouverte.close()
+
+    action.active = False
+    action.update()
+    # action.delete()
 
 
 async def open_action(action):
@@ -63,12 +74,22 @@ async def open_action(action):
     joueur = action.joueur
     chan = joueur.private_chan
 
+    # Vérification base
+    if not action.base:
+        await tools.log(f"{action} : pas de base, exit")
+        return
+
+    # Vérification active
+    if not action.active:
+        await tools.log(f"{action} : inactive, exit (pas de reprogrammation)")
+        return
+
     # Vérification cooldown
     if action.cooldown > 0:                 # Action en cooldown
         action.cooldown = action.cooldown - 1
         config.session.commit()
         await tools.log(
-            f"Action {action} : en cooldown, exit "
+            f"{action} : en cooldown, exit "
             "(reprogrammation si temporel)."
         )
         if action.base.trigger_debut == ActionTrigger.temporel:
@@ -83,7 +104,7 @@ async def open_action(action):
     if not joueur.role_actif:
         # role_actif == False : on reprogramme la tâche au lendemain tanpis
         await tools.log(
-            f"Action {action} : role_actif == False, exit "
+            f"{action} : role_actif == False, exit "
             "(reprogrammation si temporel)."
         )
         if action.base.trigger_debut == ActionTrigger.temporel:
@@ -97,7 +118,7 @@ async def open_action(action):
     if action.charges == 0:
         # Plus de charges, mais action maintenue en base car refill / ...
         await tools.log(
-            f"Action {action} : plus de charges, exit "
+            f"{action} : plus de charges, exit "
             "(reprogrammation si temporel)."
         )
         return
@@ -114,7 +135,7 @@ async def open_action(action):
             )
         else:
             await tools.log(
-                f"Action {action} : automatique, appel processus de clôture"
+                f"{action} : automatique, appel processus de clôture"
             )
 
         await close_action(action)
@@ -162,7 +183,7 @@ async def open_action(action):
                   action=action).add()
 
     # Information du joueur
-    if action.decision_ == "rien":      # déjà ouverte
+    if action.is_open:          # déjà ouverte
         message = await chan.send(
             f"{tools.montre()}  Rappel : tu peux utiliser quand tu le "
             f"souhaites ton action {tools.code(action.base.slug)} ! "
@@ -175,7 +196,10 @@ async def open_action(action):
             )
         )
     else:
-        action.decision_ = "rien"
+        # on ouvre !
+        util = Utilisation(action=action)
+        util.add()
+        util.open()
         message = await chan.send(
             f"{tools.montre()}  Tu peux maintenant utiliser ton action "
             f"{tools.code(action.base.slug)} !  {config.Emoji.action} \n"
@@ -199,7 +223,7 @@ async def close_action(action):
         action (.bdd.Action): l'action à enregistrer
 
     Opérations réalisées :
-        - Suppression si nécessaire ;
+        - Archivage si nécessaire ;
         - Gestion des tâches planifiées (planifie prochaine ouverture
           si applicable) ;
         - Information du joueur (si charge-- seulement).
@@ -207,8 +231,23 @@ async def close_action(action):
     joueur = action.joueur
     chan = joueur.private_chan
 
+    # Vérification base
+    if not action.base:
+        await tools.log(f"{action} : pas de base, exit")
+        return
+
+    # Vérification active
+    if not action.active:
+        await tools.log(f"{action} : inactive, exit")
+        return
+
+    # Vérification ouverte
+    if not action.is_open:
+        await tools.log(f"{action} : pas ouverte, exit")
+        return
+
     deleted = False
-    if action.decision_ != "rien":
+    if not action.is_waiting:       # décision prise
         # Résolution de l'action
         # (pour l'instant juste charge -= 1 et suppression le cas échéant)
         if action.charges:
@@ -222,7 +261,7 @@ async def close_action(action):
                 deleted = True
 
     if not deleted:
-        action.decision_ = None
+        action.utilisation_ouverte.close()
 
         # Si l'action a un cooldown, on le met
         if action.base.base_cooldown > 0:
@@ -250,12 +289,9 @@ def get_actions(quoi, trigger, heure=None):
     Args:
         quoi (str): Type d'opération en cours :
 
-          - ``"open"`` : ouverture, ``Action.decision_`` doit être
-            ``None``;
-          - ``"close"`` :  fermeture, ``Action.decision_`` ne doit pas
-            être None;
-          - ``"remind"`` : rappel, ``Action.decision_`` doit être
-            ``"rien"``
+          - ``"open"`` : ouverture, :attr:`Action.is_open` doit être faux;
+          - ``"close"`` :  fermeture, :attr:`Action.is_open` doit être vrai;
+          - ``"remind"`` : rappel, :attr:`Action.is_waiting` doit être vrai.
 
         trigger (bdd.ActionTrigger): valeur de ``Action.trigger_debut/fin``
             à détecter.
@@ -265,35 +301,24 @@ def get_actions(quoi, trigger, heure=None):
     Returns:
         Sequence[.bdd.Action]: La liste des actions correspondantes.
     """
+    criteres = Action.active.is_(True)
+
+    if quoi == "open":
+        criteres &= Action.base.has(trigger_debut=trigger) & ~Action.is_open
+    elif quoi == "close":
+        criteres &= Action.base.has(trigger_fin=trigger) & Action.is_open
+    elif quoi == "remind":
+        criteres &= Action.base.has(trigger_fin=trigger) & Action.is_waiting
+    else:
+        raise commands.UserInputError(f"bad value for quoi: '{quoi}'")
+
     if trigger == ActionTrigger.temporel:
         if not heure:
             raise commands.UserInputError("merci de préciser une heure")
 
         if quoi == "open":
-            criteres = (Action.base.has(BaseAction.trigger_debut == trigger)
-                        & Action.base.has(BaseAction.heure_debut == heure)
-                        & Action.decision_.is_(None))
-        elif quoi == "close":
-            criteres = (Action.base.has(BaseAction.trigger_fin == trigger)
-                        & Action.base.has(BaseAction.heure_fin == heure)
-                        & Action.decision_.isnot(None))
-        elif quoi == "remind":
-            criteres = (Action.base.has(BaseAction.trigger_fin == trigger)
-                        & Action.base.has(BaseAction.heure_fin == heure)
-                        & (Action.decision_ == "rien"))
-        else:
-            raise commands.UserInputError(f"bad value for quoi: '{quoi}'")
-    else:
-        if quoi == "open":
-            criteres = (Action.base.has(BaseAction.trigger_debut == trigger)
-                        & Action.decision_.is_(None))
-        elif quoi == "close":
-            criteres = (Action.base.has(BaseAction.trigger_fin == trigger)
-                        & Action.decision_.isnot(None))
-        elif quoi == "remind":
-            criteres = (Action.base.has(BaseAction.trigger_fin == trigger)
-                        & (Action.decision_ == "rien"))
-        else:
-            raise commands.UserInputError(f"bad value for quoi: '{quoi}'")
+            criteres &= Action.base.has(heure_debut=heure)
+        else:       # close / remind
+            criteres &= Action.base.has(heure_fin=heure)
 
     return Action.query.filter(criteres).all()

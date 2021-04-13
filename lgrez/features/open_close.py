@@ -12,7 +12,8 @@ from lgrez import config
 from lgrez.blocs import tools
 from lgrez.features import gestion_actions
 from lgrez.bdd import (Joueur, Action, BaseAction, Tache, CandidHaro,
-                       CandidHaroType, ActionTrigger)
+                       Utilisation, CandidHaroType, ActionTrigger,
+                       UtilEtat, Vote)
 
 
 async def recup_joueurs(quoi, qui, heure=None):
@@ -20,11 +21,9 @@ async def recup_joueurs(quoi, qui, heure=None):
 
     Args:
         quoi (str): évènement, ``"open" / "close" / "remind"``.
-        qui (str):
+        qui (:class:`.bdd.Vote` | :class:`str`):
             ===========     ===========
-            ``cond``        pour le vote du condamné
-            ``maire``       pour le vote du maire
-            ``loups``       pour le vote des loups
+            ``Vote``        pour le vote correspondant
             ``action``      pour les actions commençant à ``heure``
             ``{id}``        pour une action précise (:attr:`bdd.Action.id`)
             ===========     ===========
@@ -42,29 +41,22 @@ async def recup_joueurs(quoi, qui, heure=None):
     if quoi not in ["open", "close", "remind"]:
         raise ValueError(f"recup_joueurs: bad value for `quoi`: `{quoi}`")
 
-    criteres = {
-        "cond": {
-            "open": (Joueur.votant_village.is_(True)
-                     & Joueur.vote_condamne_.is_(None)),
-            "close": Joueur.vote_condamne_.isnot(None),
-            "remind": Joueur.vote_condamne_ == "non défini",
-        },
-        "maire": {
-            "open": (Joueur.votant_village.is_(True)
-                     & Joueur.vote_maire_.is_(None)),
-            "close": Joueur.vote_maire_.isnot(None),
-            "remind": Joueur.vote_maire_ == "non défini",
-        },
-        "loups": {
-            "open": (Joueur.votant_loups.is_(True)
-                     & Joueur.vote_loups_.is_(None)),
-            "close": Joueur.vote_loups_.isnot(None),
-            "remind": Joueur.vote_loups_ == "non défini",
-        },
-    }
+    if isinstance(qui, Vote):
+        # Critère principale : présence/absence d'une action actuellement
+        # ouverte (et non traitée pour remind)
+        criteres = {
+            "open": ~Joueur.actions.any(Action.is_open, vote=qui),
+            "close": Joueur.actions.any(Action.is_open, vote=qui),
+            "remind": Joueur.actions.any(Action.is_waiting, vote=qui),
+        }
+        critere = criteres[quoi]
+        if quoi == "open":
+            # Open : le joueur doit en plus avoir votant_village/loups True
+            if qui == Vote.loups:
+                critere &= Joueur.votant_loups.is_(True)
+            else:
+                critere &= Joueur.votant_village.is_(True)
 
-    if qui in criteres:
-        critere = criteres[qui][quoi]
         return Joueur.query.filter(critere).all()
         # Liste des joueurs répondant aux critères
 
@@ -73,7 +65,7 @@ async def recup_joueurs(quoi, qui, heure=None):
             # Si l'heure est précisée, on convertit "HHhMM" -> datetime.time
             tps = tools.heure_to_time(heure)
         else:
-            raise ValueError(
+            raise commands.BadArgument(
                 "[heure] doit être spécifiée lorque <qui> == \"action\""
             )
 
@@ -97,22 +89,24 @@ async def recup_joueurs(quoi, qui, heure=None):
     elif qui.isdigit():
         action = Action.query.get(int(qui))
         if not action:
-            raise ValueError(f"Pas d'action d'ID = {qui}")
+            raise commands.BadArgument(f"Pas d'action d'ID = {qui}")
+        if not action.active:
+            raise commands.BadArgument(f"Action d'ID = {qui} inactive")
 
-        # Appel direct action par son numéro
+        # Appel direct action par son numéro (perma : rappel seulement)
         if ((quoi == "open" and (
-                not action.decision_
+                not action.is_open
                 or action.base.trigger_debut == ActionTrigger.perma
             ))
-            or (quoi == "close" and action.decision_)
-            or (quoi == "remind" and action.decision_ == "rien")):
+            or (quoi == "close" and action.is_open)
+            or (quoi == "remind" and action.is_waiting)):
             # Action lançable
             return {action.joueur: [action]}
         else:
             return {}
 
     else:
-        raise ValueError(f"""Argument <qui> == \"{qui}" invalide""")
+        raise commands.BadArgument(f"""Argument <qui> == \"{qui}" invalide""")
 
 
 async def _do_refill(motif, actions):
@@ -209,6 +203,10 @@ class OpenClose(commands.Cog):
             - ``!open 122`` :          lance l'action d'ID 122
 
         """
+        try:
+            qui = Vote[qui.lower()]         # cond / maire / loups
+        except KeyError:
+            pass
         joueurs = await recup_joueurs("open", qui, heure)
         # Liste de joueurs (votes) ou dictionnaire joueur : action
 
@@ -216,14 +214,20 @@ class OpenClose(commands.Cog):
         await tools.send_code_blocs(
             ctx,
             f"Utilisateur(s) répondant aux critères ({len(joueurs)}) : \n"
-            f" - {str_joueurs}"
+            + str_joueurs
         )
 
+        # Création utilisations & envoi messages
         for joueur in joueurs:
             chan = joueur.private_chan
 
-            if qui == "cond":
-                joueur.vote_condamne_ = "non défini"
+            if isinstance(qui, Vote):
+                action = joueur.action_vote(qui)
+                util = Utilisation(action=action)
+                util.add()
+                util.open()
+
+            if qui == Vote.cond:
                 message = await chan.send(
                     f"{tools.montre()}  Le vote pour le condamné du "
                     f"jour est ouvert !  {config.Emoji.bucher} \n"
@@ -234,8 +238,7 @@ class OpenClose(commands.Cog):
                 )
                 await message.add_reaction(config.Emoji.bucher)
 
-            elif qui == "maire":
-                joueur.vote_maire_ = "non défini"
+            elif qui == Vote.maire:
                 message = await chan.send(
                     f"{tools.montre()}  Le vote pour l'élection du "
                     f"maire est ouvert !  {config.Emoji.maire} \n"
@@ -248,8 +251,7 @@ class OpenClose(commands.Cog):
                 )
                 await message.add_reaction(config.Emoji.maire)
 
-            elif qui == "loups":
-                joueur.vote_loups_ = "non défini"
+            elif qui == Vote.loups:
                 message = await chan.send(
                     f"{tools.montre()}  Le vote pour la victime de "
                     f"cette nuit est ouvert !  {config.Emoji.lune} \n"
@@ -269,22 +271,22 @@ class OpenClose(commands.Cog):
         config.session.commit()
 
         # Actions déclenchées par ouverture
-        if qui in ["cond", "maire", "loups"] :
+        if isinstance(qui, Vote):
             for action in Action.query.filter(Action.base.has(
-                    BaseAction.trigger_debut == ActionTrigger[f"open_{qui}"])):
+                    BaseAction.trigger_debut == ActionTrigger.open(qui))):
                 await gestion_actions.open_action(action)
 
         # Réinitialise haros/candids
         items = []
-        if qui == "cond":
+        if qui == Vote.cond:
             items = CandidHaro.query.filter_by(
                 type=CandidHaroType.haro).all()
-        elif qui == "maire":
+        elif qui == Vote.maire:
             items = CandidHaro.query.filter_by(
                 type=CandidHaroType.candidature).all()
         if items:
             CandidHaro.delete(*items)
-            await tools.log(f"!open {qui} : haros/candids wiped")
+            await tools.log(f"!open {qui.name} : haros/candids wiped")
             await config.Channel.haros.send(
                 f"{config.Emoji.void}\n" * 30
                 + "Nouveau vote, nouveaux haros !\n"
@@ -295,16 +297,17 @@ class OpenClose(commands.Cog):
             )
 
         # Programme fermeture
-        if qui in ["cond", "maire", "loups"] and heure:
+        if isinstance(qui, Vote) and heure:
             ts = tools.next_occurence(tools.heure_to_time(heure))
             Tache(timestamp=ts - datetime.timedelta(minutes=30),
-                  commande=f"!remind {qui}").add()
+                  commande=f"!remind {qui.name}").add()
             if heure_chain:
                 Tache(timestamp=ts,
-                      commande=f"!close {qui} {heure_chain} {heure}").add()
+                      commande=f"!close {qui.name} {heure_chain} {heure}"
+                ).add()
                 # Programmera prochaine ouverture
             else:
-                Tache(timestamp=ts, commande=f"!close {qui}").add()
+                Tache(timestamp=ts, commande=f"!close {qui.name}").add()
 
 
     @commands.command()
@@ -360,66 +363,74 @@ class OpenClose(commands.Cog):
               se terminant à 22h00
             - ``!close 122`` :          ferme l'action d'ID 122
         """
-
+        try:
+            qui = Vote[qui.lower()]         # cond / maire / loups
+        except KeyError:
+            pass
         joueurs = await recup_joueurs("close", qui, heure)
 
         str_joueurs = "\n - ".join([joueur.nom for joueur in joueurs])
-        await ctx.send(tools.code_bloc(
+        await tools.send_code_blocs(
+            ctx,
             f"Utilisateur(s) répondant aux critères ({len(joueurs)}) : \n"
             + str_joueurs
-        ))
+        )
 
+        # Fermeture utilisations et envoi messages
         for joueur in joueurs:
             chan = joueur.private_chan
 
-            if qui == "cond":
+            if isinstance(qui, Vote):
+                util = joueur.action_vote(qui).utilisation_ouverte
+                nom_cible = util.cible.nom if util.cible else "*non défini*"
+
+                util.close()        # update direct pour empêcher de voter
+
+            if qui == Vote.cond:
                 await chan.send(
                     f"{tools.montre()}  Fin du vote pour le condamné du jour !"
-                    f"\nVote définitif : {joueur.vote_condamne_}\n"
+                    f"\nVote définitif : {nom_cible}\n"
                     f"Les résultats arrivent dans l'heure !\n"
                 )
-                joueur.vote_condamne_ = None
 
-            elif qui == "maire":
+            elif qui == Vote.maire:
                 await chan.send(
                     f"{tools.montre()}  Fin du vote pour le maire ! \n"
-                    f"Vote définitif : {joueur.vote_maire_}"
+                    f"Vote définitif : {nom_cible}"
                 )
-                joueur.vote_maire_ = None
 
-            elif qui == "loups":
+            elif qui == Vote.loups:
                 await chan.send(
                     f"{tools.montre()}  Fin du vote pour la victime du soir !"
-                    f"\nVote définitif : {joueur.vote_loups_}"
+                    f"\nVote définitif : {nom_cible}"
                 )
-                joueur.vote_loups_ = None
 
             else:       # Action
                 for action in joueurs[joueur]:
                     await chan.send(
                         f"{tools.montre()}  Fin de la possiblité d'utiliser "
                         f"ton action {tools.code(action.base.slug)} ! \n"
-                        f"Action définitive : {action.decision_}"
+                        f"Action définitive : {action.decision}"
                     )
                     await gestion_actions.close_action(action)
 
         config.session.commit()
 
         # Actions déclenchées par fermeture
-        if qui in ["cond", "maire", "loups"] :
+        if isinstance(qui, Vote):
             for action in Action.query.filter(Action.base.has(
-                  BaseAction.trigger_debut == ActionTrigger[f"close_{qui}"])):
+                  BaseAction.trigger_debut == ActionTrigger.close(qui))):
                 await gestion_actions.close_action(action)
 
         # Programme prochaine ouverture
-        if qui in ["cond", "maire", "loups"] and heure:
+        if isinstance(qui, Vote) and heure:
             ts = tools.next_occurence(tools.heure_to_time(heure))
             if heure_chain:
                 Tache(timestamp=ts,
-                      commande=f"!open {qui} {heure_chain} {heure}").add()
+                      commande=f"!open {qui.name} {heure_chain} {heure}").add()
                 # Programmera prochaine fermeture
             else:
-                Tache(timestamp=ts, commande=f"!open {qui}").add()
+                Tache(timestamp=ts, commande=f"!open {qui.name}").add()
 
 
     @commands.command()
@@ -456,7 +467,10 @@ class OpenClose(commands.Cog):
               se terminant à 22h00
             - ``!remind 122`` :        rappelle l'action d'ID 122
         """
-
+        try:
+            qui = Vote[qui.lower()]         # cond / maire / loups
+        except KeyError:
+            pass
         joueurs = await recup_joueurs("remind", qui, heure)
 
         str_joueurs = "\n - ".join([joueur.nom for joueur in joueurs])
@@ -469,21 +483,21 @@ class OpenClose(commands.Cog):
             chan = joueur.private_chan
             member = joueur.member
 
-            if qui == "cond":
+            if qui == Vote.cond:
                 message = await chan.send(
                     f"⏰ {member.mention} Plus que 30 minutes pour voter "
                     "pour le condamné du jour ! 😱 \n"
                 )
                 await message.add_reaction(config.Emoji.bucher)
 
-            elif qui == "maire":
+            elif qui == Vote.maire:
                 message = await chan.send(
                     f"⏰ {member.mention} Plus que 30 minutes pour élire "
                     "le nouveau maire ! 😱 \n"
                 )
                 await message.add_reaction(config.Emoji.maire)
 
-            elif qui == "loups":
+            elif qui == Vote.loups:
                 message = await chan.send(
                     f"⏰ {member.mention} Plus que 30 minutes pour voter "
                     "pour la victime du soir ! 😱 \n"
@@ -573,6 +587,7 @@ class OpenClose(commands.Cog):
         - Programme un vote maire 10h-18h
         - Programme les actions au lancement du jeu (choix de mentor...)
           et permanentes (forgeron)... à 19h
+        - Crée les "actions de vote", sans quoi !open plante
 
         À utiliser le jour du lancement après 10h (lance les premières
         actions le soir et les votes le lendemain)
@@ -654,7 +669,15 @@ class OpenClose(commands.Cog):
         ))
         await tools.log(r, code=True)
 
+        # Drop (éventuel) et (re-)création actions de vote
+        Action.query.filter_by(base=None).delete()
+        actions = []
+        for joueur in Joueur.query.all():
+            for vote in Vote:
+                actions.append(Action(joueur=joueur, vote=vote))
+
         Tache.add(*taches)      # On enregistre et programme le tout !
+        Action.add(*actions)
 
         await ctx.send(
             f"C'est tout bon ! (détails dans {config.Channel.logs.mention})"

@@ -16,6 +16,7 @@ class TestOpenCloseFunctions(unittest.IsolatedAsyncioTestCase):
     def tearDown(self):
         mock_discord.unmock_config()
 
+    @unittest.SkipTest
     @mock_bdd.patch_db      # Empty database for this method
     @mock.patch("lgrez.features.gestion_actions.get_actions")
     async def test_recup_joueurs(self, getact_patch):
@@ -319,6 +320,7 @@ class TestOpenCloseFunctions(unittest.IsolatedAsyncioTestCase):
 
 
 
+@unittest.SkipTest
 class TestOpenClose(unittest.IsolatedAsyncioTestCase):
     """Unit tests for lgrez.features.open_close commands."""
 

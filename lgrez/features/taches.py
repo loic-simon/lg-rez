@@ -134,7 +134,7 @@ class GestionTaches(commands.Cog):
         tache = Tache(timestamp=ts,
                       commande=commande,
                       action=Action.query.get(action_id))
-        tache.add()
+        tache.add()         # Planifie la tâche
         await ctx.send(
             f"{tools.code(commande)} planifiée pour le "
             f"{tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))}.\n"
@@ -199,7 +199,7 @@ class GestionTaches(commands.Cog):
         tache = Tache(timestamp=ts,
                       commande=commande,
                       action=Action.query.get(action_id))
-        tache.add()
+        tache.add()         # Planifie la tâche
 
         await ctx.send(
             f"Commande {tools.code(commande)} planifiée pour le "
@@ -235,5 +235,5 @@ class GestionTaches(commands.Cog):
             await ctx.send("Mission aborted.")
             return
 
-        Tache.delete(*taches)
+        Tache.delete(*taches)       # Annule les tâches
         await ctx.send("Tâche(s) annulée(s).")

@@ -21,29 +21,7 @@ from lgrez.features import *        # Tous les sous-modules
 default_descr = "LG-bot – Plateforme pour parties endiablées de Loup-Garou"
 
 
-# ---- Réactions aux différents évènements
-
-# Au démarrage du bot
-async def _on_ready(bot):
-    config.loop = bot.loop          # Enregistrement loop
-
-    guild = bot.get_guild(bot.GUILD_ID)
-    if not guild:
-        raise RuntimeError(f"on_ready : Serveur d'ID {bot.GUILD_ID} "
-                           "(``LGREZ_SERVER_ID``) introuvable")
-
-    print(f"      Connected to '{guild.name}'! "
-          f"({len(guild.channels)} channels, {len(guild.members)} members)")
-
-    if config.output_liveness:
-        bot.i_am_alive()            # Start liveness regular output
-
-    print("[3/3] Initialization (bot.on_ready)...")
-
-
-    # Préparations des objects globaux
-    config.guild = guild
-
+async def _check_and_prepare_objects(bot):
     errors = []
 
     def prepare_attributes(rc_class, discord_type, converter):
@@ -71,7 +49,14 @@ async def _on_ready(bot):
         errors.append(f"catégorie config.private_chan_category_name = "
                       f"\"{config.private_chan_category_name}\" non trouvée")
 
-    if errors:
+    try:
+        tools.channel(config.boudoirs_category_name)
+    except ValueError:
+        errors.append(f"catégorie config.boudoirs_category_name = "
+                      f"\"{config.boudoirs_category_name}\" non trouvée")
+
+    if len(errors) > config._missing_objects:
+        # Nouvelles erreurs
         msg = (f"LGBot.on_ready: {len(errors)} errors:\n - "
                + "\n - ".join(errors))
         logging.error(msg)
@@ -87,6 +72,54 @@ async def _on_ready(bot):
             config.Channel.logs = config.guild.text_channels[0]
             msg += "\n-- Routing logs to this channel."
             await tools.log(msg, code=True, prefixe=f"{atmj} ERREURS :")
+
+    elif len(errors) < config._missing_objects:
+        if errors:
+            # Erreurs résolues, il en reste
+            msg = f"{len(errors)} errors:\n - " + "\n - ".join(errors)
+            logging.error(msg)
+            await tools.log(msg, code=True, prefixe=f"Erreurs restantes :")
+        else:
+            # Toutes erreurs résolues
+            await tools.log("Configuration rôles/chans/emojis OK.")
+
+    config._missing_objects = len(errors)
+
+    # Webhook
+    existing = await config.Channel.logs.webhooks()
+
+    if existing:
+        config.webhook = existing[0]
+    else:           # Création du webhook
+        config.webhook = await config.Channel.logs.create_webhook(
+            name=bot.user.name,
+            avatar=await bot.user.avatar_url.read()
+        )
+        await tools.log(f"Webhook de tâches planifiées créé")
+
+
+# ---- Réactions aux différents évènements
+
+# Au démarrage du bot
+async def _on_ready(bot):
+    config.loop = bot.loop          # Enregistrement loop
+
+    guild = bot.get_guild(bot.GUILD_ID)
+    if not guild:
+        raise RuntimeError(f"on_ready : Serveur d'ID {bot.GUILD_ID} "
+                           "(``LGREZ_SERVER_ID``) introuvable")
+
+    print(f"      Connected to '{guild.name}'! "
+          f"({len(guild.channels)} channels, {len(guild.members)} members)")
+
+    if config.output_liveness:
+        bot.i_am_alive()            # Start liveness regular output
+
+    print("[3/3] Initialization (bot.on_ready)...")
+
+    # Préparations des objects globaux
+    config.guild = guild
+    await bot.check_and_prepare_objects()
 
     await tools.log("Just rebooted!")
     await bot.change_presence(activity=discord.Activity(
@@ -261,12 +294,13 @@ async def _on_command_error(bot, ctx, exc):
 
     elif isinstance(exc, (commands.ConversionError, commands.UserInputError)):
         await ctx.send(
-            f"Hmm, ce n'est pas comme ça qu'on utilise cette commande !"
-            f"Petit rappel : {tools.code(_showexc(exc))}"
+            f"Hmm, ce n'est pas comme ça qu'on utilise cette commande ! "
+            f"({tools.code(_showexc(exc))})\n*Tape "
+            f"`!help {ctx.invoked_with}` pour plus d'informations.*"
         )
-        ctx.message.content = f"!help {ctx.command.name}"
-        ctx = await bot.get_context(ctx.message)
-        await ctx.reinvoke()
+        # ctx.message.content = f"!help {ctx.command.name}"
+        # ctx = await bot.get_context(ctx.message)
+        # await ctx.reinvoke()
 
     elif isinstance(exc, commands.CheckAnyFailure):
         # Normalement raise que par @tools.mjs_only
@@ -278,7 +312,7 @@ async def _on_command_error(bot, ctx, exc):
         # Normalement raise que par @tools.joueurs_only
         await ctx.send(
             "Cette commande est réservée aux joueurs ! "
-            "(parce qu'ils doivent être inscrits en base, toussa)"
+            "(parce qu'ils doivent être inscrits en base, toussa) "
             f"({tools.code('!doas')} est là en cas de besoin)"
         )
 
@@ -430,6 +464,7 @@ class LGBot(commands.Bot):
         # Commandes mixtes : comportement de l'IA et trucs divers
         self.add_cog(IA.GestionIA(self))
         self.add_cog(annexe.Annexe(self))
+        self.add_cog(chans.GestionChans(self))
         # Commandes spéciales, méta-commandes...
         self.remove_command("help")
         self.add_cog(special.Special(self))
@@ -438,11 +473,12 @@ class LGBot(commands.Bot):
     async def on_ready(self):
         """Méthode appellée par Discord au démarrage du bot.
 
-        Vérifie le serveur, log et affiche publiquement que le bot est
-        fonctionnel ; restaure les tâches planifiées éventuelles et
-        exécute celles manquées.
+        Vérifie le serveur (appelle :meth:`check_and_prepare_objects`),
+        log et affiche publiquement que le bot est fonctionnel
+        (activité) ;  restaure les tâches planifiées éventuelles
+        et exécute celles manquées.
 
-        Si :attr:`config.output_liveness vaut ``True``, lance
+        Si :attr:`config.output_liveness` vaut ``True``, lance
         :attr:`bot.i_am_alive <.LGBot.i_am_alive>`
         (écriture chaque minute sur un fichier disque)
 
@@ -564,6 +600,50 @@ class LGBot(commands.Bot):
         """
         await _on_error(self, event, *args, **kwargs)
 
+    # Checks en temps réels des modifs des objets nécessaires au bot
+    async def check_and_prepare_objects(self):
+        """Vérifie et prépare les objets Discord nécessaires au bot.
+
+        Remplit :class:`.config.Role`, :class:`.config.Channel`,
+        :class:`.config.Emoji`, :attr:`config.private_chan_category_name`,
+        :attr:`config.boudoirs_category_name` et :attr:`config.webhook`
+        avec les objets Discord correspondants, et avertit les MJs en cas
+        d'éléments manquants.
+        """
+        await _check_and_prepare_objects(self)
+
+    async def on_guild_channel_delete(self, channel):
+        if channel.guild == config.guild:
+            await self.check_and_prepare_objects()
+
+    async def on_guild_channel_update(self, before, after):
+        if before.guild == config.guild and config._missing_objects:
+            await self.check_and_prepare_objects()
+
+    async def on_guild_channel_create(self, channel):
+        if channel.guild == config.guild and config._missing_objects:
+            await self.check_and_prepare_objects()
+
+    async def on_guild_role_delete(self, role):
+        if role.guild == config.guild:
+            await self.check_and_prepare_objects()
+
+    async def on_guild_role_update(self, before, after):
+        if before.guild == config.guild and config._missing_objects:
+            await self.check_and_prepare_objects()
+
+    async def on_guild_role_create(self, channel):
+        if role.guild == config.guild and config._missing_objects:
+            await self.check_and_prepare_objects()
+
+    async def on_guild_emojis_update(self, guild, before, after):
+        if guild == config.guild:
+            await self.check_and_prepare_objects()
+
+    async def on_webhooks_update(self, channel):
+        if channel == config.Channel.logs:
+            await self.check_and_prepare_objects()
+
     # Système de vérification de vie
     def i_am_alive(self, filename="alive.log"):
         """Témoigne que le bot est en vie et non bloqué.
@@ -584,7 +664,7 @@ class LGBot(commands.Bot):
     def run(self, **kwargs):
         """Prépare puis lance le bot (bloquant).
 
-        Récupère les informations de connection, établit la connection
+        Récupère les informations de connexion, établit la connexion
         à la base de données puis lance le bot.
 
         Args:
