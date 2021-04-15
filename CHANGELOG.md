@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## 2.1.1 - 2021-04-15
+
+### Fixed
+
+  - Critical error (importing non-requied package) in ``__main__.py``;
+  - Bad order in inscription messages if chambre and additional step.
+
+
 ## 2.1.0 - 2021-04-13
 
 ### Added

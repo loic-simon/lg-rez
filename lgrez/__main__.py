@@ -7,7 +7,6 @@ import traceback
 import warnings
 
 import discord
-import discord_webhook
 from dotenv import load_dotenv
 import gspread
 import sqlalchemy

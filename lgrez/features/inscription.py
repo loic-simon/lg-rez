@@ -280,16 +280,18 @@ async def main(member):
         else:
             chambre = config.chambre_mj
 
-        await chan.send(
-            f"{nom}, en chambre {chambre}... Je t'inscris en base !"
-        )
+    else:
+        chambre = None
 
     res = await config.additional_inscription_step(member, chan)
     if res is False:
         return
 
+    if config.demande_chambre:
+        await chan.send(
+            f"{nom}, en chambre {chambre}... Je t'inscris en base !"
+        )
     else:
-        chambre = None
         await chan.send(f"{nom}... Je t'inscris en base !")
 
     # Indicateur d'écriture pour informer le joueur que le bot fait des trucs
