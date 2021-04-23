@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## 2.1.2 - 2021-04-23
+
+### Changed
+
+  - ``!annoncemort`` can now prepair several embeds and post them at once;
+  - ``!addIA``: new fast-add syntax and duplicate tirggers security check.
+
+### Fixed
+
+  - Error when using ``!menu`` before the game has started;
+  - "stop" messages were detected by every waiting functions, even if an
+    other chennel; this is solved by new ``chan`` keyword argument to
+    :func:`functions.tools.wait_for_message`. Dependant functions were
+    modified consequently; while optionnal, omitting this argument may
+    lead to undetected "stop" messages.
+
+
 ## 2.1.1 - 2021-04-15
 
 ### Fixed

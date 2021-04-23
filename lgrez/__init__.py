@@ -10,7 +10,7 @@ __author__ = "Loïc Simon, Tom Lacoma"
 __license__ = "MIT"
 __copyright__ = ("Copyright 2020 - 2021 Loïc Simon & Tom Lacoma - "
                  "Club BD-Jeux × GRIs – ESPCI Paris - PSL")
-__version__ = "2.1.1"
+__version__ = "2.1.2"
 __all__ = ["LGBot"]
 
 

@@ -218,11 +218,23 @@ class GestionIA(commands.Cog):
 
         Args:
             triggers: mot(s), phrase(s), ou expression(s) séparées par
-                des points-virgules ou sauts de lignes
+                des points-virgules ou sauts de lignes (ne peut pas
+                contenir de ">" ou ";" hors séparateurs)
+
+        Nouveau système d'ajout rapide :
+            !addIA trigger > reponse
+            !addIA trig1 ; trig2 > reponse
+
+        ou, si réponse à un message de contenu "trigger" :
+            !addIA > reponse        (triggers = [trigger])
+            !addIA trig2 > reponse  (triggers = [trigger, trig2])
+
+        Une sécurité empêche d'ajouter un trigger déjà existant.
 
         Dans le cas où plusieurs expressions sont spécifiées, toutes
         déclencheront l'action demandée.
         """
+        fast = False
         if not triggers:
             await ctx.send(
                 "Mots/expressions déclencheurs (non sensibles à la "
@@ -232,13 +244,37 @@ class GestionIA(commands.Cog):
             mess = await tools.wait_for_message_here(ctx)
             triggers = mess.content
 
+        elif ">" in triggers:
+            fast = True
+            # Mode rapide
+            triggers, reponse = triggers.split(">", maxsplit=1)
+
         triggers = triggers.replace('\n', ';').split(';')
+        if fast and ctx.message.reference:
+            repmess = ctx.message.reference.resolved
+            if repmess:
+                triggers.append(repmess.content)
+
         triggers = [tools.remove_accents(s).lower().strip() for s in triggers]
         triggers = list({trig for trig in triggers if trig})
         # filtre doublons (accents et non accents...) et triggers vides
+
+        for trigger in triggers.copy():
+            if Trigger.query.filter_by(trigger=trigger).all():
+                await ctx.send(f"Trigger `{trigger}` déjà associé à une "
+                               "réaction, enlevé")
+                triggers.remove(trigger)
+
+        if not triggers:
+            await ctx.send("Aucun trigger valide, abort")
+            return
+
         await ctx.send(f"Triggers : `{'` – `'.join(triggers)}`")
 
-        reponse = await _build_sequence(ctx)
+        if fast:
+            reponse = reponse.strip()
+        else:
+            reponse = await _build_sequence(ctx)
 
         await ctx.send(f"Résumé de la séquence : {tools.code(reponse)}")
         async with ctx.typing():

@@ -121,7 +121,12 @@ class Informations(commands.Cog):
         reacts = []
         r = "––– MENU –––\n\n"
 
-        vaction = joueur.action_vote(Vote.cond)
+        try:
+            vaction = joueur.action_vote(Vote.cond)
+        except RuntimeError:
+            await ctx.send("Minute papillon, le jeu n'est pas encore lancé !")
+            return
+
         if vaction.is_open:
             r += (f" - {config.Emoji.bucher}  Vote pour le bûcher en cours – "
                   f"vote actuel : {tools.code(vaction.decision)}\n")

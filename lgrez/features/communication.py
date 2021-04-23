@@ -41,6 +41,50 @@ def _emoji_repl(mtch):
     return mtch.group()
 
 
+async def _create_annoncemort_embed(ctx, victime=None):
+    joueur = await tools.boucle_query_joueur(ctx, victime,
+                                             "Qui est la victime ?")
+
+    role = joueur.role.nom_complet
+    mess = await ctx.send(
+        f"Rôle à afficher pour {joueur.nom} = {role} ? "
+        "(Pas double peau ou autre)"
+    )
+    if await tools.yes_no(mess):
+        emoji_camp = joueur.camp.discord_emoji_or_none
+    else:
+        await ctx.send("Rôle à afficher :")
+        role = (await tools.wait_for_message_here(ctx)).content
+        mess = await ctx.send("Camp :")
+        camps = Camp.query.filter_by(public=True).all()
+        emoji_camp = await tools.wait_for_react_clic(
+            mess,
+            [camp.discord_emoji for camp in camps if camp.emoji]
+        )
+
+    if joueur.statut == Statut.MV:
+        mess = await ctx.send("Annoncer la mort-vivance ?")
+        if await tools.yes_no(mess):
+            role += " Mort-Vivant"
+        else:
+            emoji_camp = joueur.role.camp.discord_emoji_or_none
+
+    await ctx.send("Contexte ?")
+    desc = (await tools.wait_for_message_here(ctx)).content
+
+    # Création embed
+    embed = discord.Embed(
+        title=f"Mort de {tools.bold(joueur.nom)}, {role}",
+        description=desc,
+        color=0x730000
+    )
+    embed.set_author(name="Oh mon dieu, quelqu'un est mort !")
+    if emoji_camp:
+        embed.set_thumbnail(url=emoji_camp.url)
+
+    return embed
+
+
 class Communication(commands.Cog):
     """Commandes d'envoi de messages, d'embeds, d'annonces..."""
 
@@ -665,72 +709,38 @@ class Communication(commands.Cog):
     @commands.command()
     @tools.mjs_only
     async def annoncemort(self, ctx, *, victime=None):
-        """Annonce un mort hors-vote (COMMANDE MJ)
+        """Annonce un ou plusieur mort(s) hors-vote (COMMANDE MJ)
 
         Args:
-            victime: mort à annoncer
+            victime: (premier) mort à annoncer
 
-        Envoie un embed dans ``#annonces``
+        Envoie un embed par mort dans ``#annonces``
         """
-        joueur = await tools.boucle_query_joueur(ctx, victime,
-                                                 "Qui est la victime ?")
+        embeds = []
+        ok = False
+        while not ok:
+            embed = await _create_annoncemort_embed(ctx, victime)
+            embeds.append(embed)
+            victime = None      # que le 1er appel
 
-        role = joueur.role.nom_complet
-        mess = await ctx.send(
-            f"Rôle à afficher pour {joueur.nom} = {role} ? "
-            "(Pas double peau ou autre)"
-        )
+            mess = await ctx.send("Ajouter un mort ?", embed=embed)
+            if not await tools.yes_no(mess):
+                ok = True
+
+        mess = await ctx.send("Ça part ?")
         if await tools.yes_no(mess):
-            emoji_camp = joueur.camp.discord_emoji_or_none
-        else:
-            await ctx.send("Rôle à afficher :")
-            role = (await tools.wait_for_message_here(ctx)).content
-            mess = await ctx.send("Camp :")
-            camps = Camp.query.filter_by(public=True).all()
-            emoji_camp = await tools.wait_for_react_clic(
-                mess,
-                [camp.discord_emoji for camp in camps if camp.emoji]
-            )
-
-        if joueur.statut == Statut.MV:
-            mess = await ctx.send("Annoncer la mort-vivance ?")
-            if await tools.yes_no(mess):
-                role += " Mort-Vivant"
-            else:
-                emoji_camp = joueur.role.camp.discord_emoji_or_none
-
-        await ctx.send("Contexte ?")
-        desc = (await tools.wait_for_message_here(ctx)).content
-
-        # Création embed
-        embed = discord.Embed(
-            title=f"Mort de {tools.bold(joueur.nom)}, {role}",
-            description=desc,
-            color=0x730000
-        )
-        embed.set_author(name="Oh mon dieu, quelqu'un est mort !")
-        if emoji_camp:
-            embed.set_thumbnail(url=emoji_camp.url)
-
-        mess = await ctx.send(
-            "Ça part ?\n"
-            + tools.ital("(si Non, l'embed est personnalisable via "
-                         "`!embed` puis envoyable à la main)"),
-            embed=embed
-        )
-        if await tools.yes_no(mess):
-            # Envoi du graphe
             await config.Channel.annonces.send(
                 "@everyone Il s'est passé quelque chose ! :scream:",
-                embed=embed
+                embed=embeds[0]
             )
+            for embed in embeds[1:]:
+                await config.Channel.annonces.send(embed=embed)
             await ctx.send(
                 f"Et c'est parti dans {config.Channel.annonces.mention} !"
             )
 
         else:
             await ctx.send("Mission aborted.")
-            self.current_embed = embed
 
 
 

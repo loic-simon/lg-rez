@@ -208,7 +208,7 @@ class RealShell(asyncode.AsyncInteractiveConsole):
         react_task = asyncio.create_task(self.bot.wait_for(
             'raw_reaction_add', check=react_check))
         mess_task = asyncio.create_task(tools.wait_for_message(
-            check=message_check, trigger_on_commands=True))
+            check=message_check, chan=self.channel, trigger_on_commands=True))
         # On exécute les deux tâche concurremment
         done, pending = await asyncio.wait(
             {react_task, mess_task},

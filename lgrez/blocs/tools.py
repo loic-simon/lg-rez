@@ -10,6 +10,7 @@ import asyncio
 import datetime
 import functools
 import re
+import warnings
 
 import discord
 import discord.utils
@@ -244,7 +245,7 @@ def private(callback):
 # ---------------------------------------------------------------------------
 
 # Commande générale, à utiliser à la place de bot.wait_for('message', ...)
-async def wait_for_message(check, trigger_on_commands=False):
+async def wait_for_message(check, trigger_on_commands=False, chan=None):
     """Attend le premier message reçu rencontrant les critères demandés.
 
     Surcouche de :meth:`discord.ext.commands.Bot.wait_for` permettant
@@ -255,6 +256,10 @@ async def wait_for_message(check, trigger_on_commands=False):
             fonction validant ou non chaque message.
         trigger_on_commands (bool): si ``False`` (défaut), un message
             respectant ``check`` sera ignoré si c'est une commande.
+        chan (discord.TextChannel): le channel dans lequel le message
+            est attendu (si applicable). Si ``None``, les messages
+            d'arrêt (:obj:`config.stop_keywords`) peuvent ne pas être
+            détectés (la fonction émettera un warning en ce sens).
 
     Returns:
         :class:`discord.Message`
@@ -265,16 +270,25 @@ async def wait_for_message(check, trigger_on_commands=False):
     """
     stop_keywords = [kw.lower() for kw in config.stop_keywords]
 
+    if chan:
+        def stop_check(m):
+            return (m.channel == chan and m.content.lower() in stop_keywords)
+    else:
+        warnings.warn("lgrez.tools.wait_for_message called with `chan=None`, "
+                      "stop messages may be ignored.", stacklevel=2)
+        def stop_check(m):
+            return False
+
     if trigger_on_commands:
         # on trigger en cas de STOP
         def trig_check(m):
-            return (check(m) or m.content.lower() in stop_keywords)
+            return (check(m) or stop_check(m))
     else:
         def trig_check(m):
             # on ne trigger pas sur les commandes et on trigger en cas de STOP
             return ((check(m)
                      and not m.content.startswith(config.bot.command_prefix))
-                    or m.content.lower() in stop_keywords)
+                    or stop_check(m))
 
     message = await config.bot.wait_for('message', check=trig_check)
     if message.content.lower() in stop_keywords:
@@ -306,7 +320,7 @@ async def wait_for_message_here(ctx, trigger_on_commands=False):
         return (message.channel == ctx.channel
                 and message.author != ctx.bot.user)
 
-    message = await wait_for_message(check=trig_check,
+    message = await wait_for_message(check=trig_check, chan=ctx.channel,
                                      trigger_on_commands=trigger_on_commands)
     return message
 
@@ -340,10 +354,10 @@ async def boucle_message(chan, in_message, condition_sortie, rep_message=None):
 
     if in_message:
         await chan.send(in_message)
-    rep = await wait_for_message(check_chan)
+    rep = await wait_for_message(check_chan, chan=chan)
     while not condition_sortie(rep):
         await chan.send(rep_message)
-        rep = await wait_for_message(check_chan)
+        rep = await wait_for_message(check_chan, chan=chan)
 
     return rep
 
@@ -563,7 +577,7 @@ async def wait_for_react_clic(message, emojis={}, *, process_text=False,
                 return False
 
         mess_task = asyncio.create_task(
-            wait_for_message(check=message_check,
+            wait_for_message(check=message_check, chan=message.channel,
                              trigger_on_commands=trigger_on_commands)
         )
 

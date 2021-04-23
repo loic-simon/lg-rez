@@ -238,10 +238,10 @@ async def main(member):
             + tools.ital("(Répond simplement dans ce channel, "
                          "à l'aide du champ de texte normal)")
         )
-        prenom = await tools.wait_for_message(check=check_chan)
+        prenom = await tools.wait_for_message(check=check_chan, chan=chan)
 
         await chan.send("Très bien, et ton nom de famille ?")
-        nom_famille = await tools.wait_for_message(check=check_chan)
+        nom_famille = await tools.wait_for_message(check=check_chan, chan=chan)
         nom = f"{prenom.content.title()} {nom_famille.content.title()}"
         # .title met en majuscule la permière lettre de chaque mot
 
