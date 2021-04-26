@@ -261,11 +261,11 @@ async def close_action(action):
                 deleted = True
 
     if not deleted:
-        action.utilisation_ouverte.close()
-
-        # Si l'action a un cooldown, on le met
-        if action.base.base_cooldown > 0:
+        # Si l'action a été faite et a un cooldown, on le met
+        if (not action.is_waiting) and (action.base.base_cooldown > 0):
             action.cooldown = action.base.base_cooldown
+
+        action.utilisation_ouverte.close()
 
         # Programmation prochaine ouverture
         if action.base.trigger_debut == ActionTrigger.temporel:

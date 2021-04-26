@@ -11,6 +11,7 @@ from lgrez import config
 from lgrez.blocs import tools
 from lgrez.bdd import (Joueur, Role, Camp, Action, BaseAction,
                        ActionTrigger, Vote)
+from lgrez.features import gestion_actions
 
 
 class Informations(commands.Cog):
@@ -268,7 +269,7 @@ class Informations(commands.Cog):
 
             action = Action(joueur=joueur, base=base, cooldown=cooldown,
                             charges=charges)
-            action.add()
+            gestion_actions.add_action(action)
             await ctx.send(f"Action ajoutée (id {action.id}).")
             return
 

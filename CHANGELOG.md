@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## 2.1.3 - 2021-04-26
+
+### Changed
+
+  - ``!boudoir``: ``invite`` and ``expulse`` now take only one name as
+    a full argument, other various improvements;
+  - ``!sync``: role sync message now hides role slug.
+
+### Fixed
+
+  - :func:`.blocs.tools.private`: fixed :mod:`.blocs.one_command` bypass;
+  - ``!actions``: new action creation did not properly added action;
+  - ``!open`` / ``!close``: all open/close triggers were not triggered;
+  - :func:`.features.gestion_actions.close_action`: base cooldown was set
+    on actions even if no decision was made;
+
+
 ## 2.1.2 - 2021-04-23
 
 ### Changed
@@ -17,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Error when using ``!menu`` before the game has started;
   - "stop" messages were detected by every waiting functions, even if an
     other chennel; this is solved by new ``chan`` keyword argument to
-    :func:`functions.tools.wait_for_message`. Dependant functions were
+    :func:`.blocs.tools.wait_for_message`. Dependant functions were
     modified consequently; while optionnal, omitting this argument may
     lead to undetected "stop" messages.
 

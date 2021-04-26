@@ -226,6 +226,7 @@ def private(callback):
     async def new_callback(self, ctx, *args, **kwargs):
         if not ctx.channel.name.startswith(config.private_chan_prefix):
             await ctx.message.delete()
+            one_command.remove_from_in_command(ctx)
             # chan dans le contexte d'appel = chan privé
             ctx.channel = Joueur.from_member(ctx.author).private_chan
             await ctx.send(
@@ -234,6 +235,7 @@ def private(callback):
                 f" en dehors de ta conv privée ! :warning:\n"
                 f"J'ai supprimé ton message, et j'exécute la commande ici :"
             )
+            one_command.add_to_in_command(ctx)
         # Dans tous les cas, appelle callback (avec le contexte modifié)
         return await callback(self, ctx, *args, **kwargs)
 

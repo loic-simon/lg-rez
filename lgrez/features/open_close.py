@@ -276,6 +276,10 @@ class OpenClose(commands.Cog):
                     BaseAction.trigger_debut == ActionTrigger.open(qui))):
                 await gestion_actions.open_action(action)
 
+            for action in Action.query.filter(Action.base.has(
+                    BaseAction.trigger_fin == ActionTrigger.open(qui))):
+                await gestion_actions.close_action(action)
+
         # Réinitialise haros/candids
         items = []
         if qui == Vote.cond:
@@ -420,6 +424,10 @@ class OpenClose(commands.Cog):
         if isinstance(qui, Vote):
             for action in Action.query.filter(Action.base.has(
                   BaseAction.trigger_debut == ActionTrigger.close(qui))):
+                await gestion_actions.open_action(action)
+
+            for action in Action.query.filter(Action.base.has(
+                  BaseAction.trigger_fin == ActionTrigger.close(qui))):
                 await gestion_actions.close_action(action)
 
         # Programme prochaine ouverture

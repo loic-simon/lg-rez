@@ -44,8 +44,10 @@ async def _invite(joueur, boudoir, invite_msg):
     """Invitation d'un joueur dans un boudoir (lancer comme tâche à part)"""
     pc = joueur.private_chan
     bc = boudoir.chan
-    mess = await pc.send(f"{boudoir.gerant.nom} t'as invité à rejoindre son "
-                         f"boudoir : « {boudoir.nom} » !\nAcceptes-tu ?")
+    mess = await pc.send(
+        f"{joueur.member.mention} {boudoir.gerant.nom} t'as invité(e) à "
+        f"rejoindre son boudoir : « {boudoir.nom} » !\nAcceptes-tu ?"
+    )
 
     if await tools.yes_no(mess):
         await boudoir.add_joueur(joueur)
@@ -155,7 +157,7 @@ class GestionChans(commands.Cog):
             chan = await config.guild.create_text_channel(
                 nom,
                 topic=f"Boudoir crée le {now:%d/%m à %H:%M}. "
-                      f"Gérant : {joueur.nom}",
+                      f"Gérant(e) : {joueur.nom}",
                 category=categ,
             )
 
@@ -176,8 +178,8 @@ class GestionChans(commands.Cog):
     @boudoir.command(aliases=["add"])
     @tools.joueurs_only
     @in_boudoir
-    async def invite(self, ctx, *cibles):
-        """Invite un ou plusieur joueur(s) à rejoindre ce boudoir"""
+    async def invite(self, ctx, *, cible):
+        """Invite un joueur à rejoindre ce boudoir"""
         boudoir = Boudoir.from_channel(ctx.channel)
         gerant = Joueur.from_member(ctx.author)
         if boudoir.gerant != gerant:
@@ -185,24 +187,23 @@ class GestionChans(commands.Cog):
                             "de nouvelles personnes.")
             return
 
-        for cible in cibles:
-            joueur = await tools.boucle_query_joueur(
-                ctx, cible=cible, message="Qui souhaites-tu inviter ?"
-            )
-            if joueur in boudoir.joueurs:
-                await ctx.send(f"{joueur.nom} est déjà dans ce boudoir !")
-                return
+        joueur = await tools.boucle_query_joueur(
+            ctx, cible=cible, message="Qui souhaites-tu inviter ?"
+        )
+        if joueur in boudoir.joueurs:
+            await ctx.send(f"{joueur.nom} est déjà dans ce boudoir !")
+            return
 
-            mess = await ctx.send(f"Invitation envoyée à {joueur.nom}.")
-            asyncio.create_task(_invite(joueur, boudoir, mess))
-            # On envoie l'invitation en arrière-plan (libération du chan).
+        mess = await ctx.send(f"Invitation envoyée à {joueur.nom}.")
+        asyncio.create_task(_invite(joueur, boudoir, mess))
+        # On envoie l'invitation en arrière-plan (libération du chan).
 
 
     @boudoir.command(aliases=["remove"])
     @tools.joueurs_only
     @in_boudoir
-    async def expulse(self, ctx, *cibles):
-        """Expulse un ou plusieur membre(s) de ce boudoir"""
+    async def expulse(self, ctx, *, cible):
+        """Expulse un membre de ce boudoir"""
         boudoir = Boudoir.from_channel(ctx.channel)
         gerant = Joueur.from_member(ctx.author)
         if boudoir.gerant != gerant:
@@ -210,18 +211,17 @@ class GestionChans(commands.Cog):
                             "des membres.")
             return
 
-        for cible in cibles:
-            joueur = await tools.boucle_query_joueur(
-                ctx, cible=cible, message="Qui souhaites-tu expulser ?"
-            )
-            if joueur not in boudoir.joueurs:
-                await ctx.send(f"{joueur.nom} n'est pas membre du boudoir !")
-                return
+        joueur = await tools.boucle_query_joueur(
+            ctx, cible=cible, message="Qui souhaites-tu expulser ?"
+        )
+        if joueur not in boudoir.joueurs:
+            await ctx.send(f"{joueur.nom} n'est pas membre du boudoir !")
+            return
 
-            await boudoir.remove_joueur(joueur)
-            await joueur.private_chan.send(f"Tu as été expulsé(e) du boudoir "
-                                           f"« {boudoir.nom} ».")
-            await ctx.send(f"{joueur.nom} a bien été expulsé de ce boudoir.")
+        await boudoir.remove_joueur(joueur)
+        await joueur.private_chan.send(f"Tu as été expulsé(e) du boudoir "
+                                       f"« {boudoir.nom} ».")
+        await ctx.send(f"{joueur.nom} a bien été expulsé de ce boudoir.")
 
 
     @boudoir.command(aliases=["quit"])
@@ -289,7 +289,7 @@ class GestionChans(commands.Cog):
         Bouderie.update()
         await boudoir.chan.edit(
             topic=f"Boudoir crée le {boudoir.ts_created:%d/%m à %H:%M}. "
-                  f"Gérant : {joueur.nom}"
+                  f"Gérant(e) : {joueur.nom}"
         )
 
         await ctx.send(f"Boudoir transféré à {joueur.nom}.")
@@ -329,7 +329,7 @@ class GestionChans(commands.Cog):
     @boudoir.command()
     @tools.joueurs_only
     @in_boudoir
-    async def rename(self, ctx, nom=None):
+    async def rename(self, ctx, *, nom):
         """Renomme ce boudoir"""
         boudoir = Boudoir.from_channel(ctx.channel)
         gerant = Joueur.from_member(ctx.author)

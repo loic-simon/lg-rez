@@ -544,7 +544,7 @@ async def modif_joueur(joueur_id, modifs, silent=False):
                     f"{af} Ton nouveau rôle, si tu l'acceptes : "
                     f"{tools.bold(new_role.nom_complet)} !\nQue ce soit pour "
                     "un jour ou pour le reste de la partie, renseigne-toi en "
-                    f"tapant {tools.code(f'!roles {new_role.slug}')}.\n"
+                    f"tapant {tools.code(f'!roles {new_role.nom}')}.\n"
                 )
 
         elif modif.col == "camp" and not silent:    # Modification camp
@@ -626,7 +626,7 @@ class Sync(commands.Cog):
 
         message = await ctx.send(
             f"{len(modifs)} modification(s) trouvée(s) "
-            f"pour {len(dic)} joueur(s), go ?"
+            f"pour {len(dic)} joueur(s), go ? (silent = {silent})"
         )
         if not await tools.yes_no(message):
             await ctx.send("Mission aborted.")
