@@ -120,7 +120,7 @@ async def get_cible(ctx, action, base_ciblage, first=None):
     elif base_ciblage.type == CibleType.booleen:
         message = await ctx.send(f"{phrase}\n\n*{stop}*")
         if first:
-            await ctx.send(quote_bloc(first))
+            await ctx.send(tools.quote_bloc(first))
         res = await tools.yes_no(message, first_text=first)
     elif base_ciblage.type == CibleType.texte:
         if first:
@@ -497,7 +497,10 @@ class VoterAgir(commands.Cog):
             cib = Ciblage(utilisation=util, base=bc)
             cib.valeur = cible      # affecte le bon attribut selon le bc.type
         util.ts_decision = datetime.datetime.now()
-        util.etat = UtilEtat.remplie
+        if cibles:
+            util.etat = UtilEtat.remplie
+        else:
+            util.etat = UtilEtat.ignoree
         util.update()
 
         async with ctx.typing():

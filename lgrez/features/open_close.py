@@ -223,6 +223,8 @@ class OpenClose(commands.Cog):
 
             if isinstance(qui, Vote):
                 action = joueur.action_vote(qui)
+                if action.is_open:      # Sécurité : action ouverte depuis
+                    continue
                 util = Utilisation(action=action)
                 util.add()
                 util.open()
@@ -385,6 +387,9 @@ class OpenClose(commands.Cog):
             chan = joueur.private_chan
 
             if isinstance(qui, Vote):
+                action = joueur.action_vote(qui)
+                if not action.is_open:      # Sécurité : action fermée depuis
+                    continue
                 util = joueur.action_vote(qui).utilisation_ouverte
                 nom_cible = util.cible.nom if util.cible else "*non défini*"
 

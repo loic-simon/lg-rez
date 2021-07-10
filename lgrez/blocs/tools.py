@@ -18,6 +18,7 @@ from discord.ext import commands
 import unidecode
 
 from lgrez import config, bdd
+from lgrez.blocs import one_command
 from lgrez.bdd import *
 # on importe toutes les tables, plus simple pour y accéder depuis des
 # réactions etc (via eval_accols)

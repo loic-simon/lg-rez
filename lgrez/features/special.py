@@ -152,7 +152,23 @@ class Special(commands.Cog):
         joueur = await tools.boucle_query_joueur(ctx, qui.strip())
 
         ctx.message.content = config.bot.command_prefix + quoi
-        ctx.message.author = joueur.member
+        try:
+            member = joueur.member
+        except ValueError:
+            await ctx.send(f"{joueur} absent du serveur, "
+                           "tentative de contournement")
+            class PseudoMember:
+                __class__ = discord.Member
+                id = joueur.discord_id
+                display_name = joueur.nom
+                guild = config.guild
+                mention = f"[@{joueur.nom}]"
+                top_role = (config.Role.joueur_en_vie if joueur.est_vivant
+                            else config.Role.joueur_mort)
+                roles = [config.Role.everyone, top_role]
+            member = PseudoMember()
+
+        ctx.message.author = member
 
         await ctx.send(f":robot: Exécution en tant que {joueur.nom} :")
         with one_command.bypass(ctx):

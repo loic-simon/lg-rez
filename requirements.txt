@@ -24,7 +24,7 @@ multidict==4.7.6
 numpy==1.19.4
 oauth2client==4.1.3
 oauthlib==3.1.0
-Pillow==8.1.1
+Pillow==8.2.0
 protobuf==3.14.0
 psycopg2==2.8.6
 pyasn1==0.4.8
@@ -35,11 +35,11 @@ python-dotenv==0.15.0
 pytz==2020.4
 requests==2.25.0
 requests-oauthlib==1.3.0
-rsa==4.6
+rsa==4.7
 six==1.15.0
 SQLAlchemy==1.3.20
 typing-extensions==3.7.4.3
 Unidecode==1.1.1
 uritemplate==3.0.1
-urllib3==1.26.4
+urllib3==1.26.5
 yarl==1.5.1

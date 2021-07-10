@@ -21,7 +21,8 @@ _baseaction_role = sqlalchemy.Table('_baseactions_roles',
     base.TableBase.metadata,
     sqlalchemy.Column('_role_slug', sqlalchemy.ForeignKey('roles.slug')),
     sqlalchemy.Column('_baseaction_slug',
-                      sqlalchemy.ForeignKey('baseactions.slug'))
+                      sqlalchemy.ForeignKey('baseactions.slug')),
+    sqlalchemy.schema.UniqueConstraint('_role_slug', '_baseaction_slug'),
 )
 
 

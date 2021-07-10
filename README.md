@@ -17,7 +17,7 @@ internationalization is available at this time.*
 ## What's New in LG-Rez
 
 Only major features are reported here; see [`CHANGELOG.md`](CHANGELOG.md)
-or in [the doc](https://lg-rez.readthedocs.io/fr/2.1.0/changelog.html) for
+or in [the doc](https://lg-rez.readthedocs.io/fr/2.1.4/changelog.html) for
 details.
 
 ### 2.1
@@ -126,7 +126,7 @@ We also provide a direct way to customize some parameters of the game and
 of the Discord server through [`config`](lgrez/config.py) module:
 roles/channels/emoji names, date of season beginning, inscription
 customization... See
-[the doc](https://lg-rez.readthedocs.io/fr/2.1.0/config.html)
+[the doc](https://lg-rez.readthedocs.io/fr/2.1.4/config.html)
 for full API usage information.
 
 See additional attributes and overriden methods on

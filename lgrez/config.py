@@ -152,6 +152,10 @@ refills_one = ["forgeron", "rebouteux", "divin"]
 refills_divins = ["divin"]
 
 
+#: bool: Indique si le bot est prêt (:meth:`.LGBot.on_ready` appelé)
+#: N'est pas concu pour être changé manuellement.
+is_ready = False
+
 
 class Role(ready_check.ReadyCheck, check_type=discord.Role):
     """Rôles Discord nécessaires au jeu

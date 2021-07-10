@@ -1,5 +1,5 @@
-# Specific server customizarion
-start_bot.py
+# Specific server customization
+start_bot*.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

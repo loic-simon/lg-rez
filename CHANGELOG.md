@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+*If you are reading this on GitHub, you may consider switching to the docs
+to benefit Sphinx internal links to Python objects:*
+https://lg-rez.readthedocs.io/fr/2.1.4/changelog.html
+
+
+## 2.1.4 - 2021-07-10
+
+### Changed
+
+  - ``!lore`` can now replace ``@role_slug`` (:class:`.config.Role` attributes
+    only) with role mention;
+  - ``!doas`` can now act for players that left the server (limited range);
+  - Database host and name is now printed at bot startup;
+  - ``.gitignore`` now ignores all ``start_bot*.py`` files.
+
+### Fixed
+
+  - ``!open``/``!close``: new safety check to avoid double opening/closing;
+  - Added :obj:`.config.is_ready` to avoid double :meth:`.LGBot.on_ready` calls;
+  - Added unique constraint to :class:`.bdd.Role`-:class:`.bdd.BaseAction`
+    junction table to avoid duplicate rows;
+  - ``!boudoir``: dead players could create some and sometimes write messages in;
+  - ``!lore`` did not correctly detect some docs ID;
+  - ``!lore`` formatting failed on some specific cases (e.g bullet lists +
+    italic);
+  - ``!action``: :attr:`.bdd.UtilEtat.remplie` was sometimes used istead of
+    :attr:`.bdd.UtilEtat.ignoree`;
+  - Fixed fatal errors on :func:`.blocs.tools.private` commands warning
+    messages, :func:`.features.voter_agir.get_cible`, ``!infos``, and role
+    creation detection (if missing required roles);
+  - Bumped dependencies security upgrades.
+
 
 ## 2.1.3 - 2021-04-26
 

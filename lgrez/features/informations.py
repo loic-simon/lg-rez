@@ -192,8 +192,7 @@ class Informations(commands.Cog):
                    else action.base.temporalite).ljust(22)
                 + (f"   {action.charges} charge(s)"
                     + (" pour cette semaine"
-                        if (action.refill and "weekends" in action.refill)
-                        else "")
+                        if "weekends" in action.base.refill else "")
                     if isinstance(action.charges, int) else "Illimitée")
             ) for action in joueur.actions_actives))
             # Vraiment désolé pour cette immondice j'ai la flemme

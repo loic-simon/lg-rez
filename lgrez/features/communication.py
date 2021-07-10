@@ -21,7 +21,7 @@ from lgrez.features import gestion_actions
 from lgrez.features.sync import transtype
 
 
-def _mention_repl(mtch):
+def _joueur_repl(mtch):
     """Remplace @(Prénom Nom) par la mention du joueur, si possible"""
     nearest = Joueur.find_nearest(mtch.group(1),
                                   col=Joueur.nom, sensi=0.8)
@@ -31,6 +31,13 @@ def _mention_repl(mtch):
             return joueur.member.mention
         except ValueError:
             pass
+    return mtch.group(1)
+
+def _role_repl(mtch):
+    """Remplace @role_slug par la mention du rôle"""
+    if mtch.group(1).lower() in config.Role:
+        role = getattr(config.Role, mtch.group(1))
+        return role.mention
     return mtch.group(1)
 
 def _emoji_repl(mtch):
@@ -769,7 +776,7 @@ class Communication(commands.Cog):
             raise commands.BadArgument("'doc_id' doit être l'ID ou l'URL "
                                        "d'un document Google Docs")
         elif len(doc_id) > 44:      # URL fournie (pas que l'ID)
-            mtch = re.search(r"/d/(\w{44})(\W|$)", doc_id)
+            mtch = re.search(r"/d/([\w-]{44})(\W|$)", doc_id)
             if mtch:
                 doc_id = mtch.group(1)
             else:
@@ -783,17 +790,18 @@ class Communication(commands.Cog):
         formatted_text = ""
         for (_text, style) in content:
             _text = _text.replace("\v", "\n").replace("\f", "\n")
-            # Espaces/newlines à la fin de _text ==> à part
-            text = _text.rstrip()
-            len_rest = len(_text) - len(text)
-            rest = _text[-len_rest:] if len_rest else ""
 
-            if not text:    # espcaes/newlines uniquement
-                formatted_text += rest
+            # Espaces/newlines au début/fin de _text ==> à part
+            motif = re.fullmatch(r"(\s*)(.*?)(\s*)", _text)
+            pref, text, suff = motif.group(1, 2, 3)
+
+            if not text:    # espaces/newlines uniquement
+                formatted_text += pref + suff
                 continue
 
             # Remplacement des mentions
-            text = re.sub(r"@([\w-]+ [\w-]+)", _mention_repl, text)
+            text = re.sub(r"@([\w-]+ [\w-]+)", _joueur_repl, text)
+            text = re.sub(r"@(\w+)", _role_repl, text)
             text = re.sub(r":(\w+):", _emoji_repl, text)
 
             if style.get("bold"):
@@ -815,7 +823,7 @@ class Communication(commands.Cog):
             elif style.get("underline"):    # ne pas souligner si lien
                 text = tools.soul(text)
 
-            formatted_text += text + rest
+            formatted_text += pref + text + suff
 
         await ctx.send("————————————————————")
         await tools.send_blocs(ctx, formatted_text)

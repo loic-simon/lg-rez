@@ -102,6 +102,10 @@ async def _check_and_prepare_objects(bot):
 
 # Au démarrage du bot
 async def _on_ready(bot):
+    if config.is_ready:
+        await tools.log("[`on_ready` called but bot already ready, ignored]")
+        return
+
     config.loop = bot.loop          # Enregistrement loop
 
     guild = bot.get_guild(bot.GUILD_ID)
@@ -137,6 +141,7 @@ async def _on_ready(bot):
         await tools.log(f"{len(taches)} tâches planifiées récupérées "
                         "en base et reprogrammées.")
 
+    config.is_ready = True
     print("      Initialization complete.")
     print("\nListening for events.")
 
@@ -632,7 +637,7 @@ class LGBot(commands.Bot):
         if before.guild == config.guild and config._missing_objects:
             await self.check_and_prepare_objects()
 
-    async def on_guild_role_create(self, channel):
+    async def on_guild_role_create(self, role):
         if role.guild == config.guild and config._missing_objects:
             await self.check_and_prepare_objects()
 
@@ -676,10 +681,11 @@ class LGBot(commands.Bot):
         LGREZ_DISCORD_TOKEN = env.load("LGREZ_DISCORD_TOKEN")
         self.GUILD_ID = int(env.load("LGREZ_SERVER_ID"))
 
-        # Connection BDD
+        # Connexion BDD
         print("[1/3] Connecting to database...")
         bdd.connect()
-        print("      Connected!")
+        url = config.engine.url
+        print(f"      Connected to {url.host}/{url.database}!")
 
         # Enregistrement
         config.bot = self

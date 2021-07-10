@@ -116,7 +116,7 @@ class GestionChans(commands.Cog):
 
 
     @boudoir.command(aliases=["new", "creer", "créer"])
-    @tools.joueurs_only
+    @tools.vivants_only
     @tools.private
     async def create(self, ctx, *, nom=None):
         """Crée un nouveau boudoir dont tu es gérant"""
@@ -384,8 +384,7 @@ class GestionChans(commands.Cog):
 
         for joueur in joueurs:
             await ctx.channel.set_permissions(joueur.member,
-                                              read_messages=True,
-                                              send_messages=True)
+                                              read_messages=True)
             await ctx.send(f"{joueur.nom} ajouté")
 
         mess = await ctx.send("Fini, purge les messages ?")
