@@ -10,6 +10,7 @@
 
 .. automodule:: lgrez.blocs.env
    :members:
+   :special-members: __getattr__
    :member-order: bysource
 
 

@@ -5,6 +5,165 @@
 .. automodule:: lgrez.features
 
 
+Liste des commandes :
+
++------------------+----------------------------------------------------------------------+--------------------------------------------------------------+------------------+
+| **Commande**     | **Description**                                                      | **Autorisations**                                            | **Restrictions** |
+|                  |                                                                      +-------------------+-----------------+---------------+--------+                  +
+|                  |                                                                      | **Joueur en vie** | **Joueur mort** | **Rédacteur** | **MJ** |                  |
++==================+======================================================================+===================+=================+===============+========+==================+
+| **Informations - Commandes pour en savoir plus sur soi et les autres :**                                                                                                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!roles``       | Affiche la liste des rôles / des informations sur un rôle            | X                 | X               |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!rolede``      | Donne le rôle d'un joueur                                            |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!quiest``      | Liste les joueurs ayant un rôle donné                                |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!menu``        | Affiche des informations et boutons sur les votes / actions en cours | X                 |                 |               |        | ``private``      |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!infos``       | Affiche tes informations de rôle / actions                           | X                 |                 |               |        | ``private``      |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!actions``     | Affiche et modifie les actions d'un joueur                           |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!vivants``     | Affiche la liste des joueurs vivants                                 | X                 | X               |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!morts``       | Affiche la liste des joueurs morts                                   | X                 | X               |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| **VoterAgir - Commandes de vote et d'action de rôle :**                                                                                                                   |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!vote``        | Vote pour le condamné du jour                                        | X                 |                 |               |        | ``private``      |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!votemaire``   | Vote pour le nouveau maire                                           | X                 |                 |               |        | ``private``      |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!voteloups``   | Vote pour la victime de l'attaque des loups                          | X                 |                 |               |        | ``private``      |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!action``      | Utilise l'action de ton rôle / une des actions associées             | X                 |                 |               |        | ``private``      |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| **ActionsPubliques - Commandes d'actions vous engageant publiquement :**                                                                                                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!haro``        | Lance publiquement un haro contre un autre joueur.                   | X                 |                 |               |        | ``private``      |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!candid``      | Candidate à l'élection du nouveau maire.                             | X                 |                 |               |        | ``private``      |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!wipe``        | Efface les haros / candidatures du jour                              |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| **OpenClose - Commandes de gestion des votes et actions :**                                                                                                               |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!open``        | Lance un vote / des actions de rôle                                  |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!close``       | Ferme un vote / des actions de rôle                                  |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!remind``      | Envoi un rappel de vote / actions de rôle                            |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!refill``      | Recharger un/des pouvoirs rechargeables                              |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!cparti``      | Lance le jeu                                                         |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| **Sync - Commandes de synchronisation des GSheets vers la BDD et les joueurs :**                                                                                          |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!sync``        | Récupère et applique les modifs du Tableau de bord                   |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!fillroles``   | Remplit les tables et #roles depuis le GSheet ad hoc                 |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| **GestionTaches - Commandes de planification, exécution, annulation de tâches :**                                                                                         |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!taches``      | Liste les tâches en attente                                          |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!planif``      | Planifie une tâche au moment voulu                                   |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!delay``       | Exécute une commande après XhYmZs                                    |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!cancel``      | Annule une ou plusieurs tâche(s) planifiée(s)                        |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| **Communication - Commandes d'envoi de messages, d'embeds, d'annonces... :**                                                                                              |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!embed``       | Prépare un embed (message riche) et l'envoie                         |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!send``        | Envoie un message à tous ou certains joueurs                         |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!post``        | Envoie un message dans un salon                                      |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!plot``        | Trace le résultat du vote et l'envoie sur #annonces                  |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!annoncemort`` | Annonce un ou plusieur mort(s) hors-vote                             |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!lore``        | Récupère et poste un lore depuis un Google Docs                      |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!modif``       | Modifie un message du bot                                            |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| **GestionIA - Commandes relatives à l'IA (réponses automatiques du bot) :**                                                                                               |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!stfu``        | Active/désactive la réponse automatique du bot sur ton channel privé | X                 | X               |               | X      | ``private``      |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!fals``        | Active/désactive le mode « foire à la saucisse »                     | X                 | X               |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!react``       | Force le bot à réagir à un message                                   | X                 | X               |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!reactfals``   | Force le bot à réagir à un message comme en mode Foire à la saucisse | X                 | X               |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!addIA``       | Ajoute une règle d'IA                                                |                   |                 | X             | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!listIA``      | Liste les règles d'IA reconnues par le bot                           |                   |                 | X             | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!modifIA``     | Modifie/supprime une règle d'IA                                      |                   |                 | X             | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| **Annexe - Commandes annexes aux usages divers :**                                                                                                                        |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!roll``        | Lance un ou plusieurs dés                                            | X                 | X               |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!coinflip``    | Renvoie le résultat d'un tirage à Pile ou Face (aléatoire)           | X                 | X               |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!ping``        | Envoie un ping au bot                                                | X                 | X               |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!akinator``    | J'ai glissé chef                                                     | X                 | X               |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!xkcd``        | J'ai aussi glissé chef, mais un peu moins                            | X                 | X               |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| **GestionChans - Gestion des salons :**                                                                                                                                   |
++------------------+----------------------------------------------+-----------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!boudoir``     | Gestion des boudoirs                         | list                  | X                 | X               |               |        | ``private``      |
+|                  |                                              +-----------------------+-------------------+-----------------+---------------+--------+------------------+
+|                  |                                              | create                | X                 |                 |               |        | ``private``      |
+|                  |                                              +-----------------------+-------------------+-----------------+---------------+--------+------------------+
+|                  |                                              | invite                | X                 | X               |               |        | ``in_boudoir``   |
+|                  |                                              +-----------------------+-------------------+-----------------+---------------+--------+------------------+
+|                  |                                              | expulse               | X                 | X               |               |        | ``in_boudoir``   |
+|                  |                                              +-----------------------+-------------------+-----------------+---------------+--------+------------------+
+|                  |                                              | leave                 | X                 | X               |               |        | ``in_boudoir``   |
+|                  |                                              +-----------------------+-------------------+-----------------+---------------+--------+------------------+
+|                  |                                              | transfer              | X                 | X               |               |        | ``in_boudoir``   |
+|                  |                                              +-----------------------+-------------------+-----------------+---------------+--------+------------------+
+|                  |                                              | delete                | X                 | X               |               |        | ``in_boudoir``   |
+|                  |                                              +-----------------------+-------------------+-----------------+---------------+--------+------------------+
+|                  |                                              | rename                | X                 | X               |               |        | ``in_boudoir``   |
++------------------+----------------------------------------------+-----------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!addhere``     | Ajoute les membres au chan courant                                   |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!purge``       | Supprime tous les messages de ce chan                                |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| **Special - Commandes spéciales (méta-commandes et expérimentations) :**                                                                                                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!panik``       | Tue instantanément le bot, sans confirmation                         |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!do``          | Exécute du code Python et affiche le résultat                        |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!shell``       | Lance un terminal Python directement dans Discord                    |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!co``          | Lance la procédure d'inscription pour un membre                      |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!doas``        | Exécute une commande en tant qu'un autre joueur                      |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!secret``      | Supprime le message puis exécute la commande                         |                   |                 |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!stop``        | Peut débloquer des situations compliquées (beta)                     | X                 | X               |               | X      | ``private``      |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!help``        | Affiche la liste des commandes utilisables et leur utilisation       | X                 | X               |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+| ``!apropos``     | Informations et mentions légales du projet                           | X                 | X               |               | X      |                  |
++------------------+----------------------------------------------------------------------+-------------------+-----------------+---------------+--------+------------------+
+
+
 ``.special``
 ----------------------------------------------------------------------
 
@@ -13,8 +172,8 @@
    :exclude-members: Special
    :member-order: bysource
 
-.. --autocog--:lgrez.features.special.Special: { 
-.. (this bloc is autogenerated each time docs are build, don't 
+.. --autocog--:lgrez.features.special.Special: {
+.. (this bloc is autogenerated each time docs are build, don't
 .. change manually! See end of conf.py for generation code.)
 .. autoclass:: lgrez.features.special.Special
     :members:
@@ -63,8 +222,8 @@
    :exclude-members: ActionsPubliques
    :member-order: bysource
 
-.. --autocog--:lgrez.features.actions_publiques.ActionsPubliques: { 
-.. (this bloc is autogenerated each time docs are build, don't 
+.. --autocog--:lgrez.features.actions_publiques.ActionsPubliques: {
+.. (this bloc is autogenerated each time docs are build, don't
 .. change manually! See end of conf.py for generation code.)
 .. autoclass:: lgrez.features.actions_publiques.ActionsPubliques
     :members:
@@ -95,8 +254,8 @@
    :exclude-members: Annexe
    :member-order: bysource
 
-.. --autocog--:lgrez.features.annexe.Annexe: { 
-.. (this bloc is autogenerated each time docs are build, don't 
+.. --autocog--:lgrez.features.annexe.Annexe: {
+.. (this bloc is autogenerated each time docs are build, don't
 .. change manually! See end of conf.py for generation code.)
 .. autoclass:: lgrez.features.annexe.Annexe
     :members:
@@ -133,8 +292,8 @@
    :exclude-members: GestionChans
    :member-order: bysource
 
-.. --autocog--:lgrez.features.chans.GestionChans: { 
-.. (this bloc is autogenerated each time docs are build, don't 
+.. --autocog--:lgrez.features.chans.GestionChans: {
+.. (this bloc is autogenerated each time docs are build, don't
 .. change manually! See end of conf.py for generation code.)
 .. autoclass:: lgrez.features.chans.GestionChans
     :members:
@@ -194,8 +353,8 @@
    :exclude-members: Communication
    :member-order: bysource
 
-.. --autocog--:lgrez.features.communication.Communication: { 
-.. (this bloc is autogenerated each time docs are build, don't 
+.. --autocog--:lgrez.features.communication.Communication: {
+.. (this bloc is autogenerated each time docs are build, don't
 .. change manually! See end of conf.py for generation code.)
 .. autoclass:: lgrez.features.communication.Communication
     :members:
@@ -223,6 +382,9 @@
         .. _lore:
     - :Commande ``!lore``  :
         .. automethod:: lgrez.features.communication.Communication.lore.callback
+        .. _modif:
+    - :Commande ``!modif``  :
+        .. automethod:: lgrez.features.communication.Communication.modif.callback
 
 .. }
 
@@ -243,8 +405,8 @@
    :exclude-members: GestionIA
    :member-order: bysource
 
-.. --autocog--:lgrez.features.IA.GestionIA: { 
-.. (this bloc is autogenerated each time docs are build, don't 
+.. --autocog--:lgrez.features.IA.GestionIA: {
+.. (this bloc is autogenerated each time docs are build, don't
 .. change manually! See end of conf.py for generation code.)
 .. autoclass:: lgrez.features.IA.GestionIA
     :members:
@@ -287,8 +449,8 @@
    :exclude-members: Informations
    :member-order: bysource
 
-.. --autocog--:lgrez.features.informations.Informations: { 
-.. (this bloc is autogenerated each time docs are build, don't 
+.. --autocog--:lgrez.features.informations.Informations: {
+.. (this bloc is autogenerated each time docs are build, don't
 .. change manually! See end of conf.py for generation code.)
 .. autoclass:: lgrez.features.informations.Informations
     :members:
@@ -342,8 +504,8 @@
    :exclude-members: OpenClose
    :member-order: bysource
 
-.. --autocog--:lgrez.features.open_close.OpenClose: { 
-.. (this bloc is autogenerated each time docs are build, don't 
+.. --autocog--:lgrez.features.open_close.OpenClose: {
+.. (this bloc is autogenerated each time docs are build, don't
 .. change manually! See end of conf.py for generation code.)
 .. autoclass:: lgrez.features.open_close.OpenClose
     :members:
@@ -380,8 +542,8 @@
    :exclude-members: Sync
    :member-order: bysource
 
-.. --autocog--:lgrez.features.sync.Sync: { 
-.. (this bloc is autogenerated each time docs are build, don't 
+.. --autocog--:lgrez.features.sync.Sync: {
+.. (this bloc is autogenerated each time docs are build, don't
 .. change manually! See end of conf.py for generation code.)
 .. autoclass:: lgrez.features.sync.Sync
     :members:
@@ -409,8 +571,8 @@
    :exclude-members: GestionTaches
    :member-order: bysource
 
-.. --autocog--:lgrez.features.taches.GestionTaches: { 
-.. (this bloc is autogenerated each time docs are build, don't 
+.. --autocog--:lgrez.features.taches.GestionTaches: {
+.. (this bloc is autogenerated each time docs are build, don't
 .. change manually! See end of conf.py for generation code.)
 .. autoclass:: lgrez.features.taches.GestionTaches
     :members:
@@ -444,8 +606,8 @@
    :exclude-members: VoterAgir
    :member-order: bysource
 
-.. --autocog--:lgrez.features.voter_agir.VoterAgir: { 
-.. (this bloc is autogenerated each time docs are build, don't 
+.. --autocog--:lgrez.features.voter_agir.VoterAgir: {
+.. (this bloc is autogenerated each time docs are build, don't
 .. change manually! See end of conf.py for generation code.)
 .. autoclass:: lgrez.features.voter_agir.VoterAgir
     :members:

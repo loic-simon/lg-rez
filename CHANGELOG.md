@@ -6,7 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *If you are reading this on GitHub, you may consider switching to the docs
 to benefit Sphinx internal links to Python objects:*
-https://lg-rez.readthedocs.io/fr/2.1.4/changelog.html
+https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
+
+
+## 2.2.0 - 2021-10-05
+
+### Added
+
+  - New command ``!modif`` to edit a bot message;
+  - New commands table in :mod:`lgrez.features` doc page;
+  - New convenience method :func:`.blocs.env.__getattr__`.
+
+### Fixed
+
+  - Diverse documentation fixes.
 
 
 ## 2.1.4 - 2021-07-10

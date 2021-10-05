@@ -839,3 +839,81 @@ class Communication(commands.Cog):
             await tools.send_code_blocs(ctx, formatted_text)
         else:
             await ctx.send("Mission aborted.")
+
+
+    @commands.command()
+    @tools.mjs_only
+    async def modif(self, ctx, ref, *, modifs):
+        """Modifie un message du bot (COMMANDE MJ)
+
+        Args:
+            ref: référence vers le message à modifier, peut être
+
+                - le lien du message,
+                - son couple d'IDs dans le serveur (salon-message),
+                - son ID seul (seulement si message dans ce salon),
+                - un nom/mention de salon (si le dernier message est du bot),
+                - rien, si on répond au message à modifier.
+
+            modifs: modifications à faire, sous la forme "avant > après"
+                (ou juste "> après" pour tout remplacer).
+
+        Il n'est pas possible (pour le moment ?) de modifier une image,
+        pièce jointe ou embed.
+        """
+        # Détermination message à modifier
+        if ctx.message.reference:
+            msg = ctx.message.reference.resolved
+            if not isinstance(msg, discord.Message):
+                await ctx.send("Message répondu inaccessible")
+                return
+            modifs = f"{ref} {modifs}"
+
+        else:
+            if (chan := tools.channel(ref, must_be_found=False)):
+                msg_id = chan.last_message_id
+            elif (mtch := re.fullmatch(r"https*://discord.com/channels/"
+                                       r"(\d{18})/(\d{18})/(\d{18})/*", ref)):
+                chan = ctx.guild.get_channel(int(mtch.group(2)))
+                msg_id = mtch.group(3)
+            elif (mtch := re.fullmatch(r"(\d{18})-(\d{18})", ref)):
+                chan = ctx.guild.get_channel(int(mtch.group(1)))
+                msg_id = mtch.group(2)
+            elif (mtch := re.fullmatch(r"\d{18}", ref)):
+                chan = ctx.channel
+                msg_id = mtch.group(0)
+            else:
+                await ctx.send("Je dois modifier quoi là ??????????")
+                return
+
+            if not chan:
+                await ctx.send("Channel spécifié introuvable")
+                return
+
+            try:
+                msg = await chan.fetch_message(msg_id)
+            except discord.errors.NotFound:
+                await ctx.send("Pas trouvé, pas de chance")
+                return
+
+        if msg.author != ctx.bot.user:
+           await ctx.send("Message ciblé non rédigé par le bot")
+           return
+
+        old = msg.content
+        if not ">" in modifs:
+            await ctx.send("L'ordre de remplacement doit contenir '>'.")
+            return
+
+        before, _, after = modifs.partition(">")
+        if before:
+            new = old.replace(before.strip(), after.strip())
+        else:
+            new = after.strip()
+
+        if new == old:
+            await ctx.send("Pas de remplacement à effectuer.")
+            return
+
+        await msg.edit(content=new)
+        await ctx.send("Fait.")

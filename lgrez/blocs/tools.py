@@ -60,9 +60,9 @@ def channel(nom, must_be_found=True):
     """Renvoie l'objet associé au salon ``#nom``.
 
     Args:
-        nom (:class:`str`): nom du channel (texte/vocal/catégorie) ou sa
+        nom (str): nom du channel (texte/vocal/catégorie) ou sa
             mention (détection directe par regex)
-        must_be_found (:class:`bool`): si ``True`` (défaut), raise une
+        must_be_found (bool): si ``True`` (défaut), raise une
             :exc:`ValueError` si le channel ``#nom`` n'existe pas
             (si ``False``, renvoie ``None``)
 
@@ -79,9 +79,9 @@ def role(nom, must_be_found=True):
     """Renvoie l'objet associé au rôle ``@&nom``.
 
     Args:
-        nom (:class:`str`): nom du rôle ou sa mention
+        nom (str): nom du rôle ou sa mention
             (détection directe par regex)
-        must_be_found (:class:`bool`): si ``True`` (défaut), raise une
+        must_be_found (bool): si ``True`` (défaut), raise une
             :exc:`ValueError` si le channel ``@&nom`` n'existe pas
             (si ``False``, renvoie ``None``)
 
@@ -98,9 +98,9 @@ def member(nom, must_be_found=True):
     """Renvoie l'objet associé au membre ``@nom``.
 
     Args:
-        nom (:class:`str`): nom du joueur ou sa mention
+        nom (str): nom du joueur ou sa mention
             (détection directe par regex)
-        must_be_found (:class:`bool`): si ``True`` (défaut),
+        must_be_found (bool): si ``True`` (défaut),
             raise une :exc:`ValueError` si le membre ``@nom`` n'existe pas
             (si ``False``, renvoie ``None``)
 
@@ -117,9 +117,9 @@ def emoji(nom, must_be_found=True):
     """Renvoie l'objet associé à l'emoji ``:nom:``.
 
     Args:
-        nom (:class:`str`): nom de l'emoji (texte/vocal/catégorie)
+        nom (str): nom de l'emoji (texte/vocal/catégorie)
             ou son utilisation (détection directe par regex)
-        must_be_found (:class:`bool`): si ``True`` (défaut), raise une
+        must_be_found (bool): si ``True`` (défaut), raise une
             :exc:`ValueError` si l'emoji ``:nom:`` n'existe pas
             (si ``False``, renvoie ``None``)
 

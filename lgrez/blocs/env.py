@@ -41,3 +41,19 @@ def load(VAR_NAME):
     if var is None:
         raise RuntimeError(f"Variable d'environnement {VAR_NAME} manquante")
     return var
+
+
+def __getattr__(attr):
+    """Raccourci pour accéder aux variables d'environnement.
+
+    Permet d'utiliser ``blocs.env.VAR_NAME`` comme raccourci pour
+    :func:`blocs.env.load(VAR_NAME) <.load>`, à la différence près
+    que c'est une exception :exc:`AttributeError` qui sera levée si
+    la variable n'est pas définie.
+    """
+    try:
+        return load(attr)
+    except RuntimeError:
+        raise AttributeError(
+            f"module '{__name__}' has no attribute '{attr}'"
+        ) from None
