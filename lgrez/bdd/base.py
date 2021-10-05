@@ -8,7 +8,7 @@ import re
 import difflib
 
 import sqlalchemy
-from sqlalchemy.ext import declarative
+from sqlalchemy import orm
 import unidecode
 
 from lgrez import config
@@ -26,10 +26,10 @@ def _remove_accents(text):
 
 # ---- Objets de base des classes de données
 
-class TableMeta(declarative.api.DeclarativeMeta):
+class TableMeta(sqlalchemy.orm.DeclarativeMeta):
     """Métaclasse des tables de données de LG-Rez.
 
-    Sous-classe de :class:`sqlalchemy.declarative.api.DeclarativeMeta`.
+    Sous-classe de :class:`sqlalchemy.orm.decl_api.DeclarativeMeta`.
 
     Cette métaclasse :
         - nomme automatiquement la table ``cls.__name__.lower() + "s"``,
@@ -46,6 +46,8 @@ class TableMeta(declarative.api.DeclarativeMeta):
         cls.__tablename__ = name.lower() + "s"
         if comment is None:
             comment = cls.__doc__
+
+        dic["registry"] = cls.registry      # un peu de magie noire...
         super().__init__(name, bases, dic, comment=comment, **kwargs)
 
         cls._attrs = {n: k for n, k in dic.items() if isinstance(k, (
@@ -226,15 +228,17 @@ class TableMeta(declarative.api.DeclarativeMeta):
 
 
 # Dictionnaire {nom de la base -> table}, automatiquement rempli par
-# sqlalchemy.ext.declarative.declarative_base
+# sqlalchemy.orm.declarative_base
 tables = {}
 
 
-@declarative.as_declarative(class_registry=tables, metaclass=TableMeta)
+mapper_registry = sqlalchemy.orm.registry(class_registry=tables)
+
+@mapper_registry.as_declarative_base(metaclass=TableMeta)
 class TableBase:
     """Classe de base des tables de données.
 
-    (construite par :func:`sqlalchemy.ext.declarative.declarative_base`)
+    (construite par :func:`sqlalchemy.orm.registry.generate_base`)
     """
     @property
     def primary_key(self):

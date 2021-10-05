@@ -9,13 +9,18 @@ to benefit Sphinx internal links to Python objects:*
 https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
 
 
-## 2.2.0 - 2021-10-05
+## 2.2.0 - 2021-10-06
 
 ### Added
 
   - New command ``!modif`` to edit a bot message;
   - New commands table in :mod:`lgrez.features` doc page;
   - New convenience method :func:`.blocs.env.__getattr__`.
+
+### Changed
+
+  - Extended to Python 3.10
+  - Bumped all requirements to their latest version
 
 ### Fixed
 
