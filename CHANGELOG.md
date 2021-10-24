@@ -9,6 +9,15 @@ to benefit Sphinx internal links to Python objects:*
 https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
 
 
+## 2.2.1 - 2021-10-24
+
+### Fixed
+
+  - Critical error in :func:`features.sync.transtype` caused by
+    SQLAlchemy internals changes between 1.3.x and 1.4.x.
+  - Minor fixes in some commands docstrings.
+
+
 ## 2.2.0 - 2021-10-06
 
 ### Added

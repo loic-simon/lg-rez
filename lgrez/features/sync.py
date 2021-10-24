@@ -215,7 +215,7 @@ def transtype(value, cst):
     """
     if isinstance(cst, sqlalchemy.orm.RelationshipProperty):
         # Relationship
-        table = cst.argument()    # -> cas suivant
+        table = cst.entity.entity   # SQLAlchemy black magic
         if not isinstance(value, table.primary_col.type.python_type):
             raise ValueError(
                 f"Valeur '{value}' incorrecte pour la colonne '{cst.key}' "

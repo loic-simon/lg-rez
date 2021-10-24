@@ -192,7 +192,7 @@ class OpenClose(commands.Cog):
         des votes, par exemple).
 
         Examples:
-            - ``!open maire`` :        lance un vote condamné maintenant
+            - ``!open maire`` :        lance un vote maire maintenant
             - ``!open cond 19h`` :     lance un vote condamné maintenant
               et programme sa fermeture à 19h00 (ex. Juge Bègue)
             - ``!open cond 18h 10h`` : lance un vote condamné maintenant,

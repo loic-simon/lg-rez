@@ -273,6 +273,7 @@ class Special(commands.Cog):
                 doc = doc.replace("``", "`")
                 doc = doc.replace("Args:", "Arguments :")
                 doc = doc.replace("Warning:", "Avertissement :")
+                doc = doc.replace("Examples:", "Exemples :")
                 doc = re.sub(r":\w+?:`[\.~!]*(.+?)`", r"`\1`", doc)
                 # enlève les :class: et consors
 
