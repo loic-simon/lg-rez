@@ -1151,6 +1151,7 @@ def eval_accols(rep, globals_=None, locals_=None, debug=False):
     """
     if globals_ is None:
         globals_ = globals()
+        globals_.update(tools=__import__(__name__, fromlist=("tools")))
     if locals_ is None:
         locals_ = globals_
 

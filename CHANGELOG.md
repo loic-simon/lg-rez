@@ -9,6 +9,23 @@ to benefit Sphinx internal links to Python objects:*
 https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
 
 
+## 2.2.2 - 2021-11-01
+
+### Changed
+
+  - Made gsheets operations asynchronous (using new dependency module
+    :mod:`gspread_asyncio`): :func:`blocs.gsheets.connect` and
+    :func:`~blocs.gsheets.update` are now asynchronous and work with
+    :class:`~gspread_asyncio.AsyncioGspreadWorksheet` objects; some
+    dependant functions made asynchronous too.
+
+### Fixed
+
+  - References to ``tools`` could not be used in reactions evaluations.
+  - Bot activity was sometimes lost when errors occured.
+  - Messages reactions caused fatal errors in some cases.
+
+
 ## 2.2.1 - 2021-10-24
 
 ### Fixed

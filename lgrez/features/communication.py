@@ -809,7 +809,6 @@ class Communication(commands.Cog):
             if style.get("italic"):
                 text = tools.ital(text)
             if style.get("strikethrough"):
-                input(style.get("strikethrough"))
                 text = tools.strike(text)
             if style.get("smallCaps"):
                 text = text.upper()
@@ -818,7 +817,7 @@ class Communication(commands.Cog):
                     text = tools.code(text)
             if (link := style.get("link")):
                 if (url := link.get("url")):
-                    if not "://" in text:
+                    if "://" not in text:
                         text = text + f" (<{url}>)"
             elif style.get("underline"):    # ne pas souligner si lien
                 text = tools.soul(text)

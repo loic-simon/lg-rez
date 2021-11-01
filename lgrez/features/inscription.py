@@ -4,6 +4,8 @@
 
 """
 
+import asyncio
+
 from lgrez import config
 from lgrez.blocs import tools, env, gsheets
 from lgrez.bdd import Joueur, Role, Camp, Statut
@@ -50,18 +52,21 @@ async def new_channel(member):
     return chan
 
 
-def register_on_tdb(joueur):
+async def register_on_tdb(joueur):
     """Enregistre un joueur dans le Tableau de bord.
 
     Peut être personnalisé à un autre système de gestion des joueurs.
 
     Args:
         joueur (.bdd.Joueur): le joueur à enregistrer.
+
+    Note:
+        Fonction asynchrone depuis la version 2.2.2.
     """
     SHEET_ID = env.load("LGREZ_TDB_SHEET_ID")
-    workbook = gsheets.connect(SHEET_ID)
-    sheet = workbook.worksheet(config.tdb_main_sheet)
-    values = sheet.get_all_values()         # Liste de listes
+    workbook = await gsheets.connect(SHEET_ID)
+    sheet = await workbook.worksheet(config.tdb_main_sheet)
+    values = await sheet.get_all_values()           # Liste de listes
 
     head = values[config.tdb_header_row - 1]
     # Ligne d'en-têtes (noms des colonnes), - 1 car indexé à 0
@@ -133,7 +138,12 @@ def register_on_tdb(joueur):
         # Colonnes "tampon_<col>" ==> <col>
         modifs.append(gsheets.Modif(plv, index, val))
 
-    gsheets.update(sheet, *modifs)
+    try:
+        await gsheets.update(sheet, *modifs)
+    except gsheets.ConnectionError:
+        await joueur.private_chan.send("Petit problème, on réessaie...")
+        await asyncio.sleep(10)
+        await gsheets.update(sheet, *modifs)
 
 
 # Routine d'inscription (fonction appellée par la commande !co)
@@ -314,7 +324,7 @@ async def main(member):
 
         # Ajout sur le TDB
 
-        register_on_tdb(joueur)
+        await register_on_tdb(joueur)
 
         # Grant accès aux channels joueurs et information
 
@@ -333,7 +343,7 @@ async def main(member):
         "Juste quelques dernières choses :\n "
         "- Plein de commandes te sont d'ores et déjà accessibles ! "
         f"Découvre les toutes en tapant {tools.code('!help')} ;\n "
-        "- Si tu as besoin d'aide, plus de bouton MJ ALED : mentionne "
+        "- Si tu as besoin d'aide, mentionne "
         f"simplement les MJs ({tools.code('@' + config.Role.mj.name)}) "
         "et on viendra voir ce qui se passe !\n "
         "- Si ce n'est pas le cas, je te conseille fortement d'installer "

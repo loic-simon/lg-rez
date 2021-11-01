@@ -104,6 +104,11 @@ async def _check_and_prepare_objects(bot):
 async def _on_ready(bot):
     if config.is_ready:
         await tools.log("[`on_ready` called but bot already ready, ignored]")
+        # On remet l'activité, qui peut sauter sinon
+        await bot.change_presence(activity=discord.Activity(
+            type=discord.ActivityType.listening,
+            name="vos demandes (!help)"
+        ))
         return
 
     config.loop = bot.loop          # Enregistrement loop
@@ -212,7 +217,7 @@ async def _on_raw_reaction_add(bot, payload):
         return
 
     chan = config.guild.get_channel(payload.channel_id)
-    if not chan.name.startswith(config.private_chan_prefix):
+    if not chan or not chan.name.startswith(config.private_chan_prefix):
         # Pas dans un chan privé
         return
 
@@ -247,7 +252,7 @@ async def _on_raw_reaction_add(bot, payload):
     elif payload.emoji == config.Emoji.action:
         ctx = await tools.create_context(reactor, "!action")
         await ctx.send(f"{payload.emoji} > " + tools.bold("Action :"))
-        await bot.invoke(ctx)       # On trigger !voteloups
+        await bot.invoke(ctx)       # On trigger !action
 
 
 # ---- Gestion des erreurs
@@ -343,7 +348,8 @@ async def _on_command_error(bot, ctx, exc):
         await ctx.send(
             f"Tiens, il semblerait que cette commande ne puisse "
             f"pas être exécutée ! {tools.mention_MJ(ctx)} ?\n"
-            f"({tools.ital(_showexc(exc))})")
+            f"({tools.ital(_showexc(exc))})"
+        )
 
     else:
         await ctx.send(
@@ -655,7 +661,7 @@ class LGBot(commands.Bot):
 
         Exporte le temps actuel (UTC) et planifie un nouvel appel
         dans 60s. Ce processus n'est lancé que si
-        :attr:`config.output_liveness` est mis à ``True``.
+        :attr:`config.output_liveness` est mis à ``True`` (*opt-in*).
 
         Args:
             filename (:class:`str`): fichier où exporter le temps

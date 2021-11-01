@@ -5,6 +5,7 @@ modifications décidées via le Tableau de bord et rôles
 
 """
 
+import asyncio
 import datetime
 import time
 import traceback
@@ -227,7 +228,7 @@ def transtype(value, cst):
         if inst is None:
             raise ValueError(
                 f"Valeur '{value}' incorrecte pour la colonne '{cst.key}': "
-                f"instance de '{table.__name__}' correspondate non trouvée."
+                f"instance de '{table.__name__}' correspondante non trouvée."
             )
 
         return inst
@@ -245,7 +246,7 @@ def transtype(value, cst):
         if inst is None:
             raise ValueError(
                 f"Valeur '{value}' incorrecte pour la table '{cst.__name__}': "
-                f"instance correspondate non trouvée."
+                f"instance correspondante non trouvée."
             )
 
         return inst
@@ -296,7 +297,7 @@ def transtype(value, cst):
         ) from None
 
 
-def get_sync():
+async def get_sync():
     """Récupère les modifications en attente sur le TDB.
 
     Charge les données du Tableau de bord (variable d'environment
@@ -308,13 +309,16 @@ def get_sync():
 
     Returns:
         list[.TDBModif]: La liste des modifications à apporter
+
+    Note:
+        Fonction asynchrone depuis la version 2.2.2.
     """
     # RÉCUPÉRATION INFOS GSHEET ET VÉRIFICATIONS
 
     SHEET_ID = env.load("LGREZ_TDB_SHEET_ID")
-    workbook = gsheets.connect(SHEET_ID)
-    sheet = workbook.worksheet(config.tdb_main_sheet)
-    values = sheet.get_all_values()         # Liste de listes
+    workbook = await gsheets.connect(SHEET_ID)
+    sheet = await workbook.worksheet(config.tdb_main_sheet)
+    values = await sheet.get_all_values()         # Liste de listes
 
     head = values[config.tdb_header_row - 1]
     # Ligne d'en-têtes (noms des colonnes), - 1 car indexé à 0
@@ -425,7 +429,7 @@ def get_sync():
     return modifs
 
 
-def validate_sync(modifs):
+async def validate_sync(modifs):
     """Valide des modificatons sur le Tableau de bord (case plus en rouge).
 
     Args:
@@ -434,12 +438,19 @@ def validate_sync(modifs):
     Modifie sur le Tableau de bord (variable d'environment
     ``LGREZ_TDB_SHEET_ID``) et applique les modifications contenues
     dans ``modifs``.
+
+    Note:
+        Fonction asynchrone depuis la version 2.2.2.
     """
     SHEET_ID = env.load("LGREZ_TDB_SHEET_ID")
-    workbook = gsheets.connect(SHEET_ID)    # Tableau de bord
-    sheet = workbook.worksheet(config.tdb_main_sheet)
+    workbook = await gsheets.connect(SHEET_ID)    # Tableau de bord
+    sheet = await workbook.worksheet(config.tdb_main_sheet)
 
-    gsheets.update(sheet, *modifs)
+    try:
+        await gsheets.update(sheet, *modifs)
+    except gsheets.ConnectionError:
+        await asyncio.sleep(10)
+        await gsheets.update(sheet, *modifs)
 
 
 async def modif_joueur(joueur_id, modifs, silent=False):
@@ -610,7 +621,7 @@ class Sync(commands.Cog):
         await ctx.send("Récupération des modifications...")
         async with ctx.typing():
             # Récupération de la liste des modifs
-            modifs = get_sync()
+            modifs = await get_sync()
             silent = bool(silent)
             changelog = f"Synchronisation TDB (silencieux = {silent}) :"
 
@@ -655,7 +666,7 @@ class Sync(commands.Cog):
             if done:
                 # Au moins une modification a été appliquée
                 config.session.commit()
-                validate_sync(done)
+                await validate_sync(done)
 
             await tools.log(changelog, code=True)
 
@@ -682,7 +693,7 @@ class Sync(commands.Cog):
         """
         # ==== Mise à jour tables ===
         SHEET_ID = env.load("LGREZ_ROLES_SHEET_ID")
-        workbook = gsheets.connect(SHEET_ID)    # Rôles et actions
+        workbook = await gsheets.connect(SHEET_ID)    # Rôles et actions
 
         for table in [Camp, Role, BaseAction]:
             await ctx.send(
@@ -691,7 +702,7 @@ class Sync(commands.Cog):
             # --- 1 : Récupération des valeurs
             async with ctx.typing():
                 try:
-                    sheet = workbook.worksheet(table.__tablename__)
+                    sheet = await workbook.worksheet(table.__tablename__)
                 except gsheets.WorksheetNotFound:
                     raise ValueError(
                         f"!fillroles : feuille '{table.__tablename__}' non "
@@ -699,7 +710,7 @@ class Sync(commands.Cog):
                         "(`LGREZ_ROLES_SHEET_ID`)"
                     ) from None
 
-                values = sheet.get_all_values()
+                values = await sheet.get_all_values()
                 # Liste de liste des valeurs des cellules
 
             # --- 2 : Détermination colonnes à récupérer

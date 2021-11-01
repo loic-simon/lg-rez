@@ -15,7 +15,7 @@ from lgrez.bdd import (Joueur, Action, Role, Camp, Utilisation, Ciblage,
 from lgrez.features import gestion_actions
 
 
-def export_vote(vote, utilisation):
+async def export_vote(vote, utilisation):
     """Enregistre un vote/les actions résolues dans le GSheet ad hoc.
 
     Écrit dans le GSheet ``LGREZ_DATA_SHEET_ID``. Peut être écrasé
@@ -29,6 +29,9 @@ def export_vote(vote, utilisation):
     Raises:
         RuntimeError: si la variable d'environnement ``LGREZ_DATA_SHEET_ID``
             n'est pas définie.
+
+    Note:
+        Fonction asynchrone depuis la version 2.2.2.
     """
     if vote and not isinstance(vote, Vote):
         vote = Vote[vote]       # str -> Vote
@@ -56,9 +59,11 @@ def export_vote(vote, utilisation):
         data = [joueur.nom, joueur.role.slug, joueur.camp.slug, recap]
 
     LGREZ_DATA_SHEET_ID = env.load("LGREZ_DATA_SHEET_ID")
-    sheet = gsheets.connect(LGREZ_DATA_SHEET_ID).worksheet(sheet_name)
+    workbook = await gsheets.connect(LGREZ_DATA_SHEET_ID)
+    sheet = await workbook.worksheet(sheet_name)
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    sheet.append_row([timestamp, *data], value_input_option="USER_ENTERED")
+    await sheet.append_row([timestamp, *data],
+                           value_input_option="USER_ENTERED")
 
 
 async def get_cible(ctx, action, base_ciblage, first=None):
@@ -243,7 +248,7 @@ class VoterAgir(commands.Cog):
 
         async with ctx.typing():
             # Écriture dans sheet Données brutes
-            export_vote(Vote.cond, util)
+            await export_vote(Vote.cond, util)
 
         await ctx.send(
             f"Vote contre {tools.bold(cible.nom)} bien pris en compte.\n"
@@ -326,7 +331,7 @@ class VoterAgir(commands.Cog):
 
         async with ctx.typing():
             # Écriture dans sheet Données brutes
-            export_vote(Vote.maire, util)
+            await export_vote(Vote.maire, util)
 
         await ctx.send(
             f"Vote pour {tools.bold(cible.nom)} bien pris en compte.\n"
@@ -392,7 +397,7 @@ class VoterAgir(commands.Cog):
 
         async with ctx.typing():
             # Écriture dans sheet Données brutes
-            export_vote(Vote.loups, util)
+            await export_vote(Vote.loups, util)
 
         await ctx.send(
             f"Vote contre {tools.bold(cible.nom)} bien pris en compte."
@@ -505,7 +510,7 @@ class VoterAgir(commands.Cog):
 
         async with ctx.typing():
             # Écriture dans sheet Données brutes
-            export_vote(None, util)
+            await export_vote(None, util)
 
         # Conséquences si action instantanée
         if action.base.instant:

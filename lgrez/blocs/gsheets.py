@@ -8,6 +8,8 @@ import enum
 import json
 
 import gspread
+import gspread_asyncio
+import requests
 from oauth2client import service_account
 from googleapiclient.discovery import build
 
@@ -16,6 +18,8 @@ from lgrez.blocs import env
 
 
 WorksheetNotFound = gspread.exceptions.WorksheetNotFound
+ConnectionError = requests.exceptions.ConnectionError
+
 
 class Modif():
     """Modification à appliquer à un Google Sheet.
@@ -48,7 +52,7 @@ class Modif():
 
 
 
-def connect(key):
+async def connect(key):
     """Charge les credentials GSheets et renvoie le classeur demandé.
 
     Nécessite la variable d'environment ``LGREZ_GCP_CREDENTIALS``.
@@ -57,28 +61,31 @@ def connect(key):
         key (str): ID du classeur à charger (25 caractères)
 
     Returns:
-        :class:`gspread.models.Spreadsheet`
+        :class:`gspread_asyncio.AsyncioGspreadWorksheet`
     """
     # use creds to create a client to interact with the Google Drive API
     LGREZ_GCP_CREDENTIALS = env.load("LGREZ_GCP_CREDENTIALS")
 
-    scope = ['https://spreadsheets.google.com/feeds']
-    creds = service_account.ServiceAccountCredentials.from_json_keyfile_dict(
-        json.loads(LGREZ_GCP_CREDENTIALS),
-        scope)
-    client = gspread.authorize(creds)
+    def _get_creds():
+        scope = ['https://spreadsheets.google.com/feeds']
+        return service_account.ServiceAccountCredentials.from_json_keyfile_dict(
+            json.loads(LGREZ_GCP_CREDENTIALS), scope
+        )
+    manager = gspread_asyncio.AsyncioGspreadClientManager(_get_creds)
+    client = await manager.authorize()
 
     # Open the workbook
-    workbook = client.open_by_key(key)
+    workbook = await client.open_by_key(key)
 
     return workbook
 
 
-def update(sheet, *modifs):
+async def update(sheet, *modifs):
     """Met à jour une feuille GSheets avec les modifications demandées.
 
     Args:
-        sheet (gspread.models.Worksheet): La feuille à modifier
+        sheet (gspread_asyncio.AsyncioGspreadWorksheet): La feuille à
+            modifier
         *modifs (list[.Modif]): Modification(s) à apporter
 
     Le type de la nouvelle valeur sera interpreté par ``gspread`` pour
@@ -95,7 +102,7 @@ def update(sheet, *modifs):
     cm = max([modif.column for modif in modifs])
 
     # Récupère toutes les valeurs sous forme de cellules gspread
-    cells = sheet.range(1, 1, lm + 1, cm + 1)
+    cells = await sheet.range(1, 1, lm + 1, cm + 1)
     # gspread indexe à partir de 1 (comme les gsheets)
 
     cells_to_update = []
@@ -127,7 +134,7 @@ def update(sheet, *modifs):
 
         cells_to_update.append(cell)
 
-    sheet.update_cells(cells_to_update)
+    await sheet.update_cells(cells_to_update)
 
 
 def a_to_index(column):
