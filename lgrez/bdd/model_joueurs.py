@@ -268,7 +268,7 @@ class Boudoir(base.TableBase):
         try:
             return next(boud.joueur for boud in self.bouderies if boud.gerant)
         except StopIteration:
-            raise ValueError(f"Pas de membre gérant le boudoir *{self.name}*")
+            raise ValueError(f"Pas de membre gérant le boudoir *{self.nom}*")
 
     async def add_joueur(self, joueur, gerant=False):
         """Ajoute un joueur sur le boudoir.

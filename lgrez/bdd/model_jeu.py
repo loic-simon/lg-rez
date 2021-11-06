@@ -193,6 +193,18 @@ class Camp(base.TableBase):
         except ValueError:
             return None
 
+    @property
+    def embed(self):
+        """discord.Embed: Embed Discord présentant le camp."""
+        emb = discord.Embed(
+            title=f"Camp : {self.nom}",
+            description=self.description,
+            color=0x64b9e9,
+        )
+        if (emoji := self.discord_emoji_or_none):
+            emb.set_image(url=emoji.url)
+        return emb
+
     @classmethod
     def default(cls):
         """Retourne le camp par défaut (celui avant attribution).

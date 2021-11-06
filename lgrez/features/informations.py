@@ -14,54 +14,88 @@ from lgrez.bdd import (Joueur, Role, Camp, Action, BaseAction,
 from lgrez.features import gestion_actions
 
 
+def _roles_list(roles):
+    return "\n".join(
+        str(role.camp.discord_emoji_or_none or "")
+        + tools.code(f"{role.nom.ljust(25)} {role.description_courte}")
+        for role in roles if not role.nom.startswith("(")
+    )
+
+
 class Informations(commands.Cog):
     """Commandes pour en savoir plus sur soi et les autres"""
 
-    @commands.command(aliases=["role", "rôles", "rôle", "camp", "camps"])
-    async def roles(self, ctx, *, filtre=None):
+    @commands.command(aliases=["role", "rôles", "rôle"])
+    async def roles(self, ctx, *, role=None):
         """Affiche la liste des rôles / des informations sur un rôle
 
         Args:
-            filtre: peut être
+            role: le nom d'un rôle, pour les informations sur ce rôle.
 
-                - Le nom d'un camp pour les rôles le composant ;
-                - Le nom d'un rôle pour les informations sur ce rôle.
-
-        Sans argument liste tous les rôles existants.
+        Sans argument, liste tous les rôles existants.
+        Voir aussi la commande `!camps`.
         """
-        if filtre:
-            filtre = tools.remove_accents(filtre.lower())
-            filtre = filtre.strip("<>[](){}")
+        if role:
+            role = tools.remove_accents(role.lower())
+            role = role.strip("<>[](){}")
 
-        if not filtre:
+        if not role:
             roles = Role.query.filter_by(actif=True).order_by(Role.nom).all()
         else:
-            camps = Camp.find_nearest(
-                filtre, col=Camp.nom,
-                sensi=0.6, filtre=Camp.public.is_(True)
-            )
-
-            if camps:
-                roles = camps[0][0].roles
-            else:
-                roles = Role.find_nearest(filtre, col=Role.nom)
-                if not roles:
-                    await ctx.send(f"Rôle / camp \"{filtre}\" non trouvé.")
-                    return
-
-                await ctx.send(embed=roles[0][0].embed)
+            roles = Role.find_nearest(role, col=Role.nom)
+            if not roles:
+                await ctx.send(f"Rôle \"{role}\" non trouvé.")
                 return
+
+            await ctx.send(embed=roles[0][0].embed)
+            return
 
         await tools.send_blocs(
             ctx,
-            "Rôles trouvés :\n"
-            + "\n".join([
-                str(role.camp.discord_emoji_or_none or "")
-                + tools.code(f"{role.nom.ljust(25)} {role.description_courte}")
-                for role in roles if not role.nom.startswith("(")
-            ])
-            + "\n" + tools.ital(f"({tools.code('!roles <role>')} "
+            f"Rôles trouvés :\n{_roles_list(roles)}"
+            + "\n" + tools.ital(f"({tools.code('!role <role>')} "
                                 "pour plus d'informations sur un rôle.)")
+        )
+
+
+    @commands.command(aliases=["camp"])
+    async def camps(self, ctx, *, camp=None):
+        """Affiche la liste des camps / les rôles d'un camp
+
+        Args:
+            camp: le nom d'un camp, pour les informations sur ce camp.
+
+        Sans argument, liste tous les camps existants.
+        Voir aussi la commande `!role`.
+        """
+        if camp:
+            camp = tools.remove_accents(camp.lower())
+            camp = camp.strip("<>[](){}")
+
+        if not camp:
+            camps = Camp.query.filter_by(public=True).order_by(Camp.nom).all()
+        else:
+            camps = Camp.find_nearest(camp, col=Camp.nom)
+            if not camps:
+                await ctx.send(f"Camp \"{camp}\" non trouvé.")
+                return
+
+            await ctx.send(embed=camps[0][0].embed)
+            await tools.send_blocs(
+                ctx,
+                f"Rôles dans ce camp :\n{_roles_list(camps[0][0].roles)}"
+                + "\n" + tools.ital(f"({tools.code('!role <role>')} "
+                                    "pour plus d'informations sur un rôle.)")
+            )
+            return
+
+        await tools.send_blocs(
+            ctx,
+            "Camps trouvés :\n"
+            + "\n".join(str(camp.discord_emoji_or_none or "") + " " + camp.nom
+                        for camp in camps if not camp.nom.startswith("("))
+            + "\n" + tools.ital(f"({tools.code('!camp <camp>')} "
+                                "pour plus d'informations sur un camp.)")
         )
 
 

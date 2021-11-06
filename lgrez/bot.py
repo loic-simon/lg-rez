@@ -4,6 +4,7 @@ Classe principale
 
 """
 
+import asyncio
 import logging
 import sys
 import time
@@ -13,7 +14,7 @@ import discord
 from discord.ext import commands
 
 from lgrez import __version__, config, bdd
-from lgrez.blocs import env, tools, one_command, ready_check
+from lgrez.blocs import env, tools, one_command, ready_check, console
 from lgrez.features import *        # Tous les sous-modules
 
 
@@ -96,6 +97,9 @@ async def _check_and_prepare_objects(bot):
             avatar=await bot.user.avatar_url.read()
         )
         await tools.log(f"Webhook de tâches planifiées créé")
+
+    # Start admin console in the background
+    asyncio.create_task(console.run_admin_console(globals()))
 
 
 # ---- Réactions aux différents évènements
@@ -303,14 +307,13 @@ async def _on_command_error(bot, ctx, exc):
         await ctx.send("Cette commande est désactivée. Pas de chance !")
 
     elif isinstance(exc, (commands.ConversionError, commands.UserInputError)):
+        c = ctx.invoked_parents[0] if ctx.invoked_parents else ctx.invoked_with
+        c = (ctx.invoked_parents or [ctx.invoked_with])[0]
         await ctx.send(
             f"Hmm, ce n'est pas comme ça qu'on utilise cette commande ! "
             f"({tools.code(_showexc(exc))})\n*Tape "
-            f"`!help {ctx.invoked_with}` pour plus d'informations.*"
+            f"`!help {c}` pour plus d'informations.*"
         )
-        # ctx.message.content = f"!help {ctx.command.name}"
-        # ctx = await bot.get_context(ctx.message)
-        # await ctx.reinvoke()
 
     elif isinstance(exc, commands.CheckAnyFailure):
         # Normalement raise que par @tools.mjs_only

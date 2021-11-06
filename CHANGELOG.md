@@ -9,13 +9,35 @@ to benefit Sphinx internal links to Python objects:*
 https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
 
 
+## 2.3.0 - 2021-11-06
+
+### Added
+
+  - New subcommand `!boudoir ping`;
+  - New admin console to execute code/commands from the shell running
+    the bot (BETA: direct commands execution) using new module
+    :mod:`.blocs.console`;
+  - New indicative messages about the `stop` keyword;
+  - New property :meth:`.bdd.Camp.embed` (like :meth:`.bdd.Role.embed`).
+
+### Changed
+
+  - Command ``!roles`` separated inro ``!roles`` and new command ``!camps``
+    to address some names overlapping issues and for more clarity.
+
+### Fixed
+
+  - Help message was not accurate for some subcommands errors;
+  - Adding IA reactions could produce API 400 errors (empty messages).
+
+
 ## 2.2.2 - 2021-11-01
 
 ### Changed
 
   - Made gsheets operations asynchronous (using new dependency module
-    :mod:`gspread_asyncio`): :func:`blocs.gsheets.connect` and
-    :func:`~blocs.gsheets.update` are now asynchronous and work with
+    :mod:`gspread_asyncio`): :func:`.blocs.gsheets.connect` and
+    :func:`~.blocs.gsheets.update` are now asynchronous and work with
     :class:`~gspread_asyncio.AsyncioGspreadWorksheet` objects; some
     dependant functions made asynchronous too.
 
@@ -30,7 +52,7 @@ https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
 
 ### Fixed
 
-  - Critical error in :func:`features.sync.transtype` caused by
+  - Critical error in :func:`.features.sync.transtype` caused by
     SQLAlchemy internals changes between 1.3.x and 1.4.x.
   - Minor fixes in some commands docstrings.
 

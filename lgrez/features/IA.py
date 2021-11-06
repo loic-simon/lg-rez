@@ -276,6 +276,10 @@ class GestionIA(commands.Cog):
         else:
             reponse = await _build_sequence(ctx)
 
+        if not reponse:
+            await ctx.send("Réponse textuelle vide interdite, abort.")
+            return
+
         await ctx.send(f"Résumé de la séquence : {tools.code(reponse)}")
         async with ctx.typing():
             reac = Reaction(reponse=reponse)
@@ -448,6 +452,9 @@ class GestionIA(commands.Cog):
                 )
 
             reponse = await _build_sequence(ctx)
+            if not reponse:
+                await ctx.send("Réponse textuelle vide interdite, abort.")
+
             reac.reponse = reponse
 
         else:                       # Suppression

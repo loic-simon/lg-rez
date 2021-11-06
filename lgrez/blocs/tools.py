@@ -416,7 +416,8 @@ async def boucle_query(ctx, table, col=None, cible=None, filtre=None,
                                      match_first_word=True)
 
         if not nearest:
-            await ctx.send("Aucune entrée trouvée, merci de réessayer :")
+            await ctx.send("Aucune entrée trouvée, merci de réessayer : "
+                           + ital("(`stop` pour annuler)"))
 
         elif len(nearest) == 1:         # Une seule correspondance
             result, score = nearest[0]
@@ -428,7 +429,8 @@ async def boucle_query(ctx, table, col=None, cible=None, filtre=None,
             if await yes_no(mess):
                 return result
             else:
-                await ctx.send("Bon d'accord, alors qui ?")
+                await ctx.send("Bon d'accord, alors qui ? "
+                               + ital("(`stop` pour annuler)"))
 
         else:
             text = ("Les résultats les plus proches de ton entrée "
@@ -437,7 +439,8 @@ async def boucle_query(ctx, table, col=None, cible=None, filtre=None,
                 text += f"{emoji_chiffre(i + 1)}. {result} \n"
             mess = await ctx.send(
                 text + ital("Tu peux les choisir en réagissant à ce "
-                            "message, ou en répondant au clavier.")
+                            "message, ou en répondant au clavier. "
+                            "(`stop` pour annuler)")
             )
             n = await choice(mess, min(10, len(nearest)))
             return nearest[n - 1][0]

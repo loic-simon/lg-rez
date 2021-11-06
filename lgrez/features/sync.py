@@ -823,12 +823,7 @@ class Sync(commands.Cog):
                 if not camp.roles:
                     continue
 
-                embed = Embed(title=f"Camp : {camp.nom}",
-                              description=camp.description,
-                              color=0x64b9e9)
-                if (emoji := camp.discord_emoji_or_none):
-                    embed.set_image(url=emoji.url)
-                mess = await chan_roles.send(camp.nom, embed=embed)
+                mess = await chan_roles.send(camp.nom, embed=camp.embed)
                 shortcuts.append(mess)
 
                 for role in camp.roles:

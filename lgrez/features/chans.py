@@ -353,6 +353,21 @@ class GestionChans(commands.Cog):
         await ctx.send("Boudoir renommé avec succès.")
 
 
+    @boudoir.command(aliases=["hého"])
+    @tools.joueurs_only
+    @in_boudoir
+    async def ping(self, ctx, *, mess=""):
+        """Mentionne tous les joueurs vivants dans le boudoir."""
+        boudoir = Boudoir.from_channel(ctx.channel)
+        gerant = Joueur.from_member(ctx.author)
+        if boudoir.gerant != gerant:
+            await ctx.reply("Seul le gérant du boudoir peut utiliser "
+                            "le pouvoir du PING.")
+            return
+
+        await ctx.channel.send(f"{config.Role.joueur_en_vie.mention} {mess}")
+
+
     @commands.command()
     @tools.mjs_only
     async def addhere(self, ctx, *joueurs):
