@@ -23,19 +23,41 @@ def in_boudoir(callback):
     Lors d'une invocation de la commande décorée hors d'un boudoir
     (enregistré dans :class:`.bdd.Boudoir`), affiche un message d'erreur.
 
-    Ce décorateur n'est utilisable que sur une commande définie dans un
-    Cog.
+    Ce décorateur n'est utilisable que sur une commande définie dans un Cog.
     """
     @functools.wraps(callback)
-    async def new_callback(self, ctx, *args, **kwargs):
+    async def new_callback(cog, ctx, *args, **kwargs):
         try:
             Boudoir.from_channel(ctx.channel)
         except ValueError:
             await ctx.reply("Cette commande est invalide en dehors "
                             "d'un boudoir.")
         else:
-            # if ctx.authors
-            return await callback(self, ctx, *args, **kwargs)
+            return await callback(cog, ctx, *args, **kwargs)
+
+    return new_callback
+
+
+def gerant_only(callback):
+    """Décorateur : commande utilisable par le gérant d'un boudoir uniquement.
+
+    Lors d'une invocation de la commande décorée par un membre qui n'est
+    pas gérant du boudoir, affiche un message d'erreur.
+
+    Ce décorateur doittoujours être utilisé en combinaison avec
+    :func:`in_boudoir` et positionné après lui.
+
+    Ce décorateur n'est utilisable que sur une commande définie dans un Cog.
+    """
+    @functools.wraps(callback)
+    async def new_callback(cog, ctx, *args, **kwargs):
+        boudoir = Boudoir.from_channel(ctx.channel)
+        gerant = Joueur.from_member(ctx.author)
+        if boudoir.gerant != gerant:
+            await ctx.reply("Seul le gérant du boudoir peut utiliser "
+                            "cette commande.")
+        else:
+            return await callback(cog, ctx, *args, **kwargs)
 
     return new_callback
 
@@ -50,17 +72,22 @@ async def _invite(joueur, boudoir, invite_msg):
     )
 
     if await tools.yes_no(mess):
-        await boudoir.add_joueur(joueur)
-        info = f"{joueur.nom} a rejoint le boudoir !"
-        confirm = f"Tu as bien rejoint {bc.mention} !"
+        ok = await boudoir.add_joueur(joueur)
+        if ok:
+            info = f"{joueur.nom} a rejoint le boudoir !"
+            confirm = f"Tu as bien rejoint {bc.mention} !"
+        else:
+            info = None
+            confirm = f"Impossible de rejoindre le boudoir."
     else:
         info = f"{joueur.nom} a refusé l'invitation à rejoindre ce boudoir."
         confirm = "Invitation refusée."
 
-    try:
-        await invite_msg.reply(info)
-    except discord.HTTPException:
-        await bc.send(info)
+    if info:
+        try:
+            await invite_msg.reply(info)
+        except discord.HTTPException:       # Message d'inviation supprimé
+            await bc.send(info)
 
     await mess.reply(confirm)
 
@@ -136,24 +163,7 @@ class GestionChans(commands.Cog):
         await ctx.send("Création du boudoir...")
         async with ctx.typing():
             now = datetime.datetime.now()
-            categ = tools.channel(config.boudoirs_category_name)
-            if len(categ.channels) >= 50:
-                # Limitation Discord : 50 channels par catégorie
-                ok = False
-                N = 2
-                while not ok:
-                    nom_nouv_cat = f"{config.boudoirs_category_name} {N}"
-                    categ_new = tools.channel(nom_nouv_cat,
-                                              must_be_found=False)
-                    if not categ_new:
-                        categ = await categ.clone(name=nom_nouv_cat)
-                        ok = True
-                    elif len(categ_new.channels) < 50:
-                        # Catégorie N pas pleine
-                        categ = categ_new
-                        ok = True
-                    N += 1
-
+            categ = await tools.multicateg(config.boudoirs_category_name)
             chan = await config.guild.create_text_channel(
                 nom,
                 topic=f"Boudoir crée le {now:%d/%m à %H:%M}. "
@@ -178,15 +188,10 @@ class GestionChans(commands.Cog):
     @boudoir.command(aliases=["add"])
     @tools.joueurs_only
     @in_boudoir
-    async def invite(self, ctx, *, cible):
+    @gerant_only
+    async def invite(self, ctx, *, cible=None):
         """Invite un joueur à rejoindre ce boudoir"""
         boudoir = Boudoir.from_channel(ctx.channel)
-        gerant = Joueur.from_member(ctx.author)
-        if boudoir.gerant != gerant:
-            await ctx.reply("Seul le gérant du boudoir peut y inviter "
-                            "de nouvelles personnes.")
-            return
-
         joueur = await tools.boucle_query_joueur(
             ctx, cible=cible, message="Qui souhaites-tu inviter ?"
         )
@@ -199,18 +204,13 @@ class GestionChans(commands.Cog):
         # On envoie l'invitation en arrière-plan (libération du chan).
 
 
-    @boudoir.command(aliases=["remove"])
+    @boudoir.command(aliases=["remove", "kick"])
     @tools.joueurs_only
     @in_boudoir
-    async def expulse(self, ctx, *, cible):
+    @gerant_only
+    async def expulse(self, ctx, *, cible=None):
         """Expulse un membre de ce boudoir"""
         boudoir = Boudoir.from_channel(ctx.channel)
-        gerant = Joueur.from_member(ctx.author)
-        if boudoir.gerant != gerant:
-            await ctx.reply("Seul le gérant du boudoir peut en expulser "
-                            "des membres.")
-            return
-
         joueur = await tools.boucle_query_joueur(
             ctx, cible=cible, message="Qui souhaites-tu expulser ?"
         )
@@ -255,15 +255,11 @@ class GestionChans(commands.Cog):
     @boudoir.command(aliases=["transmit"])
     @tools.joueurs_only
     @in_boudoir
+    @gerant_only
     async def transfer(self, ctx, cible=None):
         """Transfère les droits de gestion de ce boudoir"""
         boudoir = Boudoir.from_channel(ctx.channel)
         gerant = Joueur.from_member(ctx.author)
-        if boudoir.gerant != gerant:
-            await ctx.reply("Seul le gérant du boudoir peut en transférer "
-                            "les droits de gestion.")
-            return
-
         joueur = await tools.boucle_query_joueur(
             ctx, cible=cible, message=("À qui souhaites-tu confier "
                                        "la gestion de ce boudoir ?")
@@ -298,14 +294,10 @@ class GestionChans(commands.Cog):
     @boudoir.command()
     @tools.joueurs_only
     @in_boudoir
+    @gerant_only
     async def delete(self, ctx):
         """Supprime ce boudoir"""
         boudoir = Boudoir.from_channel(ctx.channel)
-        gerant = Joueur.from_member(ctx.author)
-        if boudoir.gerant != gerant:
-            await ctx.reply("Seul le gérant du boudoir peut le supprimer.")
-            return
-
         mess = await ctx.reply("Veux-tu vraiment supprimer ce boudoir ? "
                                "Cette action est irréversible.")
         if not await tools.yes_no(mess):
@@ -329,14 +321,10 @@ class GestionChans(commands.Cog):
     @boudoir.command()
     @tools.joueurs_only
     @in_boudoir
-    async def rename(self, ctx, *, nom):
+    @gerant_only
+    async def rename(self, ctx, *, nom=None):
         """Renomme ce boudoir"""
         boudoir = Boudoir.from_channel(ctx.channel)
-        gerant = Joueur.from_member(ctx.author)
-        if boudoir.gerant != gerant:
-            await ctx.reply("Seul le gérant du boudoir peut le renommer.")
-            return
-
         if not nom:
             await ctx.send("Comment veux-tu renommer ce boudoir ?\n"
                            + tools.ital("(`stop` pour annuler)"))
@@ -356,15 +344,9 @@ class GestionChans(commands.Cog):
     @boudoir.command(aliases=["hého"])
     @tools.joueurs_only
     @in_boudoir
+    @gerant_only
     async def ping(self, ctx, *, mess=""):
         """Mentionne tous les joueurs vivants dans le boudoir."""
-        boudoir = Boudoir.from_channel(ctx.channel)
-        gerant = Joueur.from_member(ctx.author)
-        if boudoir.gerant != gerant:
-            await ctx.reply("Seul le gérant du boudoir peut utiliser "
-                            "le pouvoir du PING.")
-            return
-
         await ctx.channel.send(f"{config.Role.joueur_en_vie.mention} {mess}")
 
 

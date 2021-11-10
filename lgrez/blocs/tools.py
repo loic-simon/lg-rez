@@ -10,6 +10,7 @@ import asyncio
 import datetime
 import functools
 import re
+import string
 import warnings
 
 import discord
@@ -224,21 +225,21 @@ def private(callback):
     les joueurs ont un channel privé).
     """
     @functools.wraps(callback)
-    async def new_callback(self, ctx, *args, **kwargs):
+    async def new_callback(cog, ctx, *args, **kwargs):
         if not ctx.channel.name.startswith(config.private_chan_prefix):
             await ctx.message.delete()
-            one_command.remove_from_in_command(ctx)
+            await one_command.remove_from_in_command(ctx)
             # chan dans le contexte d'appel = chan privé
             ctx.channel = Joueur.from_member(ctx.author).private_chan
             await ctx.send(
                 f"{quote(ctx.message.content)}\n"
-                f"{ctx.author.mention} :warning: Cette commande est interdite"
-                f" en dehors de ta conv privée ! :warning:\n"
+                f"{ctx.author.mention} :warning: Cette commande est "
+                f"interdite en dehors de ta conv privée ! :warning:\n"
                 f"J'ai supprimé ton message, et j'exécute la commande ici :"
             )
-            one_command.add_to_in_command(ctx)
+            await one_command.add_to_in_command(ctx)
         # Dans tous les cas, appelle callback (avec le contexte modifié)
-        return await callback(self, ctx, *args, **kwargs)
+        return await callback(cog, ctx, *args, **kwargs)
 
     return new_callback
 
@@ -1189,6 +1190,52 @@ def eval_accols(rep, globals_=None, locals_=None, debug=False):
     if noc:     # Si expression jamais finie (nombre impair de {)
         evrep += "{" + expr
     return evrep
+
+
+async def multicateg(base_name: str) -> discord.CategoryChannel:
+    """Permet de gérer des groupes de catégories (plus de 50 salons).
+
+    Renvoie la première catégorie pouvant accueillir un nouveau
+    salon ; en crée une nouvelle si besoin.
+
+    Args:
+        base_name (str): le nom du groupe de catégorie (nom de la
+            première catégorie, puis sera suivi de 2, 3...)
+
+    Warning:
+        Une catégorie appellée ``base_name`` doit exister au préalable
+        dans le serveur (:attr:`config.guild`).
+
+    Returns:
+        :class:`discord.CategoryChannel`
+    """
+    categ = channel(base_name)
+    nb = 1
+    while len(categ.channels) >= 50:
+        # Limitation Discord : 50 channels par catégorie
+        nb += 1
+        next_name = f"{base_name} {nb}"
+        next_categ = channel(next_name, must_be_found=False)
+        if not next_categ:
+            next_categ = await categ.clone(name=next_name)
+        categ = next_categ
+
+    return categ
+
+
+def in_multicateg(categ: discord.CategoryChannel, base_name: str) -> bool:
+    """Détecte si une catégorie appartient à un groupe de catégories.
+
+    Args:
+        categ (discord.CategoryChannel): la catégorie à tester.
+        base_name (str): le nom de base du groupe de catégories
+            (voir :func:`.multicateg`).
+
+    Returns:
+        :class:`bool`
+    """
+    stripped_name = categ.name.rstrip(string.digits + " ")
+    return (stripped_name == base_name)
 
 
 # ---------------------------------------------------------------------------

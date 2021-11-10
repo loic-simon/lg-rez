@@ -280,11 +280,23 @@ class Boudoir(base.TableBase):
             joueur (.Joueur): Le joueur à ajouter.
             gerant (bool): Si le joueur doit être ajouté avec les
                 permissions de gérant.
+
+        Returns:
+            :class:`bool` - ``True`` si le joueur a été ajouté,
+                ``False`` si il y était déjà / le boudoir est fermé.
         """
+        if joueur in self.joueurs:
+            # Joueur déjà dans le boudoir
+            return False
+        if not self.joueurs and not gerant:
+            # Boudoir fermé (plus de joueurs) et pas ajout comme gérant
+            return False
+            
         now = datetime.datetime.now()
         Bouderie(boudoir=self, joueur=joueur, gerant=gerant,
                  ts_added=now, ts_promu=now if gerant else None).add()
         await self.chan.set_permissions(joueur.member, read_messages=True)
+        return True
 
     async def remove_joueur(self, joueur):
         """Retire un joueur du boudoir.

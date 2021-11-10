@@ -20,6 +20,10 @@ private_chan_category_name = "CONVERSATION BOT"
 #: (sera éventuellement suivi de 2, 3... si plus de 50 boudoirs).
 boudoirs_category_name = "BOUDOIRS"
 
+#: str: Nom de la catégorie des boudoirs devenus inutiles
+#: (sera éventuellement suivi de 2, 3... si plus de 50 boudoirs).
+old_boudoirs_category_name = "CIMETIÈRE DES BOUDOIRS"
+
 
 #: str: Date de début de saison (pour information lors de l'inscription).
 debut_saison = "32 plopembre"

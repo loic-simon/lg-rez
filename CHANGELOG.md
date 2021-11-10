@@ -9,6 +9,27 @@ to benefit Sphinx internal links to Python objects:*
 https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
 
 
+## 2.3.1 - 2021-11-10
+
+### Changed
+
+  - When a player die, useless boudoirs are now automatically moved in
+    category :attr:`.config.old_boudoirs_category_name` (new config option,
+    checked at startup) by new function :func:`.features.sync.process_mort`;
+  - Code optimizations using new utility functions
+    :func:`.blocs.tools.multicateg`, :func:`.blocs.tools.in_multicateg` and
+    new decorator :func:`.features.chans.gerant_only`;
+   - Added special values for ``!roll``: ``joueur``, ``vivant``, ``mort``,
+    ``rôle``, ``camp``.
+
+### Fixed
+
+  - Joueurs could be added several times to boudoirs (several invites);
+  - Some ``!boudoir`` options parameters were mandatory where they should not;
+  - One-command limitation was not working with private commands outside
+    private chans.
+
+
 ## 2.3.0 - 2021-11-06
 
 ### Added

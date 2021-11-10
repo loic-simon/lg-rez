@@ -519,9 +519,7 @@ async def modif_joueur(joueur_id, modifs, silent=False):
                               "Ça arrive même aux meilleurs, en espérant "
                               "que ta mort ait été belle !\n")
                 # Actions à la mort
-                for action in joueur.actions_actives:
-                    if action.base.trigger_debut == ActionTrigger.mort:
-                        await gestion_actions.open_action(action)
+                await process_mort(joueur)
 
             elif modif.val == Statut.MV:                # Statut = MV
                 await member.add_roles(config.Role.joueur_en_vie)
@@ -599,6 +597,36 @@ async def modif_joueur(joueur_id, modifs, silent=False):
         )
 
     return done, changelog
+
+
+async def process_mort(joueur: Joueur) -> None:
+    """Applique les conséquences de la mort d'un joueur.
+
+        * Ouverture des actions à la mort (chasseur...)
+        * Archivage des boudoirs devenus inutiles.
+
+    Args:
+        joueur (.bdd.Joueur): le joueur qui vient de mourir.
+    """
+    # Actions à la mort
+    for action in joueur.actions_actives:
+        if action.base.trigger_debut == ActionTrigger.mort:
+            await gestion_actions.open_action(action)
+
+    # Boudoirs au cimetière
+    for boudoir in joueur.boudoirs:
+        vivants = [jr for jr in boudoir.joueurs if joueur.est_vivant]
+        if len(vivants) < 2:
+            if tools.in_multicateg(boudoir.chan.category,
+                                   config.old_boudoirs_category_name):
+                # Boudoir déjà au cimetière
+                continue
+            await boudoir.chan.send(tools.ital(
+                "[Ce boudoir contient moins de deux joueurs vivants, "
+                "archivage...]"
+            ))
+            categ = await tools.multicateg(config.old_boudoirs_category_name)
+            await boudoir.chan.edit(category=categ)
 
 
 class Sync(commands.Cog):

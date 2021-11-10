@@ -57,3 +57,11 @@
 .. automodule:: lgrez.blocs.tools
    :members:
    :member-order: bysource
+
+
+``.console``
+----------------------------------------------------------------------
+
+.. automodule:: lgrez.blocs.console
+   :members:
+   :member-order: bysource

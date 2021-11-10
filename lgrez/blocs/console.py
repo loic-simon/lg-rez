@@ -1,7 +1,6 @@
-"""lg-rez / blocs / Émulation de terminal Python (avancé)
+"""lg-rez / blocs / Console d'administration (avancé)
 
-Permet d'utiliser un terminal Python directement dans Discord
-(implémentation de https://pypi.org/project/asyncode).
+Permet de contrôler le bot depuis la console le faisant tourner.
 
 """
 

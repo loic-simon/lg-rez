@@ -56,6 +56,12 @@ async def _check_and_prepare_objects(bot):
         errors.append(f"catégorie config.boudoirs_category_name = "
                       f"\"{config.boudoirs_category_name}\" non trouvée")
 
+    try:
+        tools.channel(config.old_boudoirs_category_name)
+    except ValueError:
+        errors.append(f"catégorie config.old_boudoirs_category_name = "
+                      f"\"{config.old_boudoirs_category_name}\" non trouvée")
+
     if len(errors) > config._missing_objects:
         # Nouvelles erreurs
         msg = (f"LGBot.on_ready: {len(errors)} errors:\n - "

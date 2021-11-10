@@ -12,7 +12,7 @@ from discord.ext import commands
 from akinator.async_aki import Akinator
 
 from lgrez.blocs import tools
-from lgrez.bdd import Joueur
+from lgrez.bdd import Joueur, Role, Camp
 
 
 class Annexe(commands.Cog):
@@ -25,7 +25,9 @@ class Annexe(commands.Cog):
         Args:
             XdY: dés à lancer + modifieurs, au format
                 ``XdY + XdY + ... + Z - Z ...`` avec X le nombre de dés,
-                Y le nombre de faces et Z les modifieurs (constants).
+                Y le nombre de faces et Z les modifieurs (constants) ;
+                OU roll spécial : ``joueur`` / ``vivant`` / ``mort`` /
+                ``rôle`` / ``camp``.
 
         Examples:
             - ``!roll 1d6``           -> lance un dé à 6 faces
@@ -33,7 +35,33 @@ class Annexe(commands.Cog):
               ajoute 3 au résultat
             - ``!roll 1d20 + 2d6 -8`` -> lance un dé 20 plus deux dés 6,
               enlève 8 au résultat
+            - ``!roll vivant``        -> choisit un joueur vivant
         """
+        # Rolls spéciaux
+        if XdY.lower() in ["joueur", "joueurs"]:
+            await ctx.reply(random.choice(Joueur.query.all()).nom)
+            return
+        if XdY.lower() in ["vivant", "vivants"]:
+            await ctx.reply(random.choice(
+                Joueur.query.filter(Joueur.est_vivant).all()
+            ).nom)
+            return
+        if XdY.lower() in ["mort", "morts"]:
+            await ctx.reply(random.choice(
+                Joueur.query.filter(Joueur.est_mort).all()
+            ).nom)
+            return
+        if XdY.lower() in ["role", "rôle", "roles", "rôles"]:
+            await ctx.reply(random.choice(
+                Role.query.filter_by(actif=True).all()
+            ).nom_complet)
+            return
+        if XdY.lower() in ["camp", "camps"]:
+            await ctx.reply(random.choice(
+                Camp.query.filter_by(public=True).all()
+            ).nom)
+            return
+
         dices = XdY.replace(' ', '').replace('-', '+-').split('+')
         # "1d6 + 5 - 2" -> ["1d6", "5", "-2"]
         r = ""

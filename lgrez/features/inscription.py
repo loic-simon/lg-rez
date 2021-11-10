@@ -24,23 +24,7 @@ async def new_channel(member):
     Returns:
         :class:`discord.TextChannel`
     """
-    categ = tools.channel(config.private_chan_category_name)
-    if len(categ.channels) >= 50:
-        # Limitation Discord : 50 channels par catégorie
-        ok = False
-        N = 2
-        while not ok:
-            nom_nouv_cat = f"{config.private_chan_category_name} {N}"
-            categ_new = tools.channel(nom_nouv_cat, must_be_found=False)
-            if not categ_new:
-                categ = await categ.clone(name=nom_nouv_cat)
-                ok = True
-            elif len(categ_new.channels) < 50:
-                # Catégorie N pas pleine
-                categ = categ_new
-                ok = True
-            N += 1
-
+    categ = await tools.multicateg(config.private_chan_category_name)
     chan = await member.guild.create_text_channel(
         f"{config.private_chan_prefix}{member.name}",
         topic=str(member.id),       # topic provisoire : ID du membre
