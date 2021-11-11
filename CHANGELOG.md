@@ -9,6 +9,21 @@ to benefit Sphinx internal links to Python objects:*
 https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
 
 
+## 2.3.2 - 2021-11-11
+
+### Changed
+
+  - When a player is removed from / added to a boudoir, the boudoir is
+    automatically sent to / from the boudoirs cemetery;
+  - ``!roll`` now has limitations to avoid bot overloading by huge rolls;
+    new special values ``ludopathe`` and ``tavernier``.
+
+### Fixed
+
+  - Automatic archiving of boudoirs when a player dies was not working
+    as intended.
+
+
 ## 2.3.1 - 2021-11-10
 
 ### Changed

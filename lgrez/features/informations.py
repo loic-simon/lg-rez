@@ -273,10 +273,10 @@ class Informations(commands.Cog):
                 + action.base.slug.ljust(25)
                 + str(action.base.heure_debut
                       if action.base.trigger_debut == ActionTrigger.temporel
-                      else action.base.trigger_debut).ljust(10)
+                      else action.base.trigger_debut.name).ljust(10)
                 + str(action.base.heure_fin
                       if action.base.trigger_fin == ActionTrigger.temporel
-                      else action.base.trigger_fin).ljust(10)
+                      else action.base.trigger_fin.name).ljust(10)
                 + str(action.cooldown).ljust(5)
                 + str(action.charges).ljust(10)
                 + str(action.base.refill)

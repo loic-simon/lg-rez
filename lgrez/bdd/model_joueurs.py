@@ -291,11 +291,21 @@ class Boudoir(base.TableBase):
         if not self.joueurs and not gerant:
             # Boudoir fermé (plus de joueurs) et pas ajout comme gérant
             return False
-            
+
         now = datetime.datetime.now()
         Bouderie(boudoir=self, joueur=joueur, gerant=gerant,
                  ts_added=now, ts_promu=now if gerant else None).add()
         await self.chan.set_permissions(joueur.member, read_messages=True)
+
+        # Sortie du cimetière le cas échéant
+        if tools.in_multicateg(self.chan.category,
+                               config.old_boudoirs_category_name):
+            await self.chan.send(tools.ital(
+                "[Ce boudoir contient au moins deux joueurs vivants, "
+                "désarchivage...]"
+            ))
+            categ = await tools.multicateg(config.boudoirs_category_name)
+            await boudoir.chan.edit(category=categ)
         return True
 
     async def remove_joueur(self, joueur):
@@ -309,6 +319,20 @@ class Boudoir(base.TableBase):
         """
         Bouderie.query.filter_by(boudoir=self, joueur=joueur).one().delete()
         await self.chan.set_permissions(joueur.member, overwrite=None)
+        # Déplacement dans le cimetière si nécessaire
+        vivants = [jr for jr in self.joueurs if jr.est_vivant]
+        if len(vivants) < 2:
+            if tools.in_multicateg(self.chan.category,
+                                   config.old_boudoirs_category_name):
+                # Boudoir déjà au cimetière
+                return
+            await self.chan.send(tools.ital(
+                "[Ce boudoir contient moins de deux joueurs vivants, "
+                "archivage...]"
+            ))
+            categ = await tools.multicateg(config.old_boudoirs_category_name)
+            await self.chan.edit(category=categ)
+
 
     @classmethod
     def from_channel(cls, channel):

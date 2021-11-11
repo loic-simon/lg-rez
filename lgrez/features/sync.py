@@ -615,8 +615,10 @@ async def process_mort(joueur: Joueur) -> None:
 
     # Boudoirs au cimetière
     for boudoir in joueur.boudoirs:
-        vivants = [jr for jr in boudoir.joueurs if joueur.est_vivant]
-        if len(vivants) < 2:
+        vivants = [jr for jr in boudoir.joueurs if jr.est_vivant]
+        if len(vivants) <= 2:
+            # <= car le joueur actuel est encore vivant, le changement
+            # d'attribut est fait après
             if tools.in_multicateg(boudoir.chan.category,
                                    config.old_boudoirs_category_name):
                 # Boudoir déjà au cimetière

@@ -37,52 +37,80 @@ class Annexe(commands.Cog):
               enlève 8 au résultat
             - ``!roll vivant``        -> choisit un joueur vivant
         """
+        inp = XdY.lower()
         # Rolls spéciaux
-        if XdY.lower() in ["joueur", "joueurs"]:
-            await ctx.reply(random.choice(Joueur.query.all()).nom)
-            return
-        if XdY.lower() in ["vivant", "vivants"]:
-            await ctx.reply(random.choice(
-                Joueur.query.filter(Joueur.est_vivant).all()
-            ).nom)
-            return
-        if XdY.lower() in ["mort", "morts"]:
-            await ctx.reply(random.choice(
-                Joueur.query.filter(Joueur.est_mort).all()
-            ).nom)
-            return
-        if XdY.lower() in ["role", "rôle", "roles", "rôles"]:
-            await ctx.reply(random.choice(
-                Role.query.filter_by(actif=True).all()
-            ).nom_complet)
-            return
-        if XdY.lower() in ["camp", "camps"]:
-            await ctx.reply(random.choice(
-                Camp.query.filter_by(public=True).all()
-            ).nom)
+        result = None
+        if inp in ["joueur", "joueurs"]:
+            result = random.choice(Joueur.query.all()).nom
+        elif inp in ["vivant", "vivants"]:
+            jr = random.choice(Joueur.query.filter(Joueur.est_vivant).all())
+            result = jr.nom
+        elif inp in ["mort", "morts"]:
+            jr = random.choice(Joueur.query.filter(Joueur.est_mort).all())
+            result = jr.nom
+        elif inp in ["role", "rôle", "roles", "rôles"]:
+            role = random.choice(Role.query.filter_by(actif=True).all())
+            result = role.nom_complet
+        elif inp in ["camp", "camps"]:
+            result = random.choice(Camp.query.filter_by(public=True).all()).nom
+        elif inp in ["ludo", "ludopathe"]:
+            result = random.choice(["Voyante", "Protecteur", "Notaire",
+                                    "Popo de mort", "Chat-garou", "Espion"])
+        elif inp in ["taverne", "tavernier"]:
+            result = random.choice(["Rôle choisi", "Vrai rôle", "Rôle random"])
+
+        if result:
+            await ctx.reply(result)
             return
 
-        dices = XdY.replace(' ', '').replace('-', '+-').split('+')
+        parts = inp.replace(" ", "").replace("-", "+-").split("+")
         # "1d6 + 5 - 2" -> ["1d6", "5", "-2"]
-        r = ""
-        s = 0
-        try:
-            for dice in dices:
-                if 'd' in dice:
-                    nb, faces = dice.split('d', maxsplit=1)
-                    for i in range(int(nb)):
-                        v = random.randrange(int(faces)) + 1
-                        s += v
-                        r += f" + {v}₍{tools.sub_chiffre(int(faces), True)}₎"
-                else:
-                    v = int(dice)
-                    s += v
-                    r += f" {'-' if v < 0 else '+'} {abs(v)}"
-            r += f" = {tools.emoji_chiffre(s, True)}"
-        except Exception:
-            raise commands.UserInputError(f"pattern non reconu")
-        else:
-            await tools.send_blocs(ctx, r[3:])
+        sum = 0
+        rep = ""
+        await ctx.send(str(parts))
+        for part in parts:
+            if not part:
+                continue
+            if "d" in part:
+                # Lancer de dé
+                nb, _, faces = part.partition("d")
+                try:
+                    nb, faces = int(nb), int(faces)
+                    if faces < 1:
+                        raise ValueError
+                except ValueError:
+                    raise commands.UserInputError(
+                        f"Pattern de dé non reconu : {part}"
+                    )
+                # Sécurité
+                if abs(nb) > 1000 or faces > 1000000:
+                    await ctx.reply(
+                        "Suite à des abus (coucou Gabin), il est "
+                        "interdit de lancer plus de 1000 dés ou "
+                        "des dés à plus de 1 million de faces."
+                    )
+                    return
+                sig = -1 if nb < 0 else 1
+                sig_s = "-" if nb < 0 else "+"
+                for _ in range(abs(nb)):
+                    val = random.randrange(faces) + 1
+                    sum += sig * val
+                    rep += f" {sig_s} {val}₍{tools.sub_chiffre(faces, True)}₎"
+            else:
+                # Bonus / malus fixe
+                try:
+                    val = int(part)
+                except ValueError:
+                    raise commands.UserInputError(
+                        f"Pattern fixe non reconu : {part}"
+                    )
+                sum += val
+                rep += f" {'-' if val < 0 else '+'} {abs(val)}"
+        # Total
+        sig = "- " if sum < 0 else ""
+        rep += f" = {sig}{tools.emoji_chiffre(abs(sum), True)}"
+        rep = rep[3:] if rep.startswith(" +") else rep
+        await tools.send_blocs(ctx, rep)
 
 
     @commands.command(aliases=["cf", "pf"])
