@@ -14,6 +14,7 @@ from lgrez.bdd import base
 from lgrez.bdd.base import (autodoc_Column, autodoc_ManyToOne,
                             autodoc_OneToMany, autodoc_DynamicOneToMany)
 from lgrez.bdd.enums import Statut, CandidHaroType, Vote
+from lgrez.blocs import tools
 
 
 # Tables de données
