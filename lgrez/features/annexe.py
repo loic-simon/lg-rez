@@ -67,7 +67,6 @@ class Annexe(commands.Cog):
         # "1d6 + 5 - 2" -> ["1d6", "5", "-2"]
         sum = 0
         rep = ""
-        await ctx.send(str(parts))
         for part in parts:
             if not part:
                 continue
