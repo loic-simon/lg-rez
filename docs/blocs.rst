@@ -51,6 +51,14 @@
   :member-order: bysource
 
 
+``.structure``
+----------------------------------------------------------------------
+
+.. automodule:: lgrez.blocs.structure
+   :members:
+   :member-order: bysource
+
+
 ``.tools``
 ----------------------------------------------------------------------
 

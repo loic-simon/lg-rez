@@ -9,6 +9,15 @@ to benefit Sphinx internal links to Python objects:*
 https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
 
 
+## 2.4.1 - 2022-04-17
+
+### Fixed
+
+  - Fix dependency conflicts;
+  - ReadTheDocs could not compile due to multiple problems;
+  - Missed doc for new module :mod:`.blocs.structure`.
+
+
 ## 2.4.0 - 2022-04-17
 
 ### Added
@@ -35,10 +44,10 @@ https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
   - ``!refill``: now ask to chose action (if > 1) instead of refilling all;
   - ``!lore``: better handle of players mentions (1 to 4 words);
   - ``!planif``: now planif to tomorrow if past date (rather that instant);
-  - ```!cancel``: now directly cancels (no confirmation), but show command to
+  - ``!cancel``: now directly cancels (no confirmation), but show command to
     type to re-planif task;
-  - :func:`.features.gestion_actions` now creates action only if not already
-    existing (changed signature: now takes action parameters and not action);
+  - :func:`.features.gestion_actions.add_action` now creates action only if
+    not already existing (changed signature: now takes action parameters);
   - Bumped packages dependencies.
 
 ### Fixed
