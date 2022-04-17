@@ -20,7 +20,7 @@
 
     .. exception:: DriverOperationalError
 
-        Alias de :exc:`psycopg2.OperationalError` : erreur levée en cas
+        Alias de :exc:`sqlalchemy.exc.OperationalError` : erreur levée en cas
         de perte de connexion avec la BDD. Seul PostreSQL est géré
         nativement : le cas échéant, remplacer cette exception par
         l'équivalent pour un autre driver.

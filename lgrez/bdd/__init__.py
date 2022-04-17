@@ -5,7 +5,6 @@ Déclaration de toutes les tables, colonnes, méthodes, et connection à la BDD
 """
 
 import sqlalchemy
-import psycopg2
 
 from lgrez.bdd import base
 from lgrez.bdd.enums import *
@@ -26,4 +25,4 @@ connect = base.connect
 
 SQLAlchemyError = sqlalchemy.exc.SQLAlchemyError
 
-DriverOperationalError = psycopg2.OperationalError
+DriverOperationalError = sqlalchemy.exc.OperationalError
