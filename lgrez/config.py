@@ -11,7 +11,11 @@ import discord
 from lgrez.blocs import ready_check, structure
 
 
-with open("server_structure.json") as fp:
+try:
+    fp = open("server_structure.json")
+except FileNotFoundError:
+    fp = open("../server_structure.json")
+with fp:
     #: dict[str, Any]: Structure du serveur utilisée par !setup (serveur,
     #: rôles, salons, emojis). Voir le fichier ```server_structure.json``
     #: (valeur par défaut) pour les possibilités de personnalisation.
