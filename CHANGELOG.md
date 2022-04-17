@@ -9,6 +9,52 @@ to benefit Sphinx internal links to Python objects:*
 https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
 
 
+## 2.4.0 - 2022-04-17
+
+### Added
+
+  - Server automatic setup (guild, channels, roles, emojis...):
+      - New command ``!setup``;
+      - New module :mod:`.blocs.structure` to check server structure;
+      - New config variables :attr:`.config.server_structure` (default:
+        new file ``server_structure.json``) and :attr:`.config.is_setup`;
+      - New functions :func:`.blocs.gsheets.get_files_in_folder`,
+        :func:`.blocs.gsheets.download_file` and
+        :func:`.config.set_config_from_server_structure`;
+  - Remind to enable Dashboard backup Google Apps trigger in ``!cparti``;
+  - Put role name in player's private chan topic on role sync;
+  - New subcommands ``!boudoir find`` and ``!boudoir help``;
+  - New command ``!mp`` to easily create a boudoir with some other player;
+  - New command ``!cfini`` to automatically delete tasks at game end;
+  - New command ``!nextroll``.
+
+### Changed
+
+  - Boudoirs are now transferred to most ancient member when owner dies;
+  - A cross mark is now added to boudoir name when moved to cemetery;
+  - ``!refill``: now ask to chose action (if > 1) instead of refilling all;
+  - ``!lore``: better handle of players mentions (1 to 4 words);
+  - ``!planif``: now planif to tomorrow if past date (rather that instant);
+  - ```!cancel``: now directly cancels (no confirmation), but show command to
+    type to re-planif task;
+  - :func:`.features.gestion_actions` now creates action only if not already
+    existing (changed signature: now takes action parameters and not action);
+  - Bumped packages dependencies.
+
+### Fixed
+
+  - Some bot parts did not work because of circular imports between
+    :mod:`.bdd.model_joueurs` and :mod:`.blocs.tools`. Fixed by moving
+    ``Boudoir.add_joueur``/``Boudoir.remove_joueur`` to new functions
+    :func:`.features.chans.add_joueur_to_boudoir`/
+    :func:`.features.chans.remove_joueur_from_boudoir`.
+  - Crash when trying to add a joueur to a boudoir in cemetery;
+  - ``!lore`` sometimes crashed when evaluating a role mention;
+  - Admin console was endlessly rebooting when sending an EOF or when
+    input pipe was closed (e.g. bot not launched from a TTY);
+  - README's What's New in 2.3 was missing.
+
+
 ## 2.3.2 - 2021-11-11
 
 ### Changed

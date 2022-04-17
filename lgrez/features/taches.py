@@ -74,8 +74,8 @@ class GestionTaches(commands.Cog):
         Si le bot est down à l'heure d'exécution prévue, la commande
         sera exécutée dès le bot de retour en ligne.
 
-        Si la date est dans le passé, la commande est exécutée
-        immédiatement.
+        Si la date spécifiée est dans le passé, la commande est planifiée
+        pour le lendemain.
 
         Examples:
             - ``!planif 18:00 !close maire``
@@ -113,6 +113,11 @@ class GestionTaches(commands.Cog):
         time = datetime.time(hour=hour, minute=minute, second=second)
 
         ts = datetime.datetime.combine(date, time)
+        if ts < datetime.datetime.now():
+            ts = datetime.datetime.combine(
+                datetime.date.today() + datetime.timedelta.days(1), time
+            )
+            await ctx.send("Date dans le passé, décalée à demain")
 
         action_id = None
         # ID de l'action associée à la tâche le cas échéant
@@ -123,20 +128,12 @@ class GestionTaches(commands.Cog):
         except ValueError:
             pass
 
-        if ts < datetime.datetime.now():
-            mess = await ctx.send(
-                "Date dans le passé ==> exécution immédiate ! On valide ?"
-            )
-            if not await tools.yes_no(mess):
-                await ctx.send("Mission aborted.")
-                return
-
         tache = Tache(timestamp=ts,
                       commande=commande,
                       action=Action.query.get(action_id))
         tache.add()         # Planifie la tâche
         await ctx.send(
-            f"{tools.code(commande)} planifiée pour le "
+            f"Commande {tools.code(commande)} planifiée pour le "
             f"{tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))}.\n"
             f"{tools.code(f'!cancel {tache.id}')} pour annuler."
         )
@@ -227,13 +224,10 @@ class GestionTaches(commands.Cog):
             await ctx.send("Aucune tâche trouvée.")
             return
 
-        message = await ctx.send("Annuler les tâches :\n" + "\n".join([
-            f" - {tools.code(tache.timestamp.strftime('%d/%m/%Y %H:%M:%S'))} "
-            f"> {tools.code(tache.commande)}" for tache in taches
-        ]))
-        if not await tools.yes_no(message):
-            await ctx.send("Mission aborted.")
-            return
-
         Tache.delete(*taches)       # Annule les tâches
-        await ctx.send("Tâche(s) annulée(s).")
+        await ctx.send("Tâche(s) annulée(s) :\n" + "\n".join([
+            tools.code(
+                f"!planif {tache.timestamp:%d/%m/%Y-%X} {tache.commande}`"
+            )
+            for tache in taches
+        ]))

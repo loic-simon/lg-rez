@@ -23,6 +23,26 @@ default_descr = "LG-bot – Plateforme pour parties endiablées de Loup-Garou"
 
 
 async def _check_and_prepare_objects(bot):
+    # Start admin console in the background
+    asyncio.create_task(console.run_admin_console(globals()))
+
+    if not config.is_setup:
+        return
+
+    async for entry in config.guild.audit_logs(
+        oldest_first=True,
+        user=config.bot.user,
+        action=discord.AuditLogAction.guild_update
+    ):
+        if entry.reason == "Guild set up!":
+            break
+    else:
+        config.is_setup = False
+        # *really* needed objects, even if nothing is setup
+        config.Channel.logs = config.guild.text_channels[0]
+        await tools.log("Server not setup - call `!setup` !")
+        return
+
     errors = []
 
     def prepare_attributes(rc_class, discord_type, converter):
@@ -103,9 +123,6 @@ async def _check_and_prepare_objects(bot):
             avatar=await bot.user.avatar_url.read()
         )
         await tools.log(f"Webhook de tâches planifiées créé")
-
-    # Start admin console in the background
-    asyncio.create_task(console.run_admin_console(globals()))
 
 
 # ---- Réactions aux différents évènements
@@ -195,7 +212,8 @@ async def _on_message(bot, message):
     if message.guild != config.guild:       # Mauvais serveur
         return
 
-    if (not message.webhook_id              # Pas un webhook
+    if (config.is_setup
+        and not message.webhook_id          # Pas un webhook
         and message.author.top_role == config.Role.everyone):
         # Pas de rôle affecté : le bot te calcule même pas
         return
@@ -293,7 +311,8 @@ async def _on_command_error(bot, ctx, exc):
         prefixe = ("Oups ! Un problème est survenu à l'exécution de "
                    "la commande  :grimacing: :")
 
-        if ctx.message.webhook_id or ctx.author.top_role >= config.Role.mj:
+        if (not config.is_setup or ctx.message.webhook_id
+            or ctx.author.top_role >= config.Role.mj):
             # MJ / webhook : affiche le traceback complet
             e = traceback.format_exception(type(exc.original), exc.original,
                                            exc.original.__traceback__)

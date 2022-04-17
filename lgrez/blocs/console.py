@@ -4,6 +4,7 @@ Permet de contrôler le bot depuis la console le faisant tourner.
 
 """
 
+import os
 import sys
 import asyncio
 
@@ -86,12 +87,7 @@ class AdminConsole(asyncode.AsyncInteractiveConsole):
                     'the whole LGBot.')
             banner = f"Python {sys.version} on {sys.platform}\n{base}\n{warn}"
 
-        try:
-            await super().interact(banner, exitmsg)
-        except (SystemExit, KeyboardInterrupt, EOFError) as exc:
-            yn = await aioconsole.ainput("Exit LG-Rez? (y/N) ")
-            if yn.lower().strip() in ("o", "y", "oui", "yes"):
-                raise KeyboardInterrupt from None
+        await super().interact(banner, exitmsg)
 
     async def write(self, data):
         """Method called on each print / repr / traceback...
@@ -138,11 +134,11 @@ async def run_admin_console(locals):
     Args:
         locals (dict): the objects accessible from the console.
     """
-    while True:
+    if os.isatty(sys.stdin.fileno()):   # Lancement depuis un terminal
         await asyncio.sleep(1)
         cons = AdminConsole(locals=locals)
         await cons.interact()
-        await aioconsole.aprint("Aborted, restarting admin console...")
+        await aioconsole.aprint("Admin console closed (bot still runs).")
 
 
 async def execute_command(entree):

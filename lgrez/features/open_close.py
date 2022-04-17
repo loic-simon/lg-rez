@@ -109,42 +109,39 @@ async def recup_joueurs(quoi, qui, heure=None):
         raise commands.BadArgument(f"""Argument <qui> == \"{qui}" invalide""")
 
 
-async def _do_refill(motif, actions):
+async def _do_refill(motif, action):
     # Détermination nouveau nombre de charges
     if motif in config.refills_full:
         # Refill -> nombre de charges initial de l'action
-        new_charges = {action: action.base.base_charges for action in actions}
+        new_charges = action.base.base_charges
     else:
         # Refill -> + 1 charge
-        new_charges = {action: action.charges + 1 for action in actions}
+        new_charges = action.charges + 1
 
     # Refill proprement dit
-    for action, charge in new_charges.items():
-        if charge <= action.charges:
-            # Pas de rechargement à faire (déjà base_charges)
-            continue
+    if new_charges <= action.charges:
+        # Pas de rechargement à faire (déjà base_charges)
+        return
 
-        if (not action.charges
-            and action.base.trigger_debut == ActionTrigger.perma):
-            # Action permanente qui était épuisée : on ré-ouvre !
-            if tools.en_pause():
-                ts = tools.fin_pause()
-            else:
-                ts = datetime.datetime.now() + datetime.timedelta(seconds=10)
-                # + 10 secondes pour ouvrir après le message de refill
-            Tache(timestamp=ts,
-                  commande=f"!open {action.id}",
-                  action=action).add()
+    if (not action.charges
+        and action.base.trigger_debut == ActionTrigger.perma):
+        # Action permanente qui était épuisée : on ré-ouvre !
+        if tools.en_pause():
+            ts = tools.fin_pause()
+        else:
+            ts = datetime.datetime.now() + datetime.timedelta(seconds=10)
+            # + 10 secondes pour ouvrir après le message de refill
+        Tache(timestamp=ts,
+                commande=f"!open {action.id}",
+                action=action).add()
 
-        action.charges = charge
-
-        await action.joueur.private_chan.send(
-            f"Ton action {action.base.slug} vient d'être rechargée, "
-            f"tu as maintenant {charge} charge(s) disponible(s) !"
-        )
-
+    action.charges = new_charges
     config.session.commit()
 
+    await action.joueur.private_chan.send(
+        f"Ton action {action.base.slug} vient d'être rechargée, "
+        f"tu as maintenant {new_charges} charge(s) disponible(s) !"
+    )
 
 
 class OpenClose(commands.Cog):
@@ -580,14 +577,17 @@ class OpenClose(commands.Cog):
         await tools.log(refillable, code=True,
                         prefixe=f"Refill {motif} {cible} :")
 
-        await tools.send_code_blocs(
+        *_, msg = await tools.send_code_blocs(
             ctx,
-            "\n".join(f"- {action.base.slug}, id = {action.id} \n"
-                      for action in refillable),
+            "\n".join(f"{tools.emoji_chiffre(i + 1)} {action.base.slug}, "
+                      f"id = {action.id} \n"
+                      for i, action in enumerate(refillable)),
             prefixe="Action(s) répondant aux critères :\n"
         )
+        if len(refillable) > 1:
+            n = await tools.choice(msg, len(refillable))
 
-        await _do_refill(motif, refillable)
+        await _do_refill(motif, refillable[n - 1])
 
 
 
@@ -624,6 +624,20 @@ class OpenClose(commands.Cog):
             "monde est en `role_actif == False` sur le Tableau de bord.\n"
             "Il faut donc **passer tout le monde à `True` maintenant**"
             "(puis `!sync silent`) avant de continuer."
+        )
+        if not await tools.yes_no(message):
+            await ctx.send("Mission aborted.")
+            return
+
+        message = await ctx.send(
+            "Dernière chose à faire : activer le backup automatique du "
+            "Tableau de bord tous les jours. Pour ce faire, l'ouvrir et "
+            "aller dans `Extensions > Apps Script` puis dans le pannel "
+            "`Déclencheurs` à gauche (l'horloge) et cliquer sur "
+            "`Ajouter un déclencheur` en bas à droite.\n\n"
+            "Remplir les paramètres : `Backupfeuille`, `Head`, "
+            "`Déchencheur horaire`, `Quotidien`, `Entre 1h et 2h` (pas "
+            "plus tard car les votes du jour changent à 3h)."
         )
         if not await tools.yes_no(message):
             await ctx.send("Mission aborted.")
@@ -694,4 +708,35 @@ class OpenClose(commands.Cog):
 
         await ctx.send(
             f"C'est tout bon ! (détails dans {config.Channel.logs.mention})"
+        )
+
+
+
+    @commands.command()
+    @tools.mjs_only
+    async def cfini(self, ctx):
+        """✨ Clôture le jeu (COMMANDE MJ)
+
+        Supprime toutes les tâches planifiées, ce qui stoppe de fait le jeu.
+        """
+        message = await ctx.send(
+            "C'est fini ?\nATTENTION : Confirmer supprimera TOUTES LES "
+            "TÂCHES EN ATTENTE, ce qui est compliqué à annuler !"
+        )
+        if not await tools.yes_no(message):
+            await ctx.send("Mission aborted.")
+            return
+
+        await ctx.send("Suppression des tâches...")
+        async with ctx.typing():
+            taches = Tache.query.all()
+            Tache.delete(*taches)       # On supprime et déprogramme le tout !
+
+        await ctx.send(
+            "C'est tout bon !\n"
+            "Dernière chose : penser à désactiver le backup automatique du "
+            "Tableau de bord !. Pour ce faire, l'ouvrir et "
+            "aller dans `Extensions > Apps Script` puis dans le pannel "
+            "`Déclencheurs` à gauche (l'horloge) et cliquer sur "
+            "les trois points à droite du déclencheur > Supprimer."
         )

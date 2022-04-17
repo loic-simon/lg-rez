@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.abspath('..'))
 # -- Project information -----------------------------------------------------
 
 project = 'lg-rez'
-copyright = ('2020 - 2021, Loïc Simon / Tom Lacoma. '
+copyright = ('2020 - 2022, Loïc Simon / Tom Lacoma. '
              'Sphinx theme by Rapptz for discord.py')
 author = 'Loïc Simon, Tom Lacoma'
 

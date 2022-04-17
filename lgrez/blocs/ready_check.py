@@ -155,4 +155,9 @@ class ReadyCheck(metaclass=_RCMeta):
         :returns: The attribute value, whatever it is.
         :raises AttributeError: if the attribute doesnt exist
     """
-    pass        # Everything is in the metaclass!
+    def __init__(self, *args, **kwargs) -> None:
+        raise RuntimeError(
+            "ReadyCheck-derivated classes are not meant to be instanciated!"
+        )
+
+    # Everything else is in the metaclass!

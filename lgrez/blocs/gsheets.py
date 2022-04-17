@@ -5,6 +5,7 @@ Connection, récupération de classeurs, modifications
 """
 
 import enum
+import functools
 import json
 
 import gspread
@@ -51,6 +52,14 @@ class Modif():
         return hash((self.row, self.column, self.val))
 
 
+@functools.cache
+def _get_creds(*scopes: str) -> service_account.ServiceAccountCredentials:
+    # use creds to create a client to interact with the Google Drive API
+    LGREZ_GCP_CREDENTIALS = env.load("LGREZ_GCP_CREDENTIALS")
+    return service_account.ServiceAccountCredentials.from_json_keyfile_dict(
+        json.loads(LGREZ_GCP_CREDENTIALS), list(scopes)
+    )
+
 
 async def connect(key):
     """Charge les credentials GSheets et renvoie le classeur demandé.
@@ -63,15 +72,10 @@ async def connect(key):
     Returns:
         :class:`gspread_asyncio.AsyncioGspreadWorksheet`
     """
-    # use creds to create a client to interact with the Google Drive API
-    LGREZ_GCP_CREDENTIALS = env.load("LGREZ_GCP_CREDENTIALS")
-
-    def _get_creds():
-        scope = ['https://spreadsheets.google.com/feeds']
-        return service_account.ServiceAccountCredentials.from_json_keyfile_dict(
-            json.loads(LGREZ_GCP_CREDENTIALS), scope
-        )
-    manager = gspread_asyncio.AsyncioGspreadClientManager(_get_creds)
+    scope = 'https://spreadsheets.google.com/feeds'
+    manager = gspread_asyncio.AsyncioGspreadClientManager(
+        lambda: _get_creds(scope)
+    )
     client = await manager.authorize()
 
     # Open the workbook
@@ -178,13 +182,8 @@ def get_doc_content(doc_id):
         googleapiclient.errors.HttpError: ID incorrect ou document non
             accessible.
     """
-    LGREZ_GCP_CREDENTIALS = env.load("LGREZ_GCP_CREDENTIALS")
-
-    scope = ['https://www.googleapis.com/auth/documents.readonly']
-    creds = service_account.ServiceAccountCredentials.from_json_keyfile_dict(
-        json.loads(LGREZ_GCP_CREDENTIALS), scope
-    )
-    service = build('docs', 'v1', credentials=creds)
+    scope = 'https://www.googleapis.com/auth/documents.readonly'
+    service = build('docs', 'v1', credentials=_get_creds(scope))
 
     # Retrieve the documents contents from the Docs service.
     document = service.documents().get(documentId=doc_id).execute()
@@ -207,3 +206,62 @@ def get_doc_content(doc_id):
                 content.append((run["content"], run["textStyle"]))
 
     return content
+
+
+def get_files_in_folder(folder_id: str) -> list[dict[str, str]]:
+    """Récupère le contenu binaire d'un fichier Google Drive.
+
+    Args:
+        folder_id: ID du fichier à récupérer (doit être public ou
+            dans le Drive partagé avec le compte de service).
+
+    Returns:
+        A list of, for each file, a directory with ``"file_id"``,
+        ``name`` (with extension) and ``extension`` (without dot) data.
+
+    Raises:
+        googleapiclient.errors.HttpError: ID incorrect ou dossier non
+            accessible.
+        RuntimeError: Autre erreur.
+    """
+    scope = "https://www.googleapis.com/auth/drive.readonly"
+    service = build("drive", "v3", credentials=_get_creds(scope))
+    data = service.files().list(
+        corpora="user",
+        q=f"'{folder_id}' in parents",
+        fields="files(id, fileExtension, name)",
+    ).execute()
+    if not data:
+        raise RuntimeError(f"Unable to get Drive folder info '{folder_id}'")
+    files = [
+        {
+            "file_id": file_data.get("id", ""),
+            "name": file_data.get("name", ""),
+            "extension": file_data.get("fileExtension", ""),
+        }
+        for file_data in data.get("files", [])
+    ]
+    return files
+
+
+def download_file(file_id: str) -> bytes:
+    """Récupère le contenu binaire d'un fichier Google Drive.
+
+    Args:
+        file_id: ID du fichier à récupérer (doit être public ou
+            dans le Drive partagé avec le compte de service).
+
+    Returns:
+        Le contenu binaire du fichier.
+
+    Raises:
+        googleapiclient.errors.HttpError: ID incorrect ou document non
+            accessible.
+        RuntimeError: Autre erreur.
+    """
+    scope = "https://www.googleapis.com/auth/drive.readonly"
+    service = build("drive", "v3", credentials=_get_creds(scope))
+    data = service.files().get_media(fileId=file_id).execute()
+    if not data:
+        raise RuntimeError(f"Unable to download Drive file '{file_id}'")
+    return data

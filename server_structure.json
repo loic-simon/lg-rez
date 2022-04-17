@@ -1,0 +1,358 @@
+{
+    "name": "LG-Rez Server",
+    "icon": {
+        "drive": true,
+        "png_path_or_id": "13AmXXo_uF1prMAc6csJQ-pHGQ3A7Ux--"
+    },
+    "afk_channel": null,
+    "afk_timeout": 300,
+    "verification_level": "none",
+    "default_notifications": "only_mentions",
+    "explicit_content_filter": "disabled",
+    "system_channel": "logs",
+    "system_channel_flags": {
+        "join_notifications": true,
+        "premium_subscriptions": true
+    },
+    "preferred_locale": "fr",
+    "roles": {
+        "mj": {
+            "name": "MJ",
+            "color": "64b9e9",
+            "hoist": true,
+            "mentionable": true,
+            "permissions": "all"
+        },
+        "bot": {
+            "name": "Bot",
+            "color": "9b59b6",
+            "hoist": true,
+            "mentionable": false,
+            "permissions": "all"
+        },
+        "maire": {
+            "name": "Maire",
+            "color": "f1c40f",
+            "hoist": true,
+            "mentionable": true,
+            "permissions": [
+                "mention_everyone"
+            ]
+        },
+        "observateur": {
+            "name": "Observateur",
+            "color": "648080",
+            "hoist": true,
+            "mentionable": false,
+            "permissions": []
+        },
+        "joueur_en_vie": {
+            "name": "Joueur en vie",
+            "color": "70ad47",
+            "hoist": true,
+            "mentionable": false,
+            "permissions": [
+                "read_messages",
+                "send_messages"
+            ]
+        },
+        "joueur_mort": {
+            "name": "Joueur mort",
+            "color": "992d22",
+            "hoist": true,
+            "mentionable": false,
+            "permissions": [
+                "read_messages"
+            ]
+        },
+        "redacteur": {
+            "name": "Rédacteur",
+            "color": "607d8b",
+            "hoist": false,
+            "mentionable": false,
+            "permissions": []
+        }
+    },
+    "base_role": "@everyone",
+    "everyone_permissions": [
+        "embed_links",
+        "attach_files",
+        "add_reactions",
+        "use_external_emojis",
+        "read_message_history",
+        "send_tts_messages",
+        "use_slash_commands",
+        "connect",
+        "speak",
+        "stream",
+        "use_voice_activation"
+    ],
+    "categories": {
+        "informations": {
+            "name": "INFORMATIONS",
+            "overwrites": {
+                "@everyone": {
+                    "send_messages": false
+                }
+            },
+            "channels": {
+                "bienvenue": {
+                    "name": "bienvenue",
+                    "topic": "Bonjour à tous !",
+                    "overwrites": {
+                        "@everyone": {
+                            "read_messages": true,
+                            "send_messages": false
+                        }
+                    }
+                },
+                "regles": {
+                    "name": "règles",
+                    "topic": "À lire !",
+                    "overwrites": {}
+                },
+                "roles": {
+                    "name": "rôles",
+                    "topic": "Liste des rôles (accessible en faisant !roles)",
+                    "overwrites": {}
+                },
+                "meta": {
+                    "name": "meta",
+                    "topic": "Salon pour parler de tout ce qui est extérieur au jeu : le serveur, le bot... (mais pas de spam)",
+                    "overwrites": {
+                        "@everyone": {
+                            "send_messages": null
+                        }
+                    }
+                }
+            },
+            "voice_channels": {}
+        },
+        "private_chan": {
+            "name": "CONVERSATION BOT",
+            "overwrites": {
+                "observateur": {
+                    "read_messages": true
+                },
+                "@everyone": {
+                    "read_messages": false
+                }
+            },
+            "channels": {},
+            "voice_channels": {}
+        },
+        "mjs_home": {
+            "name": "MANOIR DES MJS 🏰",
+            "overwrites": {
+                "observateur": {
+                    "read_messages": true
+                },
+                "@everyone": {
+                    "read_messages": false
+                }
+            },
+            "channels": {
+                "general": {
+                    "name": "général",
+                    "topic": "Le QG des Moussaillons Joyeux",
+                    "overwrites": {}
+                },
+                "lore": {
+                    "name": "le-lore",
+                    "topic": "Ici on raconte des histoires",
+                    "overwrites": {}
+                },
+                "resolution": {
+                    "name": "résolution",
+                    "topic": "Alors, qui va mourir ce soir ?",
+                    "overwrites": {}
+                },
+                "prices": {
+                    "name": "prix",
+                    "topic": "Une remise des quoi ???",
+                    "overwrites": {}
+                },
+                "tech": {
+                    "name": "technique",
+                    "topic": "Pour lancer toutes les commandes",
+                    "overwrites": {}
+                },
+                "rules_details": {
+                    "name": "titillage-de-règles",
+                    "topic": "OK, mais si un mage mage un mage qui mage un mage ?",
+                    "overwrites": {}
+                },
+                "logs": {
+                    "name": "logs",
+                    "topic": "Logs techniques du bot",
+                    "overwrites": {}
+                },
+                "ideas": {
+                    "name": "boîte-à-idées",
+                    "topic": "Toutes les possibilités d'amélioration pour le futur",
+                    "overwrites": {}
+                },
+                "spam_for_mjs": {
+                    "name": "spam-mais-pour-les-mjs",
+                    "topic": "Tout est dans le titre",
+                    "overwrites": {}
+                }
+            },
+            "voice_channels": {
+                "general": {
+                    "name": "Général",
+                    "overwrites": {}
+                },
+                "tech": {
+                    "name": "Tech",
+                    "overwrites": {}
+                }
+            }
+        },
+        "conversations_camps": {
+            "name": "CONVERSATIONS CAMPS",
+            "overwrites": {
+                "observateur": {
+                    "read_messages": true
+                },
+                "@everyone": {
+                    "read_messages": false
+                }
+            },
+            "channels": {
+                "loups": {
+                    "name": "tanière-des-loups",
+                    "topic": "Aouuuuuuuuu",
+                    "overwrites": {}
+                },
+                "exorcistes_1": {
+                    "name": "prétoire-des-exorcistes",
+                    "topic": null,
+                    "overwrites": {}
+                },
+                "exorcistes_2": {
+                    "name": "aréopage-des-exorcistes",
+                    "topic": null,
+                    "overwrites": {}
+                },
+                "enfer": {
+                    "name": "enfer",
+                    "topic": "Oh bah non, vous êtes morts",
+                    "overwrites": {
+                        "@everyone": {
+                            "read_messages": false
+                        },
+                        "joueur_mort": {
+                            "read_messages": true,
+                            "send_messages": true
+                        },
+                        "observateur": {
+                            "read_messages": true
+                        }
+                    }
+                }
+            },
+            "voice_channels": {}
+        },
+        "boudoirs": {
+            "name": "BOUDOIRS",
+            "overwrites": {
+                "observateur": {
+                    "read_messages": true
+                },
+                "@everyone": {
+                    "read_messages": false
+                }
+            },
+            "channels": {
+                "about": {
+                    "name": "information-boudoirs",
+                    "topic": "Oui c'est un nom à la con, non t'as pas le droit de le dire.",
+                    "overwrites": {
+                        "@everyone": {
+                            "read_messages": false
+                        },
+                        "joueur_mort": {
+                            "read_messages": true
+                        },
+                        "joueur_en_vie": {
+                            "read_messages": true,
+                            "send_messages": false
+                        },
+                        "observateur": {
+                            "read_messages": true
+                        }
+                    }
+                }
+            },
+            "voice_channels": {}
+        },
+        "village_place": {
+            "name": "PLACE DU VILLAGE",
+            "overwrites": {},
+            "channels": {
+                "annonces": {
+                    "name": "annonces",
+                    "topic": "Pour tout savoir sur les morts, les informations importantes et la partie en général !",
+                    "overwrites": {
+                        "@everyone": {
+                            "send_messages": false
+                        }
+                    }
+                },
+                "haros": {
+                    "name": "haros",
+                    "topic": "Postez dans ce chan en utilisant !haro / !candid pendant les horaires d'ouvertures du vote ! Seuls les joueurs ayant été accusés peuvent être tués au vote.",
+                    "overwrites": {
+                        "@everyone": {
+                            "send_messages": false
+                        }
+                    }
+                },
+                "debats": {
+                    "name": "débats",
+                    "topic": "Salon principal, pour parler du jeu !",
+                    "overwrites": {}
+                },
+                "spam": {
+                    "name": "spam",
+                    "topic": "SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPMA SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM SPAM",
+                    "overwrites": {}
+                }
+            },
+            "voice_channels": {}
+        },
+        "old_boudoirs": {
+            "name": "CIMETIÈRE DES BOUDOIRS",
+            "overwrites": {
+                "observateur": {
+                    "read_messages": true
+                },
+                "@everyone": {
+                    "read_messages": false
+                }
+            },
+            "channels": {},
+            "voice_channels": {}
+        }
+    },
+    "emojis": {
+        "drive": true,
+        "folder_path_or_id": "188HSkUVKdwmx6RjKdcnIX0GeAP-b-h7r",
+        "required": {
+            "ha": "ha",
+            "ro": "ro",
+            "bucher": "bucher",
+            "maire": "maire",
+            "action": "action",
+            "lune": "lune",
+            "void": "void"
+        },
+        "restrict_roles": {
+            "bucher": ["bot"],
+            "maire": ["bot"],
+            "action": ["bot"],
+            "lune": ["bot"]
+        }
+    }
+}

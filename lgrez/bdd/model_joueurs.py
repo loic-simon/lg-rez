@@ -4,8 +4,6 @@ Déclaration de toutes les tables et leurs colonnes
 
 """
 
-import datetime
-
 import sqlalchemy
 from sqlalchemy.ext.hybrid import hybrid_property
 
@@ -14,7 +12,6 @@ from lgrez.bdd import base
 from lgrez.bdd.base import (autodoc_Column, autodoc_ManyToOne,
                             autodoc_OneToMany, autodoc_DynamicOneToMany)
 from lgrez.bdd.enums import Statut, CandidHaroType, Vote
-from lgrez.blocs import tools
 
 
 # Tables de données
@@ -270,69 +267,6 @@ class Boudoir(base.TableBase):
             return next(boud.joueur for boud in self.bouderies if boud.gerant)
         except StopIteration:
             raise ValueError(f"Pas de membre gérant le boudoir *{self.nom}*")
-
-    async def add_joueur(self, joueur, gerant=False):
-        """Ajoute un joueur sur le boudoir.
-
-        Crée la :class:`.Bouderie` correspondante et modifie les
-        permissions du salon.
-
-        Args:
-            joueur (.Joueur): Le joueur à ajouter.
-            gerant (bool): Si le joueur doit être ajouté avec les
-                permissions de gérant.
-
-        Returns:
-            :class:`bool` - ``True`` si le joueur a été ajouté,
-                ``False`` si il y était déjà / le boudoir est fermé.
-        """
-        if joueur in self.joueurs:
-            # Joueur déjà dans le boudoir
-            return False
-        if not self.joueurs and not gerant:
-            # Boudoir fermé (plus de joueurs) et pas ajout comme gérant
-            return False
-
-        now = datetime.datetime.now()
-        Bouderie(boudoir=self, joueur=joueur, gerant=gerant,
-                 ts_added=now, ts_promu=now if gerant else None).add()
-        await self.chan.set_permissions(joueur.member, read_messages=True)
-
-        # Sortie du cimetière le cas échéant
-        if tools.in_multicateg(self.chan.category,
-                               config.old_boudoirs_category_name):
-            await self.chan.send(tools.ital(
-                "[Ce boudoir contient au moins deux joueurs vivants, "
-                "désarchivage...]"
-            ))
-            categ = await tools.multicateg(config.boudoirs_category_name)
-            await boudoir.chan.edit(category=categ)
-        return True
-
-    async def remove_joueur(self, joueur):
-        """Retire un joueur du boudoir.
-
-        Supprime la :class:`.Bouderie` correspondante et modifie les
-        permissions du salon.
-
-        Args:
-            joueur (.Joueur): Le joueur à ajouter.
-        """
-        Bouderie.query.filter_by(boudoir=self, joueur=joueur).one().delete()
-        await self.chan.set_permissions(joueur.member, overwrite=None)
-        # Déplacement dans le cimetière si nécessaire
-        vivants = [jr for jr in self.joueurs if jr.est_vivant]
-        if len(vivants) < 2:
-            if tools.in_multicateg(self.chan.category,
-                                   config.old_boudoirs_category_name):
-                # Boudoir déjà au cimetière
-                return
-            await self.chan.send(tools.ital(
-                "[Ce boudoir contient moins de deux joueurs vivants, "
-                "archivage...]"
-            ))
-            categ = await tools.multicateg(config.old_boudoirs_category_name)
-            await self.chan.edit(category=categ)
 
 
     @classmethod

@@ -4,9 +4,18 @@ Personalisation de différents paramètres et accès global
 
 """
 
+import json
+
 import discord
 
-from lgrez.blocs import ready_check
+from lgrez.blocs import ready_check, structure
+
+
+with open("server_structure.json") as fp:
+    #: dict[str, Any]: Structure du serveur utilisée par !setup (serveur,
+    #: rôles, salons, emojis). Voir le fichier ```server_structure.json``
+    #: (valeur par défaut) pour les possibilités de personnalisation.
+    server_structure = json.load(fp)
 
 
 #: str: Préfixe des noms des salons de conversation bot.
@@ -14,15 +23,21 @@ private_chan_prefix = "conv-bot-"
 
 #: str: Nom de la catégorie des conversations bot, pour l'inscription
 #: (sera éventuellement suivi de 2, 3... si plus de 50 joueurs).
-private_chan_category_name = "CONVERSATION BOT"
+#: Devrait correspondre à au nom de la catégorie correspondante dans
+#: :attr:`server_structure` ``["categories"]``
+private_chan_category_name = None       # Deduced from server_structure
 
 #: str: Nom de la catégorie des boudoirs
 #: (sera éventuellement suivi de 2, 3... si plus de 50 boudoirs).
-boudoirs_category_name = "BOUDOIRS"
+#: Devrait correspondre à au nom de la catégorie correspondante dans
+#: :attr:`server_structure` ``["categories"]``
+boudoirs_category_name = None           # Deduced from server_structure
 
 #: str: Nom de la catégorie des boudoirs devenus inutiles
 #: (sera éventuellement suivi de 2, 3... si plus de 50 boudoirs).
-old_boudoirs_category_name = "CIMETIÈRE DES BOUDOIRS"
+#: Devrait correspondre à au nom de la catégorie correspondante dans
+#: :attr:`server_structure` ``["categories"]``
+old_boudoirs_category_name = None       # Deduced from server_structure
 
 
 #: str: Date de début de saison (pour information lors de l'inscription).
@@ -160,6 +175,10 @@ refills_divins = ["divin"]
 #: N'est pas concu pour être changé manuellement.
 is_ready = False
 
+#: bool: Indique si le serveur est construit (``!setup`` appelé)
+#: N'est pas conçu pour être changé manuellement.
+is_setup = True
+
 
 class Role(ready_check.ReadyCheck, check_type=discord.Role):
     """Rôles Discord nécessaires au jeu
@@ -195,11 +214,12 @@ class Role(ready_check.ReadyCheck, check_type=discord.Role):
             est ce rôle (ou moins) seront ignorés par le bot.
             Nom par défaut: "@everyone" (rôle Discord de base)
     """
-    mj = "MJ"
-    redacteur = "Rédacteur"
-    joueur_en_vie = "Joueur en vie"
-    joueur_mort = "Joueur mort"
-    maire = "Maire"
+    # Default attributes values will be deduced from server_structure.
+    mj = None
+    redacteur = None
+    joueur_en_vie = None
+    joueur_mort = None
+    maire = None
     everyone = "@everyone"
 
 
@@ -232,11 +252,12 @@ class Channel(ready_check.ReadyCheck, check_type=discord.TextChannel):
         debats: Salon de discussion principal (catégorie Place du village).
             Nom par défaut : "débats".
     """
-    roles = "rôles"
-    logs = "logs"
-    annonces = "annonces"
-    haros = "haros"
-    debats = "débats"
+    # Default attributes values will be deduced from server_structure.
+    roles = None
+    logs = None
+    annonces = None
+    haros = None
+    debats = None
 
 
 class Emoji(ready_check.ReadyCheck, check_type=discord.Emoji):
@@ -265,13 +286,51 @@ class Emoji(ready_check.ReadyCheck, check_type=discord.Emoji):
         action: Représente les actions de rôle
         void: Image vide, pour séparations verticales et autres filouteries
     """
-    ha = "ha"
-    ro = "ro"
-    bucher = "bucher"
-    maire = "maire"
-    action = "action"
-    lune = "lune"
-    void = "void"
+    # Default attributes values will be deduced from server_structure.
+    ha = None
+    ro = None
+    bucher = None
+    maire = None
+    action = None
+    lune = None
+    void = None
+
+
+def set_config_from_server_structure():
+    """Deduce some configuration values from server structure.
+
+    Call this function after customizing :attr:`.server_structure`,
+    but BEFORE launching the bot! Should never be called at runtime.
+    """
+    global private_chan_category_name
+    global boudoirs_category_name
+    global old_boudoirs_category_name
+
+    structure.check_server_structure(server_structure, Role, Channel, Emoji)
+
+    categories = server_structure["categories"]
+    private_chan_category_name = categories["private_chan"]["name"]
+    boudoirs_category_name = categories["boudoirs"]["name"]
+    old_boudoirs_category_name = categories["old_boudoirs"]["name"]
+    for role in Role:
+        if role == "everyone":
+            continue
+        setattr(Role, role, server_structure["roles"][role]["name"])
+    if (base_role := server_structure["base_role"]) == "@everyone":
+        Role.everyone = "@everyone"
+    else:
+        Role.everyone = server_structure["roles"][base_role]["name"]
+    for channel in Channel:
+        setattr(Channel, channel, next(chan
+            for categ in categories.values()
+            for slug, chan in categ["channels"].items()
+            if slug == channel
+        )["name"]
+    )
+    for emoji in Emoji:
+        setattr(Emoji, emoji, server_structure["emojis"]["required"][emoji])
+
+set_config_from_server_structure()      # First deduction at import time
 
 
 class _ModuleGlobals(ready_check.ReadyCheck):
