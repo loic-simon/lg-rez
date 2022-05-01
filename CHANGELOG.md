@@ -9,6 +9,14 @@ to benefit Sphinx internal links to Python objects:*
 https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
 
 
+## 2.4.2 - 2022-05-01
+
+### Fixed
+
+  - ``server_structure.json`` was not included in package data;
+  - Minimal Python version was not updated (must be >=3.10 since 2.4).
+
+
 ## 2.4.1 - 2022-04-17
 
 ### Fixed

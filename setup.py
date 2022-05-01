@@ -51,8 +51,6 @@ setuptools.setup(
         "Framework :: AsyncIO",
         "Intended Audience :: Developers",
         "Natural Language :: French",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
@@ -60,5 +58,9 @@ setuptools.setup(
         "Topic :: Internet",
     ],
     install_requires=requirements,
-    python_requires='>=3.8',
+    python_requires=">=3.10",
+    package_data={
+        "lgrez": ["server_structure.json"],
+    },
+    include_package_data=True,
 )

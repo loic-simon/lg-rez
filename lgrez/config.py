@@ -5,21 +5,19 @@ Personalisation de différents paramètres et accès global
 """
 
 import json
+import pkgutil
 
 import discord
 
 from lgrez.blocs import ready_check, structure
 
 
-try:
-    fp = open("server_structure.json")
-except FileNotFoundError:
-    fp = open("../server_structure.json")
-with fp:
-    #: dict[str, Any]: Structure du serveur utilisée par !setup (serveur,
-    #: rôles, salons, emojis). Voir le fichier ```server_structure.json``
-    #: (valeur par défaut) pour les possibilités de personnalisation.
-    server_structure = json.load(fp)
+#: dict[str, Any]: Structure du serveur utilisée par !setup (serveur,
+#: rôles, salons, emojis). Voir le fichier ```server_structure.json``
+#: (valeur par défaut) pour les possibilités de personnalisation.
+server_structure = json.loads(
+    pkgutil.get_data("lgrez", "server_structure.json")
+)
 
 
 #: str: Préfixe des noms des salons de conversation bot.
