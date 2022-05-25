@@ -115,7 +115,7 @@ class GestionTaches(commands.Cog):
         ts = datetime.datetime.combine(date, time)
         if ts < datetime.datetime.now():
             ts = datetime.datetime.combine(
-                datetime.date.today() + datetime.timedelta.days(1), time
+                datetime.date.today() + datetime.timedelta(days=1), time
             )
             await ctx.send("Date dans le passé, décalée à demain")
 

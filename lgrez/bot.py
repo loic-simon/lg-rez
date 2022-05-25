@@ -312,7 +312,7 @@ async def _on_command_error(bot, ctx, exc):
                    "la commande  :grimacing: :")
 
         if (not config.is_setup or ctx.message.webhook_id
-            or ctx.author.top_role >= config.Role.mj):
+            or ctx.author.top_role == config.Role.mj):
             # MJ / webhook : affiche le traceback complet
             e = traceback.format_exception(type(exc.original), exc.original,
                                            exc.original.__traceback__)

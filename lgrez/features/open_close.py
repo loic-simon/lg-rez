@@ -584,6 +584,7 @@ class OpenClose(commands.Cog):
                       for i, action in enumerate(refillable)),
             prefixe="Action(s) répondant aux critères :\n"
         )
+        n = 1
         if len(refillable) > 1:
             n = await tools.choice(msg, len(refillable))
 

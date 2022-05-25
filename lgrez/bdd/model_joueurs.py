@@ -4,6 +4,8 @@ Déclaration de toutes les tables et leurs colonnes
 
 """
 
+import datetime
+
 import sqlalchemy
 from sqlalchemy.ext.hybrid import hybrid_property
 
@@ -223,7 +225,7 @@ class Boudoir(base.TableBase):
     chan_id = autodoc_Column(sqlalchemy.BigInteger(), primary_key=True,
         autoincrement=False, doc="ID Discord du salon")
 
-    nom = autodoc_Column(sqlalchemy.String(32), nullable=False,
+    nom = autodoc_Column(sqlalchemy.String(80), nullable=False,
         doc="Nom du boudoir (demandé à la création)")
     ts_created = autodoc_Column(sqlalchemy.DateTime(), nullable=False,
         doc="Timestamp de la création")
@@ -258,7 +260,7 @@ class Boudoir(base.TableBase):
 
     @property
     def gerant(self):
-        """.bdd.Joueur: Membre du boudoir ayant les droits de gestion.
+        """.bdd.Joueur: Membre du boudoir ayant les droits de gestion (r+w).
 
         Raises:
             ValueError: pas de membre avec les droits de gestion
@@ -268,6 +270,20 @@ class Boudoir(base.TableBase):
         except StopIteration:
             raise ValueError(f"Pas de membre gérant le boudoir *{self.nom}*")
 
+    @gerant.setter
+    def gerant(self, new_gerant: Joueur):
+        bouderie_new = next(
+            (boud for boud in self.bouderies if boud.joueur == new_gerant),
+            None,
+        )
+        if not bouderie_new:
+            raise ValueError(f"{new_gerant} is not in {self}")
+        bouderie_old = next(boud for boud in self.bouderies if boud.gerant)
+        if bouderie_old.joueur == new_gerant:
+            return
+        bouderie_old.gerant = False
+        bouderie_new.gerant = True
+        bouderie_new.ts_promu = datetime.datetime.now()
 
     @classmethod
     def from_channel(cls, channel):

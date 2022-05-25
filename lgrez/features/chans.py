@@ -353,13 +353,8 @@ class GestionChans(commands.Cog):
             await ctx.send("Mission aborted.")
             return
 
-        bd_gerant = next(bd for bd in boudoir.bouderies if bd.joueur == gerant)
-        bd_nouv = next(bd for bd in boudoir.bouderies if bd.joueur == joueur)
-
-        bd_gerant.gerant = False
-        bd_nouv.gerant = True
-        bd_nouv.ts_promu = datetime.datetime.now()
-        Bouderie.update()
+        boudoir.gerant = joueur
+        boudoir.update()
         await boudoir.chan.edit(
             topic=f"Boudoir crée le {boudoir.ts_created:%d/%m à %H:%M}. "
                   f"Gérant(e) : {joueur.nom}"
@@ -443,10 +438,11 @@ class GestionChans(commands.Cog):
         if not boudoirs:
             await ctx.reply("Pas de boudoir(s) réunissant ces joueurs.")
         else:
-            await tools.send_blocs(ctx, "\n".join(
+            liste = "\n".join(
                 f"- {boudoir.chan.mention} ({len(boudoir.joueurs)} joueurs)"
                 for boudoir in boudoirs
-            ))
+            )
+            await tools.send_blocs(ctx, f"{len(boudoirs)} boudoirs :\n{liste}")
 
 
     @boudoir.command()

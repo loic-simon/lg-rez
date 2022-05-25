@@ -9,6 +9,18 @@ to benefit Sphinx internal links to Python objects:*
 https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
 
 
+## 2.4.3 - 2022-05-26
+
+### Fixed
+
+  - :func:`features.sync.process_mort` crashed if dead player was gerant of
+    boudoirs, disallowing sync of dead players;
+  - ``!planif`` crashed for dates in the past;
+  - ``!mp`` crashed if combined names were > 32 characters long;
+  - ``!refill`` crashed if only one action was refillable;
+  - :func:`blocs.tools.mention_MJ` always returned a role mention.
+
+
 ## 2.4.2 - 2022-05-01
 
 ### Fixed
