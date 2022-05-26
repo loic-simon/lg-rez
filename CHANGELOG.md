@@ -9,6 +9,14 @@ to benefit Sphinx internal links to Python objects:*
 https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
 
 
+## 2.4.4 - 2022-05-27
+
+### Fixed
+
+  - :func:`features.sync.process_mort` boudoir transfer selected dead player;
+  - Small formatting problem with ``!cancel``.
+
+
 ## 2.4.3 - 2022-05-26
 
 ### Fixed

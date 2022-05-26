@@ -638,7 +638,11 @@ async def process_mort(joueur: Joueur) -> None:
 
         elif joueur == boudoir.gerant:
             # Mort du gérant (et pas cimetière) : transférer le boudoir
-            oldest_bouderie = min(boudoir.bouderies, key=lambda b: b.ts_added)
+            oldest_bouderie = min(
+                (bouderie for bouderie in boudoir.bouderies 
+                 if bouderie.joueur != joueur and bouderie.joueur.est_vivant), 
+                key=lambda b: b.ts_added
+            )
             boudoir.gerant = oldest_bouderie.joueur
             boudoir.update()
             await boudoir.chan.send(

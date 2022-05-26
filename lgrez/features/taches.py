@@ -226,7 +226,7 @@ class GestionTaches(commands.Cog):
 
         Tache.delete(*taches)       # Annule les tâches
         await ctx.send("Tâche(s) annulée(s) :\n" + "\n".join([
-            tools.code(
+            tools.code_bloc(
                 f"!planif {tache.timestamp:%d/%m/%Y-%X} {tache.commande}`"
             )
             for tache in taches
