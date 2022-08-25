@@ -4,8 +4,11 @@ Connection, récupération de classeurs, modifications
 (implémentation de https://pypi.org/project/gspread)
 """
 
+from __future__ import annotations
+
 import enum
 import json
+import typing
 
 import gspread
 import gspread_asyncio
@@ -21,56 +24,55 @@ WorksheetNotFound = gspread.exceptions.WorksheetNotFound
 ConnectionError = requests.exceptions.ConnectionError
 
 
-class Modif():
+class Modif:
     """Modification à appliquer à un Google Sheet.
 
     Attributes:
-        row (int): Numéro de la ligne (0 = ligne 1)
-        column (int): Numéro de la colonne (0 = colonne A)
-        val (Any): Nouvelle valeur
+        row: Numéro de la ligne (0 = ligne 1)
+        column: Numéro de la colonne (0 = colonne A)
+        val: Nouvelle valeur
     """
-    def __init__(self, row, column, val):
+
+    def __init__(self, row: int, column: int, val: typing.Any) -> None:
         """Initializes self."""
         self.row = row
         self.column = column
         self.val = val
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Returns repr(self)"""
         return f"<gsheets.Modif: ({self.row}, {self.column}) = {self.val!r}>"
 
-    def __eq__(self, other):
+    def __eq__(self, other: Modif) -> bool:
         """Returns self == other"""
         if not isinstance(other, self.__class__):
             return NotImplemented
-        return (self.row == other.row
-                and self.column == other.column
-                and self.val == other.val)
+        return self.row == other.row and self.column == other.column and self.val == other.val
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.row, self.column, self.val))
 
 
-
-async def connect(key):
+async def connect(key: str) -> gspread_asyncio.AsyncioGspreadWorksheet:
     """Charge les credentials GSheets et renvoie le classeur demandé.
 
     Nécessite la variable d'environment ``LGREZ_GCP_CREDENTIALS``.
 
     Args:
-        key (str): ID du classeur à charger (25 caractères)
+        key: ID du classeur à charger (25 caractères)
 
     Returns:
-        :class:`gspread_asyncio.AsyncioGspreadWorksheet`
+        Le classeur correspondant à l'ID demandé.
     """
     # use creds to create a client to interact with the Google Drive API
     LGREZ_GCP_CREDENTIALS = env.load("LGREZ_GCP_CREDENTIALS")
 
     def _get_creds():
-        scope = ['https://spreadsheets.google.com/feeds']
+        scope = ["https://spreadsheets.google.com/feeds"]
         return service_account.ServiceAccountCredentials.from_json_keyfile_dict(
             json.loads(LGREZ_GCP_CREDENTIALS), scope
         )
+
     manager = gspread_asyncio.AsyncioGspreadClientManager(_get_creds)
     client = await manager.authorize()
 
@@ -80,15 +82,17 @@ async def connect(key):
     return workbook
 
 
-async def update(sheet, *modifs):
+async def update(
+    sheet: gspread_asyncio.AsyncioGspreadWorksheet,
+    *modifs: Modif,
+) -> None:
     """Met à jour une feuille GSheets avec les modifications demandées.
 
     Args:
-        sheet (gspread_asyncio.AsyncioGspreadWorksheet): La feuille à
-            modifier
-        *modifs (list[.Modif]): Modification(s) à apporter
+        sheet: La feuille à modifier.
+        *modifs: Les modification(s) à apporter.
 
-    Le type de la nouvelle valeur sera interpreté par ``gspread`` pour
+    Le type de la nouvelle valeur sera interprété par ``gspread`` pour
     donner le type GSheets adéquat à la cellule (texte, numérique,
     temporel...)
 
@@ -108,9 +112,7 @@ async def update(sheet, *modifs):
     cells_to_update = []
     for modif in modifs:
         # On récupère l'objet Cell correspondant aux coords à modifier
-        cell = next(cell for cell in cells
-                    if cell.col == modif.column + 1
-                    and cell.row == modif.row + 1)
+        cell = next(cell for cell in cells if cell.col == modif.column + 1 and cell.row == modif.row + 1)
 
         val = modif.val
 
@@ -137,26 +139,26 @@ async def update(sheet, *modifs):
     await sheet.update_cells(cells_to_update)
 
 
-def a_to_index(column):
+def a_to_index(column: str) -> int:
     """Utilitaire : convertit une colonne ("A", "B"...) en indice.
 
     Args:
-        column (str): nom de la colonne. Doit être composé de caractères
+        column: nom de la colonne. Doit être composé de caractères
             dans [a-z, A-Z] uniquement.
 
     Returns:
-        int: L'indice de la colonne, **indexé à partir de 0** (cellules
-            considérées comme une liste de liste).
+        L'indice de la colonne, **indexé à partir de 0** (cellules
+        considérées comme une liste de liste).
 
     Raises:
         gspread.exceptions.IncorrectCellLabel: valeur incorrecte.
     """
     a1 = column + "1"
     row, col = gspread.utils.a1_to_rowcol(a1)
-    return col - 1      # a1_to_rowcol indexe à partir de 1
+    return col - 1  # a1_to_rowcol indexe à partir de 1
 
 
-def get_doc_content(doc_id):
+def get_doc_content(doc_id: str) -> list[tuple[str, dict]]:
     """Récupère le contenu d'un document Google Docs.
 
     Transforme le document pour ne garder que les fragments de
@@ -166,13 +168,12 @@ def get_doc_content(doc_id):
     paragraphes et les autres objets GDocs sont ignorés.
 
     Args:
-        doc_id (str): ID du document à récupérer (doit être public
+        doc_id: ID du document à récupérer (doit être public
             ou dans le Drive partagé avec le compte de service).
 
     Returns:
-        list[tuple(str, dict)]: Les différents fragments de texte
-        du document et leur formattage (référence : https://developers.\
-        google.com/docs/api/reference/rest/v1/documents#TextStyle)
+        Les différents fragments de texte du document et leur formattage
+        (référence : https://developers.google.com/docs/api/reference/rest/v1/documents#TextStyle)
 
     Raises:
         googleapiclient.errors.HttpError: ID incorrect ou document non
@@ -180,11 +181,9 @@ def get_doc_content(doc_id):
     """
     LGREZ_GCP_CREDENTIALS = env.load("LGREZ_GCP_CREDENTIALS")
 
-    scope = ['https://www.googleapis.com/auth/documents.readonly']
-    creds = service_account.ServiceAccountCredentials.from_json_keyfile_dict(
-        json.loads(LGREZ_GCP_CREDENTIALS), scope
-    )
-    service = build('docs', 'v1', credentials=creds)
+    scope = ["https://www.googleapis.com/auth/documents.readonly"]
+    creds = service_account.ServiceAccountCredentials.from_json_keyfile_dict(json.loads(LGREZ_GCP_CREDENTIALS), scope)
+    service = build("docs", "v1", credentials=creds)
 
     # Retrieve the documents contents from the Docs service.
     document = service.documents().get(documentId=doc_id).execute()
@@ -203,7 +202,7 @@ def get_doc_content(doc_id):
         elements = paragraph["elements"]
         for element in elements:
             run = element.get("textRun")
-            if run:     # bout de texte
+            if run:  # bout de texte
                 content.append((run["content"], run["textStyle"]))
 
     return content

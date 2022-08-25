@@ -9,6 +9,7 @@ import enum
 
 # Définition des enums
 
+
 class Statut(enum.Enum):
     """:class:`~enum.Enum` représentant le statut RP d'un Joueur.
 
@@ -18,6 +19,7 @@ class Statut(enum.Enum):
         MV: Le joueur est Mort-Vivant. Pas de chance.
         immortel: Le joueur est Immortel. Si jamais...
     """
+
     vivant = enum.auto()
     mort = enum.auto()
     MV = enum.auto()
@@ -42,6 +44,7 @@ class ActionTrigger(enum.Enum):
         open_loups: À l'ouverture du vote des loups
         close_loups: À la fermeture du vote des loups
     """
+
     temporel = enum.auto()
     delta = enum.auto()
     perma = enum.auto()
@@ -76,6 +79,7 @@ class CandidHaroType(enum.Enum):
         candidature: Candidature à la mairie
         haro: Haro pour le bûcher
     """
+
     candidature = enum.auto()
     haro = enum.auto()
 
@@ -88,6 +92,7 @@ class Vote(enum.Enum):
         maire: Vote pour le nouveau maire
         loups: Vote pour la victime des loups
     """
+
     cond = enum.auto()
     maire = enum.auto()
     loups = enum.auto()
@@ -103,6 +108,7 @@ class UtilEtat(enum.Enum):
         ignoree: Créneau pour agir fini sans qu'une décision soit prise
         contree: Utilisation validée, mais contrée par un évènement externe
     """
+
     ouverte = enum.auto()
     remplie = enum.auto()
     validee = enum.auto()
@@ -122,6 +128,7 @@ class CibleType(enum.Enum):
         booleen: Oui/non : sert à ue action sans paramètres, à une option...
         texte: Permet d'entrer un texte libre
     """
+
     joueur = enum.auto()
     vivant = enum.auto()
     mort = enum.auto()

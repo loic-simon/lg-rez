@@ -450,7 +450,7 @@ Consequences:
     - New liveness checking system: new method ``LGBot.i_am_alive`` writes every 60s current UTC time to a ``"alive.log"`` (set ``LGBot.config["output_liveness"]`` to ``True`` to enable)
 - API usage:
     - Inscription: customize default chambre with ``LGBot.config["chambre_mj"]``.
-    - ``blocs.tools.yes_no``: new ``additionnal`` option to add aditionnal emojis.
+    - ``blocs.tools.yes_no``: new ``additional`` option to add additional emojis.
 
 ### Changed
 

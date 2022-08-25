@@ -32,8 +32,9 @@ class GestionTaches(commands.Cog):
                 LT += (
                     f"\n{str(tache.id).ljust(5)} "
                     f"{tache.timestamp.strftime('%d/%m/%Y %H:%M:%S')}    "
-                    f"{tache.commande.ljust(25)} ")
-                if (action := tache.action):
+                    f"{tache.commande.ljust(25)} "
+                )
+                if action := tache.action:
                     LT += f"{action.base.slug.ljust(20)} {action.joueur.nom}"
 
             if LT:
@@ -47,7 +48,6 @@ class GestionTaches(commands.Cog):
                 mess = "Aucune tâche en attente."
 
         await tools.send_code_blocs(ctx, mess)
-
 
     @commands.command(aliases=["doat"])
     @tools.mjs_only
@@ -85,11 +85,11 @@ class GestionTaches(commands.Cog):
         """
         now = datetime.datetime.now()
 
-        if "/" in quand:            # Date précisée
+        if "/" in quand:  # Date précisée
             date, time = quand.split("-")
             J, MA = date.split("/", maxsplit=1)
             day = int(J)
-            if "/" in MA:           # Année précisée
+            if "/" in MA:  # Année précisée
                 M, A = MA.split("/")
                 month = int(M)
                 year = int(A)
@@ -103,7 +103,7 @@ class GestionTaches(commands.Cog):
 
         H, MS = time.split(":", maxsplit=1)
         hour = int(H)
-        if ":" in MS:               # Secondes précisées
+        if ":" in MS:  # Secondes précisées
             M, S = MS.split(":")
             minute = int(M)
             second = int(S)
@@ -124,23 +124,18 @@ class GestionTaches(commands.Cog):
             pass
 
         if ts < datetime.datetime.now():
-            mess = await ctx.send(
-                "Date dans le passé ==> exécution immédiate ! On valide ?"
-            )
+            mess = await ctx.send("Date dans le passé ==> exécution immédiate ! On valide ?")
             if not await tools.yes_no(mess):
                 await ctx.send("Mission aborted.")
                 return
 
-        tache = Tache(timestamp=ts,
-                      commande=commande,
-                      action=Action.query.get(action_id))
-        tache.add()         # Planifie la tâche
+        tache = Tache(timestamp=ts, commande=commande, action=Action.query.get(action_id))
+        tache.add()  # Planifie la tâche
         await ctx.send(
             f"{tools.code(commande)} planifiée pour le "
             f"{tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))}.\n"
             f"{tools.code(f'!cancel {tache.id}')} pour annuler."
         )
-
 
     @commands.command(aliases=["retard", "doin"])
     @tools.mjs_only
@@ -173,10 +168,10 @@ class GestionTaches(commands.Cog):
         try:
             if "h" in duree.lower():
                 h, duree = duree.split("h")
-                secondes += 3600*int(h)
+                secondes += 3600 * int(h)
             if "m" in duree.lower():
                 m, duree = duree.split("m")
-                secondes += 60*int(m)
+                secondes += 60 * int(m)
             if "s" in duree.lower():
                 s, duree = duree.split("s")
                 secondes += float(s)
@@ -196,17 +191,14 @@ class GestionTaches(commands.Cog):
         except ValueError:
             pass
 
-        tache = Tache(timestamp=ts,
-                      commande=commande,
-                      action=Action.query.get(action_id))
-        tache.add()         # Planifie la tâche
+        tache = Tache(timestamp=ts, commande=commande, action=Action.query.get(action_id))
+        tache.add()  # Planifie la tâche
 
         await ctx.send(
             f"Commande {tools.code(commande)} planifiée pour le "
             f"{tools.code(ts.strftime('%d/%m/%Y %H:%M:%S'))}\n"
             f"{tools.code(f'!cancel {tache.id}')} pour annuler."
         )
-
 
     @commands.command()
     @tools.mjs_only
@@ -227,13 +219,18 @@ class GestionTaches(commands.Cog):
             await ctx.send("Aucune tâche trouvée.")
             return
 
-        message = await ctx.send("Annuler les tâches :\n" + "\n".join([
-            f" - {tools.code(tache.timestamp.strftime('%d/%m/%Y %H:%M:%S'))} "
-            f"> {tools.code(tache.commande)}" for tache in taches
-        ]))
+        message = await ctx.send(
+            "Annuler les tâches :\n"
+            + "\n".join(
+                [
+                    f" - {tools.code(tache.timestamp.strftime('%d/%m/%Y %H:%M:%S'))} " f"> {tools.code(tache.commande)}"
+                    for tache in taches
+                ]
+            )
+        )
         if not await tools.yes_no(message):
             await ctx.send("Mission aborted.")
             return
 
-        Tache.delete(*taches)       # Annule les tâches
+        Tache.delete(*taches)  # Annule les tâches
         await ctx.send("Tâche(s) annulée(s).")

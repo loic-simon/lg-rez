@@ -17,7 +17,7 @@ else:
 load_dotenv(path)
 
 
-def load(VAR_NAME):
+def load(var_name: str) -> str:
     """Lit une valeur depuis les variables d'environnement.
 
     Les variables sont recherchées dans les variables d'environnement ;
@@ -29,21 +29,21 @@ def load(VAR_NAME):
     que la variable existe.
 
     Args:
-        VAR_NAME (str): nom de la variable à charger (``LGREZ_...``)
+        var_name: nom de la variable à charger (``LGREZ_...``).
 
     Returns:
-        :class:`str`
+        La valeur de la variable demandée.
 
     Raises:
-        RuntimeError: la variable d'environnement n'est pas définie
+        RuntimeError: la variable d'environnement n'est pas définie.
     """
-    var = os.getenv(VAR_NAME)
+    var = os.getenv(var_name)
     if var is None:
-        raise RuntimeError(f"Variable d'environnement {VAR_NAME} manquante")
+        raise RuntimeError(f"Variable d'environnement {var_name} manquante")
     return var
 
 
-def __getattr__(attr):
+def __getattr__(attr: str) -> str:
     """Raccourci pour accéder aux variables d'environnement.
 
     Permet d'utiliser ``blocs.env.VAR_NAME`` comme raccourci pour
@@ -54,6 +54,4 @@ def __getattr__(attr):
     try:
         return load(attr)
     except RuntimeError:
-        raise AttributeError(
-            f"module '{__name__}' has no attribute '{attr}'"
-        ) from None
+        raise AttributeError(f"module '{__name__}' has no attribute '{attr}'") from None

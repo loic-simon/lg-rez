@@ -6,43 +6,43 @@
 
 import asyncio
 
+import discord
+
 from lgrez import config
 from lgrez.blocs import tools, env, gsheets
 from lgrez.bdd import Joueur, Role, Camp, Statut
 
 
-async def new_channel(member):
-    """Crée et renvoie un nouveau salon privé.
+async def new_channel(member: discord.Member) -> discord.TextChannel:
+    """Crée un nouveau salon privé.
 
-    Peut être étendue, mais toujours appeller cette fonction pour
-    créer le chan en lui-même, au risque d'altérer le fonctionnement
-    normal du bot.
+    Peut être étendue, mais toujours appeler cette fonction pour créer le chan en lui-même,
+    au risque d'altérer le fonctionnement normal du bot.
 
     Args:
-        member (discord.Member): le membre pour qui créer le salon.
+        member: le membre pour qui créer le salon.
 
     Returns:
-        :class:`discord.TextChannel`
+        Le salon créé.
     """
     categ = await tools.multicateg(config.private_chan_category_name)
     chan = await member.guild.create_text_channel(
         f"{config.private_chan_prefix}{member.name}",
-        topic=str(member.id),       # topic provisoire : ID du membre
+        topic=str(member.id),  # topic provisoire : ID du membre
         category=categ,
     )
-    await chan.set_permissions(member, read_messages=True,
-                               send_messages=True)
+    await chan.set_permissions(member, read_messages=True, send_messages=True)
 
     return chan
 
 
-async def register_on_tdb(joueur):
+async def register_on_tdb(joueur: Joueur) -> None:
     """Enregistre un joueur dans le Tableau de bord.
 
     Peut être personnalisé à un autre système de gestion des joueurs.
 
     Args:
-        joueur (.bdd.Joueur): le joueur à enregistrer.
+        joueur: le joueur à enregistrer.
 
     Note:
         Fonction asynchrone depuis la version 2.2.2.
@@ -50,7 +50,7 @@ async def register_on_tdb(joueur):
     SHEET_ID = env.load("LGREZ_TDB_SHEET_ID")
     workbook = await gsheets.connect(SHEET_ID)
     sheet = await workbook.worksheet(config.tdb_main_sheet)
-    values = await sheet.get_all_values()           # Liste de listes
+    values = await sheet.get_all_values()  # Liste de listes
 
     head = values[config.tdb_header_row - 1]
     # Ligne d'en-têtes (noms des colonnes), - 1 car indexé à 0
@@ -67,8 +67,7 @@ async def register_on_tdb(joueur):
         )
 
     mstart, mstop = config.tdb_main_columns
-    main_indexes = range(gsheets.a_to_index(mstart),
-                         gsheets.a_to_index(mstop) + 1)
+    main_indexes = range(gsheets.a_to_index(mstart), gsheets.a_to_index(mstop) + 1)
     # Indices des colonnes à remplir
     cols = {}
     for index in main_indexes:
@@ -84,8 +83,7 @@ async def register_on_tdb(joueur):
             )
 
     tstart, tstop = config.tdb_tampon_columns
-    tampon_indexes = range(gsheets.a_to_index(tstart),
-                           gsheets.a_to_index(tstop) + 1)
+    tampon_indexes = range(gsheets.a_to_index(tstart), gsheets.a_to_index(tstop) + 1)
 
     TDB_tampon_index = {}
     for index in tampon_indexes:
@@ -101,7 +99,7 @@ async def register_on_tdb(joueur):
                 "`lgrez.config.main_indexes`)"
             )
 
-    plv = config.tdb_header_row         # Première Ligne Vide
+    plv = config.tdb_header_row  # Première Ligne Vide
     # (si tableau vide, suit directement le header, - 1 pour l'indexage)
     for i_row, row in enumerate(values):
         # On parcourt les lignes du TDB
@@ -130,47 +128,39 @@ async def register_on_tdb(joueur):
         await gsheets.update(sheet, *modifs)
 
 
-# Routine d'inscription (fonction appellée par la commande !co)
-async def main(member):
+# Routine d'inscription (fonction appelée par la commande !co)
+async def main(member: discord.Member) -> None:
     """Routine d'inscription complète d'un joueur.
 
     Args:
-        member (:class:`~discord.Member`): joueur à inscrire.
+        member: Le joueur à inscrire.
 
     Crée et paramètre le salon privé du joueur, lui pose des questions
     et l'inscrit en base.
 
-    Personalisation : voir :obj:`.config.demande_chambre`,
+    Personnalisation : voir :obj:`.config.demande_chambre`,
     :obj:`.config.chambre_mj`, :func:`.config.additional_inscription_step`
     et :obj:`.config.debut_saison`.
 
-    Commande appellée à l'arrivée sur le serveur, utiliser
-    :meth:`\!co <.bot.Special.Special.co.callback>` pour trigger cette
-    commande depuis Discord.
+    Commande appelée à l'arrivée sur le serveur, utiliser :meth:`\!co <.bot.Special.Special.co.callback>`
+    pour trigger cette commande depuis Discord.
     """
     try:
         joueur = Joueur.from_member(member)
-    except ValueError:      # Joueur pas encore inscrit en base
+    except ValueError:  # Joueur pas encore inscrit en base
         pass
-    else:                   # Joueur dans la bdd = déjà inscrit
+    else:  # Joueur dans la bdd = déjà inscrit
         chan = joueur.private_chan
-        await chan.set_permissions(member, read_messages=True,
-                                   send_messages=True)
-        await chan.send(
-            f"Saloww ! {member.mention} tu es déjà inscrit, "
-            "viens un peu ici !"
-        )
+        await chan.set_permissions(member, read_messages=True, send_messages=True)
+        await chan.send(f"Saloww ! {member.mention} tu es déjà inscrit, viens un peu ici !")
         return
 
-    if (chan := tools.get(config.guild.text_channels, topic=str(member.id))):
+    if chan := tools.get(config.guild.text_channels, topic=str(member.id)):
         # Inscription en cours (topic du chan = ID du membre)
-        await chan.set_permissions(member, read_messages=True,
-                                   send_messages=True)
-        await chan.send(
-            f"Tu as déjà un channel à ton nom, {member.mention}, par ici !"
-        )
+        await chan.set_permissions(member, read_messages=True, send_messages=True)
+        await chan.send(f"Tu as déjà un channel à ton nom, {member.mention}, par ici !")
 
-    else:           # Pas d'inscription déjà en cours : création channel
+    else:  # Pas d'inscription déjà en cours : création channel
         chan = await new_channel(member)
 
     # Récupération nom et renommages
@@ -229,8 +219,7 @@ async def main(member):
     while not ok:
         await chan.send(
             "Quel est ton prénom, donc ?\n"
-            + tools.ital("(Répond simplement dans ce channel, "
-                         "à l'aide du champ de texte normal)")
+            + tools.ital("(Répond simplement dans ce channel, à l'aide du champ de texte normal)")
         )
         prenom = await tools.wait_for_message(check=check_chan, chan=chan)
 
@@ -240,8 +229,7 @@ async def main(member):
         # .title met en majuscule la permière lettre de chaque mot
 
         message = await chan.send(
-            f"Tu me dis donc t'appeller {tools.bold(nom)}. "
-            "C'est bon pour toi ? Pas d'erreur, pas de troll ?"
+            f"Tu me dis donc t'appeller {tools.bold(nom)}. C'est bon pour toi ? Pas d'erreur, pas de troll ?"
         )
         ok = await tools.yes_no(message)
 
@@ -251,24 +239,24 @@ async def main(member):
         await member.edit(nick=nom)
 
     await chan.send(
-        "Parfait ! Je t'ai renommé(e) pour que tout le monde te "
-        "reconnaisse, et j'ai renommé cette conversation."
+        "Parfait ! Je t'ai renommé(e) pour que tout le monde te reconnaisse, et j'ai renommé cette conversation."
     )
 
     if config.demande_chambre:
         await tools.sleep(chan, 3)
-        a_la_rez = await tools.yes_no(await chan.send(
-            "Bien, dernière chose : habites-tu à la Rez ?"
-        ))
+        a_la_rez = await tools.yes_no(await chan.send("Bien, dernière chose : habites-tu à la Rez ?"))
 
         if a_la_rez:
+
             def sortie_num_rez(m):
                 # Longueur de chambre de rez maximale
                 return len(m.content) < Joueur.chambre.type.length
+
             mess = await tools.boucle_message(
-                chan, "Alors, quelle est ta chambre ?", sortie_num_rez,
-                rep_message=("Désolé, ce n'est pas un numéro de chambre "
-                             "valide, réessaie...")
+                chan,
+                "Alors, quelle est ta chambre ?",
+                sortie_num_rez,
+                rep_message=("Désolé, ce n'est pas un numéro de chambre valide, réessaie..."),
             )
             chambre = mess.content
         else:
@@ -282,9 +270,7 @@ async def main(member):
         return
 
     if config.demande_chambre:
-        await chan.send(
-            f"{nom}, en chambre {chambre}... Je t'inscris en base !"
-        )
+        await chan.send(f"{nom}, en chambre {chambre}... Je t'inscris en base !")
     else:
         await chan.send(f"{nom}... Je t'inscris en base !")
 
@@ -313,8 +299,7 @@ async def main(member):
         # Grant accès aux channels joueurs et information
 
         await member.add_roles(config.Role.joueur_en_vie)
-        await chan.edit(topic="Ta conversation privée avec le bot, "
-                              "c'est ici que tout se passera !")
+        await chan.edit(topic="Ta conversation privée avec le bot, c'est ici que tout se passera !")
 
     # Conseiller d'ACTIVER TOUTES LES NOTIFS du chan
     # (et mentions only pour le reste, en activant @everyone)
@@ -334,7 +319,7 @@ async def main(member):
         "Discord sur ton téléphone, "
         f"et d'{tools.bold('activer toutes les notifications')} pour ce "
         "channel ! Promis, pas de spam :innocent:\n"
-        "Pour le reste du serveur, tu peux le mettre en \"mentions only\", "
+        'Pour le reste du serveur, tu peux le mettre en "mentions only", '
         f"en activant le {tools.code('@everyone')} – il est limité ;\n\n"
         "Enfin, n'hésite pas à me parler, j'ai toujours quelques réponses "
         "en stock..."
@@ -342,8 +327,7 @@ async def main(member):
 
     await tools.sleep(chan, 5)
     await chan.send(
-        "Voilà, c'est tout bon ! Installe toi bien confortablement, "
-        f"la partie commence le {config.debut_saison}."
+        "Voilà, c'est tout bon ! Installe toi bien confortablement, " f"la partie commence le {config.debut_saison}."
     )
 
     # Log

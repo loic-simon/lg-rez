@@ -18,10 +18,10 @@ from lgrez.bdd import Trigger, Reaction, Role
 
 
 # Marqueurs de séparation du mini-langage des séquences-réactions
-MARK_OR = ' <||> '
-MARK_THEN = ' <&&> '
-MARK_REACT = '<::>'
-MARK_CMD = '<!!>'
+MARK_OR = " <||> "
+MARK_THEN = " <&&> "
+MARK_REACT = "<::>"
+MARK_CMD = "<!!>"
 MARKS = [MARK_OR, MARK_THEN, MARK_REACT, MARK_CMD]
 
 
@@ -30,26 +30,20 @@ async def _build_sequence(ctx):
     reponse = ""
     fini = False
     while not fini:
-        message = await ctx.send(
-            "Réaction du bot : prochain message/commande/média, "
-            "ou réaction à ce message"
-        )
+        message = await ctx.send("Réaction du bot : prochain message/commande/média, ou réaction à ce message")
         ret = await tools.wait_for_react_clic(
-            message, process_text=True, trigger_all_reacts=True,
-            trigger_on_commands=True
+            message, process_text=True, trigger_all_reacts=True, trigger_on_commands=True
         )
         if isinstance(ret, str):
-            if ret.startswith(config.bot.command_prefix):   # Commande
+            if ret.startswith(config.bot.command_prefix):  # Commande
                 reponse += MARK_CMD + ret.lstrip(config.bot.command_prefix)
-            else:                                           # Texte / média
+            else:  # Texte / média
                 reponse += ret
-        else:                                               # React
+        else:  # React
             reponse += MARK_REACT + ret.name
 
         message = await ctx.send("▶ Puis / 🔀 Ou / ⏹ Fin ?")
-        ret = await tools.wait_for_react_clic(
-            message, emojis={"▶": MARK_THEN, "🔀": MARK_OR, "⏹": False}
-        )
+        ret = await tools.wait_for_react_clic(message, emojis={"▶": MARK_THEN, "🔀": MARK_OR, "⏹": False})
         if ret:
             # On ajoute la marque OR ou THEN à la séquence
             reponse += ret
@@ -74,10 +68,14 @@ def fetch_tenor(trigger):
     rep = requests.get(
         url="https://api.tenor.com/v1/search",
         params={
-            "q": trigger, "key": apikey, "limit": 1,
-            "locale": "fr_FR", "contentfilter": "off",
-            "media_filter": "minimal", "ar_range": "all"
-        }
+            "q": trigger,
+            "key": apikey,
+            "limit": 1,
+            "locale": "fr_FR",
+            "contentfilter": "off",
+            "media_filter": "minimal",
+            "ar_range": "all",
+        },
     )
 
     if rep:
@@ -87,7 +85,7 @@ def fetch_tenor(trigger):
         if gifs:
             return gifs[0]["itemurl"]
 
-    return None     # Pas de GIF trouvé
+    return None  # Pas de GIF trouvé
 
 
 class GestionIA(commands.Cog):
@@ -114,10 +112,7 @@ class GestionIA(commands.Cog):
 
         if force in [None, "start", "on"] and id not in config.bot.in_stfu:
             config.bot.in_stfu.append(id)
-            await ctx.send(
-                "Okay, je me tais ! Tape !stfu quand tu voudras de "
-                "nouveau de moi :cry:"
-            )
+            await ctx.send("Okay, je me tais ! Tape !stfu quand tu voudras de nouveau de moi :cry:")
 
         elif force in [None, "stop", "off"] and id in config.bot.in_stfu:
             config.bot.in_stfu.remove(id)
@@ -130,7 +125,6 @@ class GestionIA(commands.Cog):
                 config.bot.in_stfu.remove(id)
             else:
                 config.bot.in_stfu.append(id)
-
 
     @commands.command(aliases=["cancer", "214"])
     async def fals(self, ctx, force=None):
@@ -152,9 +146,7 @@ class GestionIA(commands.Cog):
 
         if force in [None, "start", "on"] and id not in config.bot.in_fals:
             config.bot.in_fals.append(id)
-            await ctx.send(
-                "https://tenor.com/view/saucisse-sausage-gif-5426973"
-            )
+            await ctx.send("https://tenor.com/view/saucisse-sausage-gif-5426973")
 
         elif force in [None, "stop", "off"] and id in config.bot.in_fals:
             config.bot.in_fals.remove(id)
@@ -167,7 +159,6 @@ class GestionIA(commands.Cog):
                 config.bot.in_fals.remove(id)
             else:
                 config.bot.in_fals.append(id)
-
 
     @commands.command(aliases=["r"])
     async def react(self, ctx, *, trigger):
@@ -184,13 +175,11 @@ class GestionIA(commands.Cog):
         """
         oc = ctx.message.content
         ctx.message.content = trigger
-        debug = (ctx.message.webhook_id
-                 or ctx.author.top_role == config.Role.mj)
+        debug = ctx.message.webhook_id or ctx.author.top_role == config.Role.mj
         await process_IA(ctx.message, debug=debug)
         ctx.message.content = oc
         # On rétablit le message original pour ne pas qu'il trigger
         # l'IA 2 fois, le cas échéant
-
 
     @commands.command(aliases=["rf"])
     async def reactfals(self, ctx, *, trigger):
@@ -209,7 +198,6 @@ class GestionIA(commands.Cog):
             await ctx.send(gif)
         else:
             await ctx.send("Palaref")
-
 
     @commands.command()
     @tools.mjs_et_redacteurs
@@ -249,7 +237,7 @@ class GestionIA(commands.Cog):
             # Mode rapide
             triggers, reponse = triggers.split(">", maxsplit=1)
 
-        triggers = triggers.replace('\n', ';').split(';')
+        triggers = triggers.replace("\n", ";").split(";")
         if fast and ctx.message.reference:
             repmess = ctx.message.reference.resolved
             if repmess:
@@ -261,8 +249,7 @@ class GestionIA(commands.Cog):
 
         for trigger in triggers.copy():
             if Trigger.query.filter_by(trigger=trigger).all():
-                await ctx.send(f"Trigger `{trigger}` déjà associé à une "
-                               "réaction, enlevé")
+                await ctx.send(f"Trigger `{trigger}` déjà associé à une réaction, enlevé")
                 triggers.remove(trigger)
 
         if not triggers:
@@ -285,14 +272,12 @@ class GestionIA(commands.Cog):
             reac = Reaction(reponse=reponse)
             config.session.add(reac)
 
-            trigs = [Trigger(trigger=trigger, reaction=reac)
-                     for trigger in triggers]
+            trigs = [Trigger(trigger=trigger, reaction=reac) for trigger in triggers]
             config.session.add_all(trigs)
 
             config.session.commit()
 
         await ctx.send("Règle ajoutée en base.")
-
 
     @commands.command()
     @tools.mjs_et_redacteurs
@@ -308,14 +293,9 @@ class GestionIA(commands.Cog):
         """
         async with ctx.typing():
             if trigger:
-                trigs = Trigger.find_nearest(
-                    trigger, col=Trigger.trigger,
-                    sensi=sensi, solo_si_parfait=False
-                )
+                trigs = Trigger.find_nearest(trigger, col=Trigger.trigger, sensi=sensi, solo_si_parfait=False)
                 if not trigs:
-                    await ctx.send(
-                        f"Rien trouvé, pas de chance (sensi = {sensi})"
-                    )
+                    await ctx.send(f"Rien trouvé, pas de chance (sensi = {sensi})")
                     return
             else:
                 raw_trigs = Trigger.query.order_by(Trigger.id).all()
@@ -323,7 +303,7 @@ class GestionIA(commands.Cog):
                 trigs = list(zip(raw_trigs, [None] * len(raw_trigs)))
                 # Mise au format (trig, score)
 
-            reacts = []     # Réactions associées à notre liste de triggers
+            reacts = []  # Réactions associées à notre liste de triggers
             for trig in trigs:
                 if (reac := trig[0].reaction) not in reacts:
                     # Pas de doublons, et reste ordonné
@@ -332,17 +312,17 @@ class GestionIA(commands.Cog):
             def nettoy(s):
                 # Abrège la réponse si trop longue et neutralise les
                 # sauts de ligne / rupture code_bloc, pour affichage
-                s = s.replace('\r\n', '\\n').replace('\n', '\\n')
-                s = s.replace('\r', '\\r').replace("```", "'''")
+                s = s.replace("\r\n", "\\n").replace("\n", "\\n")
+                s = s.replace("\r", "\\r").replace("```", "'''")
                 if len(s) < 75:
                     return s
                 else:
                     return s[:50] + " [...] " + s[-15:]
 
             rep = ""
-            for reac in reacts:                 # pour chaque réponse
+            for reac in reacts:  # pour chaque réponse
                 r = ""
-                for (trig, score) in trigs:         # pour chaque trigger
+                for (trig, score) in trigs:  # pour chaque trigger
                     if trig.reaction == reac:
                         sc = f"({float(score):.2}) " if score else ""
                         r += f" - {sc}{trig.trigger}"
@@ -355,7 +335,6 @@ class GestionIA(commands.Cog):
 
         await tools.send_code_blocs(ctx, rep)
         # On envoie, en séparant en blocs de 2000 caractères max
-
 
     @commands.command()
     @tools.mjs_et_redacteurs
@@ -371,9 +350,7 @@ class GestionIA(commands.Cog):
         successives ou aléatoires) ou de supprimer la réaction.
         """
         if not trigger:
-            await ctx.send(
-                "Mot/expression déclencheur de la réaction à modifier :"
-            )
+            await ctx.send("Mot/expression déclencheur de la réaction à modifier :")
             mess = await tools.wait_for_message_here(ctx)
             trigger = mess.content
 
@@ -385,37 +362,28 @@ class GestionIA(commands.Cog):
         trig = trigs[0][0]
         reac = trig.reaction
 
-        displ_seq = (reac.reponse if reac.reponse.startswith('`')
-                     else tools.code(reac.reponse))     # Pour affichage
+        displ_seq = reac.reponse if reac.reponse.startswith("`") else tools.code(reac.reponse)  # Pour affichage
         trigs = list(reac.triggers)
 
         await ctx.send(
-            f"Triggers : `{'` – `'.join([trig.trigger for trig in trigs])}`\n"
-            f"Séquence réponse : {displ_seq}"
+            f"Triggers : `{'` – `'.join([trig.trigger for trig in trigs])}`\n" f"Séquence réponse : {displ_seq}"
         )
 
-        message = await ctx.send(
-            "Modifier : ⏩ triggers / ⏺ Réponse / 🚮 Supprimer ?"
-        )
-        choix = await tools.wait_for_react_clic(
-            message, emojis={"⏩": 1, "⏺": 2, "🚮": 0})
+        message = await ctx.send("Modifier : ⏩ triggers / ⏺ Réponse / 🚮 Supprimer ?")
+        choix = await tools.wait_for_react_clic(message, emojis={"⏩": 1, "⏺": 2, "🚮": 0})
 
-        if choix == 1:              # Modification des triggers
+        if choix == 1:  # Modification des triggers
             fini = False
             while not fini:
                 s = "Supprimer un trigger : \n"
                 for i, t in enumerate(trigs[:10]):
                     s += f"{tools.emoji_chiffre(i+1)}. {t.trigger} \n"
 
-                mess = await ctx.send(
-                    s + "Ou entrer un mot / une expression pour l'ajouter "
-                    "en trigger.\n⏹ pour finir"
-                )
+                mess = await ctx.send(s + "Ou entrer un mot / une expression pour l'ajouter en trigger.\n⏹ pour finir")
                 r = await tools.wait_for_react_clic(
                     mess,
-                    emojis={(tools.emoji_chiffre(i) if i else "⏹"): str(i)
-                            for i in range(len(trigs) + 1)},
-                    process_text=True
+                    emojis={(tools.emoji_chiffre(i) if i else "⏹"): str(i) for i in range(len(trigs) + 1)},
+                    process_text=True,
                 )
 
                 if r == "0":
@@ -430,15 +398,13 @@ class GestionIA(commands.Cog):
                     config.session.add(trig)
                     config.session.commit()
 
-            if not trigs:        # on a tout supprimé !
-                await ctx.send(
-                    "Tous les triggers supprimés, suppression de la réaction"
-                )
+            if not trigs:  # on a tout supprimé !
+                await ctx.send("Tous les triggers supprimés, suppression de la réaction")
                 config.session.delete(reac)
                 config.session.commit()
                 return
 
-        elif choix == 2:            # Modification de la réponse
+        elif choix == 2:  # Modification de la réponse
             if any([mark in reac.reponse for mark in MARKS]):
                 # Séquence compliquée
                 await ctx.send(
@@ -457,7 +423,7 @@ class GestionIA(commands.Cog):
 
             reac.reponse = reponse
 
-        else:                       # Suppression
+        else:  # Suppression
             config.session.delete(reac)
             for trig in trigs:
                 config.session.delete(trig)
@@ -479,9 +445,7 @@ async def trigger_at_mj(message):
         - ``False`` -- sinon
     """
     if config.Role.mj in message.role_mentions:
-        await message.channel.send(
-            "Les MJs ont entenu ton appel, ils sont en route ! :superhero:"
-        )
+        await message.channel.send("Les MJs ont entenu ton appel, ils sont en route ! :superhero:")
         return True
 
     return False
@@ -503,10 +467,9 @@ async def trigger_roles(message, sensi=0.8):
           et qu'une réponse a été envoyée
         - ``False`` -- sinon
     """
-    roles = Role.find_nearest(message.content, col=Role.nom,
-                              filtre=(Role.actif.is_(True)), sensi=sensi)
+    roles = Role.find_nearest(message.content, col=Role.nom, filtre=(Role.actif.is_(True)), sensi=sensi)
 
-    if roles:       # Au moins un trigger trouvé à cette sensi
+    if roles:  # Au moins un trigger trouvé à cette sensi
         await message.channel.send(embed=roles[0][0].embed)
         return True
 
@@ -534,31 +497,30 @@ async def trigger_reactions(message, chain=None, sensi=0.7, debug=False):
           ``> sensi``) et qu'une réponse a été envoyée
         - ``False`` -- sinon
     """
-    if not chain:                   # Si pas précisé,
-        chain = message.content         # contenu de message
+    if not chain:  # Si pas précisé,
+        chain = message.content  # contenu de message
     trigs = Trigger.find_nearest(chain, col=Trigger.trigger, sensi=sensi)
 
-    if trigs:       # Au moins un trigger trouvé à cette sensi
-        trig = trigs[0][0]                  # Meilleur trigger (score max)
-        seq = trig.reaction.reponse         # Séquence-réponse associée
+    if trigs:  # Au moins un trigger trouvé à cette sensi
+        trig = trigs[0][0]  # Meilleur trigger (score max)
+        seq = trig.reaction.reponse  # Séquence-réponse associée
 
-        for rep in seq.split(MARK_THEN):        # Pour chaque étape :
+        for rep in seq.split(MARK_THEN):  # Pour chaque étape :
             if MARK_OR in rep:
                 # Si plusieurs possiblités, on en choisit une random
                 rep = random.choice(rep.split(MARK_OR))
 
-            if rep.startswith(MARK_REACT):          # Réaction
+            if rep.startswith(MARK_REACT):  # Réaction
                 react = rep.lstrip(MARK_REACT)
                 emoji = tools.emoji(react, must_be_found=False) or react
                 await message.add_reaction(emoji)
 
-            elif rep.startswith(MARK_CMD):          # Commande
-                message.content = rep.replace(MARK_CMD,
-                                              config.bot.command_prefix)
+            elif rep.startswith(MARK_CMD):  # Commande
+                message.content = rep.replace(MARK_CMD, config.bot.command_prefix)
                 # Exécution de la commande
                 await config.bot.process_commands(message)
 
-            else:                                   # Sinon, texte / média
+            else:  # Sinon, texte / média
                 # On remplace tous les "{expr}" par leur évaluation
                 rep = tools.eval_accols(rep, locals_=locals(), debug=debug)
                 await message.channel.send(rep)
@@ -589,12 +551,11 @@ async def trigger_sub_reactions(message, sensi=0.9, debug=False):
         - ``False`` -- sinon
     """
     mots = message.content.split(" ")
-    if len(mots) > 1:       # Si le message fait plus d'un mot
+    if len(mots) > 1:  # Si le message fait plus d'un mot
         for mot in sorted(mots, key=lambda m: -len(m)):
             # On parcourt les mots du plus long au plus court
-            if len(mot) > 4:        # on élimine les mots de liaison
-                if await trigger_reactions(message, chain=mot,
-                                           sensi=sensi, debug=debug):
+            if len(mot) > 4:  # on élimine les mots de liaison
+                if await trigger_reactions(message, chain=mot, sensi=sensi, debug=debug):
                     # Si on trouve une sous-rect (à 0.9)
                     return True
 
@@ -615,17 +576,16 @@ async def trigger_di(message):
     c = message.content
     diprefs = ["di", "dy", "dis ", "dit ", "dis-", "dit-"]
     criprefs = ["cri", "cry", "kri", "kry"]
-    pos_prefs = {c.lower().find(pref): pref for pref in diprefs + criprefs
-                 if pref in c[:-1].lower()}
+    pos_prefs = {c.lower().find(pref): pref for pref in diprefs + criprefs if pref in c[:-1].lower()}
     # On extrait les cas où le préfixe est à la fin du message
 
-    if pos_prefs:           # Si on a trouvé au moins un préfixe
+    if pos_prefs:  # Si on a trouvé au moins un préfixe
         i = min(pos_prefs)
         pref = pos_prefs[i]
         if pref in criprefs:
-            mess = tools.bold(c[i + len(pref):].upper())
+            mess = tools.bold(c[i + len(pref) :].upper())
         else:
-            mess = c[i + len(pref):]
+            mess = c[i + len(pref) :]
         await message.channel.send(mess, tts=True)
         # On envoie le di.../cri... en mode TTS (oh si, c'est rigolo)
         return True
@@ -686,7 +646,7 @@ async def trigger_a_ou_b(message):
           envoyée
         - ``False`` -- sinon
     """
-    if (motif := re.fullmatch(r"(.+)\s+ou\s+(.+?)", message.content)):
+    if motif := re.fullmatch(r"(.+)\s+ou\s+(.+?)", message.content):
         rep = f"{motif.group(2).rstrip(' !?.,;')}.".capitalize()
         await message.channel.send(rep)
         return True
@@ -721,15 +681,13 @@ async def process_IA(message, debug=False):
             l'évaluation des messages (voir :func:`.tools.eval_accols`).
     """
     (
-        await trigger_at_mj(message)            # @MJ (aled)
-        or await trigger_gif(message)           # Un petit GIF ? (si FALS)
-        or await trigger_roles(message)         # Rôles
-        or await trigger_reactions(             # Table Reaction ("IA")
-            message, debug=debug)
-        or await trigger_sub_reactions(         # IA sur les mots
-            message, debug=debug)
-        or await trigger_a_ou_b(message)        # "a ou b" ==> "b"
-        or await trigger_di(message)            # di... / cri...
-        or await trigger_mot_unique(message)    # Un seul mot ==> on répète
-        or await default(message)               # Réponse par défaut
+        await trigger_at_mj(message)  # @MJ (aled)
+        or await trigger_gif(message)  # Un petit GIF ? (si FALS)
+        or await trigger_roles(message)  # Rôles
+        or await trigger_reactions(message, debug=debug)  # Table Reaction ("IA")
+        or await trigger_sub_reactions(message, debug=debug)  # IA sur les mots
+        or await trigger_a_ou_b(message)  # "a ou b" ==> "b"
+        or await trigger_di(message)  # di... / cri...
+        or await trigger_mot_unique(message)  # Un seul mot ==> on répète
+        or await default(message)  # Réponse par défaut
     )

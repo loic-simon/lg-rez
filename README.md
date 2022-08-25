@@ -49,7 +49,7 @@ We strongly recommand to install this package in a dedicated virtualenv
 
 ### Dependencies
 
-* Python 3.8+
+* Python 3.10+
 * Packages: see [`requirements.txt`](requirements.txt)
 
 

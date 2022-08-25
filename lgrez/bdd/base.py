@@ -4,27 +4,32 @@ Métaclasse et classe de base des tables de données, fonction de connection
 
 """
 
+from __future__ import annotations
+
+from collections import abc
 import re
 import difflib
+import typing
 
 import sqlalchemy
-from sqlalchemy import orm
+import sqlalchemy.orm
 import unidecode
 
 from lgrez import config
 from lgrez.blocs import env
 
 
-def _remove_accents(text):
+def _remove_accents(text: str) -> str:
     """Renvoie la chaîne non accentuée.
 
     Mais conserve les caractères spéciaux (emojis...)
     """
-    p = re.compile("([À-ʲΆ-ת])")    # Abracadabrax, c'est moche mais ça marche
+    p = re.compile("([À-ʲΆ-ת])")  # Abracadabrax, c'est moche mais ça marche
     return p.sub(lambda m: unidecode.unidecode(m.group()), text)
 
 
 # ---- Objets de base des classes de données
+
 
 class TableMeta(sqlalchemy.orm.DeclarativeMeta):
     """Métaclasse des tables de données de LG-Rez.
@@ -37,7 +42,8 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
         - définit des méthodes et propriétés de classe simplifiant
           l'utilisation des tables.
     """
-    def __init__(cls, name, bases, dic, comment=None, **kwargs):
+
+    def __init__(cls, name: str, bases: tuple, dic: dict, comment: str | None = None, **kwargs) -> None:
         """Constructs the data class"""
         if name == "TableBase":
             # Ne pas documenter TableBase (pas une vraie table)
@@ -47,13 +53,20 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
         if comment is None:
             comment = cls.__doc__
 
-        dic["registry"] = cls.registry      # un peu de magie noire...
+        dic["registry"] = cls.registry  # un peu de magie noire...
         super().__init__(name, bases, dic, comment=comment, **kwargs)
 
-        cls._attrs = {n: k for n, k in dic.items() if isinstance(k, (
-            sqlalchemy.Column,
-            sqlalchemy.orm.relationships.RelationshipProperty,
-        ))}
+        cls._attrs = {
+            n: k
+            for n, k in dic.items()
+            if isinstance(
+                k,
+                (
+                    sqlalchemy.Column,
+                    sqlalchemy.orm.relationships.RelationshipProperty,
+                ),
+            )
+        }
 
         cls.__doc__ += f"""\n    Note:
         Cette classe est une *classe de données* (sous-classe de
@@ -65,23 +78,21 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
           instances (entrées de BDD), mais de type
           :class:`sqlalchemy.orm.attributes.InstrumentedAttribute`
           pour la classe elle-même.
-        """       # On adore la doc vraiment
+        """  # On adore la doc vraiment
 
     @property
-    def query(cls):
-        """sqlalchemy.orm.query.Query: Raccourci pour
-        ``.config.session.query(Table)``.
+    def query(cls) -> sqlalchemy.orm.query.Query:
+        """Raccourci pour ``.config.session.query(Table)``.
 
         Raises:
-            :exc:`ready_check.NotReadyError`: session non initialisée
+            :exc:`readycheck.NotReadyError`: session non initialisée
                 (:obj:`.config.session` vaut ``None``)
         """
         return config.session.query(cls)
 
     @property
-    def columns(cls):
-        """sqlalchemy.sql.base.ImmutableColumnCollection: Raccourci pour
-        ``Table.__table__.columns`` (pseudo-dictionnaire nom -> colonne).
+    def columns(cls) -> sqlalchemy.sql.base.ImmutableColumnCollection:
+        """Raccourci pour ``Table.__table__.columns`` (mapping nom -> colonne).
 
         Comportement global de dictionnaire :
 
@@ -98,17 +109,16 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
         return cls.__table__.columns
 
     @property
-    def attrs(cls):
-        """Mapping[:class:`str`, :class:`sqlalchemy.schema.Column` |\
-        :class:`sqlalchemy.orm.RelationshipProperty`]: Attributs de
-        données publics des instances (dictionnaire nom -> colonne
-        / relationship).
+    def attrs(cls) -> abc.Mapping[str, sqlalchemy.schema.Column | sqlalchemy.orm.RelationshipProperty]:
+        """: Attributs de données publics des instances.
+
+        (dictionnaire nom -> colonne / relationship)
         """
         return cls._attrs
 
     @property
-    def primary_col(cls):
-        """sqlalchemy.schema.Column: Colonne clé primaire de la table.
+    def primary_col(cls) -> sqlalchemy.schema.Column:
+        """Colonne clé primaire de la table.
 
         Raises:
             :exc:`ValueError`: Pas de colonne clé primaire pour cette
@@ -118,47 +128,50 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
         if not cols:
             raise ValueError(f"Pas de clé primaire pour {cls.__name__}")
         if len(cols) > 1:
-            raise ValueError("Plusieurs colonnes clés primaires pour "
-                             f"{cls.__name__} (clé composite)")
+            raise ValueError("Plusieurs colonnes clés primaires pour " f"{cls.__name__} (clé composite)")
         return next(iter(cols))
 
-    def find_nearest(cls, chaine, col=None, sensi=0.25, filtre=None,
-                     solo_si_parfait=True, parfaits_only=True,
-                     match_first_word=False):
+    def find_nearest(
+        cls,
+        chaine: str,
+        col: sqlalchemy.schema.Column | str | None = None,
+        sensi: float = 0.25,
+        filtre: sqlalchemy.sql.expression.BinaryExpression | None = None,
+        solo_si_parfait: bool = True,
+        parfaits_only: bool = True,
+        match_first_word: bool = False,
+    ) -> list[tuple[TableBase, float]]:
         """Recherche les plus proches résultats d'une chaîne donnée.
 
         Args:
-            chaine (str): motif à rechercher
-            col (:class:`sqlalchemy.schema.Column` | :class:`str`):
-                colonne selon laquelle rechercher (défaut : colonne
+            chaine: motif à rechercher
+            col: colonne selon laquelle rechercher (défaut : colonne
                 primaire). Doit être de type textuel.
-            sensi (float): score\* minimal pour retenir une entrée
-            filtre (~sqlalchemy.sql.expression.BinaryExpression):
-                argument de :meth:`query.filter()
+            sensi: score\* minimal pour retenir une entrée
+            filtre: argument de :meth:`query.filter()
                 <sqlalchemy.orm.query.Query.filter>`
                 (ex. ``Table.colonne == valeur``)
-            solo_si_parfait (bool): si ``True`` (défaut), renvoie
+            solo_si_parfait: si ``True`` (défaut), renvoie
                 uniquement le premier élément de score\* ``1`` trouvé
                 s'il existe (ignore les autres éléments, même si
                 ``>= sensi`` ou même ``1``)
-            parfaits_only (bool): si ``True`` (défaut), ne renvoie que
+            parfaits_only: si ``True`` (défaut), ne renvoie que
                 les éléments de score\* ``1`` si on en trouve au moins
                 un (ignore les autres éléments, même si ``>= sensi`` ;
                 pas d'effet si ``solo_si_parfait`` vaut ``True``)
-            match_first_word (bool): si ``True``, teste aussi
-                ``chaine`` vis à vis du premier *mot* (caractères
-                précédentla première espace) de chaque entrée, et
-                conserve ce score si il est supérieur.
+            match_first_word: si ``True``, teste aussi ``chaine`` vis
+                à vis du premier *mot* de chaque entrée (caractères
+                précédent la première espace), et conserve ce score
+                si il est supérieur.
 
         Returns:
-            :class:`list`\[\(:class:`TableBase`, :class:`float`\)\]: Les
-            entrées correspondant le mieux à ``chaine``, sous forme de
-            liste de tuples ``(element, score*)`` triés par score\*
+            Les entrées correspondant le mieux à ``chaine``, sous forme
+            de liste de tuples ``(element, score*)`` triés par score\*
             décroissant (et ce même si un seul résultat).
 
         Raises:
             ValueError: ``col`` inexistante ou pas de type textuel
-            ~ready_check.NotReadyError: session non initialisée
+            ~readycheck.NotReadyError: session non initialisée
                 (:attr:`.lgrez.config.session` vaut ``None``)
 
         *\*score* = ratio de :class:`difflib.SequenceMatcher`, i.e.
@@ -174,13 +187,10 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
             try:
                 col = cls.columns[col]
             except LookupError:
-                raise ValueError(
-                    f"{cls.__name__}.find_nearest: Colonne '{col}' invalide"
-                ) from None
+                raise ValueError(f"{cls.__name__}.find_nearest: Colonne '{col}' invalide") from None
 
         if not isinstance(col.type, sqlalchemy.String):
-            raise ValueError(f"{cls.__name__}.find_nearest: "
-                             f"Colonne {col.key} pas de type textuel")
+            raise ValueError(f"{cls.__name__}.find_nearest: " f"Colonne {col.key} pas de type textuel")
 
         query = cls.query
         if filtre is not None:
@@ -199,7 +209,7 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
 
             # On compare chaque élément à la cible (en non accentué)
             SM.set_seq2(slug2)
-            score = SM.ratio()          # Taux de ressemblance
+            score = SM.ratio()  # Taux de ressemblance
 
             if match_first_word:
                 # On compare aussi avec le premier mot, si demandé
@@ -234,15 +244,17 @@ tables = {}
 
 mapper_registry = sqlalchemy.orm.registry(class_registry=tables)
 
+
 @mapper_registry.as_declarative_base(metaclass=TableMeta)
 class TableBase:
     """Classe de base des tables de données.
 
     (construite par :func:`sqlalchemy.orm.registry.generate_base`)
     """
+
     @property
-    def primary_key(self):
-        """Any: Clé primaire de l'instance (``id``, ``slug``...).
+    def primary_key(self) -> int | str:
+        """Clé primaire de l'instance (``id``, ``slug``...).
 
         Raccourci pour ``getattr(inst, type(inst).primary_col.key)``.
 
@@ -254,7 +266,7 @@ class TableBase:
         return getattr(self, key)
 
     @staticmethod
-    def update():
+    def update() -> None:
         """Applique les modifications en attente en base (commit).
 
         Toutes les modifications, y compris des autres instances,
@@ -267,7 +279,9 @@ class TableBase:
         """
         config.session.commit()
 
-    def add(self, *other):
+    _T = typing.TypeVar("_T", bound="TableBase")
+
+    def add(self: _T, *other: _T) -> None:
         """Enregistre l'instance dans la base de donnée et commit.
 
         Semble équivalent à :meth:`update` si l'instance est déjà
@@ -295,7 +309,7 @@ class TableBase:
 
         self.update()
 
-    def delete(self, *other):
+    def delete(self: _T, *other: _T) -> None:
         """Supprime l'instance de la base de données et commit.
 
         Args:
@@ -307,7 +321,7 @@ class TableBase:
             - ``<Table>.delete(*items)``
 
         Raises:
-            sqlalchemy.exc.SAWarning: l'instance a déjà été supprimmée
+            sqlalchemy.exc.SAWarning: l'instance a déjà été supprimée
                 (Warning, pas exception : ne bloque pas l'exécution).
 
         Globlament équivalent à::
@@ -327,27 +341,27 @@ class TableBase:
 
 # ---- Autodoc objects
 
-def autodoc_Column(*args, doc="", comment=None, **kwargs):
+
+def autodoc_Column(*args, doc: str = "", comment: str | None = None, **kwargs) -> sqlalchemy.Column:
     """Returns Python-side and SQL-side well documented Column.
 
     Use exactly as :class:`sqlalchemy.Column <sqlalchemy.schema.Column>`.
 
     Args:
         \*args, \*\*kwargs: passed to :class:`sqlalchemy.schema.Column`.
-        doc (str): column description, enhanced with column infos
+        doc: column description, enhanced with column infos
             (Python and SQL types, if nullable, primary...) and
             passed to ``Column.doc``.
-        comment (str): passed to ``Column.comment``; defaults to ``doc``
+        comment: passed to ``Column.comment``; defaults to ``doc``
             (not enhanced). Set it to ``''`` to disable comment creation.
 
     Returns:
-        :class:`sqlalchemy.schema.Column`
+        La colonne annotée.
     """
     if comment is None:
         comment = doc
     col = sqlalchemy.Column(*args, **kwargs, comment=comment)
-    sa_type = (f":class:`{col.type!r} "
-               f"<sqlalchemy.types.{type(col.type).__name__}>`")
+    sa_type = f":class:`{col.type!r} " f"<sqlalchemy.types.{type(col.type).__name__}>`"
     py_type = col.type.python_type
     if py_type.__module__ in ("builtins", "lgrez.bdd.enums"):
         py_type_str = py_type.__name__
@@ -357,19 +371,22 @@ def autodoc_Column(*args, doc="", comment=None, **kwargs):
         py_type_str = f"{py_type.__module__}.{py_type.__name__}"
     or_none = " | ``None``" if col.nullable else ""
     primary = " (clé primaire)" if col.primary_key else ""
-    autoinc = (" (auto-incrémental)"
-               if (col.autoincrement and primary
-                   and isinstance(col.type, sqlalchemy.Integer))
-               else "")
+    autoinc = (
+        " (auto-incrémental)" if (col.autoincrement and primary and isinstance(col.type, sqlalchemy.Integer)) else ""
+    )
     nullable = "" if (col.nullable or autoinc) else " (NOT NULL)"
     default = f" (défaut ``{col.default.arg!r}``)" if col.default else ""
-    col.doc = (f"{doc}{primary}{autoinc}{nullable}{default}\n\n"
-               f"Type SQLAlchemy : {sa_type} / Type SQL : ``{col.type}``\n\n"
-               f":type: :class:`{py_type_str}`{or_none}")
+    col.doc = (
+        f"{doc}{primary}{autoinc}{nullable}{default}\n\n"
+        f"Type SQLAlchemy : {sa_type} / Type SQL : ``{col.type}``\n\n"
+        f":type: :class:`{py_type_str}`{or_none}"
+    )
     return col
 
 
-def autodoc_ManyToOne(tablename, *args, doc="", nullable=False, **kwargs):
+def autodoc_ManyToOne(
+    tablename: str, *args, doc: str = "", nullable: bool = False, **kwargs
+) -> sqlalchemy.orm.RelationshipProperty:
     """Returns Python-side well documented many-to-one relationship.
 
     Represents a relationship where each element in this table is
@@ -384,18 +401,17 @@ def autodoc_ManyToOne(tablename, *args, doc="", nullable=False, **kwargs):
 
     Args:
         \*args, \*\*kwargs: passed to :class:`sqlalchemy.orm.relationship`.
-        doc (str): relationship description, enhanced with class name
+        doc: relationship description, enhanced with class name
             and relationship type.
-        nullable (bool): indicates whether the relationship can be
+        nullable: indicates whether the relationship can be
             omitted (impacts docs only, default ``False``).
 
     Returns:
-        :class:`sqlalchemy.orm.RelationshipProperty`
+        The annotated relationship.
     """
     first, sep, rest = doc.partition("\n")
     or_none = " | ``None``" if nullable else ""
-    doc = (f":class:`~.bdd.{tablename}`{or_none}: {first} "
-           "*(many-to-one relationship)*")
+    doc = f":class:`~.bdd.{tablename}`{or_none}: {first} *(many-to-one relationship)*"
     if not nullable:
         doc += " (NOT NULL)"
     if rest:
@@ -404,7 +420,7 @@ def autodoc_ManyToOne(tablename, *args, doc="", nullable=False, **kwargs):
     return sqlalchemy.orm.relationship(tablename, *args, doc=doc, **kwargs)
 
 
-def autodoc_OneToMany(tablename, *args, doc="", **kwargs):
+def autodoc_OneToMany(tablename: str, *args, doc: str = "", **kwargs) -> sqlalchemy.orm.RelationshipProperty:
     """Returns Python-side well documented one-to-many relationship.
 
     Represents a relationship where each element in this table is
@@ -418,11 +434,11 @@ def autodoc_OneToMany(tablename, *args, doc="", **kwargs):
 
     Args:
         \*args, \*\*kwargs: passed to :class:`sqlalchemy.orm.relationship`.
-        doc (str): relationship description, enhanced with class name
+        doc: relationship description, enhanced with class name
             and relationship type.
 
     Returns:
-        :class:`sqlalchemy.orm.RelationshipProperty`
+        The annotated relationship.
     """
     first, sep, rest = doc.partition("\n")
     doc = f"Sequence[~bdd.{tablename}]: {first} *(one-to-many relationship)*"
@@ -432,7 +448,7 @@ def autodoc_OneToMany(tablename, *args, doc="", **kwargs):
     return sqlalchemy.orm.relationship(tablename, *args, doc=doc, **kwargs)
 
 
-def autodoc_DynamicOneToMany(tablename, *args, doc="", **kwargs):
+def autodoc_DynamicOneToMany(tablename: str, *args, doc: str = "", **kwargs) -> sqlalchemy.orm.RelationshipProperty:
     """Returns Python-side well documented dynamic one-to-many relationship.
 
     Represents a relationship where each element in this table is
@@ -449,22 +465,21 @@ def autodoc_DynamicOneToMany(tablename, *args, doc="", **kwargs):
 
     Args:
         \*args, \*\*kwargs: passed to :class:`sqlalchemy.orm.dynamic_loader`.
-        doc (str): relationship description, enhanced with class name
+        doc: relationship description, enhanced with class name
             and relationship type.
 
     Returns:
-        :class:`sqlalchemy.orm.RelationshipProperty`
+        The annotated relationship.
     """
     first, sep, rest = doc.partition("\n")
-    doc = (f"~sqlalchemy.orm.query.Query[~bdd.{tablename}]: {first} "
-           "*(dynamic one-to-many relationship)*")
+    doc = f"~sqlalchemy.orm.query.Query[~bdd.{tablename}]: {first} *(dynamic one-to-many relationship)*"
     if rest:
         doc += sep + rest
 
     return sqlalchemy.orm.dynamic_loader(tablename, *args, doc=doc, **kwargs)
 
 
-def autodoc_ManyToMany(tablename, *args, doc="", **kwargs):
+def autodoc_ManyToMany(tablename: str, *args, doc: str = "", **kwargs) -> sqlalchemy.orm.RelationshipProperty:
     """Returns Python-side well documented many-to-many relationship.
 
     Represents a relationship where each element in this table is
@@ -482,7 +497,7 @@ def autodoc_ManyToMany(tablename, *args, doc="", **kwargs):
             and relationship type.
 
     Returns:
-        :class:`sqlalchemy.orm.RelationshipProperty`
+        The annotated relationship.
     """
     first, sep, rest = doc.partition("\n")
     doc = f"Sequence[~bdd.{tablename}]: {first} *(many-to-many relationship)*"
@@ -494,7 +509,8 @@ def autodoc_ManyToMany(tablename, *args, doc="", **kwargs):
 
 # ---- Connection function
 
-def connect():
+
+def connect() -> None:
     """Se connecte à la base de données et prépare les objets connectés.
 
     - Utilise la variable d'environment ``LGREZ_DATABASE_URI``
@@ -503,8 +519,7 @@ def connect():
     """
     LGREZ_DATABASE_URI = env.load("LGREZ_DATABASE_URI")
     # Moteur SQL : connexion avec le serveur
-    config.engine = sqlalchemy.create_engine(LGREZ_DATABASE_URI,
-                                             pool_pre_ping=True)
+    config.engine = sqlalchemy.create_engine(LGREZ_DATABASE_URI, pool_pre_ping=True)
 
     # Création des tables si elles n'existent pas déjà
     TableBase.metadata.create_all(config.engine)

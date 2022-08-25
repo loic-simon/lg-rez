@@ -15,16 +15,25 @@ from matplotlib.ticker import MaxNLocator
 
 from lgrez import config
 from lgrez.blocs import tools, gsheets
-from lgrez.bdd import (Joueur, Action, Camp, BaseAction, Utilisation,
-                       Statut, ActionTrigger, CandidHaroType, UtilEtat, Vote)
+from lgrez.bdd import (
+    Joueur,
+    Action,
+    Camp,
+    BaseAction,
+    Utilisation,
+    Statut,
+    ActionTrigger,
+    CandidHaroType,
+    UtilEtat,
+    Vote,
+)
 from lgrez.features import gestion_actions
 from lgrez.features.sync import transtype
 
 
-def _joueur_repl(mtch):
+def _joueur_repl(mtch: re.Match) -> str:
     """Remplace @(Prénom Nom) par la mention du joueur, si possible"""
-    nearest = Joueur.find_nearest(mtch.group(1),
-                                  col=Joueur.nom, sensi=0.8)
+    nearest = Joueur.find_nearest(mtch.group(1), col=Joueur.nom, sensi=0.8)
     if nearest:
         joueur = nearest[0][0]
         try:
@@ -33,14 +42,16 @@ def _joueur_repl(mtch):
             pass
     return mtch.group(1)
 
-def _role_repl(mtch):
+
+def _role_repl(mtch: re.Match) -> str:
     """Remplace @role_slug par la mention du rôle"""
     if mtch.group(1).lower() in config.Role:
         role = getattr(config.Role, mtch.group(1))
         return role.mention
     return mtch.group(1)
 
-def _emoji_repl(mtch):
+
+def _emoji_repl(mtch: re.Match) -> str:
     """Remplace :(emoji): par la représentation de l'emoji, si possible"""
     emo = tools.emoji(mtch.group(1), must_be_found=False)
     if emo:
@@ -48,15 +59,11 @@ def _emoji_repl(mtch):
     return mtch.group()
 
 
-async def _create_annoncemort_embed(ctx, victime=None):
-    joueur = await tools.boucle_query_joueur(ctx, victime,
-                                             "Qui est la victime ?")
+async def _create_annoncemort_embed(ctx: commands.Context, victime: str | None = None) -> discord.Embed:
+    joueur = await tools.boucle_query_joueur(ctx, victime, "Qui est la victime ?")
 
     role = joueur.role.nom_complet
-    mess = await ctx.send(
-        f"Rôle à afficher pour {joueur.nom} = {role} ? "
-        "(Pas double peau ou autre)"
-    )
+    mess = await ctx.send(f"Rôle à afficher pour {joueur.nom} = {role} ? (Pas double peau ou autre)")
     if await tools.yes_no(mess):
         emoji_camp = joueur.camp.discord_emoji_or_none
     else:
@@ -64,10 +71,7 @@ async def _create_annoncemort_embed(ctx, victime=None):
         role = (await tools.wait_for_message_here(ctx)).content
         mess = await ctx.send("Camp :")
         camps = Camp.query.filter_by(public=True).all()
-        emoji_camp = await tools.wait_for_react_clic(
-            mess,
-            [camp.discord_emoji for camp in camps if camp.emoji]
-        )
+        emoji_camp = await tools.wait_for_react_clic(mess, [camp.discord_emoji for camp in camps if camp.emoji])
 
     if joueur.statut == Statut.MV:
         mess = await ctx.send("Annoncer la mort-vivance ?")
@@ -80,11 +84,7 @@ async def _create_annoncemort_embed(ctx, victime=None):
     desc = (await tools.wait_for_message_here(ctx)).content
 
     # Création embed
-    embed = discord.Embed(
-        title=f"Mort de {tools.bold(joueur.nom)}, {role}",
-        description=desc,
-        color=0x730000
-    )
+    embed = discord.Embed(title=f"Mort de {tools.bold(joueur.nom)}, {role}", description=desc, color=0x730000)
     embed.set_author(name="Oh mon dieu, quelqu'un est mort !")
     if emoji_camp:
         embed.set_thumbnail(url=emoji_camp.url)
@@ -104,13 +104,13 @@ class Communication(commands.Cog):
 
         Warning:
             Commande en bêta, non couverte par les tests unitaires
-            et souffrant de bugs connus (avec les fields notemment)
+            et souffrant de bugs connus (avec les fields notamment)
 
         Args:
             key: sous-commande (voir ci-dessous). Si omis, prévisualise
                 le brouillon d'embed actuellement en préparation ;
             val: valeur associée. Pour les sous-commandes de
-                construction d'élement, supprime ledit élément si omis.
+                construction d'élément, supprime ledit élément si omis.
 
         - Sous-commandes générales :
             - ``!embed create <titre>`` :  Créer un nouveau brouillon
@@ -182,27 +182,26 @@ class Communication(commands.Cog):
             "author_icon": ("author", "icon_url"),
         }
 
-        if not emb:             # Pas d'embed en cours
+        if not emb:  # Pas d'embed en cours
             if key == "create" and val:
                 emb = discord.Embed(title=val)
             else:
                 await ctx.send(
-                    "Pas d'embed en préparation. "
-                    + tools.code("!embed create <titre>")
-                    + " pour en créer un.")
+                    "Pas d'embed en préparation. " + tools.code("!embed create <titre>") + " pour en créer un."
+                )
                 return
 
-        elif key in direct:         # Attributs modifiables directement
+        elif key in direct:  # Attributs modifiables directement
             setattr(emb, key, val)
 
-        elif key in method:         # Attributs à modifier via une méthode
+        elif key in method:  # Attributs à modifier via une méthode
             prop, attr = method[key]
             getattr(emb, f"set_{prop}")(**{attr: val})
 
-        elif key == "author":       # Cas particulier
+        elif key == "author":  # Cas particulier
             emb.set_author(name=val) if val else emb.remove_author()
 
-        elif key == "color":        # Cas particulier : cast couleur en int
+        elif key == "color":  # Cas particulier : cast couleur en int
             try:
                 if val:
                     emb.color = eval(val.replace("#", "0x"))
@@ -212,8 +211,8 @@ class Communication(commands.Cog):
                 await ctx.send("Couleur invalide")
                 return
 
-        elif key == "field":        # Cas encore plus particulier
-            i_max = len(emb.fields)     # N fields ==> i_max = N+1
+        elif key == "field":  # Cas encore plus particulier
+            i_max = len(emb.fields)  # N fields ==> i_max = N+1
             try:
                 i, skey, val = val.split(" ", maxsplit=2)
                 i = int(i)
@@ -228,11 +227,9 @@ class Communication(commands.Cog):
 
             if i == i_max:
                 if skey == "name":
-                    emb.add_field(name=val,
-                                  value=f"!embed field {i} value <valeur>")
+                    emb.add_field(name=val, value=f"!embed field {i} value <valeur>")
                 elif skey == "value":
-                    emb.add_field(name=f"!embed field {i} name <nom>",
-                                  value=val)
+                    emb.add_field(name=f"!embed field {i} name <nom>", value=val)
                 # emb.add_field(*, name, value, inline=True)
 
             else:
@@ -246,44 +243,31 @@ class Communication(commands.Cog):
 
         elif key == "delete":
             self.current_embed = None
-            await ctx.send(
-                "Supprimé. " + tools.code("!embed create <titre>")
-                + " pour en créer un."
-            )
+            await ctx.send("Supprimé. " + tools.code("!embed create <titre>") + " pour en créer un.")
             return
 
         elif key == "create":
             await ctx.send(
-                "Déjà un embed en cours de création. Utiliser "
-                + tools.code("!embed delete") + "pour le supprimer."
+                "Déjà un embed en cours de création. Utiliser " + tools.code("!embed delete") + "pour le supprimer."
             )
 
         elif key == "preview":
             await ctx.send("Prévisuatisation :", embed=emb)
-            await ctx.send(
-                "Utiliser " + tools.code("!embed post #channel")
-                + "pour publier l'embed."
-            )
+            await ctx.send("Utiliser " + tools.code("!embed post #channel") + "pour publier l'embed.")
             return
 
         elif key == "post":
-            if not val:     # channel non précisé
+            if not val:  # channel non précisé
                 await ctx.send(embed=emb)
-            elif (chan := tools.channel(val, must_be_found=False)):
+            elif chan := tools.channel(val, must_be_found=False):
                 await chan.send(embed=emb)
                 await ctx.send("Et pouf !")
             else:
-                await ctx.send(
-                    f"Channel inconnu. Réessaye en le mentionnant "
-                    f"({tools.code('#channel')})"
-                )
+                await ctx.send(f"Channel inconnu. Réessaye en le mentionnant " f"({tools.code('#channel')})")
             return
 
         elif key is not None:
-            await ctx.send(
-                f"Option {key} incorrecte ; voir "
-                + tools.code("!help embed") + "pour en savoir plus."
-            )
+            await ctx.send(f"Option {key} incorrecte ; voir " + tools.code("!help embed") + "pour en savoir plus.")
             return
 
         h_emb = emb.copy()
@@ -296,20 +280,20 @@ class Communication(commands.Cog):
         if not emb.author:
             h_emb.set_author(name="!embed author <auteur>")
 
-        i_max = len(emb.fields)                 # N fields ==> i_max = N+1
-        h_emb.add_field(name=f"!embed field {i_max} name <nom>",
-                        value=f"!embed field {i_max} value <nom>")
+        i_max = len(emb.fields)  # N fields ==> i_max = N+1
+        h_emb.add_field(name=f"!embed field {i_max} name <nom>", value=f"!embed field {i_max} value <nom>")
 
         await ctx.send("Embed en préparation :", embed=h_emb)
         await ctx.send(
             f"Utiliser {tools.code('!embed preview')} pour prévisualiser "
             f"l'embed.\n Autres options : "
-            + tools.code("!embed color <#xxxxxx> / url <url> / image <url> / "
-                         "thumb <url> / author_url <url> / footer_icon <url>")
+            + tools.code(
+                "!embed color <#xxxxxx> / url <url> / image <url> / "
+                "thumb <url> / author_url <url> / footer_icon <url>"
+            )
         )
 
         self.current_embed = emb
-
 
     @commands.command(aliases=["tell"])
     @tools.mjs_only
@@ -395,7 +379,6 @@ class Communication(commands.Cog):
 
         await ctx.send("Fini.")
 
-
     @commands.command()
     @tools.mjs_only
     async def post(self, ctx, chan, *, message):
@@ -409,7 +392,6 @@ class Communication(commands.Cog):
         chan = tools.channel(chan)
         await chan.send(message)
         await ctx.send("Fait.")
-
 
     @commands.command()
     @tools.mjs_only
@@ -454,7 +436,7 @@ class Communication(commands.Cog):
             mort_election = "Élection"
             pour_contre = "pour"
             emoji = config.Emoji.maire
-            couleur = 0xd4af37
+            couleur = 0xD4AF37
 
         else:
             raise commands.BadArgument("`quoi` doit être `maire` ou `cond`")
@@ -465,7 +447,7 @@ class Communication(commands.Cog):
             tps = datetime.time(0, 0)
 
         ts = datetime.datetime.combine(datetime.date.today(), tps)
-        if ts > datetime.datetime.now():        # hier
+        if ts > datetime.datetime.now():  # hier
             ts -= datetime.timedelta(days=1)
 
         log = f"!plot {quoi} (> {ts}) :"
@@ -479,7 +461,7 @@ class Communication(commands.Cog):
         # Get votes
         utils = query.filter(Utilisation.action.has(vote=vote_enum)).all()
         votes = {util.action.joueur: util.cible for util in utils}
-        votelog = " / ".join(f'{v.nom} -> {c.nom}' for v, c in votes.items())
+        votelog = " / ".join(f"{v.nom} -> {c.nom}" for v, c in votes.items())
         log += f"\n  - Votes : {votelog}"
 
         for votant, vote in votes.items():
@@ -494,13 +476,12 @@ class Communication(commands.Cog):
 
                 votant = util.ciblage("cible").valeur
                 vote = util.ciblage("vote").valeur
-                log += (f"{util.action.joueur.nom} : "
-                        f"{votant.nom} -> {vote.nom} / ")
+                log += f"{util.action.joueur.nom} : " f"{votant.nom} -> {vote.nom} / "
 
                 initial_vote = votes.get(votant)
                 if initial_vote:
                     cibles[initial_vote].remove(votant.nom)
-                    if not cibles[initial_vote]:    # plus de votes
+                    if not cibles[initial_vote]:  # plus de votes
                         del cibles[initial_vote]
                 votes[votant] = vote
                 cibles.setdefault(vote, [])
@@ -508,7 +489,7 @@ class Communication(commands.Cog):
 
         # Tri des votants
         for votants in cibles.values():
-            votants.sort()      # ordre alphabétique
+            votants.sort()  # ordre alphabétique
 
         # Get corbeaux, après tri -> à la fin
         corba = BaseAction.query.get(config.ajout_vote_baseaction)
@@ -517,33 +498,31 @@ class Communication(commands.Cog):
             for util in query.filter(Utilisation.action.has(base=corba)).all():
                 log += f"{util.action.joueur.nom} -> {util.cible} / "
                 cibles.setdefault(util.cible, [])
-                cibles[util.cible].extend(
-                    [util.action.joueur.role.nom]*config.n_ajouts_votes
-                )
+                cibles[util.cible].extend([util.action.joueur.role.nom] * config.n_ajouts_votes)
 
         # Classe utilitaire
         @functools.total_ordering
-        class _Cible():
+        class _Cible:
             """Représente un joueur ciblé, pour usage dans !plot"""
+
             def __init__(self, joueur, votants):
                 self.joueur = joueur
                 self.votants = votants
 
-            def __repr__(self):
+            def __repr__(self) -> str:
                 return f"{self.joueur.nom} ({self.votes})"
 
             def __eq__(self, other):
                 if not isinstance(other, type(self)):
                     return NotImplemented
-                return (self.joueur.nom == other.joueur.nom
-                        and self.votes == other.votes)
+                return self.joueur.nom == other.joueur.nom and self.votes == other.votes
 
             def __lt__(self, other):
                 if not isinstance(other, type(self)):
                     return NotImplemented
                 if self.votes == other.votes:
-                    return (self.joueur.nom < other.joueur.nom)
-                return (self.votes < other.votes)
+                    return self.joueur.nom < other.joueur.nom
+                return self.votes < other.votes
 
             @property
             def votes(self):
@@ -551,8 +530,7 @@ class Communication(commands.Cog):
 
             @property
             def eligible(self):
-                return any(ch.type == haro_candidature
-                           for ch in self.joueur.candidharos)
+                return any(ch.type == haro_candidature for ch in self.joueur.candidharos)
 
             def couleur(self, choisi):
                 if self == choisi:
@@ -564,7 +542,7 @@ class Communication(commands.Cog):
 
         # Récupération votes
         cibles = [_Cible(jr, vts) for (jr, vts) in cibles.items()]
-        cibles.sort(reverse=True)       # par nb de votes, puis ordre alpha
+        cibles.sort(reverse=True)  # par nb de votes, puis ordre alpha
         log += f"\n  - Cibles : {cibles}"
 
         # Détermination cible
@@ -576,17 +554,16 @@ class Communication(commands.Cog):
             maxvotes = eligibles[0].votes
             egalites = [c for c in eligibles if c.votes == maxvotes]
 
-            if len(egalites) > 1:       # Égalité
+            if len(egalites) > 1:  # Égalité
                 mess = await ctx.send(
                     "Égalité entre\n"
-                    + "\n".join(f"{tools.emoji_chiffre(i+1)} {c.joueur.nom}"
-                                for i, c in enumerate(egalites))
+                    + "\n".join(f"{tools.emoji_chiffre(i+1)} {c.joueur.nom}" for i, c in enumerate(egalites))
                     + "\nQui meurt / est élu ? (regarder vote du maire, "
                     "0️⃣ pour personne / si le vainqueur est garde-loupé, "
                     "inéligible ou autre)"
                 )
                 choice = await tools.choice(mess, len(egalites), start=0)
-                if choice:      # pas 0
+                if choice:  # pas 0
                     choisi = eligibles[choice - 1]
 
             else:
@@ -603,15 +580,15 @@ class Communication(commands.Cog):
         await tools.log(log)
 
         # Paramètres plot
-        discord_gray = '#2F3136'
+        discord_gray = "#2F3136"
         plt.figure(facecolor=discord_gray)
-        plt.rcParams.update({'font.size': 16})
-        ax = plt.axes(facecolor='#8F9194')  # coloration de TOUT le graphe
-        ax.tick_params(axis='both', colors='white')
-        ax.spines['bottom'].set_color('white')
-        ax.spines['left'].set_color(discord_gray)
-        ax.spines['right'].set_color(discord_gray)
-        ax.spines['top'].set_color(discord_gray)
+        plt.rcParams.update({"font.size": 16})
+        ax = plt.axes(facecolor="#8F9194")  # coloration de TOUT le graphe
+        ax.tick_params(axis="both", colors="white")
+        ax.spines["bottom"].set_color("white")
+        ax.spines["left"].set_color(discord_gray)
+        ax.spines["right"].set_color(discord_gray)
+        ax.spines["top"].set_color(discord_gray)
         ax.set_facecolor(discord_gray)
         ax.set_axisbelow(True)
         ax.yaxis.set_major_locator(MaxNLocator(integer=True))
@@ -639,10 +616,7 @@ class Communication(commands.Cog):
         if choisi:
             if quoi == "cond":
                 role = choisi.joueur.role.nom_complet
-                mess = await ctx.send(
-                    f"Rôle à afficher pour {choisi.joueur.nom} = {role} ? "
-                    "(Pas double peau ou autre)"
-                )
+                mess = await ctx.send(f"Rôle à afficher pour {choisi.joueur.nom} = {role} ? (Pas double peau ou autre)")
                 if await tools.yes_no(mess):
                     emoji_camp = choisi.joueur.camp.discord_emoji_or_none
                 else:
@@ -651,8 +625,7 @@ class Communication(commands.Cog):
                     mess = await ctx.send("Camp :")
                     camps = Camp.query.filter_by(public=True).all()
                     emoji_camp = await tools.wait_for_react_clic(
-                        mess,
-                        [camp.discord_emoji for camp in camps if camp.emoji]
+                        mess, [camp.discord_emoji for camp in camps if camp.emoji]
                     )
 
                 nometrole = f"{tools.bold(choisi.joueur.nom)}, {role}"
@@ -664,22 +637,21 @@ class Communication(commands.Cog):
 
         # Création embed
         embed = discord.Embed(
-            title=f"{mort_election} de {nometrole}",
-            description=f"{len(votes)} votes au total",
-            color=couleur
+            title=f"{mort_election} de {nometrole}", description=f"{len(votes)} votes au total", color=couleur
         )
-        embed.set_author(name=f"Résultats du vote pour le {typo}",
-                         icon_url=emoji.url)
+        embed.set_author(name=f"Résultats du vote pour le {typo}", icon_url=emoji.url)
 
         if emoji_camp:
             embed.set_thumbnail(url=emoji_camp.url)
 
-        embed.set_footer(text="\n".join(
-            ("A" if cible.votes == 1 else "Ont")
-            + f" voté {pour_contre} {cible.joueur.nom} : "
-            + ", ".join(cible.votants)
-            for cible in cibles
-        ))
+        embed.set_footer(
+            text="\n".join(
+                ("A" if cible.votes == 1 else "Ont")
+                + f" voté {pour_contre} {cible.joueur.nom} : "
+                + ", ".join(cible.votants)
+                for cible in cibles
+            )
+        )
 
         file = discord.File(image_path, filename="image.png")
         embed.set_image(url="attachment://image.png")
@@ -696,14 +668,11 @@ class Communication(commands.Cog):
                 file=file,
                 embed=embed,
             )
-            await ctx.send(
-                f"Et c'est parti dans {config.Channel.annonces.mention} !"
-            )
+            await ctx.send(f"Et c'est parti dans {config.Channel.annonces.mention} !")
 
             if quoi == "cond":
                 # Actions au mot des MJs
-                for action in Action.query.filter(Action.base.has(
-                        trigger_debut=ActionTrigger.mot_mjs)).all():
+                for action in Action.query.filter(Action.base.has(trigger_debut=ActionTrigger.mot_mjs)).all():
                     await gestion_actions.open_action(action)
 
                 await ctx.send("(actions liées au mot MJ ouvertes)")
@@ -711,7 +680,6 @@ class Communication(commands.Cog):
         else:
             await ctx.send("Mission aborted.")
             self.current_embed = embed
-
 
     @commands.command()
     @tools.mjs_only
@@ -728,7 +696,7 @@ class Communication(commands.Cog):
         while not ok:
             embed = await _create_annoncemort_embed(ctx, victime)
             embeds.append(embed)
-            victime = None      # que le 1er appel
+            victime = None  # que le 1er appel
 
             mess = await ctx.send("Ajouter un mort ?", embed=embed)
             if not await tools.yes_no(mess):
@@ -736,20 +704,13 @@ class Communication(commands.Cog):
 
         mess = await ctx.send("Ça part ?")
         if await tools.yes_no(mess):
-            await config.Channel.annonces.send(
-                "@everyone Il s'est passé quelque chose ! :scream:",
-                embed=embeds[0]
-            )
+            await config.Channel.annonces.send("@everyone Il s'est passé quelque chose ! :scream:", embed=embeds[0])
             for embed in embeds[1:]:
                 await config.Channel.annonces.send(embed=embed)
-            await ctx.send(
-                f"Et c'est parti dans {config.Channel.annonces.mention} !"
-            )
+            await ctx.send(f"Et c'est parti dans {config.Channel.annonces.mention} !")
 
         else:
             await ctx.send("Mission aborted.")
-
-
 
     @commands.command()
     @tools.mjs_only
@@ -773,15 +734,13 @@ class Communication(commands.Cog):
                 Drive partagé avec le compte de service)
         """
         if len(doc_id) < 44:
-            raise commands.BadArgument("'doc_id' doit être l'ID ou l'URL "
-                                       "d'un document Google Docs")
-        elif len(doc_id) > 44:      # URL fournie (pas que l'ID)
+            raise commands.BadArgument("'doc_id' doit être l'ID ou l'URL d'un document Google Docs")
+        elif len(doc_id) > 44:  # URL fournie (pas que l'ID)
             mtch = re.search(r"/d/([\w-]{44})(\W|$)", doc_id)
             if mtch:
                 doc_id = mtch.group(1)
             else:
-                raise commands.BadArgument("'doc_id' doit être l'ID ou l'URL "
-                                           "d'un document Google Docs")
+                raise commands.BadArgument("'doc_id' doit être l'ID ou l'URL d'un document Google Docs")
 
         await ctx.send("Récupération du document...")
         async with ctx.typing():
@@ -795,7 +754,7 @@ class Communication(commands.Cog):
             motif = re.fullmatch(r"(\s*)(.*?)(\s*)", _text)
             pref, text, suff = motif.group(1, 2, 3)
 
-            if not text:    # espaces/newlines uniquement
+            if not text:  # espaces/newlines uniquement
                 formatted_text += pref + suff
                 continue
 
@@ -812,23 +771,25 @@ class Communication(commands.Cog):
                 text = tools.strike(text)
             if style.get("smallCaps"):
                 text = text.upper()
-            if (wff := style.get("weightedFontFamily")):
-                if wff["fontFamily"] in ["Consolas", "Courier New"] :
+            if wff := style.get("weightedFontFamily"):
+                if wff["fontFamily"] in ["Consolas", "Courier New"]:
                     text = tools.code(text)
-            if (link := style.get("link")):
-                if (url := link.get("url")):
+            if link := style.get("link"):
+                if url := link.get("url"):
                     if "://" not in text:
                         text = text + f" (<{url}>)"
-            elif style.get("underline"):    # ne pas souligner si lien
+            elif style.get("underline"):  # ne pas souligner si lien
                 text = tools.soul(text)
 
             formatted_text += pref + text + suff
 
         await ctx.send("————————————————————")
         await tools.send_blocs(ctx, formatted_text)
-        mess = await ctx.send("————————————————————\nPublier sur "
-                              f"{config.Channel.annonces.mention} / "
-                              "Récupérer la version formatée / Stop ?")
+        mess = await ctx.send(
+            "————————————————————\nPublier sur "
+            f"{config.Channel.annonces.mention} / "
+            "Récupérer la version formatée / Stop ?"
+        )
         r = await tools.wait_for_react_clic(mess, {"📣": 1, "📝": 2, "⏹": 0})
 
         if r == 1:
@@ -838,7 +799,6 @@ class Communication(commands.Cog):
             await tools.send_code_blocs(ctx, formatted_text)
         else:
             await ctx.send("Mission aborted.")
-
 
     @commands.command()
     @tools.mjs_only
@@ -869,16 +829,15 @@ class Communication(commands.Cog):
             modifs = f"{ref} {modifs}"
 
         else:
-            if (chan := tools.channel(ref, must_be_found=False)):
+            if chan := tools.channel(ref, must_be_found=False):
                 msg_id = chan.last_message_id
-            elif (mtch := re.fullmatch(r"https*://discord.com/channels/"
-                                       r"(\d{18})/(\d{18})/(\d{18})/*", ref)):
+            elif mtch := re.fullmatch(r"https*://discord.com/channels/" r"(\d{18})/(\d{18})/(\d{18})/*", ref):
                 chan = ctx.guild.get_channel(int(mtch.group(2)))
                 msg_id = mtch.group(3)
-            elif (mtch := re.fullmatch(r"(\d{18})-(\d{18})", ref)):
+            elif mtch := re.fullmatch(r"(\d{18})-(\d{18})", ref):
                 chan = ctx.guild.get_channel(int(mtch.group(1)))
                 msg_id = mtch.group(2)
-            elif (mtch := re.fullmatch(r"\d{18}", ref)):
+            elif mtch := re.fullmatch(r"\d{18}", ref):
                 chan = ctx.channel
                 msg_id = mtch.group(0)
             else:
@@ -896,8 +855,8 @@ class Communication(commands.Cog):
                 return
 
         if msg.author != ctx.bot.user:
-           await ctx.send("Message ciblé non rédigé par le bot")
-           return
+            await ctx.send("Message ciblé non rédigé par le bot")
+            return
 
         old = msg.content
         if not ">" in modifs:

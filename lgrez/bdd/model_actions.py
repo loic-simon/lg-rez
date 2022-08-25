@@ -4,21 +4,23 @@ Déclaration de toutes les tables et leurs colonnes
 
 """
 
+from __future__ import annotations
+
 import asyncio
 import datetime
-import time
+import typing
 
 import sqlalchemy
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from lgrez import config
 from lgrez.bdd import base, ActionTrigger
-from lgrez.bdd.base import (autodoc_Column, autodoc_ManyToOne,
-                            autodoc_OneToMany, autodoc_DynamicOneToMany)
+from lgrez.bdd.base import autodoc_Column, autodoc_ManyToOne, autodoc_OneToMany, autodoc_DynamicOneToMany
 from lgrez.bdd.enums import UtilEtat, CibleType, Vote
 
 
 # Tables de données
+
 
 class Action(base.TableBase):
     """Table de données des actions attribuées (liées à un joueur).
@@ -27,58 +29,82 @@ class Action(base.TableBase):
     :func:`.gestion_actions.add_action` et supprimées via
     :func:`.gestion_actions.delete_action`.
     """
-    id = autodoc_Column(sqlalchemy.Integer(), primary_key=True,
-        doc="Identifiant unique de l'action, sans signification")
 
-    _joueur_id = sqlalchemy.Column(sqlalchemy.ForeignKey("joueurs.discord_id"),
-        nullable=False)
-    joueur = autodoc_ManyToOne("Joueur", back_populates="actions",
-        doc="Joueur concerné")
+    id: int = autodoc_Column(
+        sqlalchemy.Integer(), primary_key=True, doc="Identifiant unique de l'action, sans signification"
+    )
+
+    _joueur_id = sqlalchemy.Column(
+        sqlalchemy.ForeignKey("joueurs.discord_id"),
+        nullable=False,
+    )
+    joueur: Joueur = autodoc_ManyToOne(
+        "Joueur",
+        back_populates="actions",
+        doc="Joueur concerné",
+    )
 
     _base_slug = sqlalchemy.Column(sqlalchemy.ForeignKey("baseactions.slug"))
-    base = autodoc_ManyToOne("BaseAction", back_populates="actions",
+    base: BaseAction | None = autodoc_ManyToOne(
+        "BaseAction",
+        back_populates="actions",
         nullable=True,
-        doc="Action de base (``None`` si action de vote)")
+        doc="Action de base (``None`` si action de vote)",
+    )
 
-    vote = autodoc_Column(sqlalchemy.Enum(Vote),
-        doc="Si action de vote, vote concerné")
+    vote: Vote | None = autodoc_Column(
+        sqlalchemy.Enum(Vote),
+        doc="Si action de vote, vote concerné",
+    )
 
-    active = autodoc_Column(sqlalchemy.Boolean(), nullable=False, default=True,
-        doc="Si l'action est actuellement utilisable (False = archives)")
+    active: bool = autodoc_Column(
+        sqlalchemy.Boolean(),
+        nullable=False,
+        default=True,
+        doc="Si l'action est actuellement utilisable (False = archives)",
+    )
 
-    cooldown = autodoc_Column(sqlalchemy.Integer(), nullable=False, default=0,
-        doc="Nombre d'ouvertures avant disponiblité de l'action")
-    charges = autodoc_Column(sqlalchemy.Integer(),
-        doc="Nombre de charges restantes (``None`` si illimité)")
+    cooldown: int = autodoc_Column(
+        sqlalchemy.Integer(),
+        nullable=False,
+        default=0,
+        doc="Nombre d'ouvertures avant disponibilité de l'action",
+    )
+    charges: int | None = autodoc_Column(
+        sqlalchemy.Integer(),
+        doc="Nombre de charges restantes (``None`` si illimité)",
+    )
 
     # One-to-manys
-    taches = autodoc_OneToMany("Tache", back_populates="action",
-        doc="Tâches liées à cette action")
-
-    utilisations = autodoc_DynamicOneToMany("Utilisation",
+    taches: list[Tache] = autodoc_OneToMany(
+        "Tache",
         back_populates="action",
-        doc="Utilisations de cette action")
+        doc="Tâches liées à cette action",
+    )
+    utilisations: list[Utilisation] = autodoc_DynamicOneToMany(
+        "Utilisation",
+        back_populates="action",
+        doc="Utilisations de cette action",
+    )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         """Initialize self."""
-        n_args = (("base" in kwargs) + ("_base_slug" in kwargs)
-                  + ("vote" in kwargs))
+        n_args = ("base" in kwargs) + ("_base_slug" in kwargs) + ("vote" in kwargs)
         if not n_args:
-            raise ValueError("bdd.Action: 'base'/'_base_slug' or 'vote' "
-                             "keyword-only argument must be specified")
+            raise ValueError("bdd.Action: 'base'/'_base_slug' or 'vote keyword-only argument must be specified")
         elif n_args > 1:
-            raise ValueError("bdd.Action: 'base'/'_base_slug' and 'vote' "
-                             "keyword-only argument cannot both be specified")
+            raise ValueError(
+                "bdd.Action: 'base'/'_base_slug' and 'vote' keyword-only argument cannot both be specified"
+            )
         super().__init__(*args, **kwargs)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return repr(self)."""
         return f"<Action #{self.id} ({self.base or self.vote}/{self.joueur})>"
 
     @property
-    def utilisation_ouverte(self):
-        """:class:`~bdd.Utilisation` | ``None``: Utilisation de l'action
-        actuellement ouverte.
+    def utilisation_ouverte(self) -> Utilisation | None:
+        """Utilisation de l'action actuellement ouverte.
 
         Vaut ``None`` si aucune action n'a actuellement l'état
         :attr:`~bdd.UtilEtat.ouverte` ou :attr:`~bdd.UtilEtat.remplie`.
@@ -91,14 +117,11 @@ class Action(base.TableBase):
         try:
             return self.utilisations.filter(filtre).one_or_none()
         except sqlalchemy.orm.exc.MultipleResultsFound:
-            raise ValueError(
-                f"Plusieurs utilisations ouvertes pour `{self}` !"
-            )
+            raise ValueError(f"Plusieurs utilisations ouvertes pour `{self}` !")
 
     @property
-    def derniere_utilisation(self):
-        """:class:`~bdd.Utilisation` | ``None``:: Dernière utilisation de
-        cette action (temporellement).
+    def derniere_utilisation(self) -> Utilisation | None:
+        """Dernière utilisation de cette action (temporellement).
 
         Considère l'utilisation ouverte le cas échéant, sinon la
         dernière utilisation par timestamp de fermeture descendant
@@ -110,14 +133,11 @@ class Action(base.TableBase):
             RuntimeError: plus d'une action a actuellement l'état
             :attr:`~bdd.UtilEtat.ouverte` ou :attr:`~bdd.UtilEtat.remplie`.
         """
-        return (
-            self.utilisation_ouverte
-            or self.utilisations.order_by(Utilisation.ts_close.desc()).first()
-        )
+        return self.utilisation_ouverte or self.utilisations.order_by(Utilisation.ts_close.desc()).first()
 
     @property
-    def decision(self):
-        """str: Description de la décision de la dernière utilisation.
+    def decision(self) -> str:
+        """Description de la décision de la dernière utilisation.
 
         Considère l'utilisation ouverte le cas échéant, sinon la
         dernière utilisation par timestamp de fermeture descendant.
@@ -136,10 +156,8 @@ class Action(base.TableBase):
             return "<N/A>"
 
     @hybrid_property
-    def is_open(self):
-        """:class:`bool` (instance)
-        / :class:`sqlalchemy.sql.selectable.Exists` (classe):
-        L'action est ouverte (l'utilisateur peut interagir) ?
+    def is_open(self) -> bool:
+        """L'action est ouverte (l'utilisateur peut interagir) ?
 
         *I.e.* l'action a au moins une utilisation
         :attr:`~.bdd.UtilEtat.ouverte` ou :attr:`~.bdd.UtilEtat.remplie`.
@@ -158,14 +176,12 @@ class Action(base.TableBase):
         return bool(self.utilisations.filter(Utilisation.is_open).all())
 
     @is_open.expression
-    def is_open(cls):
+    def is_open(cls) -> sqlalchemy.sql.selectable.Exists:
         return cls.utilisations.any(Utilisation.is_open)
 
     @hybrid_property
-    def is_waiting(self):
-        """:class:`bool` (instance)
-        / :class:`sqlalchemy.sql.selectable.Exists` (classe):
-        L'action est ouverte et aucune décision n'a été prise ?
+    def is_waiting(self) -> bool:
+        """L'action est ouverte et aucune décision n'a été prise ?
 
         *I.e.* la clause a au moins une utilisation
         :attr:`~.bdd.UtilEtat.ouverte`.
@@ -175,7 +191,7 @@ class Action(base.TableBase):
         return bool(self.utilisations.filter(Utilisation.is_waiting).all())
 
     @is_waiting.expression
-    def is_waiting(cls):
+    def is_waiting(cls) -> sqlalchemy.sql.selectable.Exists:
         return cls.utilisations.any(Utilisation.is_waiting)
 
 
@@ -186,34 +202,55 @@ class Utilisation(base.TableBase):
     <.open_close.OpenClose.OpenClose.open.callback>` ;
     elles n'ont pas vocation à être supprimées.
     """
-    id = autodoc_Column(sqlalchemy.BigInteger(), primary_key=True,
-        doc="Identifiant unique de l'utilisation, sans signification")
 
-    _action_id = sqlalchemy.Column(sqlalchemy.ForeignKey("actions.id"),
-        nullable=False)
-    action = autodoc_ManyToOne("Action", back_populates="utilisations",
-        doc="Action utilisée")
+    id: int = autodoc_Column(
+        sqlalchemy.BigInteger(),
+        primary_key=True,
+        doc="Identifiant unique de l'utilisation, sans signification",
+    )
 
-    etat = autodoc_Column(sqlalchemy.Enum(UtilEtat), nullable=False,
+    _action_id = sqlalchemy.Column(
+        sqlalchemy.ForeignKey("actions.id"),
+        nullable=False,
+    )
+    action: Action = autodoc_ManyToOne(
+        "Action",
+        back_populates="utilisations",
+        doc="Action utilisée",
+    )
+
+    etat: UtilEtat = autodoc_Column(
+        sqlalchemy.Enum(UtilEtat),
+        nullable=False,
         default=UtilEtat.ouverte,
-        doc="État de l'utilisation")
+        doc="État de l'utilisation",
+    )
 
-    ts_open = autodoc_Column(sqlalchemy.DateTime(),
-        doc="Timestamp d'ouverture de l'utilisation")
-    ts_close = autodoc_Column(sqlalchemy.DateTime(),
-        doc="Timestamp de fermeture de l'utilisation")
-    ts_decision = autodoc_Column(sqlalchemy.DateTime(),
-        doc="Timestamp du dernier remplissage de l'utilisation")
+    ts_open: datetime.datetime | None = autodoc_Column(
+        sqlalchemy.DateTime(),
+        doc="Timestamp d'ouverture de l'utilisation",
+    )
+    ts_close: datetime.datetime | None = autodoc_Column(
+        sqlalchemy.DateTime(),
+        doc="Timestamp de fermeture de l'utilisation",
+    )
+    ts_decision: datetime.datetime | None = autodoc_Column(
+        sqlalchemy.DateTime(),
+        doc="Timestamp du dernier remplissage de l'utilisation",
+    )
 
     # One-to-manys
-    ciblages = autodoc_OneToMany("Ciblage", back_populates="utilisation",
-        doc="Cibles désignées dans cette utilisation")
+    ciblages: list[Ciblage] = autodoc_OneToMany(
+        "Ciblage",
+        back_populates="utilisation",
+        doc="Cibles désignées dans cette utilisation",
+    )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return repr(self)."""
         return f"<Utilisation #{self.id} ({self.action}/{self.etat})>"
 
-    def open(self):
+    def open(self) -> None:
         """Ouvre cette utilisation.
 
         Modifie son :attr:`etat`, définit :attr:`ts_open` au temps
@@ -223,7 +260,7 @@ class Utilisation(base.TableBase):
         self.ts_open = datetime.datetime.now()
         self.update()
 
-    def close(self):
+    def close(self) -> None:
         """Clôture cette utilisation.
 
         Modifie son :attr:`etat`, définit :attr:`ts_close` au temps
@@ -236,30 +273,27 @@ class Utilisation(base.TableBase):
         self.ts_close = datetime.datetime.now()
         self.update()
 
-    def ciblage(self, slug):
-        """Renvoie le ciblage de base de slug voulu.
+    def ciblage(self, slug: str) -> Ciblage:
+        """Renvoie le ciblage de cette utilisation de slug voulu.
 
         Args:
-            slug (str): Doit correspondre à un des slugs des bases
+            slug: Doit correspondre à un des slugs des bases
                 des :attr:`ciblages` de l'utilisation.
 
         Returns:
-            :class:`.bdd.Ciblage`
+            Le ciblage de slug correspondant.
 
         Raises:
-            ValueError: slug non trouvé dans les :attr:`ciblages`
+            ValueError: slug non trouvé dans les :attr:`ciblages`.
         """
         try:
             return next(cib for cib in self.ciblages if cib.base.slug == slug)
         except StopIteration:
-            raise ValueError(
-                f"{self} : pas de ciblage de slug '{slug}'"
-            ) from None
+            raise ValueError(f"{self} : pas de ciblage de slug '{slug}'") from None
 
     @property
-    def cible(self):
-        """:class:`~bdd.Joueur` | ``None``: Joueur ciblé par l'utilisation,
-        si applicable.
+    def cible(self) -> Joueur | None:
+        """Joueur ciblé par l'utilisation, si applicable.
 
         Cet attribut n'est accessible que si l'utilisation est d'un vote
         ou d'une action définissant un et une seul ciblage de type
@@ -278,25 +312,21 @@ class Utilisation(base.TableBase):
             return self.ciblages[0].joueur if self.ciblages else None
         else:
             base_ciblages = self.action.base.base_ciblages
-            bc_joueurs = [bc for bc in base_ciblages
-                          if bc.type in [CibleType.joueur, CibleType.vivant,
-                                         CibleType.mort]]
+            bc_joueurs = [bc for bc in base_ciblages if bc.type in [CibleType.joueur, CibleType.vivant, CibleType.mort]]
             if len(bc_joueurs) != 1:
-                raise ValueError (f"L'utilisation {self} n'a pas une et "
-                                  "une seule cible de type joueur")
+                raise ValueError(f"L'utilisation {self} n'a pas une et une seule cible de type joueur")
 
             base_ciblage = bc_joueurs[0]
             try:
-                ciblage = next(cib for cib in self.ciblages
-                               if cib.base == base_ciblage)
+                ciblage = next(cib for cib in self.ciblages if cib.base == base_ciblage)
             except StopIteration:
-                return None         # Pas de ciblage fait
+                return None  # Pas de ciblage fait
 
             return ciblage.joueur
 
     @property
-    def decision(self):
-        """str: Description de la décision de cette utilisation.
+    def decision(self) -> str:
+        """Description de la décision de cette utilisation.
 
         Complète le template de :.bdd.BaseAction.decision_format` avec
         les valeurs des ciblages de l'utilisation.
@@ -311,47 +341,44 @@ class Utilisation(base.TableBase):
             return "Ne rien faire"
 
         template = self.action.base.decision_format
-        data = {ciblage.base.slug: ciblage.valeur_descr
-                for ciblage in self.ciblages}
+        data = {ciblage.base.slug: ciblage.valeur_descr for ciblage in self.ciblages}
         try:
             return template.format(**data)
         except KeyError:
             return template
 
     @hybrid_property
-    def is_open(self):
-        """:class:`bool` (instance)
-        / :class:`sqlalchemy.sql.selectable.Exists` (classe):
-        L'utilisation est ouverte (l'utilisateur peut interagir) ?
+    def is_open(self) -> bool:
+        """L'utilisation est ouverte (l'utilisateur peut interagir) ?
 
         Raccourci pour
         ``utilisation.etat in {UtilEtat.ouverte, UtilEtat.remplie}``
 
         Propriété hybride (voir :attr:`.Action.is_open` pour plus d'infos)
         """
-        return (self.etat in {UtilEtat.ouverte, UtilEtat.remplie})
+        return self.etat in {UtilEtat.ouverte, UtilEtat.remplie}
 
     @is_open.expression
-    def is_open(cls):
+    def is_open(cls) -> sqlalchemy.sql.selectable.Exists:
         return cls.etat.in_({UtilEtat.ouverte, UtilEtat.remplie})
 
     @hybrid_property
-    def is_waiting(self):
-        """:class:`bool` (instance)
-        / :class:`sqlalchemy.sql.selectable.Exists` (classe):
-        L'utilisation est ouverte et aucune décision n'a été prise ?
+    def is_waiting(self) -> bool:
+        """L'utilisation est ouverte et aucune décision n'a été prise ?
 
         Raccourci pour ``utilisation.etat == UtilEtat.ouverte``
 
         Propriété hybride (voir :attr:`.Action.is_open` pour plus d'infos)
         """
-        return (self.etat == UtilEtat.ouverte)
+        return self.etat == UtilEtat.ouverte
+
+    @is_waiting.expression
+    def is_waiting(cls) -> sqlalchemy.sql.selectable.Exists:
+        return cls.etat == UtilEtat.ouverte
 
     @hybrid_property
-    def is_filled(self):
-        """:class:`bool` (instance)
-        / :class:`sqlalchemy.sql.selectable.Exists` (classe):
-        L'utilisation est remplie (l'utilisateur a interagi avec) ?
+    def is_filled(self) -> bool:
+        """L'utilisation est remplie (l'utilisateur a interagi avec) ?
 
         Raccourci pour
         ``utilisation.etat in {UtilEtat.remplie, UtilEtat.validee,
@@ -359,13 +386,11 @@ class Utilisation(base.TableBase):
 
         Propriété hybride (voir :attr:`.Action.is_open` pour plus d'infos)
         """
-        return (self.etat in {UtilEtat.remplie, UtilEtat.validee,
-                              UtilEtat.contree})
+        return self.etat in {UtilEtat.remplie, UtilEtat.validee, UtilEtat.contree}
 
     @is_filled.expression
-    def is_filled(cls):
-        return cls.etat.in_({UtilEtat.remplie, UtilEtat.validee,
-                             UtilEtat.contree})
+    def is_filled(cls) -> sqlalchemy.sql.selectable.Exists:
+        return cls.etat.in_({UtilEtat.remplie, UtilEtat.validee, UtilEtat.contree})
 
 
 class Ciblage(base.TableBase):
@@ -375,54 +400,83 @@ class Ciblage(base.TableBase):
     <.voter_agir.VoterAgir.VoterAgir.action.callback>` ;
     elles n'ont pas vocation à être supprimées.
     """
-    id = autodoc_Column(sqlalchemy.Integer(), primary_key=True,
-        doc="Identifiant unique du ciblage, sans signification")
 
-    _base_id = sqlalchemy.Column(sqlalchemy.ForeignKey("baseciblages._id"))
-    base = autodoc_ManyToOne("BaseCiblage", back_populates="ciblages",
+    id: int = autodoc_Column(
+        sqlalchemy.Integer(),
+        primary_key=True,
+        doc="Identifiant unique du ciblage, sans signification",
+    )
+
+    _base_id = sqlalchemy.Column(sqlalchemy.ForeignKey("baseciblages.id"))
+    base: BaseCiblage | None = autodoc_ManyToOne(
+        "BaseCiblage",
+        back_populates="ciblages",
         nullable=True,
-        doc="Modèle de ciblage (lié au modèle d'action). Vaut ``None`` pour "
-            "un ciblage de vote")
+        doc="Modèle de ciblage (lié au modèle d'action). Vaut ``None`` pour un ciblage de vote",
+    )
 
-    _utilisation_id = sqlalchemy.Column(sqlalchemy.ForeignKey(
-        "utilisations.id"), nullable=False)
-    utilisation = autodoc_ManyToOne("Utilisation", back_populates="ciblages",
-        doc="Utilisation où ce ciblage a été fait")
+    _utilisation_id = sqlalchemy.Column(
+        sqlalchemy.ForeignKey("utilisations.id"),
+        nullable=False,
+    )
+    utilisation: Utilisation = autodoc_ManyToOne(
+        "Utilisation",
+        back_populates="ciblages",
+        doc="Utilisation où ce ciblage a été fait",
+    )
 
-    _joueur_id = sqlalchemy.Column(sqlalchemy.ForeignKey(
-        "joueurs.discord_id"), nullable=True)
-    joueur = autodoc_ManyToOne("Joueur", back_populates="ciblages",
-        nullable=True, doc="Joueur désigné, si ``base.type`` vaut "
+    _joueur_id = sqlalchemy.Column(
+        sqlalchemy.ForeignKey("joueurs.discord_id"),
+        nullable=True,
+    )
+    joueur: Joueur | None = autodoc_ManyToOne(
+        "Joueur",
+        back_populates="ciblages",
+        nullable=True,
+        doc="Joueur désigné, si ``base.type`` vaut "
         ":attr:`~.bdd.CibleType.joueur`, :attr:`~.bdd.CibleType.vivant` "
-        "ou :attr:`~.bdd.CibleType.mort`")
+        "ou :attr:`~.bdd.CibleType.mort`",
+    )
 
-    _role_slug = sqlalchemy.Column(sqlalchemy.ForeignKey(
-        "roles.slug"), nullable=True)
-    role = autodoc_ManyToOne("Role", back_populates="ciblages",
-        nullable=True, doc="Rôle désigné, si ``base.type`` vaut "
-        ":attr:`~.bdd.CibleType.role`")
+    _role_slug = sqlalchemy.Column(
+        sqlalchemy.ForeignKey("roles.slug"),
+        nullable=True,
+    )
+    role: Role | None = autodoc_ManyToOne(
+        "Role",
+        back_populates="ciblages",
+        nullable=True,
+        doc="Rôle désigné, si ``base.type`` vaut :attr:`~.bdd.CibleType.role`",
+    )
 
-    _camp_slug = sqlalchemy.Column(sqlalchemy.ForeignKey(
-        "camps.slug"), nullable=True)
-    camp = autodoc_ManyToOne("Camp", back_populates="ciblages",
-        nullable=True, doc="Camp désigné, si ``base.type`` vaut "
-        ":attr:`~.bdd.CibleType.camp`")
+    _camp_slug = sqlalchemy.Column(
+        sqlalchemy.ForeignKey("camps.slug"),
+        nullable=True,
+    )
+    camp: Camp | None = autodoc_ManyToOne(
+        "Camp",
+        back_populates="ciblages",
+        nullable=True,
+        doc="Camp désigné, si ``base.type`` vaut :attr:`~.bdd.CibleType.camp`",
+    )
 
-    booleen = autodoc_Column(sqlalchemy.Boolean(),
-        doc="Valeur, si ``base.type`` vaut :attr:`~.bdd.CibleType.booleen`")
-    texte = autodoc_Column(sqlalchemy.String(1000),
-        doc="Valeur, si ``base.type`` vaut :attr:`~.bdd.CibleType.texte`")
+    booleen: bool | None = autodoc_Column(
+        sqlalchemy.Boolean(),
+        doc="Valeur, si ``base.type`` vaut :attr:`~.bdd.CibleType.booleen`",
+    )
+    texte: str | None = autodoc_Column(
+        sqlalchemy.String(1000),
+        doc="Valeur, si ``base.type`` vaut :attr:`~.bdd.CibleType.texte`",
+    )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return repr(self)."""
         return f"<Ciblage #{self.id} ({self.base}/{self.utilisation})>"
 
     @property
-    def _val_attr(self):
+    def _val_attr(self) -> str:
         """Nom de l'attribut stockant la valeur du ciblage"""
-        if (not self.base       # vote
-            or self.base.type in {CibleType.joueur, CibleType.vivant,
-                                  CibleType.mort}):
+        if not self.base or self.base.type in {CibleType.joueur, CibleType.vivant, CibleType.mort}:  # vote
             return "joueur"
         elif self.base.type == CibleType.role:
             return "role"
@@ -436,9 +490,8 @@ class Ciblage(base.TableBase):
             raise ValueError(f"Ciblage de type inconnu : {self.base.type}")
 
     @property
-    def valeur(self):
-        """:class:`~bdd.Joueur` | :class:`~bdd.Role`| :class:`~bdd.Camp`
-        | :class:`bool` | :class:`str`: Valeur du ciblage, selon son type.
+    def valeur(self) -> Joueur | Role | Camp | bool | str:
+        """Valeur du ciblage, selon son type.
 
         Propriété en lecture et écriture.
 
@@ -452,8 +505,8 @@ class Ciblage(base.TableBase):
         setattr(self, self._val_attr, value)
 
     @property
-    def valeur_descr(self):
-        """str: Description de la valeur du ciblage.
+    def valeur_descr(self) -> str:
+        """Description de la valeur du ciblage.
 
         Si :attr:`valeur` vaut ``None``, renvoie ``<N/A>``
 
@@ -463,9 +516,7 @@ class Ciblage(base.TableBase):
         if self.valeur is None:
             return "<N/A>"
 
-        if (not self.base       # vote
-            or self.base.type in {CibleType.joueur, CibleType.vivant,
-                                  CibleType.mort}):
+        if not self.base or self.base.type in {CibleType.joueur, CibleType.vivant, CibleType.mort}:  # vote
             return self.joueur.nom
         elif self.base.type == CibleType.role:
             return self.role.nom_complet
@@ -483,26 +534,41 @@ class Tache(base.TableBase):
     Les instances doivent être enregistrées via :meth:`.add`
     et supprimées via :func:`.delete`.
     """
-    id = autodoc_Column(sqlalchemy.Integer(), primary_key=True,
-        doc="Identifiant unique de la tâche, sans signification")
-    timestamp = autodoc_Column(sqlalchemy.DateTime(), nullable=False,
-        doc="Moment où exécuter la tâche")
-    commande = autodoc_Column(sqlalchemy.String(2000), nullable=False,
-        doc="Texte à envoyer via le webhook (généralement une commande)")
 
-    _action_id = sqlalchemy.Column(sqlalchemy.ForeignKey("actions.id"),
-        nullable=True)
-    action = autodoc_ManyToOne("Action", back_populates="taches",
+    id: int = autodoc_Column(
+        sqlalchemy.Integer(),
+        primary_key=True,
+        doc="Identifiant unique de la tâche, sans signification",
+    )
+    timestamp: datetime.datetime = autodoc_Column(
+        sqlalchemy.DateTime(),
+        nullable=False,
+        doc="Moment où exécuter la tâche",
+    )
+    commande: str = autodoc_Column(
+        sqlalchemy.String(2000),
+        nullable=False,
+        doc="Texte à envoyer via le webhook (généralement une commande)",
+    )
+
+    _action_id = sqlalchemy.Column(
+        sqlalchemy.ForeignKey("actions.id"),
         nullable=True,
-        doc="Si la tâche est liée à une action, action concernée")
+    )
+    action: Action | None = autodoc_ManyToOne(
+        "Action",
+        back_populates="taches",
+        nullable=True,
+        doc="Si la tâche est liée à une action, action concernée",
+    )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return repr(self)."""
         return f"<Tache #{self.id} ({self.commande})>"
 
     @property
-    def handler(self):
-        """asyncio.TimerHandle: Représentation dans le bot de la tâche.
+    def handler(self) -> asyncio.TimerHandle:
+        """Représentation dans le bot de la tâche.
 
         Proxy pour :attr:`config.bot.tasks[self.id] <.LGBot.tasks>`,
         en lecture, écriture et suppression (``del``).
@@ -528,7 +594,7 @@ class Tache(base.TableBase):
         except KeyError:
             pass
 
-    async def send_webhook(self, tries=0):
+    async def send_webhook(self, tries: int = 0) -> None:
         """Exécute la tâche (coroutine programmée par :meth:`execute`).
 
         Envoie un webhook (:obj:`.config.webhook`) de contenu
@@ -542,7 +608,7 @@ class Tache(base.TableBase):
         Si aucune exception n'est levée (succès), supprime la tâche.
 
         Args:
-            tries (int): Numéro de l'essai d'envoi actuellement en cours
+            tries: Numéro de l'essai d'envoi actuellement en cours.
         """
         try:
             await config.webhook.send(self.commande)
@@ -560,40 +626,42 @@ class Tache(base.TableBase):
         else:
             self.delete()
 
-    def execute(self, tries=0):
+    def execute(self, tries: int = 0) -> None:
         """Exécute la tâche planifiée (méthode appellée par la loop).
 
         Programme :meth:`send_webhook` pour exécution immédiate.
 
         Args:
-            tries (int): Numéro de l'essai d'envoi actuellement en cours,
+            tries: Numéro de l'essai d'envoi actuellement en cours,
                 passé à :meth:`send_webhook`.
         """
         asyncio.create_task(self.send_webhook(tries=tries))
         # programme la coroutine pour exécution immédiate
 
-    def register(self):
+    def register(self) -> None:
         """Programme l'exécution de la tâche dans la loop du bot."""
         now = datetime.datetime.now()
         delay = (self.timestamp - now).total_seconds()
         TH = config.loop.call_later(delay, self.execute)
         # Programme la tâche (appellera tache.execute() à timestamp)
-        self.handler = TH               # TimerHandle, pour pouvoir cancel
+        self.handler = TH  # TimerHandle, pour pouvoir cancel
 
-    def cancel(self):
+    def cancel(self) -> None:
         """Annule et nettoie la tâche planifiée (sans la supprimer en base).
 
         Si la tâche a déjà été exécutée, ne fait que nettoyer le handler.
         """
         try:
-            self.handler.cancel()       # Annule la task (objet TimerHandle)
+            self.handler.cancel()  # Annule la task (objet TimerHandle)
             # (pas d'effet si la tâche a déjà été exécutée)
-        except RuntimeError:            # Tache non enregistrée
+        except RuntimeError:  # Tache non enregistrée
             pass
         else:
             del self.handler
 
-    def add(self, *other):
+    _T = typing.TypeVar("_T", bound="Tache")
+
+    def add(self: _T, *other: _T) -> None:
         """Enregistre la tâche sur le bot et en base.
 
         Globalement équivalent à un appel à :meth:`.register` (pour
@@ -604,14 +672,13 @@ class Tache(base.TableBase):
             \*other: autres instances à ajouter dans le même commit,
                 éventuellement.
         """
-        super().add(*other)             # Enregistre tout en base
+        super().add(*other)  # Enregistre tout en base
 
-        self.register()                 # Enregistre sur le bot
-        for item in other:              # Les autres aussi
+        self.register()  # Enregistre sur le bot
+        for item in other:  # Les autres aussi
             item.register()
 
-
-    def delete(self, *other):
+    def delete(self: _T, *other: _T) -> None:
         """Annule la tâche planifiée et la supprime en base.
 
         Globalement équivalent à un appel à :meth:`.cancel` (pour
@@ -622,8 +689,11 @@ class Tache(base.TableBase):
             \*other: autres instances à supprimer dans le même commit,
                 éventuellement.
         """
-        self.cancel()                   # Annule la tâche
-        for item in other:              # Les autres aussi
+        self.cancel()  # Annule la tâche
+        for item in other:  # Les autres aussi
             item.cancel()
 
-        super().delete(*other)          # Supprime tout en base
+        super().delete(*other)  # Supprime tout en base
+
+
+from lgrez.bdd import Joueur, Role, Camp, BaseAction, BaseCiblage

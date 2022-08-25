@@ -39,72 +39,54 @@ class ActionsPubliques(commands.Cog):
             await ctx.send("Pas de vote pour le condamné du jour en cours !")
             return
 
-        cible = await tools.boucle_query_joueur(
-            ctx, cible,
-            "Contre qui souhaites-tu déverser ta haine ?"
-        )
+        cible = await tools.boucle_query_joueur(ctx, cible, "Contre qui souhaites-tu déverser ta haine ?")
 
         if cible.statut == Statut.mort:
-            await ctx.send("Nan mais oh, tu crois qu'il a pas assez "
-                           "souffert en mourant lui ?")
+            await ctx.send("Nan mais oh, tu crois qu'il a pas assez souffert en mourant lui ?")
             return
 
         elif cible.statut == Statut.immortel:
-            await ctx.send("Comment oses-tu t'en prendre à ceux qui te sont "
-                           f"supérieurs ? {config.Role.mj.mention}, regardez "
-                           "un peu ce qu'il se passe là...")
+            await ctx.send(
+                "Comment oses-tu t'en prendre à ceux qui te sont "
+                f"supérieurs ? {config.Role.mj.mention}, regardez "
+                "un peu ce qu'il se passe là..."
+            )
             return
 
-        await tools.send_blocs(
-            ctx,
-            "Et quelle est la raison de cette haine, d'ailleurs ?"
-        )
+        await tools.send_blocs(ctx, "Et quelle est la raison de cette haine, d'ailleurs ?")
         motif = await tools.wait_for_message_here(ctx)
 
         emb = discord.Embed(
-            title=(f"**{config.Emoji.ha}{config.Emoji.ro} "
-                   f"contre {cible.nom} !**"),
+            title=(f"**{config.Emoji.ha}{config.Emoji.ro} " f"contre {cible.nom} !**"),
             description=f"**« {motif.content} »\n**",
-            color=0xff0000
+            color=0xFF0000,
         )
         emb.set_author(name=f"{joueur.nom} en a gros 😡😡")
         emb.set_thumbnail(url=config.Emoji.bucher.url)
-        emb.set_footer(
-            text=f"Utilise !vote {cible.nom} pour voter contre cette personne."
-        )
+        emb.set_footer(text=f"Utilise !vote {cible.nom} pour voter contre cette personne.")
 
         mess = await ctx.send("C'est tout bon ?", embed=emb)
         if await tools.yes_no(mess):
-            if not CandidHaro.query.filter_by(joueur=cible,
-                                              type=CandidHaroType.haro).all():
+            if not CandidHaro.query.filter_by(joueur=cible, type=CandidHaroType.haro).all():
                 # Inscription haroté
-                config.session.add(CandidHaro(joueur=cible,
-                                              type=CandidHaroType.haro))
+                config.session.add(CandidHaro(joueur=cible, type=CandidHaroType.haro))
 
-            if not CandidHaro.query.filter_by(joueur=joueur,
-                                              type=CandidHaroType.haro).all():
+            if not CandidHaro.query.filter_by(joueur=joueur, type=CandidHaroType.haro).all():
                 # Inscription haroteur
-                config.session.add(CandidHaro(joueur=joueur,
-                                              type=CandidHaroType.haro))
+                config.session.add(CandidHaro(joueur=joueur, type=CandidHaroType.haro))
 
             config.session.commit()
 
-            await config.Channel.haros.send(
-                f"(Psst, {cible.member.mention} :3)",
-                embed=emb
-            )
+            await config.Channel.haros.send(f"(Psst, {cible.member.mention} :3)", embed=emb)
             await config.Channel.debats.send(
                 f"{config.Emoji.ha}{config.Emoji.ro} de {auteur.mention} "
                 f"sur {cible.member.mention} ! Vous en pensez quoi vous ? "
                 f"(détails sur {config.Channel.haros.mention})"
             )
-            await ctx.send(
-                f"Allez, c'est parti ! ({config.Channel.haros.mention})"
-            )
+            await ctx.send(f"Allez, c'est parti ! ({config.Channel.haros.mention})")
 
         else:
             await ctx.send("Mission aborted.")
-
 
     @commands.command()
     @tools.vivants_only
@@ -127,29 +109,21 @@ class ActionsPubliques(commands.Cog):
             await ctx.send("Pas de vote pour le nouveau maire en cours !")
             return
 
-        if CandidHaro.query.filter_by(joueur=joueur,
-                                      type=CandidHaroType.candidature).all():
-            await ctx.send(
-                "Hola collègue, tout doux, tu t'es déjà présenté(e) !"
-            )
+        if CandidHaro.query.filter_by(joueur=joueur, type=CandidHaroType.candidature).all():
+            await ctx.send("Hola collègue, tout doux, tu t'es déjà présenté(e) !")
             return
 
         await tools.send_blocs(ctx, "Quel est ton programme politique ?")
         motif = await tools.wait_for_message_here(ctx)
 
         emb = discord.Embed(
-            title=(f"**{config.Emoji.maire} {joueur.nom} "
-                   "candidate à la Mairie !**"),
-            description=("Voici son programme politique :\n"
-                         + tools.bold(motif.content)),
-            color=0xf1c40f
+            title=(f"**{config.Emoji.maire} {joueur.nom} candidate à la Mairie !**"),
+            description=("Voici son programme politique :\n" + tools.bold(motif.content)),
+            color=0xF1C40F,
         )
         emb.set_author(name=f"{joueur.nom} vous a compris !")
         emb.set_thumbnail(url=config.Emoji.maire.url)
-        emb.set_footer(
-            text=(f"Utilise !votemaire {auteur.display_name} "
-                  "pour voter pour cette personne.")
-        )
+        emb.set_footer(text=(f"Utilise !votemaire {auteur.display_name} pour voter pour cette personne."))
 
         mess = await ctx.send("C'est tout bon ?", embed=emb)
         if await tools.yes_no(mess):
@@ -157,22 +131,16 @@ class ActionsPubliques(commands.Cog):
             config.session.add(ch)
             config.session.commit()
 
-            await config.Channel.haros.send(
-                "Here comes a new challenger !",
-                embed=emb
-            )
+            await config.Channel.haros.send("Here comes a new challenger !", embed=emb)
             await config.Channel.debats.send(
                 f"{auteur.mention} se présente à la Mairie ! "
                 "Vous en pensez quoi vous ?\n"
                 f"(détails sur {config.Channel.haros.mention})"
             )
-            await ctx.send(
-                f"Allez, c'est parti ! ({config.Channel.haros.mention})"
-            )
+            await ctx.send(f"Allez, c'est parti ! ({config.Channel.haros.mention})")
 
         else:
             await ctx.send("Mission aborted.")
-
 
     @commands.command()
     @tools.mjs_only

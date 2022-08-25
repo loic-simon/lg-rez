@@ -8,11 +8,11 @@ See github.com/loic-simon/lg-rez for informations.
 __title__ = "lg-rez"
 __author__ = "Loïc Simon, Tom Lacoma"
 __license__ = "MIT"
-__copyright__ = ("Copyright 2020 - 2021 Loïc Simon & Tom Lacoma - "
-                 "Club BD-Jeux × GRIs – ESPCI Paris - PSL")
-__version__ = "2.3.3"
+__copyright__ = "Copyright 2020 - 2021 Loïc Simon & Tom Lacoma - Club BD-Jeux × GRIs – ESPCI Paris - PSL"
+__version__ = "3.x"
 __all__ = ["LGBot"]
 
 
 from lgrez import bot
-LGBot = bot.LGBot                # Accès direct à lgrez.LGBot
+
+LGBot = bot.LGBot  # Accès direct à lgrez.LGBot

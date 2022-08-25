@@ -6,8 +6,7 @@ repo_url = "https://github.com/loic-simon/lg-rez"
 
 version = ""
 with open("lgrez/__init__.py") as f:
-    version = re.search(r"""^__version__\s*=\s*['"](.*?)['"]""",
-                        f.read(), re.MULTILINE).group(1)
+    version = re.search(r"""^__version__\s*=\s*['"](.*?)['"]""", f.read(), re.MULTILINE).group(1)
 
 assert version, "__version__ not found in __init__.py"
 
@@ -16,10 +15,11 @@ def absolute_links(string, base):
     """Replace all relative Markdown links by absolute links"""
     base = base.rstrip("/")
     return re.sub(
-        r"\[(.+?)\]\(([^:]+?)\)",   # Every [text](link) without ":" in link
-        f"[\\1]({base}/\\2)",       # Replace link by base/link
-        string
+        r"\[(.+?)\]\(([^:]+?)\)",  # Every [text](link) without ":" in link
+        f"[\\1]({base}/\\2)",  # Replace link by base/link
+        string,
     )
+
 
 with open("README.md", "r", encoding="utf-8") as fh:
     readme = fh.read()
@@ -60,5 +60,5 @@ setuptools.setup(
         "Topic :: Internet",
     ],
     install_requires=requirements,
-    python_requires='>=3.8',
+    python_requires=">=3.10",
 )

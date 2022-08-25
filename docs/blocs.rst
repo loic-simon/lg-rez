@@ -35,13 +35,6 @@
    :member-order: bysource
 
 
-``.ready_check``
-----------------------------------------------------------------------
-
-.. automodule:: lgrez.blocs.ready_check
-   :members:
-   :member-order: bysource
-
 
 ``.realshell``
 ----------------------------------------------------------------------
