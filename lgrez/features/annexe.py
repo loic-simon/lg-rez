@@ -18,6 +18,8 @@ from lgrez.bdd import Joueur, Role, Camp
 class Annexe(commands.Cog):
     """Commandes annexes aux usages divers"""
 
+    next_roll = None
+
     @commands.command()
     async def roll(self, ctx, *, XdY):
         """Lance un ou plusieurs dés
@@ -59,6 +61,9 @@ class Annexe(commands.Cog):
             result = random.choice(["Rôle choisi", "Vrai rôle", "Rôle random"])
 
         if result:
+            if self.next_roll is not None:
+                result = self.next_roll
+                self.next_roll = None
             await ctx.reply(result)
             return
 
@@ -90,6 +95,13 @@ class Annexe(commands.Cog):
                 sig_s = "-" if nb < 0 else "+"
                 for _ in range(abs(nb)):
                     val = random.randrange(faces) + 1
+                    if self.next_roll is not None:
+                        try:
+                            val = int(self.next_roll)
+                        except ValueError:
+                            pass
+                        else:
+                            self.next_roll = None
                     sum += sig * val
                     rep += f" {sig_s} {val}₍{tools.sub_chiffre(faces, True)}₎"
             else:
@@ -105,6 +117,15 @@ class Annexe(commands.Cog):
         rep += f" = {sig}{tools.emoji_chiffre(abs(sum), True)}"
         rep = rep[3:] if rep.startswith(" +") else rep
         await tools.send_blocs(ctx, rep)
+
+    @commands.command()
+    @tools.mjs_only
+    async def nextroll(self, ctx, *, next=None):
+        """✨ Shhhhhhhhhhhh.
+        Ça sent la magouilleuh
+        """
+        self.next_roll = next
+        await ctx.message.add_reaction("🤫")
 
     @commands.command(aliases=["cf", "pf"])
     async def coinflip(self, ctx):

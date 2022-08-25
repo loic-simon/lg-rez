@@ -41,6 +41,24 @@ default_description: str = "LG-bot – Plateforme pour parties endiablées de Lo
 
 
 async def _check_and_prepare_objects(bot: LGBot) -> None:
+    # Start admin console in the background
+    asyncio.create_task(console.run_admin_console(globals()))
+
+    if not config.is_setup:
+        return
+
+    async for entry in config.guild.audit_logs(
+        oldest_first=True, user=config.bot.user, action=discord.AuditLogAction.guild_update
+    ):
+        if entry.reason == "Guild set up!":
+            break
+    else:
+        config.is_setup = False
+        # *really* needed objects, even if nothing is setup
+        config.Channel.logs = config.guild.text_channels[0]
+        await tools.log("Server not setup - call `!setup` !")
+        return
+
     errors = []
 
     def prepare_attributes(
@@ -123,9 +141,6 @@ async def _check_and_prepare_objects(bot: LGBot) -> None:
             name=bot.user.name, avatar=await bot.user.avatar_url.read()
         )
         await tools.log(f"Webhook de tâches planifiées créé")
-
-    # Start admin console in the background
-    asyncio.create_task(console.run_admin_console(globals()))
 
 
 def _showexc(exc: Exception) -> str:
@@ -328,7 +343,11 @@ class LGBot(commands.Bot):
         if message.author == self.user:  # Pas de boucles infinies
             return
 
-        if not message.webhook_id and message.author.top_role == config.Role.everyone:  # Pas un webhook
+        if (
+            config.is_setup
+            and not message.webhook_id  # Pas un webhook
+            and message.author.top_role == config.Role.everyone
+        ):
             # Pas de rôle affecté : le bot te calcule même pas
             return
 
@@ -439,7 +458,7 @@ class LGBot(commands.Bot):
                 # Dans tous les cas, si erreur à l'exécution
                 prefixe = "Oups ! Un problème est survenu à l'exécution de la commande  :grimacing: :"
 
-                if ctx.message.webhook_id or ctx.author.top_role >= config.Role.mj:
+                if not config.is_setup or ctx.message.webhook_id or ctx.author.top_role == config.Role.mj:
                     # MJ / webhook : affiche le traceback complet
                     e = traceback.format_exception(type(exc.original), exc.original, exc.original.__traceback__)
                     await tools.send_code_blocs(ctx, "".join(e), prefixe=prefixe)
@@ -624,10 +643,10 @@ class LGBot(commands.Bot):
         self.GUILD_ID = int(env.load("LGREZ_SERVER_ID"))
 
         # Connexion BDD
-        # print("[1/3] Connecting to database...")
-        # bdd.connect()
-        # url = config.engine.url
-        # print(f"      Connected to {url.host}/{url.database}!")
+        print("[1/3] Connecting to database...")
+        bdd.connect()
+        url = config.engine.url
+        print(f"      Connected to {url.host}/{url.database}!")
 
         # Enregistrement
         config.bot = self

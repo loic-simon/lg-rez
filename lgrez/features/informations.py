@@ -310,7 +310,7 @@ class Informations(commands.Cog):
             charges = int(mess.content) if mess.content.isdigit() else None
 
             action = Action(joueur=joueur, base=base, cooldown=cooldown, charges=charges)
-            gestion_actions.add_action(action)
+            gestion_actions.add_action(joueur=joueur, base=base, cooldown=cooldown, charges=charges)
             await ctx.send(f"Action ajoutée (id {action.id}).")
             return
 

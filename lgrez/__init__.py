@@ -8,7 +8,7 @@ See github.com/loic-simon/lg-rez for informations.
 __title__ = "lg-rez"
 __author__ = "Loïc Simon, Tom Lacoma"
 __license__ = "MIT"
-__copyright__ = "Copyright 2020 - 2021 Loïc Simon & Tom Lacoma - Club BD-Jeux × GRIs – ESPCI Paris - PSL"
+__copyright__ = "Copyright 2020 - 2022 Loïc Simon & Tom Lacoma - Club BD-Jeux × GRIs – ESPCI Paris - PSL"
 __version__ = "3.x"
 __all__ = ["LGBot"]
 

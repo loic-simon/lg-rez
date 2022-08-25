@@ -17,8 +17,19 @@ internationalization is available at this time.*
 ## What's New in LG-Rez
 
 Only major features are reported here; see [`CHANGELOG.md`](CHANGELOG.md)
-or in [the doc](https://lg-rez.readthedocs.io/fr/2.3.2/changelog.html) for
+or in [the doc](https://lg-rez.readthedocs.io/fr/2.4.2/changelog.html) for
 details.
+
+### 2.4
+
+* New commands ``!mp``, ``!setup``, ``!cfini``
+* New subcommand ``!boudoir find``
+* Minor improvements and command changes.
+
+### 2.3
+
+* New subcommand ``!boudoir ping``
+* Command ``!roles`` partially splitted to ``!camps``.
 
 ### 2.2
 
@@ -130,7 +141,7 @@ We also provide a direct way to customize some parameters of the game and
 of the Discord server through [`config`](lgrez/config.py) module:
 roles/channels/emoji names, date of season beginning, inscription
 customization... See
-[the doc](https://lg-rez.readthedocs.io/fr/2.3.2/config.html)
+[the doc](https://lg-rez.readthedocs.io/fr/2.4.2/config.html)
 for full API usage information.
 
 See additional attributes and overriden methods on
@@ -214,7 +225,7 @@ Community contributions are not welcome for now. Get in touch with the authors
 ## License
 This work is shared under [the MIT license](LICENSE).
 
-© 2020 - 2021 Loïc Simon, Tom Lacoma et al. – Club BD-Jeux × GRIs –
+© 2020 - 2022 Loïc Simon, Tom Lacoma et al. – Club BD-Jeux × GRIs –
 ESPCI Paris - PSL
 
 Reach us on Discord:

@@ -10,18 +10,29 @@ from discord.ext import commands
 
 from lgrez import config
 from lgrez.blocs import tools
-from lgrez.bdd import Action, BaseAction, Tache, Utilisation, ActionTrigger
+from lgrez.bdd import Action, BaseAction, Tache, Utilisation, ActionTrigger, Joueur
 
 
-def add_action(action: Action) -> None:
+def add_action(
+    joueur: Joueur, base: BaseAction, cooldown: int = 0, charges: int | None = None, active: bool = True
+) -> None:
     """Enregistre une action et programme son ouverture le cas échéant.
 
+    Si une action existe déjà pour ce joueur et cette base, la modifie ;
+    sinon, en crée une nouvelle.
+
     Args:
-        action: l'action à enregistrer.
+        joueur, base, cooldown, charges, active: Paramètre de l'action
     """
-    if not action.active:
-        action.active = True
-    action.add()
+    action = Action.query.filter_by(joueur=joueur, base=base).first()
+    if action:
+        action.cooldown = cooldown
+        action.charges = charges
+        action.active = active
+        action.update()
+    else:
+        action = Action(joueur=joueur, base=base, cooldown=cooldown, charges=charges, active=active)
+        action.add()
 
     # Ajout tâche ouverture
     if action.base.trigger_debut == ActionTrigger.temporel:
@@ -31,7 +42,7 @@ def add_action(action: Action) -> None:
         ).add()
 
     elif action.base.trigger_debut == ActionTrigger.perma:
-        # Perma : ON LANCE DIRECT
+        # Perma : ON LANCE DIRECT (sera repoussé si jeu fermé)
         Tache(timestamp=datetime.datetime.now(), commande=f"!open {action.id}", action=action).add()
 
 

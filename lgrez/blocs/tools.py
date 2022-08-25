@@ -213,7 +213,7 @@ def mention_MJ(arg: discord.Member | commands.Context) -> str:
         La chaîne à utiliser pour mentionner le rôle MJ.
     """
     member = arg.author if isinstance(arg, commands.Context) else arg
-    if isinstance(member, discord.Member) and member.top_role >= config.Role.mj:
+    if config.is_setup and isinstance(member, discord.Member) and member.top_role == config.Role.mj:
         # Pas un webhook et (au moins) MJ
         return f"@{config.Role.mj.name}"
     else:

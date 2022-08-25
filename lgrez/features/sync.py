@@ -530,8 +530,7 @@ async def modif_joueur(joueur_id: int, modifs: list[TDBModif], silent: bool = Fa
 
             for base in new_role.base_actions:
                 # Ajout et création des tâches si trigger temporel
-                action = Action(joueur=joueur, base=base, cooldown=0, charges=base.base_charges)
-                gestion_actions.add_action(action)
+                gestion_actions.add_action(joueur=joueur, base=base, cooldown=0, charges=base.base_charges)
 
             if not silent:
                 notif += (
@@ -603,6 +602,26 @@ async def process_mort(joueur: Joueur) -> None:
             await boudoir.chan.send(tools.ital("[Ce boudoir contient moins de deux joueurs vivants, archivage...]"))
             categ = await tools.multicateg(config.old_boudoirs_category_name)
             await boudoir.chan.edit(category=categ)
+
+        elif joueur == boudoir.gerant:
+            # Mort du gérant (et pas cimetière) : transférer le boudoir
+            bouderies = [
+                bouderie for bouderie in boudoir.bouderies if bouderie.joueur != joueur and bouderie.joueur.est_vivant
+            ]
+            oldest_bouderie = min(bouderies, key=lambda b: b.ts_added)
+            boudoir.gerant = oldest_bouderie.joueur
+            boudoir.update()
+            await boudoir.chan.send(
+                f":warning: L'actuel gérant(e) de ce boudoir, {joueur.nom}, "
+                "vient de mourir (RIP). En conséquence, ce boudoir a été "
+                "transféré au membre l'ayant rejoint il y a le plus "
+                f"longtemps, à savoir {boudoir.gerant.member.mention}."
+            )
+            await boudoir.chan.send(
+                tools.ital(
+                    "Le boudoir peut être transféré à un autre membre à l'aide de la commande `!boudoir transfer`."
+                )
+            )
 
 
 class Sync(commands.Cog):

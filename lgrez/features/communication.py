@@ -32,7 +32,7 @@ from lgrez.features.sync import transtype
 
 
 def _joueur_repl(mtch: re.Match) -> str:
-    """Remplace @(Prénom Nom) par la mention du joueur, si possible"""
+    """Remplace @... par la mention d'un joueur, si possible"""
     nearest = Joueur.find_nearest(mtch.group(1), col=Joueur.nom, sensi=0.8)
     if nearest:
         joueur = nearest[0][0]
@@ -40,15 +40,17 @@ def _joueur_repl(mtch: re.Match) -> str:
             return joueur.member.mention
         except ValueError:
             pass
-    return mtch.group(1)
+    return mtch.group(0)
 
 
 def _role_repl(mtch: re.Match) -> str:
-    """Remplace @role_slug par la mention du rôle"""
-    if mtch.group(1).lower() in config.Role:
-        role = getattr(config.Role, mtch.group(1))
+    """Remplace @role_slug par la mention du rôle, si possible"""
+    try:
+        role = getattr(config.Role, mtch.group(1).lower())
+    except AttributeError:
+        return mtch.group(0)
+    else:
         return role.mention
-    return mtch.group(1)
 
 
 def _emoji_repl(mtch: re.Match) -> str:
@@ -724,6 +726,7 @@ class Communication(commands.Cog):
             - Liens hypertextes;
             - Listes à puces;
             - Mentions de joueurs, sous la forme ``@Prénom Nom``;
+            - Mentions de rôles, sous la forme ``@nom_du_role``;
             - Emojis, sous la forme ``:nom:``.
 
         Permet soit de poster directement dans #annonces, soit de
@@ -759,7 +762,8 @@ class Communication(commands.Cog):
                 continue
 
             # Remplacement des mentions
-            text = re.sub(r"@([\w-]+ [\w-]+)", _joueur_repl, text)
+            for i in (3, 2, 1, 0):
+                text = re.sub(rf"@([\w-]+( [\w-]+){{{i}}})", _joueur_repl, text)
             text = re.sub(r"@(\w+)", _role_repl, text)
             text = re.sub(r":(\w+):", _emoji_repl, text)
 

@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.abspath(".."))
 # -- Project information -----------------------------------------------------
 
 project = "lg-rez"
-copyright = "2020 - 2021, Loïc Simon / Tom Lacoma. Sphinx theme by Rapptz for discord.py"
+copyright = "2020 - 2022, Loïc Simon / Tom Lacoma. Sphinx theme by Rapptz for discord.py"
 author = "Loïc Simon, Tom Lacoma"
 
 # The short X.Y version
@@ -56,7 +56,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.coverage",
     "sphinx.ext.viewcode",
-    "recommonmark",
+    "myst_parser",
 ]
 
 
@@ -217,7 +217,6 @@ intersphinx_mapping = {
     "sqlalchemy": ("https://docs.sqlalchemy.org/en/13/", None),
     "gspread": ("https://gspread.readthedocs.io/en/latest/", None),
     "requests": ("https://requests.readthedocs.io/en/v3.0.0/", None),
-    "psycopg2": ("https://www.psycopg.org/docs/", None),
     "asyncode": ("https://asyncode.readthedocs.io/en/1.0.0/", None),
     "gspread_asyncio": ("https://gspread-asyncio.readthedocs.io/en/latest", None),
     "readycheck": ("https://readycheck.readthedocs.io/en/1.0.1/", None),
