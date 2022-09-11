@@ -5,12 +5,15 @@ Ouverture / fermeture / rappels des votes et actions (+ refill)
 """
 
 import datetime
+import enum
+from typing import Literal
 
-from discord.ext import commands
+from discord import app_commands
 
-from lgrez import config
+from lgrez import commons, config
 from lgrez.blocs import tools
-from lgrez.features import gestion_actions
+from lgrez.blocs.journey import DiscordJourney, journey_command
+from lgrez.features import gestion_actions, communication
 from lgrez.bdd import (
     Joueur,
     Action,
@@ -20,12 +23,12 @@ from lgrez.bdd import (
     Utilisation,
     CandidHaroType,
     ActionTrigger,
-    UtilEtat,
     Vote,
 )
+from lgrez.features.taches import planif_command
 
 
-async def recup_joueurs(quoi: str, qui: Vote | str, heure: str | None = None) -> list[Joueur]:
+async def _get_joueurs(quoi: Literal["open", "close", "remind"], qui: Vote) -> list[Joueur]:
     """Récupère les joueurs concernés par la tâche !quoi <qui> [heure].
 
     Args:
@@ -33,83 +36,55 @@ async def recup_joueurs(quoi: str, qui: Vote | str, heure: str | None = None) ->
         qui:
             ===========     ===========
             ``Vote``        pour le vote correspondant
-            ``action``      pour les actions commençant à ``heure``
+            ``actions``     pour les actions commençant à ``heure``
             ``{id}``        pour une action précise (:attr:`bdd.Action.id`)
             ===========     ===========
 
-        heure: si ``qui == "action"``, heure associée (au format ``HHhMM``).
+        heure: si ``qui == "actions"``, heure associée (au format ``HHhMM``).
 
     Returns:
         La liste des joueurs concernés.
-
-    Examples:
-        ``!open cond`` -> joueurs avec droit de vote
-        ``!close action 17h`` -> joueurs dont l'action se termine à 17h
     """
-    if quoi not in ["open", "close", "remind"]:
-        raise ValueError(f"recup_joueurs: bad value for `quoi`: `{quoi}`")
-
-    if isinstance(qui, Vote):
-        # Critère principale : présence/absence d'une action actuellement
-        # ouverte (et non traitée pour remind)
-        criteres = {
-            "open": ~Joueur.actions.any(Action.is_open, vote=qui),
-            "close": Joueur.actions.any(Action.is_open, vote=qui),
-            "remind": Joueur.actions.any(Action.is_waiting, vote=qui),
-        }
-        critere = criteres[quoi]
-        if quoi == "open":
-            # Open : le joueur doit en plus avoir votant_village/loups True
-            if qui == Vote.loups:
-                critere &= Joueur.votant_loups.is_(True)
-            else:
-                critere &= Joueur.votant_village.is_(True)
-
-        return Joueur.query.filter(critere).all()
-        # Liste des joueurs répondant aux critères
-
-    elif qui == "action":
-        if heure and isinstance(heure, str):
-            # Si l'heure est précisée, on convertit "HHhMM" -> datetime.time
-            tps = tools.heure_to_time(heure)
+    # Critère principal : présence/absence d'une action actuellement ouverte (et non traitée pour remind)
+    criteres = {
+        "open": ~Joueur.actions.any(Action.is_open, vote=qui),
+        "close": Joueur.actions.any(Action.is_open, vote=qui),
+        "remind": Joueur.actions.any(Action.is_waiting, vote=qui),
+    }
+    critere = criteres[quoi]
+    if quoi == "open":
+        # Open : le joueur doit en plus avoir votant_village/loups True
+        if qui == Vote.loups:
+            critere &= Joueur.votant_loups.is_(True)
         else:
-            raise commands.BadArgument('[heure] doit être spécifiée lorsque <qui> == "action"')
+            critere &= Joueur.votant_village.is_(True)
 
-        actions = gestion_actions.get_actions(quoi, ActionTrigger.temporel, tps)
+    return Joueur.query.filter(critere).all()
 
-        dic = {}
-        for action in actions:
-            joueur = action.joueur
-            if joueur not in dic:
-                dic[joueur] = []
-            dic[joueur].append(action)
 
-        return dic
-        # Formerly :
-        # {joueur.player_id:[action for action in actions if
-        # action.player_id == joueur.player_id] for joueur in
-        # [Joueur.query.get(action.player_id) for action in actions]}
+async def _get_actions(quoi: Literal["open", "close", "remind"], heure: str) -> list[Action]:
+    # Si l'heure est précisée, on convertit "HHhMM" -> datetime.time
+    tps = tools.heure_to_time(heure)
+    return gestion_actions.get_actions(quoi, ActionTrigger.temporel, tps)
 
-    elif qui.isdigit():
-        action = Action.query.get(int(qui))
-        if not action:
-            raise commands.BadArgument(f"Pas d'action d'ID = {qui}")
-        if not action.active:
-            raise commands.BadArgument(f"Action d'ID = {qui} inactive")
 
-        # Appel direct action par son numéro (perma : rappel seulement)
-        if (
-            (quoi == "open" and (not action.is_open or action.base.trigger_debut == ActionTrigger.perma))
-            or (quoi == "close" and action.is_open)
-            or (quoi == "remind" and action.is_waiting)
-        ):
-            # Action lançable
-            return {action.joueur: [action]}
-        else:
-            return {}
+async def _get_action(quoi: Literal["open", "close", "remind"], id: int) -> Action | None:
+    action = Action.query.get(id)
+    if not action:
+        raise commons.UserInputError("qui", f"Pas d'action d'ID = {id}")
+    if not action.active:
+        raise commons.UserInputError("qui", f"Action d'ID = {id} inactive")
 
+    # Appel direct action par son numéro (perma : rappel seulement)
+    if (
+        (quoi == "open" and (not action.is_open or action.base.trigger_debut == ActionTrigger.perma))
+        or (quoi == "close" and action.is_open)
+        or (quoi == "remind" and action.is_waiting)
+    ):
+        # Action lançable
+        return action
     else:
-        raise commands.BadArgument(f"""Argument <qui> == \"{qui}" invalide""")
+        return None
 
 
 async def _do_refill(motif: str, action: Action) -> None:
@@ -133,7 +108,7 @@ async def _do_refill(motif: str, action: Action) -> None:
         else:
             ts = datetime.datetime.now() + datetime.timedelta(seconds=10)
             # + 10 secondes pour ouvrir après le message de refill
-        Tache(timestamp=ts, commande=f"!open {action.id}", action=action).add()
+        await planif_command(ts, open_action, id=action.id)
 
     action.charges = new_charges
     config.session.commit()
@@ -144,540 +119,568 @@ async def _do_refill(motif: str, action: Action) -> None:
     )
 
 
-class OpenClose(commands.Cog):
-    """Commandes de gestion des votes et actions"""
+DESCRIPTION = """Commandes de gestion des votes et actions"""
 
-    @commands.command()
-    @tools.mjs_only
-    async def open(self, ctx, qui, heure=None, heure_chain=None):
-        """Lance un vote / des actions de rôle (COMMANDE BOT / MJ)
 
-        Args:
-            qui:
-                ===========     ===========
-                ``cond``        pour le vote du condamné
-                ``maire``       pour le vote du maire
-                ``loups``       pour le vote des loups
-                ``action``      pour les actions commençant à ``heure``
-                ``{id}``        pour une action spécifique
-                ===========     ===========
+open = app_commands.Group(name="open", description="Ouvrir quelque chose")
 
-            heure:
-                - si ``qui == "cond"``, ``"maire"`` ou ``"loup"``,
-                  programme en plus la fermeture à ``heure``
-                  (et un rappel 30 minutes avant) ;
-                - si ``qui == "action"``, il est obligatoire : heure des
-                  actions à lancer (cf plus haut). Pour les actions, la
-                  fermeture est de toute façon programmée le cas échéant
-                  (``trigger_fin`` ``temporel`` ou ``delta``).
 
-                Dans tous les cas, format ``HHh`` ou ``HHhMM``.
+@open.command(name="vote")
+@tools.mjs_only
+@journey_command
+async def open_vote(journey: DiscordJourney, *, qui: Vote, heure: str | None = None, heure_chain: str | None = None):
+    """Lance un vote (COMMANDE BOT / MJ)
 
-            heure_chain:
-                permet de chaîner des votes : lance le vote immédiatement
-                et programme sa fermeture à ``heure``, en appellant ``!close``
-                de sorte à programmer une nouvelle ouverture le lendemain à
-                ``heure_chain``, et ainsi de suite.
-                Format ``HHh`` ou ``HHhMM``.
+    Args:
+        qui: Type de vote à lancer (vote pour le condamné du jour, le nouveau maire ou la victime des loups)
+        heure: Heure à laquelle programmer la fermeture du vote, optionnel (HHh / HHhMM)
+        heure_chain: Heure à laquelle programmer une ré-ouverture, pour boucler à l'infini (HHh / HHhMM)
 
-        Une sécurité empêche de lancer un vote ou une action déjà en cours.
+    Une sécurité empêche de lancer un vote ou une action déjà en cours.
 
-        Cette commande a pour vocation première d'être exécutée
-        automatiquement par des tâches planifiées.
-        Elle peut être utilisée à la main, mais attention à ne pas
-        faire n'importe quoi (penser à envoyer / planifier la fermeture
-        des votes, par exemple).
+    Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
+    Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi
+    (penser à envoyer / planifier la fermeture des votes, par exemple).
 
-        Examples:
-            - ``!open maire`` :        lance un vote maire maintenant
-            - ``!open cond 19h`` :     lance un vote condamné maintenant
-              et programme sa fermeture à 19h00 (ex. Juge Bègue)
-            - ``!open cond 18h 10h`` : lance un vote condamné maintenant,
-              programme sa fermeture à 18h00, et une prochaine ouverture
-              à 10h qui se fermera à 18h, et ainsi de suite
-            - ``!open action 19h`` :   lance toutes les actions
-              commençant à 19h00
-            - ``!open 122`` :          lance l'action d'ID 122
+    Examples:
+        - ``/open maire`` :         lance un vote maire maintenant
+        - ``/open cond 19h`` :      lance un vote condamné maintenant et programme sa fermeture à 19h00
+        - ``/open cond 18h 10h`` :  lance un vote condamné maintenant, programme sa fermeture à 18h00,
+                                    et une prochaine ouverture à 10h qui se fermera à 18h, et ainsi de suite
+    """
+    joueurs = await _get_joueurs("open", qui)
 
-        """
-        try:
-            qui = Vote[qui.lower()]  # cond / maire / loups
-        except KeyError:
-            pass
-        joueurs = await recup_joueurs("open", qui, heure)
-        # Liste de joueurs (votes) ou dictionnaire joueur : action
+    await journey.final_message(
+        "\n - ".join(joueur.nom for joueur in joueurs),
+        code=True,
+        prefix=f"Utilisateur(s) répondant aux critères ({len(joueurs)}) :",
+    )
 
-        str_joueurs = "\n - ".join([joueur.nom for joueur in joueurs])
-        await tools.send_code_blocs(ctx, f"Utilisateur(s) répondant aux critères ({len(joueurs)}) : \n" + str_joueurs)
-
-        # Création utilisations & envoi messages
-        for joueur in joueurs:
-            chan = joueur.private_chan
-
-            if isinstance(qui, Vote):
-                action = joueur.action_vote(qui)
-                if action.is_open:  # Sécurité : action ouverte depuis
-                    continue
-                util = Utilisation(action=action)
-                util.add()
-                util.open()
-
-            if qui == Vote.cond:
-                message = await chan.send(
-                    f"{tools.montre()}  Le vote pour le condamné du "
-                    f"jour est ouvert !  {config.Emoji.bucher} \n"
-                    + (f"Tu as jusqu'à {heure} pour voter. \n" if heure else "")
-                    + tools.ital(f"Tape {tools.code('!vote (nom du joueur)')} ou utilise la réaction pour voter.")
-                )
-                await message.add_reaction(config.Emoji.bucher)
-
-            elif qui == Vote.maire:
-                message = await chan.send(
-                    f"{tools.montre()}  Le vote pour l'élection du "
-                    f"maire est ouvert !  {config.Emoji.maire} \n"
-                    + (f"Tu as jusqu'à {heure} pour voter. \n" if heure else "")
-                    + tools.ital(f"Tape {tools.code('!votemaire (nom du joueur)')} ou utilise la réaction pour voter.")
-                )
-                await message.add_reaction(config.Emoji.maire)
-
-            elif qui == Vote.loups:
-                message = await chan.send(
-                    f"{tools.montre()}  Le vote pour la victime de "
-                    f"cette nuit est ouvert !  {config.Emoji.lune} \n"
-                    + (f"Tu as jusqu'à {heure} pour voter. \n" if heure else "")
-                    + tools.ital(f"Tape {tools.code('!voteloups (nom du joueur)')} ou utilise la réaction pour voter.")
-                )
-                await message.add_reaction(config.Emoji.lune)
-
-            else:  # Action
-                for action in joueurs[joueur]:
-                    await gestion_actions.open_action(action)
-
-        config.session.commit()
-
-        # Actions déclenchées par ouverture
-        if isinstance(qui, Vote):
-            for action in Action.query.filter(Action.base.has(BaseAction.trigger_debut == ActionTrigger.open(qui))):
-                await gestion_actions.open_action(action)
-
-            for action in Action.query.filter(Action.base.has(BaseAction.trigger_fin == ActionTrigger.open(qui))):
-                await gestion_actions.close_action(action)
-
-        # Réinitialise haros/candids
-        items = []
-        if qui == Vote.cond:
-            items = CandidHaro.query.filter_by(type=CandidHaroType.haro).all()
-        elif qui == Vote.maire:
-            items = CandidHaro.query.filter_by(type=CandidHaroType.candidature).all()
-        if items:
-            CandidHaro.delete(*items)
-            await tools.log(f"!open {qui.name} : haros/candids wiped")
-            await config.Channel.haros.send(
-                f"{config.Emoji.void}\n" * 30
-                + "Nouveau vote, nouveaux haros !\n"
-                + tools.ital(
-                    "Les posts ci-dessus sont invalides pour le vote actuel. "
-                    f"Utilisez {tools.code('!haro')} pour en relancer."
-                )
+    match qui:
+        case Vote.cond:
+            content = (
+                f"{tools.montre()}  Le vote pour le condamné du jour est ouvert !  {config.Emoji.bucher} \n"
+                + (f"Tu as jusqu'à {heure} pour voter. \n" if heure else "")
+                + tools.ital(f"Tape {tools.code('/vote <joueur>')} pour voter.")
             )
+            vote_command = "vote"
 
-        # Programme fermeture
-        if isinstance(qui, Vote) and heure:
-            ts = tools.next_occurrence(tools.heure_to_time(heure))
-            Tache(timestamp=ts - datetime.timedelta(minutes=30), commande=f"!remind {qui.name}").add()
-            if heure_chain:
-                Tache(timestamp=ts, commande=f"!close {qui.name} {heure_chain} {heure}").add()
-                # Programmera prochaine ouverture
-            else:
-                Tache(timestamp=ts, commande=f"!close {qui.name}").add()
+        case Vote.maire:
+            content = (
+                f"{tools.montre()}  Le vote pour l'élection du maire est ouvert !  {config.Emoji.maire} \n"
+                + (f"Tu as jusqu'à {heure} pour voter. \n" if heure else "")
+                + tools.ital(f"Tape {tools.code('/votemaire <joueur>')} pour voter.")
+            )
+            vote_command = "votemaire"
 
-    @commands.command()
-    @tools.mjs_only
-    async def close(self, ctx, qui, heure=None, heure_chain=None):
-        """Ferme un vote / des actions de rôle (COMMANDE BOT / MJ)
+        case Vote.loups:
+            content = (
+                f"{tools.montre()}  Le vote pour la victime de cette nuit est ouvert !  {config.Emoji.lune} \n"
+                + (f"Tu as jusqu'à {heure} pour voter. \n" if heure else "")
+                + tools.ital(f"Tape {tools.code('/voteloups <joueur>')} pour voter.")
+            )
+            vote_command = "voteloups"
 
-        Args:
-            qui:
-                ===========     ===========
-                ``cond``        pour le vote du condamné
-                ``maire``       pour le vote du maire
-                ``loups``       pour le vote des loups
-                ``action``      pour les actions se terminant à ``heure``
-                ``{id}``        pour une action spécifique
-                ===========     ===========
+    # Activation commande de vote
+    if config.bot.tree.enable_command(vote_command):
+        await config.bot.tree.sync(guild=config.guild)
 
-            heure:
-                - si ``qui == "cond"``, ``"maire"`` ou ``"loup"``,
-                  programme en plus une prochaine ouverture à ``heure``
-                  (et un rappel 30 minutes avant) ;
-                - si ``qui == "action"``, il est obligatoire : heure des
-                  actions à lancer (cf plus haut). Pour les actions, la
-                  prochaine est de toute façon programmée le cas échéant
-                  (cooldown à 0 et reste des charges).
+    # Création utilisations & envoi messages
+    for joueur in joueurs:
+        chan = joueur.private_chan
 
-                Dans tous les cas, format ``HHh`` ou ``HHhMM``.
+        action = joueur.action_vote(qui)
+        if action.is_open:  # Sécurité : action ouverte depuis
+            continue
+        util = Utilisation(action=action)
+        util.add()
+        util.open()
 
-            heure_chain:
-                permet de chaîner des votes : ferme le vote immédiatement
-                et programme une prochaine ouverture à ``heure``, en
-                appellant ``!close`` de sorte à programmer une nouvelle
-                fermeture le lendemain à ``heure_chain``, et ainsi de suite.
-                Format ``HHh`` ou ``HHhMM``.
+        await chan.send(content)
 
-        Une sécurité empêche de fermer un vote ou une action
-        qui n'est pas en cours.
+    config.session.commit()
 
-        Cette commande a pour vocation première d'être exécutée
-        automatiquement par des tâches planifiées.
-        Elle peut être utilisée à la main, mais attention à ne pas
-        faire n'importe quoi (penser à envoyer / planifier la fermeture
-        des votes, par exemple).
+    # Actions déclenchées par ouverture
+    if isinstance(qui, Vote):
+        for action in Action.query.filter(Action.base.has(BaseAction.trigger_debut == ActionTrigger.open(qui))):
+            await gestion_actions.open_action(action)
 
-        Examples:
-            - ``!close maire`` :        ferme le vote condamné maintenant
-            - ``!close cond 10h`` :     ferme le vote condamné maintenant
-              et programme une prochaine ouverture à 10h00
-            - ``!close cond 10h 18h`` : ferme le vote condamné maintenant,
-              programme une prochaine ouverture à 10h00, qui sera fermé à
-              18h, puis une nouvelle ouverture à 10h, etc
-            - ``!close action 22h`` :   ferme toutes les actions
-              se terminant à 22h00
-            - ``!close 122`` :          ferme l'action d'ID 122
-        """
-        try:
-            qui = Vote[qui.lower()]  # cond / maire / loups
-        except KeyError:
-            pass
-        joueurs = await recup_joueurs("close", qui, heure)
+        for action in Action.query.filter(Action.base.has(BaseAction.trigger_fin == ActionTrigger.open(qui))):
+            await gestion_actions.close_action(action)
 
-        str_joueurs = "\n - ".join([joueur.nom for joueur in joueurs])
-        await tools.send_code_blocs(ctx, f"Utilisateur(s) répondant aux critères ({len(joueurs)}) : \n" + str_joueurs)
+    # Réinitialise haros/candids
+    items = []
+    if qui == Vote.cond:
+        items = CandidHaro.query.filter_by(type=CandidHaroType.haro).all()
+    elif qui == Vote.maire:
+        items = CandidHaro.query.filter_by(type=CandidHaroType.candidature).all()
+    if items:
+        for item in items:
+            await item.disable_message_buttons()
+        CandidHaro.delete(*items)
 
-        # Fermeture utilisations et envoi messages
-        for joueur in joueurs:
-            chan = joueur.private_chan
-
-            if isinstance(qui, Vote):
-                action = joueur.action_vote(qui)
-                if not action.is_open:  # Sécurité : action fermée depuis
-                    continue
-                util = joueur.action_vote(qui).utilisation_ouverte
-                nom_cible = util.cible.nom if util.cible else "*non défini*"
-
-                util.close()  # update direct pour empêcher de voter
-
-            if qui == Vote.cond:
-                await chan.send(
-                    f"{tools.montre()}  Fin du vote pour le condamné du jour !"
-                    f"\nVote définitif : {nom_cible}\n"
-                    f"Les résultats arrivent dans l'heure !\n"
-                )
-
-            elif qui == Vote.maire:
-                await chan.send(f"{tools.montre()}  Fin du vote pour le maire ! \n" f"Vote définitif : {nom_cible}")
-
-            elif qui == Vote.loups:
-                await chan.send(
-                    f"{tools.montre()}  Fin du vote pour la victime du soir !" f"\nVote définitif : {nom_cible}"
-                )
-
-            else:  # Action
-                for action in joueurs[joueur]:
-                    await chan.send(
-                        f"{tools.montre()}  Fin de la possiblité d'utiliser "
-                        f"ton action {tools.code(action.base.slug)} ! \n"
-                        f"Action définitive : {action.decision}"
-                    )
-                    await gestion_actions.close_action(action)
-
-        config.session.commit()
-
-        # Actions déclenchées par fermeture
-        if isinstance(qui, Vote):
-            for action in Action.query.filter(Action.base.has(BaseAction.trigger_debut == ActionTrigger.close(qui))):
-                await gestion_actions.open_action(action)
-
-            for action in Action.query.filter(Action.base.has(BaseAction.trigger_fin == ActionTrigger.close(qui))):
-                await gestion_actions.close_action(action)
-
-        # Programme prochaine ouverture
-        if isinstance(qui, Vote) and heure:
-            ts = tools.next_occurrence(tools.heure_to_time(heure))
-            if heure_chain:
-                Tache(timestamp=ts, commande=f"!open {qui.name} {heure_chain} {heure}").add()
-                # Programmera prochaine fermeture
-            else:
-                Tache(timestamp=ts, commande=f"!open {qui.name}").add()
-
-    @commands.command()
-    @tools.mjs_only
-    async def remind(self, ctx, qui, heure=None):
-        """Envoi un rappel de vote / actions de rôle (COMMANDE BOT / MJ)
-
-        Args:
-            qui:
-                ===========     ===========
-                ``cond``        pour le vote du condamné
-                ``maire``       pour le vote du maire
-                ``loups``       pour le vote des loups
-                ``action``      pour les actions se terminant à ``heure``
-                ``{id}``        pour une action spécifique
-                ===========     ===========
-
-            heure: ne sert que dans le cas où <qui> == "action"
-                (il est alors obligatoire), contrairement à !open et
-                !close.
-                Format HHh ou HHhMM.
-
-        Le bot n'envoie un message qu'aux joueurs n'ayant pas encore
-        voté / agi, si le vote ou l'action est bien en cours.
-
-        Cette commande a pour vocation première d'être exécutée
-        automatiquement par des tâches planifiées.
-        Elle peut être utilisée à la main, mais attention à ne pas
-        faire n'importe quoi !.
-
-        Examples:
-            - ``!remind maire`` :      rappelle le vote maire maintenant
-            - ``!remind action 22h`` : rappelle toutes les actions
-              se terminant à 22h00
-            - ``!remind 122`` :        rappelle l'action d'ID 122
-        """
-        try:
-            qui = Vote[qui.lower()]  # cond / maire / loups
-        except KeyError:
-            pass
-        joueurs = await recup_joueurs("remind", qui, heure)
-
-        str_joueurs = "\n - ".join([joueur.nom for joueur in joueurs])
-        await ctx.send(tools.code_bloc(f"Utilisateur(s) répondant aux critères ({len(joueurs)}) : \n" + str_joueurs))
-
-        for joueur in joueurs:
-            chan = joueur.private_chan
-            member = joueur.member
-
-            if qui == Vote.cond:
-                message = await chan.send(
-                    f"⏰ {member.mention} Plus que 30 minutes pour voter pour le condamné du jour ! 😱 \n"
-                )
-                await message.add_reaction(config.Emoji.bucher)
-
-            elif qui == Vote.maire:
-                message = await chan.send(f"⏰ {member.mention} Plus que 30 minutes pour élire le nouveau maire ! 😱 \n")
-                await message.add_reaction(config.Emoji.maire)
-
-            elif qui == Vote.loups:
-                message = await chan.send(
-                    f"⏰ {member.mention} Plus que 30 minutes pour voter pour la victime du soir ! 😱 \n"
-                )
-                await message.add_reaction(config.Emoji.lune)
-
-            else:  # Action
-                for action in joueurs[joueur]:
-                    message = await chan.send(
-                        f"⏰ {member.mention} Plus que 30 minutes pour "
-                        f"utiliser ton action {tools.code(action.base.slug)}"
-                        " ! 😱 \n"
-                    )
-                    await message.add_reaction(config.Emoji.action)
-
-    @commands.command()
-    @tools.mjs_only
-    async def refill(self, ctx, motif, *, cible=None):
-        """Recharger un/des pouvoirs rechargeables (COMMANDE BOT / MJ)
-
-        Args:
-            motif: ``"weekends"``, ``"forgeron"``, ``"rebouteux"``
-                ou ``"divin"`` (forcer le refill car les MJs
-                tout-puissants l'ont décidé)
-            cible: ``"all"`` ou le nom d'un joueur
-        """
-        motif = motif.lower()
-
-        if motif not in [*config.refills_full, *config.refills_one]:
-            await ctx.send(f"{motif} n'est pas un motif valide")
-            return
-
-        if motif in config.refills_divins:
-            if cible != "all":
-                target = await tools.boucle_query_joueur(ctx, cible=cible, message="Qui veux-tu recharger ?")
-                refillable = Action.query.filter(Action.charges.isnot(None)).filter_by(joueur=target).all()
-            else:
-                m = await ctx.send("Tu as choisi de recharger le pouvoir de TOUS les joueurs actifs, en es-tu sûr ?")
-                if await tools.yes_no(m):
-                    refillable = Action.query.filter(Action.charges.isnot(None)).all()
-
-                else:
-                    await ctx.send("Mission aborted.")
-                    return
-
-        else:  # refill WE, forgeron ou rebouteux
-            if cible != "all":
-                target = await tools.boucle_query_joueur(ctx, cible=cible, message="Qui veux-tu recharger ?")
-                refillable = (
-                    Action.query.filter(Action.base.has(BaseAction.refill.contains(motif)))
-                    .filter_by(joueur=target)
-                    .all()
-                )
-            else:
-                refillable = Action.query.filter(Action.base.has(BaseAction.refill.contains(motif))).all()
-
-        # do refill
-        await tools.log(refillable, code=True, prefixe=f"Refill {motif} {cible} :")
-
-        *_, msg = await tools.send_code_blocs(
-            ctx,
-            "\n".join(
-                f"{tools.emoji_chiffre(i + 1)} {action.base.slug}, " f"id = {action.id} \n"
-                for i, action in enumerate(refillable)
-            ),
-            prefixe="Action(s) répondant aux critères :\n",
-        )
-        n = 1
-        if len(refillable) > 1:
-            n = await tools.choice(msg, len(refillable))
-
-        await _do_refill(motif, refillable[n - 1])
-
-    @commands.command()
-    @tools.mjs_only
-    async def cparti(self, ctx):
-        """Lance le jeu (COMMANDE MJ)
-
-        - Programme les votes condamnés quotidiens (avec chaînage) 10h-18h
-        - Programme un vote maire 10h-18h
-        - Programme les actions au lancement du jeu (choix de mentor...)
-          et permanentes (forgeron)... à 19h
-        - Crée les "actions de vote", sans quoi !open plante
-
-        À utiliser le jour du lancement après 10h (lance les premières
-        actions le soir et les votes le lendemain)
-        """
-
-        message = await ctx.send(
-            "C'est parti ?\n"
-            "Les rôles ont bien été attribués et synchronisés ?"
-            " (si non, le faire AVANT de valider)\n\n"
-            "On est bien après 10h le jour du lancement ?\n\n"
-            "Tu es conscient que tous les joueurs reçevront à 18h55 un message"
-            " en mode « happy Hunger Games » ? (codé en dur parce que flemme)"
-        )
-        if not await tools.yes_no(message):
-            await ctx.send("Mission aborted.")
-            return
-
-        message = await ctx.send(
-            "Les actions des joueurs ont été attribuées à la synchronisation "
-            "des rôles, mais les !open n'ont aucun impact tant que tout le "
-            "monde est en `role_actif == False` sur le Tableau de bord.\n"
-            "Il faut donc **passer tout le monde à `True` maintenant**"
-            "(puis `!sync silent`) avant de continuer."
-        )
-        if not await tools.yes_no(message):
-            await ctx.send("Mission aborted.")
-            return
-
-        message = await ctx.send(
-            "Dernière chose à faire : activer le backup automatique du "
-            "Tableau de bord tous les jours. Pour ce faire, l'ouvrir et "
-            "aller dans `Extensions > Apps Script` puis dans le pannel "
-            "`Déclencheurs` à gauche (l'horloge) et cliquer sur "
-            "`Ajouter un déclencheur` en bas à droite.\n\n"
-            "Remplir les paramètres : `Backupfeuille`, `Head`, "
-            "`Déchencheur horaire`, `Quotidien`, `Entre 1h et 2h` (pas "
-            "plus tard car les votes du jour changent à 3h)."
-        )
-        if not await tools.yes_no(message):
-            await ctx.send("Mission aborted.")
-            return
-
-        taches = []
-        r = "C'est parti !\n"
-
-        n10 = tools.next_occurrence(datetime.time(hour=10))
-        n19 = tools.next_occurrence(datetime.time(hour=19))
-
-        # Programmation votes condamnés chainés 10h-18h
-        r += "\nProgrammation des votes :\n"
-        taches.append(Tache(timestamp=n10, commande="!open cond 18h 10h"))
-        r += " - À 10h : !open cond 18h 10h\n"
-
-        # Programmation votes loups chainés 19h-23h
-        taches.append(Tache(timestamp=n19, commande="!open loups 23h 19h"))
-        r += " - À 19h : !open loups 23h 19h\n"
-
-        # Programmation premier vote maire 10h-17h
-        taches.append(Tache(timestamp=n10, commande="!open maire 17h"))
-        r += " - À 10h : !open maire 17h\n"
-
-        # Programmation actions au lancement et actions permanentes
-        r += "\nProgrammation des actions start / perma :\n"
-        start_perma = Action.query.filter(
-            Action.base.has(BaseAction.trigger_debut.in_([ActionTrigger.start, ActionTrigger.perma]))
-        ).all()
-        for action in start_perma:
-            r += f" - À 19h : !open {action.id} " f"(trigger_debut == {action.base.trigger_debut})\n"
-            taches.append(Tache(timestamp=n19, commande=f"!open {action.id}", action=action))
-
-        # Programmation refill weekends
-        # r += "\nProgrammation des refills weekends :\n"
-        # ts = tools.fin_pause() - datetime.timedelta(minutes=5)
-        # taches.append(Tache(timestamp=ts,
-        #                     commande=f"!refill weekends all"))
-        # r += " - Dimanche à 18h55 : !refill weekends all\n"
-
-        # Programmation envoi d'un message aux connards
-        r += "\nEt, à 18h50 : !send all [message de hype oue oue c'est génial]\n"
-        taches.append(
-            Tache(
-                timestamp=(n19 - datetime.timedelta(minutes=10)),
-                commande=(
-                    "!send all Ah {member.mention}... J'espère que tu "
-                    "es prêt(e), parce que la partie commence DANS 10 "
-                    " MINUTES !!! https://tenor.com/view/thehungergames-"
-                    "hungergames-thggifs-effie-gif-5114734"
-                ),
+        await tools.log(f"/open {qui.name} : haros/candids wiped")
+        await config.Channel.haros.send(
+            f"{config.Emoji.void}\n" * 30
+            + "Nouveau vote, nouveaux haros !\n"
+            + tools.ital(
+                f"Les posts ci-dessus sont invalides pour le vote actuel. "
+                f"Utilisez {tools.code('/haro')} pour en relancer."
             )
         )
-        await tools.log(r, code=True)
 
-        # Drop (éventuel) et (re-)création actions de vote
-        Action.query.filter_by(base=None).delete()
-        actions = []
-        for joueur in Joueur.query.all():
-            for vote in Vote:
-                actions.append(Action(joueur=joueur, vote=vote))
+    # Programme fermeture
+    if heure:
+        ts = tools.next_occurrence(tools.heure_to_time(heure))
+        await planif_command(ts - datetime.timedelta(minutes=30), remind_vote, qui=qui)
+        if heure_chain:
+            await planif_command(ts, close_vote, qui=qui, heure=heure_chain, heure_chain=heure)
+        else:
+            await planif_command(ts, close_vote, qui=qui)
 
-        Tache.add(*taches)  # On enregistre et programme le tout !
-        Action.add(*actions)
 
-        await ctx.send(f"C'est tout bon ! (détails dans {config.Channel.logs.mention})")
+@open.command(name="actions")
+@tools.mjs_only
+@journey_command
+async def open_actions(journey: DiscordJourney, heure: str):
+    """Ouvre les actions commençant à une heure donnée (COMMANDE BOT / MJ)
 
-    @commands.command()
-    @tools.mjs_only
-    async def cfini(self, ctx):
-        """✨ Clôture le jeu (COMMANDE MJ)
+    Args:
+        heure: Heure de début des actions à lancer
 
-        Supprime toutes les tâches planifiées, ce qui stoppe de fait le jeu.
-        """
-        message = await ctx.send(
-            "C'est fini ?\nATTENTION : Confirmer supprimera TOUTES LES "
-            "TÂCHES EN ATTENTE, ce qui est compliqué à annuler !"
+    Une sécurité empêche d'ouvrir une action déjà en cours.
+
+    Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
+    Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi (penser à envoyer /
+    planifier la fermeture de l'action).
+    """
+    actions = await _get_actions("open", heure)
+
+    await journey.final_message(
+        "\n - ".join(f"{action.base.slug} - {action.joueur.nom}" for action in actions),
+        code=True,
+        prefix=f"Action(s) répondant aux critères ({len(actions)}) :",
+    )
+    for action in actions:
+        await gestion_actions.open_action(action)
+
+
+@open.command(name="action")
+@tools.mjs_only
+@journey_command
+async def open_action(journey: DiscordJourney, id: int):
+    """Lance une action donnée (COMMANDE BOT / MJ)
+
+    Args:
+        id: ID de l'action à ouvrir
+
+    Une sécurité empêche d'ouvrir une action déjà en cours.
+
+    Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
+    Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi (penser à envoyer /
+    planifier la fermeture de l'action).
+    """
+    action = await _get_action("open", id)
+    if not action:
+        await journey.final_message(f"L'action #{id} est déjà ouverte !")
+
+    await journey.final_message(f"Joueur concerné : {action.joueur}")
+    await gestion_actions.open_action(action)
+
+
+close = app_commands.Group(name="close", description="Clôturer quelque chose")
+
+
+@close.command(name="vote")
+@tools.mjs_only
+@journey_command
+async def close_vote(journey: DiscordJourney, *, qui: Vote, heure: str | None = None, heure_chain: str | None = None):
+    """Ferme un vote (COMMANDE BOT / MJ)
+
+    Args:
+        qui: Type de vote à fermer (vote pour le condamné du jour, le nouveau maire ou la victime des loups)
+        heure: Heure à laquelle programmer une prochaine ouverture du vote, optionnel (HHh / HHhMM)
+        heure_chain: Heure à laquelle programmer une re-fermeture, pour boucler à l'infini (HHh / HHhMM)
+
+    Une sécurité empêche de fermer un vote ou une action qui n'est pas en cours.
+
+    Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
+    Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi
+    (penser à envoyer / planifier la fermeture des votes, par exemple).
+
+    Examples:
+        - ``/close maire`` :        ferme le vote condamné maintenant
+        - ``/close cond 10h`` :     ferme le vote condamné maintenant et programme une prochaine ouverture à 10h00
+        - ``/close cond 10h 18h`` : ferme le vote condamné maintenant, programme une prochaine ouverture à 10h00,
+                                    qui sera fermé à 18h, puis une nouvelle ouverture à 10h, etc
+    """
+    joueurs = await _get_joueurs("close", qui)
+
+    await journey.final_message(
+        "\n - ".join(joueur.nom for joueur in joueurs),
+        code=True,
+        prefix=f"Utilisateur(s) répondant aux critères ({len(joueurs)}) :",
+    )
+
+    match qui:
+        case Vote.cond:
+            content = (
+                f"{tools.montre()}  Fin du vote pour le condamné du jour !\nVote définitif : {nom_cible}\n"
+                f"Les résultats arrivent dans l'heure !\n"
+            )
+            vote_command = "vote"
+
+        case Vote.maire:
+            content = f"{tools.montre()}  Fin du vote pour le maire ! \n" f"Vote définitif : {nom_cible}"
+            vote_command = "votemaire"
+
+        case Vote.loups:
+            content = f"{tools.montre()}  Fin du vote pour la victime du soir !" f"\nVote définitif : {nom_cible}"
+            vote_command = "voteloups"
+
+    # Activation commande de vote
+    if config.bot.tree.disable_command(vote_command):
+        await config.bot.tree.sync(guild=config.guild)
+
+    # Fermeture utilisations et envoi messages
+    for joueur in joueurs:
+        chan = joueur.private_chan
+
+        if isinstance(qui, Vote):
+            action = joueur.action_vote(qui)
+            if not action.is_open:  # Sécurité : action fermée depuis
+                continue
+            util = joueur.action_vote(qui).utilisation_ouverte
+            nom_cible = util.cible.nom if util.cible else "*non défini*"
+
+            util.close()  # update direct pour empêcher de voter
+
+        await chan.send(content)
+
+    config.session.commit()
+
+    # Actions déclenchées par fermeture
+    if isinstance(qui, Vote):
+        for action in Action.query.filter(Action.base.has(BaseAction.trigger_debut == ActionTrigger.close(qui))):
+            await gestion_actions.open_action(action)
+
+        for action in Action.query.filter(Action.base.has(BaseAction.trigger_fin == ActionTrigger.close(qui))):
+            await gestion_actions.close_action(action)
+
+    # Programme prochaine ouverture
+    if heure:
+        ts = tools.next_occurrence(tools.heure_to_time(heure))
+        if heure_chain:
+            await planif_command(ts, open_vote, qui=qui, heure=heure_chain, heure_chain=heure)
+        else:
+            await planif_command(ts, open_vote, qui=qui)
+
+
+async def _close_action(action):
+    await action.joueur.private_chan.send(
+        f"{tools.montre()}  Fin de la possibilité d'utiliser ton action {tools.code(action.base.slug)} ! \n"
+        f"Action définitive : {action.decision}"
+    )
+    await gestion_actions.close_action(action)
+
+
+@close.command(name="actions")
+@tools.mjs_only
+@journey_command
+async def close_actions(journey: DiscordJourney, heure: str):
+    """Clôture les actions terminant à une heure donnée (COMMANDE BOT / MJ)
+
+    Args:
+        heure: Heure de début des actions à clôturer
+
+    Une sécurité empêche de fermer une action déjà en cours.
+
+    Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
+    Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi (penser à envoyer /
+    planifier la fermeture de l'action).
+    """
+    actions = await _get_actions("close", heure)
+
+    await journey.final_message(
+        "\n - ".join(f"{action.base.slug} - {action.joueur.nom}" for action in actions),
+        code=True,
+        prefix=f"Action(s) répondant aux critères ({len(actions)}) :",
+    )
+    for action in actions:
+        await _close_action(action)
+
+
+@close.command(name="action")
+@tools.mjs_only
+@journey_command
+async def close_action(journey: DiscordJourney, id: int):
+    """Clôture un action (COMMANDE BOT / MJ)
+
+    Args:
+        id: ID de l'action à clôturer
+
+    Une sécurité empêche de fermer une action déjà en cours.
+
+    Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
+    Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi (penser à envoyer /
+    planifier la fermeture de l'action).
+    """
+    action = await _get_action("close", id)
+    if not action:
+        await journey.final_message(f"L'action #{id} n'est pas ouverte !")
+
+    await journey.final_message(f"Joueur concerné : {action.joueur}")
+    await _close_action(action)
+
+
+remind = app_commands.Group(name="remind", description="Rappeler quelque chose")
+
+
+@remind.command(name="vote")
+@tools.mjs_only
+@journey_command
+async def remind_vote(journey: DiscordJourney, *, qui: Vote):
+    """Envoi un rappel de vote / actions de rôle (COMMANDE BOT / MJ)
+
+    Args:
+        qui: Type de vote à rappeler (vote pour le condamné du jour, le nouveau maire ou la victime des loups)
+
+    Le bot n'envoie un message qu'aux joueurs n'ayant pas encore voté / agi,
+    si le vote ou l'action est bien en cours.
+
+    Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
+    Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi !
+
+    Example:
+        - ``!remind maire`` :       rappelle le vote maire maintenant
+    """
+    joueurs = await _get_joueurs("remind", qui)
+
+    await journey.final_message(
+        "\n - ".join(joueur.nom for joueur in joueurs),
+        code=True,
+        prefix=f"Utilisateur(s) répondant aux critères ({len(joueurs)}) :",
+    )
+
+    for joueur in joueurs:
+        match qui:
+            case Vote.cond:
+                await joueur.private_chan.send(
+                    f"⏰ {joueur.member.mention} Plus que 30 minutes pour voter pour le condamné du jour ! 😱 \n"
+                )
+            case Vote.maire:
+                await joueur.private_chan.send(
+                    f"⏰ {joueur.member.mention} Plus que 30 minutes pour élire le nouveau maire ! 😱 \n"
+                )
+            case Vote.loups:
+                await joueur.private_chan.send(
+                    f"⏰ {joueur.member.mention} Plus que 30 minutes pour voter pour la victime du soir ! 😱 \n"
+                )
+
+
+async def _remind_action(action):
+    return await action.joueur.private_chan.send(
+        f"⏰ {action.joueur.member.mention} Plus que 30 minutes pour utiliser ton action "
+        f"{tools.code(action.base.slug)} ! 😱 \n"
+    )
+
+
+@remind.command(name="actions")
+@tools.mjs_only
+@journey_command
+async def remind_actions(journey: DiscordJourney, heure: str):
+    """Rappelle d'utiliser les actions terminant à une heure donnée (COMMANDE BOT / MJ)
+
+    Args:
+        heure: Heure de début des actions à rappeler
+
+    Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
+    Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi !
+    """
+    actions = await _get_actions("remind", heure)
+
+    await journey.final_message(
+        "\n - ".join(f"{action.base.slug} - {action.joueur.nom}" for action in actions),
+        code=True,
+        prefix=f"Action(s) répondant aux critères ({len(actions)}) :",
+    )
+    for action in actions:
+        await _remind_action(action)
+
+
+@remind.command(name="action")
+@tools.mjs_only
+@journey_command
+async def remind_action(journey: DiscordJourney, id: int):
+    """Rappelle d'utiliser une action précise (COMMANDE BOT / MJ)
+
+    Args:
+        id: ID de l'action à rappeler
+
+    Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
+    Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi !
+    """
+    action = await _get_action("remind", id)
+    if not action:
+        await journey.final_message(f"L'action #{id} n'est pas ouverte !")
+
+    await journey.final_message(f"Joueur concerné : {action.joueur}")
+    await _remind_action(action)
+
+
+RefillMotif = enum.Enum("RefillMotif", config.refills_full + config.refills_one)
+
+
+@app_commands.command()
+@tools.mjs_only
+@journey_command
+async def refill(
+    journey: DiscordJourney,
+    motif: RefillMotif,
+    *,
+    joueur: app_commands.Transform[Joueur, tools.VivantTransformer] | None = None,
+):
+    """Recharger un/des pouvoirs rechargeables (COMMANDE BOT / MJ)
+
+    Args:
+        motif: Raison de rechargement (divin = forcer le refill car les MJs tout-puissants l'ont décidé)
+        joueur: Si omis, recharge TOUS les joueurs
+    """
+    motif: str = motif.name
+
+    if motif in config.refills_divins:
+        query = Action.query.filter(Action.active == True, Action.charges != None)
+    else:
+        query = Action.query.join(Action.base).filter(Action.active == True, BaseAction.refill.contains(motif))
+
+    if joueur:
+        query = query.filter(Action.joueur == joueur)
+    await journey.ok_cancel("Tu as choisi de recharger le pouvoir de TOUS les joueurs actifs, en es-tu sûr ?")
+
+    # do refill
+    refillable = query.all()
+    await tools.log(refillable, code=True, prefixe=f"Refill {motif} {joueur.nom if joueur else 'ALL'} :")
+
+    if joueur and len(refillable) > 1:
+        action = await journey.select(
+            "Action(s) répondant aux critères :",
+            {action: f"{action.base.slug}, id = {action.id} \n" for action in refillable},
+            placeholder="Choisir l'action à recharger",
         )
-        if not await tools.yes_no(message):
-            await ctx.send("Mission aborted.")
-            return
+        refillable = [action]
 
-        await ctx.send("Suppression des tâches...")
-        async with ctx.typing():
-            taches = Tache.query.all()
-            Tache.delete(*taches)  # On supprime et déprogramme le tout !
+    for action in refillable:
+        await _do_refill(motif, action)
+    await journey.final_message("Fait.")
 
-        await ctx.send(
-            "C'est tout bon !\n"
-            "Dernière chose : penser à désactiver le backup automatique du "
-            "Tableau de bord !. Pour ce faire, l'ouvrir et "
-            "aller dans `Extensions > Apps Script` puis dans le pannel "
-            "`Déclencheurs` à gauche (l'horloge) et cliquer sur "
-            "les trois points à droite du déclencheur > Supprimer."
-        )
+
+@app_commands.command()
+@tools.mjs_only
+@journey_command
+async def cparti(journey: DiscordJourney):
+    """Lance le jeu (COMMANDE MJ)
+
+    - Programme les votes condamnés quotidiens (avec chaînage) 10h-18h
+    - Programme un vote maire 10h-18h
+    - Programme les actions au lancement du jeu (choix de mentor...) et permanentes (forgeron)... à 19h
+    - Crée les "actions de vote", sans quoi /open plante
+
+    À utiliser le jour du lancement après 10h (lance les premières actions le soir et les votes le lendemain)
+    """
+    await journey.ok_cancel(
+        "C'est parti ?\n"
+        "Les rôles ont bien été attribués et synchronisés ? (si non, le faire AVANT de valider)\n\n"
+        "On est bien après 10h le jour du lancement ?\n\n"
+        "Tu es conscient que tous les joueurs recevront à 18h55 un message "
+        "en mode « happy Hunger Games » ? (codé en dur parce que flemme)"
+    )
+    await journey.ok_cancel(
+        "Les actions des joueurs ont été attribuées à la synchronisation des rôles, mais les /open "
+        "n'ont aucun impact tant que tout le monde est en `role_actif == False` sur le Tableau de bord.\n"
+        "Il faut donc **passer tout le monde à `True` maintenant** (puis `/sync silent`) avant de continuer."
+    )
+    await journey.ok_cancel(
+        "Dernière chose à faire : activer le backup automatique du Tableau de bord tous les jours. "
+        "Pour ce faire, l'ouvrir et aller dans `Extensions > Apps Script` puis dans le panel "
+        "`Déclencheurs` à gauche (l'horloge) et cliquer sur `Ajouter un déclencheur` en bas à droite.\n\n"
+        "Remplir les paramètres : `Backupfeuille`, `Head`, `Déclencheur horaire`, `Quotidien`, `Entre 1h et 2h` "
+        "(pas plus tard car les votes du jour changent à 3h)."
+    )
+
+    taches = []
+    r = "C'est parti !\n"
+
+    n10 = tools.next_occurrence(datetime.time(hour=10))
+    n19 = tools.next_occurrence(datetime.time(hour=19))
+
+    # Programmation votes condamnés chainés 10h-18h
+    r += "\nProgrammation des votes :\n"
+    await planif_command(n10, open_vote, qui=Vote.cond, heure="18h", heure_chain="10h")
+    r += " - À 10h : /open cond 18h 10h\n"
+
+    # Programmation votes loups chainés 19h-23h
+    await planif_command(n19, open_vote, qui=Vote.loups, heure="23h", heure_chain="19h")
+    r += " - À 19h : /open loups 23h 19h\n"
+
+    # Programmation premier vote maire 10h-17h
+    await planif_command(n10, open_vote, qui=Vote.maire, heure="17h")
+    r += " - À 10h : /open maire 17h\n"
+
+    # Programmation actions au lancement et actions permanentes
+    r += "\nProgrammation des actions start / perma :\n"
+    start_perma = Action.query.filter(
+        Action.base.has(BaseAction.trigger_debut.in_([ActionTrigger.start, ActionTrigger.perma]))
+    ).all()
+    for action in start_perma:
+        r += f" - À 19h : /open {action.id} " f"(trigger_debut == {action.base.trigger_debut})\n"
+        await planif_command(n19, open_action, id=action.id)
+
+    # Programmation envoi d'un message aux connards
+    r += "\nEt, à 18h50 : /send all [message de hype oue oue c'est génial]\n"
+    await planif_command(
+        n19 - datetime.timedelta(minutes=10),
+        communication.send,
+        cible="all",
+        message=(
+            "Ah {member.mention}... J'espère que tu es prêt(e), parce que la partie commence DANS 10 MINUTES !!!"
+            "https://tenor.com/view/thehungergames-hungergames-thggifs-effie-gif-5114734"
+        ),
+    )
+    await tools.log(r, code=True)
+
+    # Drop (éventuel) et (re-)création actions de vote
+    Action.query.filter_by(base=None).delete()
+    actions = []
+    for joueur in Joueur.query.all():
+        for vote in Vote:
+            actions.append(Action(joueur=joueur, vote=vote))
+
+    Action.add(*actions)
+
+    await journey.final_message(f"C'est tout bon ! (détails dans {config.Channel.logs.mention})")
+
+
+@app_commands.command()
+@tools.mjs_only
+@journey_command
+async def cfini(journey: DiscordJourney):
+    """✨ Clôture le jeu (COMMANDE MJ)
+
+    Supprime toutes les tâches planifiées, ce qui stoppe de fait le jeu.
+    """
+    await journey.ok_cancel(
+        "C'est fini ?\n"
+        "ATTENTION : Confirmer supprimera TOUTES LES TÂCHES EN ATTENTE, ce qui est compliqué à annuler !"
+    )
+
+    await journey.final_message("Suppression des tâches...")
+    async with journey.channel.typing():
+        taches = Tache.query.all()
+        Tache.delete(*taches)  # On supprime et déprogramme le tout !
+
+    await journey.final_message(
+        "C'est tout bon !\n"
+        "Dernière chose : penser à désactiver le backup automatique du Tableau de bord !. "
+        "Pour ce faire, l'ouvrir et aller dans `Extensions > Apps Script` puis dans le panel "
+        "`Déclencheurs` à gauche (l'horloge) et cliquer sur les trois points à droite du déclencheur > Supprimer."
+    )

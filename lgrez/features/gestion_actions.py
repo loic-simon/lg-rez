@@ -6,16 +6,14 @@ Liste, création, suppression, ouverture, fermeture d'actions
 
 import datetime
 
-from discord.ext import commands
-
-from lgrez import config
+from lgrez import config, commons
 from lgrez.blocs import tools
 from lgrez.bdd import Action, BaseAction, Tache, Utilisation, ActionTrigger, Joueur
 
 
 def add_action(
     joueur: Joueur, base: BaseAction, cooldown: int = 0, charges: int | None = None, active: bool = True
-) -> None:
+) -> Action:
     """Enregistre une action et programme son ouverture le cas échéant.
 
     Si une action existe déjà pour ce joueur et cette base, la modifie ;
@@ -45,6 +43,8 @@ def add_action(
         # Perma : ON LANCE DIRECT (sera repoussé si jeu fermé)
         Tache(timestamp=datetime.datetime.now(), commande=f"!open {action.id}", action=action).add()
 
+    return action
+
 
 def delete_action(action: Action) -> None:
     """Archive une action et annule les tâches en cours liées.
@@ -71,13 +71,11 @@ async def open_action(action: Action) -> None:
     """Ouvre l'action.
 
     Args:
-        action : l'action à ouvrir.
+        action: l'action à ouvrir.
 
     Opérations réalisées :
-        - Vérification des conditions (cooldown, charges...) et
-          reprogrammation si nécessaire ;
-        - Gestion des tâches planifiées (planifie remind/close si
-          applicable) ;
+        - Vérification des conditions (cooldown, charges...) et reprogrammation si nécessaire ;
+        - Gestion des tâches planifiées (planifie remind/close si applicable) ;
         - Information du joueur.
     """
     joueur = action.joueur
@@ -124,10 +122,8 @@ async def open_action(action: Action) -> None:
     if action.base.trigger_fin == ActionTrigger.auto:
         if action.base.trigger_debut == ActionTrigger.temporel:
             await tools.log(
-                f"Action {action.base.slug} pour {joueur.nom} pas vraiment "
-                f"automatique, {config.Role.mj.mention} VENEZ M'AIDER "
-                "JE PANIQUE 😱 (comme je suis vraiment sympa je vous "
-                f"file son chan, {chan.mention})"
+                f"Action {action.base.slug} pour {joueur.nom} pas vraiment automatique, {config.Role.mj.mention} "
+                f"VENEZ M'AIDER JE PANIQUE 😱 (comme je suis vraiment sympa je vous file son chan, {chan.mention})"
             )
         else:
             await tools.log(f"{action} : automatique, appel processus de clôture")
@@ -166,10 +162,9 @@ async def open_action(action: Action) -> None:
 
     # Information du joueur
     if action.is_open:  # déjà ouverte
-        message = await chan.send(
-            f"{tools.montre()}  Rappel : tu peux utiliser quand tu le "
-            f"souhaites ton action {tools.code(action.base.slug)} ! "
-            f" {config.Emoji.action} \n"
+        await chan.send(
+            f"{tools.montre()}  Rappel : tu peux utiliser quand tu le souhaites "
+            f"ton action {tools.code(action.base.slug)} !  {config.Emoji.action}\n"
             + (f"Tu as jusqu'à {heure_fin} pour le faire. \n" if heure_fin else "")
             + tools.ital(f"Tape {tools.code('!action (ce que tu veux faire)')} ou utilise la réaction pour agir.")
         )
@@ -178,14 +173,12 @@ async def open_action(action: Action) -> None:
         util = Utilisation(action=action)
         util.add()
         util.open()
-        message = await chan.send(
+        await chan.send(
             f"{tools.montre()}  Tu peux maintenant utiliser ton action "
-            f"{tools.code(action.base.slug)} !  {config.Emoji.action} \n"
+            f"{tools.code(action.base.slug)} !  {config.Emoji.action}\n"
             + (f"Tu as jusqu'à {heure_fin} pour le faire. \n" if heure_fin else "")
             + tools.ital(f"Tape {tools.code('!action (ce que tu veux faire)')} ou utilise la réaction pour agir.")
         )
-
-    await message.add_reaction(config.Emoji.action)
 
     config.session.commit()
 
@@ -198,8 +191,7 @@ async def close_action(action: Action) -> None:
 
     Opérations réalisées :
         - Archivage si nécessaire ;
-        - Gestion des tâches planifiées (planifie prochaine ouverture
-          si applicable) ;
+        - Gestion des tâches planifiées (planifie prochaine ouverture si applicable) ;
         - Information du joueur (si charge-- seulement).
     """
     joueur = action.joueur
@@ -277,11 +269,11 @@ def get_actions(quoi: str, trigger: ActionTrigger, heure: datetime.time | None =
     elif quoi == "remind":
         criteres &= Action.base.has(trigger_fin=trigger) & Action.is_waiting
     else:
-        raise commands.UserInputError(f"bad value for quoi: '{quoi}'")
+        raise commons.UserInputError("quoi", f"bad value: '{quoi}'")
 
     if trigger == ActionTrigger.temporel:
         if not heure:
-            raise commands.UserInputError("merci de préciser une heure")
+            raise commons.UserInputError("quand", "merci de préciser une heure")
 
         if quoi == "open":
             criteres &= Action.base.has(heure_debut=heure)

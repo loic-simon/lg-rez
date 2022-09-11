@@ -10,6 +10,7 @@ import asyncio
 import datetime
 import typing
 
+import discord
 import sqlalchemy
 from sqlalchemy.ext.hybrid import hybrid_property
 
@@ -19,7 +20,27 @@ from lgrez.bdd.base import autodoc_Column, autodoc_ManyToOne, autodoc_OneToMany,
 from lgrez.bdd.enums import UtilEtat, CibleType, Vote
 
 
-# Tables de données
+class _FakeInteraction(discord.Interaction):
+    __slots__ = discord.Interaction.__slots__
+
+    class _FakeInteractionResponse:
+        def is_done(self):
+            return True
+
+    class _FakeInteractionFollowup:
+        def __init__(self, message: discord.Message) -> None:
+            self.send = message.reply
+
+    def __init__(self, message: discord.Message):
+        self._original_response = message
+        self.user = message.author
+        self._cs_channel = message.channel
+        self._cs_response = self._FakeInteractionResponse()
+        self._cs_followup = self._FakeInteractionFollowup(message)
+
+    @property
+    def created_at(self):
+        return self._original_response.created_at
 
 
 class Action(base.TableBase):
@@ -535,6 +556,8 @@ class Tache(base.TableBase):
     et supprimées via :func:`.delete`.
     """
 
+    _tasks = set()
+
     id: int = autodoc_Column(
         sqlalchemy.Integer(),
         primary_key=True,
@@ -548,6 +571,11 @@ class Tache(base.TableBase):
     commande: str = autodoc_Column(
         sqlalchemy.String(2000),
         nullable=False,
+        doc="Texte à envoyer via le webhook (généralement une commande)",
+    )
+    parameters: dict | None = autodoc_Column(
+        sqlalchemy.JSON(),
+        nullable=True,
         doc="Texte à envoyer via le webhook (généralement une commande)",
     )
 
@@ -564,7 +592,14 @@ class Tache(base.TableBase):
 
     def __repr__(self) -> str:
         """Return repr(self)."""
-        return f"<Tache #{self.id} ({self.commande})>"
+        return f"<Tache #{self.id} ({self.description})>"
+
+    @property
+    def description(self) -> str:
+        command_descr = f"/{self.commande}"
+        if self.parameters:
+            command_descr += " " + " ".join(str(param) for param in self.parameters.values())
+        return command_descr
 
     @property
     def handler(self) -> asyncio.TimerHandle:
@@ -594,7 +629,7 @@ class Tache(base.TableBase):
         except KeyError:
             pass
 
-    async def send_webhook(self, tries: int = 0) -> None:
+    async def invoke_command(self, tries: int = 0) -> None:
         """Exécute la tâche (coroutine programmée par :meth:`execute`).
 
         Envoie un webhook (:obj:`.config.webhook`) de contenu
@@ -611,40 +646,48 @@ class Tache(base.TableBase):
             tries: Numéro de l'essai d'envoi actuellement en cours.
         """
         try:
-            await config.webhook.send(self.commande)
+            message = await config.Channel.logs.send(f"⏰ `#{self.id}` :arrow_forward: `{self.description}`")
+            command = config.bot.tree.get_command_by_name(self.commande)
+            if not command:
+                await message.reply(
+                    f"{config.Role.mj.mention} ALERT: commande inconnue ou désactivée : `{self.commande}`"
+                )
+                return
+            interaction = _FakeInteraction(message)
+            await command.callback(interaction, **self.parameters or {})
+
         except Exception as exc:
             if tries < 5:
                 # On réessaie
-                config.loop.call_later(2, self.execute, tries + 1)
+                asyncio.get_running_loop().call_later(2, self.execute, tries + 1)
             else:
                 await config.Channel.logs.send(
-                    f"{config.Role.mj.mention} ALERT: impossible  "
-                    f"d'envoyer un webhook (5 essais, erreur : "
-                    f"```{type(exc).__name__}: {exc})```\n"
-                    f"Commande non envoyée : `{self.commande}`"
+                    f"{config.Role.mj.mention} ALERT: impossible d'exécuter la tâche programmée "
+                    f"(5 essais, erreur : ```{type(exc).__name__}: {exc})```\n"
+                    f"Commande non envoyée : `{self.description}`"
                 )
         else:
             self.delete()
 
     def execute(self, tries: int = 0) -> None:
-        """Exécute la tâche planifiée (méthode appellée par la loop).
+        """Exécute la tâche planifiée (méthode appelée par la loop).
 
-        Programme :meth:`send_webhook` pour exécution immédiate.
+        Programme :meth:`invoke_command` pour exécution immédiate.
 
         Args:
             tries: Numéro de l'essai d'envoi actuellement en cours,
-                passé à :meth:`send_webhook`.
+                passé à :meth:`invoke_command`.
         """
-        asyncio.create_task(self.send_webhook(tries=tries))
-        # programme la coroutine pour exécution immédiate
+        task = asyncio.create_task(self.invoke_command(tries=tries))  # Programme la coroutine pour exécution immédiate
+        self._tasks.add(task)  # Cf. https://docs.python.org/fr/3/library/asyncio-task.html#asyncio.create_task
+        task.add_done_callback(self._tasks.discard)
 
     def register(self) -> None:
-        """Programme l'exécution de la tâche dans la loop du bot."""
+        """Programme l'exécution de la tâche dans la boucle d'événements du bot."""
         now = datetime.datetime.now()
         delay = (self.timestamp - now).total_seconds()
-        TH = config.loop.call_later(delay, self.execute)
-        # Programme la tâche (appellera tache.execute() à timestamp)
-        self.handler = TH  # TimerHandle, pour pouvoir cancel
+        handler = asyncio.get_running_loop().call_later(delay, self.execute)
+        self.handler = handler  # TimerHandle, pour pouvoir cancel
 
     def cancel(self) -> None:
         """Annule et nettoie la tâche planifiée (sans la supprimer en base).
@@ -652,9 +695,8 @@ class Tache(base.TableBase):
         Si la tâche a déjà été exécutée, ne fait que nettoyer le handler.
         """
         try:
-            self.handler.cancel()  # Annule la task (objet TimerHandle)
-            # (pas d'effet si la tâche a déjà été exécutée)
-        except RuntimeError:  # Tache non enregistrée
+            self.handler.cancel()  # Annule la tâche, pas d'effet si elle a déjà été exécutée
+        except RuntimeError:  # Tâche non enregistrée
             pass
         else:
             del self.handler

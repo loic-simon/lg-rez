@@ -15,6 +15,7 @@ import discord
 
 from lgrez import config
 from lgrez.blocs import tools
+from lgrez.blocs.journey import DiscordJourney
 
 
 def _py_bloc(data):
@@ -64,8 +65,8 @@ class RealShell(asyncode.AsyncInteractiveConsole):
     (subclass of :class:`asyncode.AsyncInteractiveConsole`)
 
     Args:
-        channel: Chan in which run the shell (show and wait for commands).
-            While the shell is running, every message in this channel will
+        journey: Chan in which run the shell (show and wait for commands).
+            While the shell is running, every message in this journey will
             be interpreted and deleted by this shell.
         locals, filename: passed to
             :class:`asyncode.AsyncInteractiveConsole`.
@@ -73,15 +74,15 @@ class RealShell(asyncode.AsyncInteractiveConsole):
 
     def __init__(
         self,
-        channel: discord.TextChannel,
+        journey: DiscordJourney,
         locals: dict = {},
         filename: str = "!shell",
     ) -> None:
         """Initialize self"""
         self.bot = config.bot
-        self.channel = channel
+        self.journey = journey
 
-        self.message = None
+        self.message: discord.Message = None
         self.content = ""
         self.indent = 0
         self.rsbuffer = ""
@@ -99,21 +100,18 @@ class RealShell(asyncode.AsyncInteractiveConsole):
         (see :meth:`asyncode.AsyncInteractiveConsole.interact`)
         """
         wait = _py_bloc("Launching Python shell...\n")
-        self.message = await self.channel.send(wait)
+        *_, self.message = await self.journey.final_message(wait)
 
         if banner is None:
             base = (
-                'Type "help", "copyright", "credits" or "license" for '
-                'more information.\nasync REPL: use "await" directly '
-                "instead of asyncio.run().\n"
+                '# Type "help", "copyright", "credits" or "license" for more information.\n'
+                '# async REPL: use "await" directly instead of asyncio.run().\n'
             )
             dsc = (
-                f"Discord implementation: the caret (‸) "
-                "indicates the current position of the cursor.\n"
-                'Use control reactions or send "<", ">", "=" to '
-                "(un)indent it and send empty lines."
+                f"# Discord implementation: the caret (‸) indicates the current position of the cursor.\n"
+                '# Use control buttons or send "<", ">", "=" to (un)indent it and send empty lines.'
             )
-            banner = f"Python {sys.version} on {sys.platform}\n{base}\n{dsc}\n"
+            banner = f"# Python {sys.version} on {sys.platform}\n{base}\n{dsc}\n"
 
         try:
             await super().interact(banner, exitmsg)
@@ -209,18 +207,16 @@ class RealShell(asyncode.AsyncInteractiveConsole):
         if res:  # Réaction anticipée, control effectué
             return res[1]
 
-        def react_check(payload):
+        def react_check(payload: discord.RawReactionActionEvent):
             # Check REACT : bon message et pas react du bot
             return payload.message_id == self.message.id and payload.user_id != self.bot.user.id
 
-        def message_check(mess):
+        def message_check(mess: discord.Message):
             # Check MESSAGE : bon channel et pas du bot
-            return mess.channel == self.channel and mess.author != self.bot.user
+            return mess.channel == self.journey.channel and mess.author != self.bot.user
 
         react_task = asyncio.create_task(self.bot.wait_for("raw_reaction_add", check=react_check))
-        mess_task = asyncio.create_task(
-            tools.wait_for_message(check=message_check, chan=self.channel, trigger_on_commands=True)
-        )
+        mess_task = asyncio.create_task(tools.wait_for_message(check=message_check, chan=self.journey.channel))
         # On exécute les deux tâche concurremment
         done, pending = await asyncio.wait({react_task, mess_task}, return_when=asyncio.FIRST_COMPLETED)
 
@@ -309,7 +305,7 @@ class RealShell(asyncode.AsyncInteractiveConsole):
             blocs[-1] += insert
 
             for bloc in blocs:
-                message = await self.channel.send(_py_bloc(bloc))
+                message = await self.journey.final_message(_py_bloc(bloc))
 
             # On modifie le message actuel = dernier envoyé
             self.message = message

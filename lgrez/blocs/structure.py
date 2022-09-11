@@ -220,7 +220,6 @@ def check_server_structure(
                 "all_channel",
                 "general",
                 "membership",
-                "none",
                 "stage",
                 "stage_moderator",
                 "text",

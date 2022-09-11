@@ -5,11 +5,13 @@ actions, les joueurs en vie et morts...
 
 """
 
-from discord.ext import commands
+import discord
+from discord import app_commands
 
 from lgrez import config
-from lgrez.blocs import tools
-from lgrez.bdd import Joueur, Role, Camp, Action, BaseAction, ActionTrigger, Vote
+from lgrez.blocs import tools, env
+from lgrez.bdd import Joueur, Role, Camp, BaseAction, ActionTrigger, Vote
+from lgrez.blocs.journey import DiscordJourney, journey_command
 from lgrez.features import gestion_actions
 
 
@@ -21,378 +23,335 @@ def _roles_list(roles: list[Role]) -> str:
     )
 
 
-class Informations(commands.Cog):
-    """Commandes pour en savoir plus sur soi et les autres"""
+DESCRIPTION = """Commandes pour en savoir plus sur soi et les autres"""
 
-    @commands.command(aliases=["role", "rôles", "rôle"])
-    async def roles(self, ctx, *, role=None):
-        """Affiche la liste des rôles / des informations sur un rôle
 
-        Args:
-            role: le nom d'un rôle, pour les informations sur ce rôle.
+@app_commands.command()
+@journey_command
+async def roles(journey: DiscordJourney, *, role: app_commands.Transform[Role, tools.RoleTransformer] | None = None):
+    """Affiche la liste des rôles / des informations sur un rôle
 
-        Sans argument, liste tous les rôles existants.
-        Voir aussi la commande `!camps`.
-        """
-        if role:
-            role = tools.remove_accents(role.lower())
-            role = role.strip("<>[](){}")
+    Args:
+        role: Le rôle pour lequel avoir les informations détaillées
 
-        if not role:
-            roles = Role.query.filter_by(actif=True).order_by(Role.nom).all()
-        else:
-            roles = Role.find_nearest(role, col=Role.nom)
-            if not roles:
-                await ctx.send(f'Rôle "{role}" non trouvé.')
-                return
+    Sans argument, liste tous les rôles existants.
+    Voir aussi la commande `/camps`.
+    """
+    if role:
+        await journey.final_message(embed=role.embed)
+        return
 
-            await ctx.send(embed=roles[0][0].embed)
-            return
+    roles = Role.query.filter_by(actif=True).order_by(Role.nom).all()
+    await journey.final_message(
+        f"Rôles trouvés :\n{_roles_list(roles)}\n"
+        + tools.ital(f"({tools.code('/role <role>')} pour plus d'informations sur un rôle.)"),
+    )
 
-        await tools.send_blocs(
-            ctx,
-            f"Rôles trouvés :\n{_roles_list(roles)}"
-            + "\n"
-            + tools.ital(f"({tools.code('!role <role>')} pour plus d'informations sur un rôle.)"),
+
+@app_commands.command()
+@journey_command
+async def camps(journey: DiscordJourney, *, camp: app_commands.Transform[Camp, tools.CampTransformer] | None = None):
+    """Affiche la liste des camps / les rôles d'un camp
+
+    Args:
+        camp: Le camp pour lequel avoir les informations détaillées et la liste des rôles
+
+    Sans argument, liste tous les camps existants.
+    Voir aussi la commande `/roles`.
+    """
+    if camp:
+        await journey.final_message(embed=camp.embed)
+        await journey.final_message(
+            f"Rôles dans ce camp :\n{_roles_list(camp.roles)}\n"
+            + tools.ital(f"({tools.code('/roles <role>')} pour plus d'informations sur un rôle.)"),
+        )
+        return
+
+    camps = Camp.query.filter_by(public=True).order_by(Camp.nom).all()
+    await journey.final_message(
+        "Camps trouvés :\n"
+        + "\n".join(f"{camp.discord_emoji_or_none or ''} {camp.nom}" for camp in camps if not camp.nom.startswith("("))
+        + "\n"
+        + tools.ital(f"({tools.code('/camps <camp>')} pour plus d'informations sur un camp.)"),
+    )
+
+
+@app_commands.command()
+@tools.mjs_only
+@journey_command
+async def rolede(journey: DiscordJourney, *, joueur: app_commands.Transform[Joueur, tools.JoueurTransformer]):
+    """Donne le rôle d'un joueur (COMMANDE MJ)
+
+    Args:
+        joueur: Le joueur dont on veut connaître le rôle
+    """
+    await journey.final_message(f"Rôle de {joueur.nom} : {joueur.role.nom_complet}")
+
+
+@app_commands.command()
+@tools.mjs_only
+@journey_command
+async def quiest(journey: DiscordJourney, *, role: app_commands.Transform[Role, tools.RoleTransformer]):
+    """Liste les joueurs ayant un rôle donné (COMMANDE MJ)
+
+    Args:
+        role: Le rôle qu'on cherche
+    """
+    joueurs = Joueur.query.filter_by(role=role).filter(Joueur.est_vivant).all()
+    if joueurs:
+        await journey.final_message(f"{role.nom_complet} : " + ", ".join(joueur.nom for joueur in joueurs))
+    else:
+        await journey.final_message(f"{role.nom_complet} : Personne.")
+
+
+@app_commands.command()
+@tools.vivants_only
+@tools.private()
+@journey_command
+async def menu(journey: DiscordJourney):
+    """Affiche des informations et boutons sur les votes / actions en cours
+
+    Le menu a une place beaucoup moins importante ici que sur Messenger, vu que tout est accessible par commandes.
+    """
+    joueur = Joueur.from_member(journey.member)
+
+    rep = ""
+
+    try:
+        vaction = joueur.action_vote(Vote.cond)
+    except RuntimeError:
+        await journey.final_message("Minute papillon, le jeu n'est pas encore lancé !")
+        return
+
+    if vaction.is_open:
+        rep += (
+            f" - {config.Emoji.bucher}  Vote pour le bûcher en cours – vote actuel : {tools.code(vaction.decision)} "
+            f":arrow_forward: Tape `/vote` pour voter\n"
         )
 
-    @commands.command(aliases=["camp"])
-    async def camps(self, ctx, *, camp=None):
-        """Affiche la liste des camps / les rôles d'un camp
-
-        Args:
-            camp: le nom d'un camp, pour les informations sur ce camp.
-
-        Sans argument, liste tous les camps existants.
-        Voir aussi la commande `!role`.
-        """
-        if camp:
-            camp = tools.remove_accents(camp.lower())
-            camp = camp.strip("<>[](){}")
-
-        if not camp:
-            camps = Camp.query.filter_by(public=True).order_by(Camp.nom).all()
-        else:
-            camps = Camp.find_nearest(camp, col=Camp.nom)
-            if not camps:
-                await ctx.send(f'Camp "{camp}" non trouvé.')
-                return
-
-            await ctx.send(embed=camps[0][0].embed)
-            await tools.send_blocs(
-                ctx,
-                f"Rôles dans ce camp :\n{_roles_list(camps[0][0].roles)}"
-                + "\n"
-                + tools.ital(f"({tools.code('!role <role>')} pour plus d'informations sur un rôle.)"),
-            )
-            return
-
-        await tools.send_blocs(
-            ctx,
-            "Camps trouvés :\n"
-            + "\n".join(
-                f"{camp.discord_emoji_or_none or ''} {camp.nom}" for camp in camps if not camp.nom.startswith("(")
-            )
-            + "\n"
-            + tools.ital(f"({tools.code('!camp <camp>')} pour plus d'informations sur un camp.)"),
+    vaction = joueur.action_vote(Vote.maire)
+    if vaction.is_open:
+        rep += (
+            f" - {config.Emoji.maire}  Vote pour le maire en cours – vote actuel : {tools.code(vaction.decision)} "
+            f":arrow_forward: Tape `/votemaire` pour voter\n"
         )
 
-    @commands.command()
-    @tools.mjs_only
-    async def rolede(self, ctx, *, cible=None):
-        """Donne le rôle d'un joueur (COMMANDE MJ)
-
-        Args:
-            cible: le joueur dont on veut connaître le rôle
-        """
-        joueur = await tools.boucle_query_joueur(ctx, cible, "Qui ?")
-        if joueur:
-            await ctx.send(joueur.role.nom_complet)
-
-    @commands.command()
-    @tools.mjs_only
-    async def quiest(self, ctx, *, nomrole):
-        """Liste les joueurs ayant un rôle donné (COMMANDE MJ)
-
-        Args:
-            nomrole: le rôle qu'on cherche (doit être un slug ou un nom
-                de rôle valide)
-        """
-        roles = Role.find_nearest(nomrole)
-        if roles:
-            role = roles[0][0]
-        else:
-            roles = Role.find_nearest(nomrole, col=Role.nom)
-            if roles:
-                role = roles[0][0]
-            else:
-                await ctx.send("Connais pas")
-                return
-
-        joueurs = Joueur.query.filter_by(role=role).filter(Joueur.est_vivant).all()
-        await ctx.send(
-            f"{role.nom_complet} : " + (", ".join(joueur.nom for joueur in joueurs) if joueurs else "Personne.")
+    vaction = joueur.action_vote(Vote.loups)
+    if vaction.is_open:
+        rep += (
+            f" - {config.Emoji.lune}  Vote des loups en cours – vote actuel : {tools.code(vaction.decision)} "
+            f":arrow_forward: Tape `/voteloups` pour voter\n"
         )
 
-    @commands.command()
-    @tools.vivants_only
-    @tools.private
-    async def menu(self, ctx):
-        """Affiche des informations et boutons sur les votes / actions en cours
+    if not rep:
+        rep = "Aucun vote en cours.\n"
 
-        Le menu a une place beaucoup moins importante ici que sur
-        Messenger, vu que tout est accessible par commandes.
-        """
-        member = ctx.author
-        joueur = Joueur.from_member(member)
-
-        reacts = []
-        r = "––– MENU –––\n\n"
-
-        try:
-            vaction = joueur.action_vote(Vote.cond)
-        except RuntimeError:
-            await ctx.send("Minute papillon, le jeu n'est pas encore lancé !")
-            return
-
-        if vaction.is_open:
-            r += (
-                f" - {config.Emoji.bucher}  Vote pour le bûcher en cours – "
-                f"vote actuel : {tools.code(vaction.decision)}\n"
+    actions = [ac for ac in joueur.actions_actives if ac.is_open]
+    if actions:
+        for action in actions:
+            rep += (
+                f" - {config.Emoji.action}  Action en cours : {tools.code(action.base.slug)} (id {action.id})"
+                f" – décision : {tools.code(action.decision)} :arrow_forward: Tape `/action` pour agir\n"
             )
-            reacts.append(config.Emoji.bucher)
+    else:
+        rep += "Aucune action en cours.\n"
 
-        vaction = joueur.action_vote(Vote.maire)
-        if vaction.is_open:
-            r += (
-                f" - {config.Emoji.maire}  Vote pour le maire en cours – "
-                f"vote actuel : {tools.code(vaction.decision)}\n"
-            )
-            reacts.append(config.Emoji.maire)
+    await journey.final_message(
+        f"––– MENU –––\n\n{rep}\n`/infos` pour voir ton rôle et tes actions, `@MJ` en cas de problème"
+    )
 
-        vaction = joueur.action_vote(Vote.loups)
-        if vaction.is_open:
-            r += f" - {config.Emoji.lune}  Vote des loups en cours – " f"vote actuel : {tools.code(vaction.decision)}\n"
-            reacts.append(config.Emoji.lune)
 
-        if not reacts:
-            r += "Aucun vote en cours.\n"
+@app_commands.command()
+@tools.vivants_only
+@tools.private()
+@journey_command
+async def infos(journey: DiscordJourney):
+    """Affiche tes informations de rôle / actions
 
-        actions = [ac for ac in joueur.actions_actives if ac.is_open]
-        if actions:
-            for action in actions:
-                r += (
-                    f" - {config.Emoji.action}  Action en cours : "
-                    f"{tools.code(action.base.slug)} (id {action.id}) – "
-                    f"décision : {tools.code(action.decision)}\n"
-                )
-            reacts.append(config.Emoji.action)
-        else:
-            r += "Aucune action en cours.\n"
+    Toutes les actions liées à ton rôle (et parfois d'autres) sont indiquées,
+    même celles que tu ne peux pas utiliser pour l'instant (plus de charges, déclenchées automatiquement...)
+    """
+    joueur = Joueur.from_member(journey.member)
+    rep = ""
 
-        message = await ctx.send(
-            r + f"\n{tools.code('!infos')} pour voir ton rôle et tes "
-            f"actions, {tools.code('@MJ')} en cas de problème"
-        )
-        for react in reacts:
-            await message.add_reaction(react)
+    rep += f"Ton rôle actuel : {tools.bold(joueur.role.nom_complet)}\n"
+    rep += tools.ital(f"({tools.code(f'/roles {joueur.role.nom}')} pour tout savoir sur ce rôle)")
 
-    @commands.command()
-    @tools.vivants_only
-    @tools.private
-    async def infos(self, ctx):
-        """Affiche tes informations de rôle / actions
-
-        Toutes les actions liées à ton rôle (et parfois d'autres) sont
-        indiquées, même celles que tu ne peux pas utiliser pour
-        l'instant (plus de charges, déclenchées automatiquement...)
-        """
-        member = ctx.author
-        joueur = Joueur.from_member(member)
-        r = ""
-
-        r += f"Ton rôle actuel : {tools.bold(joueur.role.nom_complet)}\n"
-        r += tools.ital(f"({tools.code(f'!roles {joueur.role.slug}')} pour tout savoir sur ce rôle)")
-
-        if joueur.actions_actives:
-            r += "\n\nActions :"
-            r += tools.code_bloc(
-                "\n".join(
-                    (
-                        f" - {action.base.slug.ljust(20)} "
-                        + (f"Cooldown : {action.cooldown}" if action.cooldown else action.base.temporalite).ljust(22)
-                        + (
-                            f"   {action.charges} charge(s)"
-                            + (" pour cette semaine" if "weekends" in action.base.refill else "")
-                            if isinstance(action.charges, int)
-                            else "Illimitée"
-                        )
+    if joueur.actions_actives:
+        rep += "\n\nActions :"
+        rep += tools.code_bloc(
+            "\n".join(
+                (
+                    f" - {action.base.slug.ljust(20)} "
+                    + (f"Cooldown : {action.cooldown}" if action.cooldown else action.base.temporalite).ljust(22)
+                    + (
+                        f"   {action.charges} charge(s)"
+                        + (" pour cette semaine" if "weekends" in action.base.refill else "")
+                        if isinstance(action.charges, int)
+                        else "Illimitée"
                     )
-                    for action in joueur.actions_actives
                 )
-            )
-            # Vraiment désolé pour cette immondice j'ai la flemme
-        else:
-            r += "\n\nAucune action disponible."
-
-        await ctx.send(
-            f"{r}\n{tools.code('!menu')} pour voir les votes et "
-            f"actions en cours, {tools.code('@MJ')} en cas de problème"
-        )
-
-    @commands.command()
-    @tools.mjs_only
-    async def actions(self, ctx, *, cible=None):
-        """Affiche et modifie les actions d'un joueur (COMMANDE MJ)
-
-        Args:
-            cible: le joueur dont on veut voir ou modifier les actions
-
-        Warning:
-            Commande expérimentale, non testée.
-        """
-        joueur = await tools.boucle_query_joueur(ctx, cible, "Qui ?")
-        actions = [ac for ac in joueur.actions if not ac.vote]
-
-        r = f"Rôle : {joueur.role.nom_complet or joueur.role}\n"
-
-        # if not actions:
-        #     r += "Aucune action pour ce joueur."
-        #     await ctx.send(r)
-        #     return
-
-        r += "Actions :"
-        r += tools.code_bloc(
-            "#️⃣  id   active  baseaction               début"
-            "     fin       cd   charges   refill     \n"
-            "---------------------------------------------"
-            "---------------------------------------------\n"
-            + "\n".join(
-                [
-                    (
-                        tools.emoji_chiffre(i + 1)
-                        + "  "
-                        + str(action.id).ljust(5)
-                        + str(action.active).ljust(8)
-                        + action.base.slug.ljust(25)
-                        + str(
-                            action.base.heure_debut
-                            if action.base.trigger_debut == ActionTrigger.temporel
-                            else action.base.trigger_debut.name
-                        ).ljust(10)
-                        + str(
-                            action.base.heure_fin
-                            if action.base.trigger_fin == ActionTrigger.temporel
-                            else action.base.trigger_fin.name
-                        ).ljust(10)
-                        + str(action.cooldown).ljust(5)
-                        + str(action.charges).ljust(10)
-                        + str(action.base.refill)
-                    )
-                    for i, action in enumerate(actions)
-                ]
+                for action in joueur.actions_actives
             )
         )
-        r += "Modifier/ajouter/stop :"
-        message = await ctx.send(r)
-        i = await tools.choice(message, len(actions), additional={"🆕": -1, "⏹": 0})
+        # Vraiment désolé pour cette immondice j'ai la flemme
+    else:
+        rep += "\n\nAucune action disponible."
 
-        if i < 0:  # ajouter
-            await ctx.send("Slug de la baseaction à ajouter ? (voir Gsheet Rôles et actions)")
-            base = await tools.boucle_query(ctx, BaseAction)
+    await journey.final_message(
+        f"{rep}\n{tools.code('/menu')} pour voir les votes et "
+        f"actions en cours, {tools.code('@MJ')} en cas de problème"
+    )
 
-            await ctx.send("Cooldown ? (nombre entier)")
-            mess = await tools.wait_for_message_here(ctx)
-            cooldown = int(mess.content)
 
-            await ctx.send(f"Charges ? ({tools.code('None')} pour illimité)")
-            mess = await tools.wait_for_message_here(ctx)
-            charges = int(mess.content) if mess.content.isdigit() else None
+@app_commands.command()
+@tools.mjs_only
+@journey_command
+async def actions(journey: DiscordJourney, *, joueur: app_commands.Transform[Joueur, tools.VivantTransformer]):
+    """Affiche et modifie les actions d'un joueur (COMMANDE MJ)
 
-            action = Action(joueur=joueur, base=base, cooldown=cooldown, charges=charges)
-            gestion_actions.add_action(joueur=joueur, base=base, cooldown=cooldown, charges=charges)
-            await ctx.send(f"Action ajoutée (id {action.id}).")
-            return
+    Args:
+        joueur: Le joueur dont on veut voir ou modifier les actions
+    """
+    actions = [ac for ac in joueur.actions if ac.base]
 
-        elif i == 0:
-            await ctx.send("Au revoir.")
-            return
+    rep = f"Rôle : {joueur.role.nom_complet or joueur.role}\n"
 
-        # Modifier
-        action = actions[i - 1]
-        stop = False
-        while not stop:
-            await ctx.send(
-                "Modifier : (parmi `active, cd, charges`}) ; `valider` pour "
-                "finir ; `supprimer` pour supprimer l'action.\n(Pour modifier "
-                "les attributs de la baseaction, modifier le Gsheet et "
-                "utiliser `!fillroles` ; pour ouvrir/fermer l'action, "
-                f"utiliser `!open {action.id}` / `!close {action.id}`.)"
+    rep += "Actions :"
+    rep += tools.code_bloc(
+        "id   active  baseaction               début     fin       cd   charges   refill\n"
+        "--------------------------------------------------------------------------------------\n"
+        + "\n".join(
+            (
+                str(action.id).ljust(5)
+                + str(action.active).ljust(8)
+                + action.base.slug.ljust(25)
+                + str(
+                    action.base.heure_debut
+                    if action.base.trigger_debut == ActionTrigger.temporel
+                    else action.base.trigger_debut.name
+                ).ljust(10)
+                + str(
+                    action.base.heure_fin
+                    if action.base.trigger_fin == ActionTrigger.temporel
+                    else action.base.trigger_fin.name
+                ).ljust(10)
+                + str(action.cooldown).ljust(5)
+                + str(action.charges).ljust(10)
+                + str(action.base.refill)
             )
-            mess = await tools.wait_for_message_here(ctx)
-            modif = mess.content.lower()
+            for action in actions
+        )
+    )
+    rep += "Modifier/ajouter/stop :"
+    choix = await journey.select(
+        rep,
+        {action: f"Modifier {action.id} {action.base.slug}" for action in actions}
+        | {"new": "Ajouter une action", "stop": "Stop"},
+        placeholder="Action à réaliser",
+    )
 
-            if modif == "active":
-                mess = await ctx.send("Action active ?")
-                action.active = await tools.yes_no(mess)
+    if choix == "new":  # ajouter
+        base_slug, cooldown, charges = await journey.modal(
+            f"Nouvelle action pour {joueur.nom}",
+            discord.ui.TextInput(label="Slug de la baseaction (cf Gsheet R&A)"),
+            discord.ui.TextInput(label="Cooldown (nombre entier)", max_length=2, default="0"),
+            discord.ui.TextInput(label="Charges (vide = illimité)", required=False),
+        )
+        if not (base := BaseAction.query.filter_by(slug=base_slug).one_or_none()):
+            await journey.final_message(f"Action `{base_slug}` invalide, vérifier dans le Gsheet Rôles et actions")
+            return
+        cooldown = int(cooldown)
+        charges = int(charges) if charges else None
 
-            elif modif in ["cd", "cooldown"]:
-                await ctx.send("Combien ?")
-                mess = await tools.wait_for_message_here(ctx)
-                action.cooldown = int(mess.content)
+        action = gestion_actions.add_action(joueur=joueur, base=base, cooldown=cooldown, charges=charges)
+        await journey.final_message(f"Action ajoutée (id {action.id}).")
+        return
 
-            elif modif == "charges":
-                await ctx.send("Combien ? (`None` pour illimité)")
-                mess = await tools.wait_for_message_here(ctx)
-                action.charges = int(mess.content) if mess.content.isdigit() else None
+    elif choix == "stop":
+        await journey.final_message("Au revoir.")
+        return
 
-            elif modif == "valider":
-                action.update()
-                await ctx.send("Fait.")
-                stop = True
+    # Modifier
+    action = choix
+    gsheet_id = env.load("LGREZ_ROLES_SHEET_ID")
+    url = f"https://docs.google.com/spreadsheets/d/{gsheet_id}"
+    while True:
+        choix = await journey.buttons(
+            "Pour modifier les attributs de la baseaction, modifier le Gsheet et utiliser `/fillroles` ; "
+            f"pour ouvrir/fermer l'action, utiliser `/open_action {action.id}` / `/close_action {action.id}`.)",
+            {
+                "active": discord.ui.Button(label="Désactiver", style=discord.ButtonStyle.gray)
+                if action.active
+                else discord.ui.Button(label="Activer", style=discord.ButtonStyle.success),
+                "edit": discord.ui.Button(label="Modifier cooldown / charges", style=discord.ButtonStyle.blurple),
+                "gsheet": discord.ui.Button(label="Modifier sur le Gsheet", style=discord.ButtonStyle.link, url=url),
+                "validate": discord.ui.Button(label="Valider et quitter", style=discord.ButtonStyle.success),
+                "cancel": discord.ui.Button(label="Annuler les modifications", style=discord.ButtonStyle.danger),
+            },
+        )
 
-            elif modif == "supprimer":
-                mess = await ctx.send("Supprimer l'action ? (privilégier l'archivage  `active = False`)")
-                if await tools.yes_no(mess):
-                    action.delete()
-                    await ctx.send("Fait.")
-                    stop = True
+        if choix == "active":
+            action.active = not action.active
 
-            else:
-                await ctx.send("Valeur incorrecte")
+        elif choix == "edit":
+            cooldown, charges = await journey.modal(
+                "Modifier l'action",
+                discord.ui.TextInput(label="Cooldown (nombre entier)", max_length=2, default=str(action.cooldown)),
+                discord.ui.TextInput(label="Charges (vide = illimité)", required=False, default=str(action.charges)),
+            )
+            action.cooldown = int(cooldown)
+            action.charges = int(charges) if charges else None
 
-    @commands.command(aliases=["joueurs", "vivant"])
-    async def vivants(self, ctx):
-        """Affiche la liste des joueurs vivants
+        elif choix == "validate":
+            action.update()
+            await journey.final_message("Modifications enregistrées.")
+            return
 
-        Aussi dite : « liste des joueurs qui seront bientôt morts »
-        """
-        joueurs = Joueur.query.filter(Joueur.est_vivant).order_by(Joueur.nom).all()
+        elif choix == "cancel":
+            await journey.final_message("Modifications annulées.")
+            return
 
-        mess = " Joueur                     en chambre\n"
-        mess += "––––––––––––––––––––––––––––––––––––––––––––––\n"
-        if config.demande_chambre:
-            for joueur in joueurs:
-                mess += f" {joueur.nom.ljust(25)}  {joueur.chambre}\n"
         else:
-            for joueur in joueurs:
-                mess += f" {joueur.nom}\n"
+            await journey.final_message(f"C'est possible ça ? {choix}")
+            return
 
-        await tools.send_code_blocs(ctx, mess, prefixe=f"Les {len(joueurs)} joueurs vivants sont :")
 
-    @commands.command(aliases=["mort"])
-    async def morts(self, ctx):
-        """Affiche la liste des joueurs morts
+@app_commands.command()
+@journey_command
+async def vivants(journey: DiscordJourney):
+    """Affiche la liste des joueurs vivants
 
-        Aussi dite : « liste des joueurs qui mangent leurs morts »
-        """
-        joueurs = Joueur.query.filter(Joueur.est_mort).order_by(Joueur.nom).all()
+    Aussi dite : « liste des joueurs qui seront bientôt morts »
+    """
+    joueurs = Joueur.query.filter(Joueur.est_vivant).order_by(Joueur.nom).all()
 
-        if joueurs:
-            mess = ""
-            for joueur in joueurs:
-                mess += f" {joueur.nom}\n"
-        else:
-            mess = "Toi (mais tu ne le sais pas encore)"
+    mess = " Joueur                     en chambre\n"
+    mess += "––––––––––––––––––––––––––––––––––––––––––––––\n"
+    if config.demande_chambre:
+        for joueur in joueurs:
+            mess += f" {joueur.nom.ljust(25)}  {joueur.chambre}\n"
+    else:
+        for joueur in joueurs:
+            mess += f" {joueur.nom}\n"
 
-        await tools.send_code_blocs(ctx, mess, prefixe=f"Les {len(joueurs) or ''} morts sont :")
+    await journey.final_message(mess, code=True, prefix=f"Les {len(joueurs)} joueurs vivants sont :")
+
+
+@app_commands.command()
+@journey_command
+async def morts(journey: DiscordJourney):
+    """Affiche la liste des joueurs morts
+
+    Aussi dite : « liste des joueurs qui mangent leurs morts »
+    """
+    joueurs = Joueur.query.filter(Joueur.est_mort).order_by(Joueur.nom).all()
+
+    if joueurs:
+        mess = ""
+        for joueur in joueurs:
+            mess += f" {joueur.nom}\n"
+    else:
+        mess = "Toi (mais tu ne le sais pas encore)"
+
+    await journey.final_message(mess, code=True, prefix=f"Les {len(joueurs) or ''} morts sont :")

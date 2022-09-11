@@ -222,7 +222,7 @@ class Joueur(base.TableBase):
         """
         joueur = cls.query.get(member.id)
         if not joueur:
-            raise ValueError("Joueur.from_member : " f"pas de joueur en base pour `{member}` !")
+            raise ValueError("Joueur.from_member : pas de joueur en base pour `{member}` !")
 
         return joueur
 
@@ -243,7 +243,7 @@ class Joueur(base.TableBase):
         try:
             return next(act for act in self.actions if act.vote == vote)
         except StopIteration:
-            raise RuntimeError(f"{self} : pas d'action de vote {vote.name} ! ``!cparti`` a bien été appelé ?") from None
+            raise RuntimeError(f"{self} : pas d'action de vote {vote.name} ! ``/cparti`` a bien été appelé ?") from None
 
 
 class CandidHaro(base.TableBase):
@@ -278,6 +278,33 @@ class CandidHaro(base.TableBase):
         nullable=False,
         doc="Haro ou candidature ?",
     )
+
+    message_id: int | None = autodoc_Column(
+        sqlalchemy.BigInteger(),
+        nullable=True,
+        doc="ID du message de haro associé",
+    )
+
+    async def fetch_message(self) -> discord.Message | None:
+        """Le message associé à ce haro"""
+        if not self.message_id:
+            return None
+
+        try:
+            return await config.Channel.haros.fetch_message(self.message_id)
+        except discord.NotFound:
+            return None
+
+    async def disable_message_buttons(self) -> None:
+        if message := await self.fetch_message():
+            view = discord.ui.View.from_message(message)
+            for component in view.children:
+                if isinstance(component, (discord.ui.Button | discord.ui.Select)):
+                    component.disabled = True
+                else:
+                    view.remove_item(component)
+
+            await message.edit(view=view)
 
     def __repr__(self) -> str:
         """Return repr(self)."""

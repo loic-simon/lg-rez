@@ -7,17 +7,20 @@ Personnalisation de différents paramètres et accès global
 import asyncio
 import json
 import pkgutil
+import typing
 
 import discord
-from discord.ext import commands
+import readycheck
 import sqlalchemy
 import sqlalchemy.orm
-import readycheck
 
 from lgrez.blocs import structure
 
+if typing.TYPE_CHECKING:
+    from lgrez.bot import LGBot
 
-#: dict[str, Any]: Structure du serveur utilisée par !setup (serveur,
+
+#: dict[str, Any]: Structure du serveur utilisée par /setup (serveur,
 #: rôles, salons, emojis). Voir le fichier ```server_structure.json``
 #: (valeur par défaut) pour les possibilités de personnalisation.
 server_structure = json.loads(pkgutil.get_data("lgrez", "server_structure.json"))
@@ -58,6 +61,7 @@ chambre_mj: str = "[chambre MJ]"
 
 
 async def additional_inscription_step(
+    journey,  # blocs.journey.DiscordJourney
     member: discord.Member,
     chan: discord.TextChannel,
 ) -> bool | None:
@@ -184,7 +188,7 @@ refills_divins: list[str] = ["divin"]
 #: N'est pas conçu pour être changé manuellement.
 is_ready: bool = False
 
-#: bool: Indique si le serveur est construit (``!setup`` appelé)
+#: bool: Indique si le serveur est construit (``/setup`` appelé)
 #: N'est pas conçu pour être changé manuellement.
 is_setup = True
 
@@ -225,12 +229,12 @@ class Role(readycheck.ReadyCheck, check_type=discord.Role):
     """
 
     # Default attributes values will be deduced from server_structure.
-    mj = None
-    redacteur = None
-    joueur_en_vie = None
-    joueur_mort = None
-    maire = None
-    everyone = "@everyone"
+    mj: discord.Role = None
+    redacteur: discord.Role = None
+    joueur_en_vie: discord.Role = None
+    joueur_mort: discord.Role = None
+    maire: discord.Role = None
+    everyone: discord.Role = "@everyone"
 
 
 class Channel(readycheck.ReadyCheck, check_type=discord.TextChannel):
@@ -264,11 +268,11 @@ class Channel(readycheck.ReadyCheck, check_type=discord.TextChannel):
     """
 
     # Default attributes values will be deduced from server_structure.
-    roles = None
-    logs = None
-    annonces = None
-    haros = None
-    debats = None
+    roles: discord.TextChannel = None
+    logs: discord.TextChannel = None
+    annonces: discord.TextChannel = None
+    haros: discord.TextChannel = None
+    debats: discord.TextChannel = None
 
 
 class Emoji(readycheck.ReadyCheck, check_type=discord.Emoji):
@@ -299,13 +303,13 @@ class Emoji(readycheck.ReadyCheck, check_type=discord.Emoji):
     """
 
     # Default attributes values will be deduced from server_structure.
-    ha = None
-    ro = None
-    bucher = None
-    maire = None
-    action = None
-    lune = None
-    void = None
+    ha: discord.Emoji = None
+    ro: discord.Emoji = None
+    bucher: discord.Emoji = None
+    maire: discord.Emoji = None
+    action: discord.Emoji = None
+    lune: discord.Emoji = None
+    void: discord.Emoji = None
 
 
 def set_config_from_server_structure() -> None:
@@ -348,8 +352,7 @@ set_config_from_server_structure()  # First deduction at import time
 
 
 guild: discord.Guild
-bot: commands.Bot
-loop: asyncio.AbstractEventLoop
+bot: "LGBot"
 engine: sqlalchemy.engine.Engine
 session: sqlalchemy.orm.Session
 webhook: discord.Webhook
@@ -363,7 +366,7 @@ class _ModuleGlobals(readycheck.ReadyCheck):
 
     guild = None
     bot = None
-    loop = None
+    commands_tree = None
     engine = None
     session = None
 

@@ -21,6 +21,7 @@ import sqlalchemy.orm
 from lgrez import config, bdd
 from lgrez.blocs import tools, env, gsheets
 from lgrez.bdd import Joueur, Action, Role, Camp, BaseAction, BaseCiblage, Statut, ActionTrigger
+from lgrez.blocs.journey import DiscordJourney, journey_command
 from lgrez.features import gestion_actions
 
 
@@ -624,219 +625,209 @@ async def process_mort(joueur: Joueur) -> None:
             )
 
 
-class Sync(commands.Cog):
-    """Commandes de synchronisation des GSheets vers la BDD et les joueurs"""
+DESCRIPTION = """Commandes de synchronisation des GSheets vers la BDD et les joueurs"""
 
-    @commands.command()
-    @tools.mjs_only
-    async def sync(self, ctx, silent=False):
-        """Récupère et applique les modifs du Tableau de bord (COMMANDE MJ)
 
-        Args:
-            silent: si spécifié (quelque soit sa valeur), les joueurs
-                ne sont pas notifiés des modifications.
+@commands.command()
+@tools.mjs_only
+@journey_command
+async def sync(journey: DiscordJourney, *, silent: bool = False):
+    """Récupère et applique les modifs du Tableau de bord (COMMANDE MJ)
 
-        Cette commande va récupérer les modifications en attente sur le
-        Tableau de bord (lignes en rouge), modifer la BDD, et appliquer
-        les modificatons dans Discord le cas échéant : renommage des
-        utilisateurs, modification des rôles...
-        """
-        await ctx.send("Récupération des modifications...")
-        async with ctx.typing():
-            # Récupération de la liste des modifs
-            modifs = await get_sync()
-            silent = bool(silent)
-            changelog = f"Synchronisation TDB (silencieux = {silent}) :"
+    Args:
+        silent: Si spécifié à True, les joueurs ne sont pas notifiés des modifications.
 
-        if not modifs:
-            await ctx.send("Pas de nouvelles modificatons.")
-            return
+    Cette commande va récupérer les modifications en attente sur le Tableau de bord (lignes en rouge),
+    modifier la BDD, et appliquer les modifications dans Discord le cas échéant :
+    renommage des utilisateurs, modification des rôles...
+    """
+    # Récupération de la liste des modifs
+    modifs = await get_sync()
+    silent = bool(silent)
+    changelog = f"Synchronisation TDB (silencieux = {silent}) :"
 
-        dic = {}  # Dicionnaire {ID joueur: modifs}
-        for modif in modifs:
-            if modif.id not in dic:
-                dic[modif.id] = []
-            dic[modif.id].append(modif)
+    if not modifs:
+        await journey.final_message("Pas de nouvelles modifications.")
+        return
 
-        message = await ctx.send(
-            f"{len(modifs)} modification(s) trouvée(s) " f"pour {len(dic)} joueur(s), go ? (silent = {silent})"
-        )
-        if not await tools.yes_no(message):
-            await ctx.send("Mission aborted.")
-            return
+    dic = {}  # Dictionnaire {ID joueur: modifs}
+    for modif in modifs:
+        if modif.id not in dic:
+            dic[modif.id] = []
+        dic[modif.id].append(modif)
 
-        # Go sync
-        done = []
-        async with ctx.typing():
-            for joueur_id, modifs in dic.items():
-                # Joueur dont au moins un attribut a été modifié
-                try:
-                    dn, cgl = await modif_joueur(int(joueur_id), modifs, silent)
-                except Exception:
-                    # Erreur lors d'une des modifs
-                    changelog += traceback.format_exc()
-                    await ctx.send(f"Erreur joueur {joueur_id}, passage au suivant (voir logs pour les détails)")
-                else:
-                    # Pas d'erreur pour ce joueur, on enregistre
-                    done.extend(dn)
-                    changelog += cgl
+    await journey.ok_cancel(
+        f"{len(modifs)} modification(s) trouvée(s) pour {len(dic)} joueur(s), go ? (silent = {silent})"
+    )
 
-            if done:
-                # Au moins une modification a été appliquée
-                config.session.commit()
-                await validate_sync(done)
+    # Go sync
+    done = []
+    mess = ""
+    for joueur_id, modifs in dic.items():
+        # Joueur dont au moins un attribut a été modifié
+        try:
+            dn, cgl = await modif_joueur(int(joueur_id), modifs, silent)
+        except Exception:
+            # Erreur lors d'une des modifs
+            changelog += traceback.format_exc()
+            mess += f":warning: Erreur joueur {joueur_id}, passage au suivant (voir logs pour les détails)\n"
+        else:
+            # Pas d'erreur pour ce joueur, on enregistre
+            done.extend(dn)
+            changelog += cgl
 
-            await tools.log(changelog, code=True)
+    if done:
+        # Au moins une modification a été appliquée
+        config.session.commit()
+        await validate_sync(done)
 
-        await ctx.send(f"Fait (voir {config.Channel.logs.mention} pour le détail)")
+    await tools.log(changelog, code=True)
+    await journey.final_message(mess + f":arrow_forward: Fait (voir {config.Channel.logs.mention} pour le détail)")
 
-    @commands.command()
-    @tools.mjs_only
-    async def fillroles(self, ctx):
-        """Remplit les tables et #roles depuis le GSheet ad hoc (COMMANDE MJ)
 
-        - Remplit les tables :class:`.bdd.Camp`, :class:`.bdd.Role`,
-          :class:`.bdd.BaseAction` et :class:`.bdd.BaseCiblage` avec les
-          informations du Google Sheets "Rôles et actions" (variable
-          d'environnement ``LGREZ_ROLES_SHEET_ID``) ;
-        - Vide le chan ``#roles`` puis le remplit avec les descriptifs
-          de chaque rôle et camp.
+@commands.command()
+@tools.mjs_only
+@journey_command
+async def fillroles(journey: DiscordJourney):
+    """Remplit les tables et #roles depuis le GSheet ad hoc (COMMANDE MJ)
 
-        Utile à chaque début de saison / changement dans les rôles/actions.
-        Met à jour les entrées déjà en base, créé les nouvelles,
-        supprime celles obsolètes.
-        """
-        # ==== Mise à jour tables ===
-        SHEET_ID = env.load("LGREZ_ROLES_SHEET_ID")
-        workbook = await gsheets.connect(SHEET_ID)  # Rôles et actions
+    - Remplit les tables :class:`.bdd.Camp`, :class:`.bdd.Role`,
+        :class:`.bdd.BaseAction` et :class:`.bdd.BaseCiblage` avec les
+        informations du Google Sheets "Rôles et actions" (variable
+        d'environnement ``LGREZ_ROLES_SHEET_ID``) ;
+    - Vide le chan ``#roles`` puis le remplit avec les descriptifs
+        de chaque rôle et camp.
 
-        for table in [Camp, Role, BaseAction]:
-            await ctx.send(f"Remplissage de la table {tools.code(table.__name__)}...")
-            # --- 1 : Récupération des valeurs
-            async with ctx.typing():
-                try:
-                    sheet = await workbook.worksheet(table.__tablename__)
-                except gsheets.WorksheetNotFound:
-                    raise ValueError(
-                        f"!fillroles : feuille '{table.__tablename__}' non "
-                        "trouvée dans le GSheet *Rôles et actions* "
-                        "(`LGREZ_ROLES_SHEET_ID`)"
-                    ) from None
+    Utile à chaque début de saison / changement dans les rôles/actions.
+    Met à jour les entrées déjà en base, créé les nouvelles,
+    supprime celles obsolètes.
+    """
+    # ==== Mise à jour tables ===
+    SHEET_ID = env.load("LGREZ_ROLES_SHEET_ID")
+    workbook = await gsheets.connect(SHEET_ID)  # Rôles et actions
 
-                values = await sheet.get_all_values()
-                # Liste de liste des valeurs des cellules
-
-            # --- 2 : Détermination colonnes à récupérer
-            cols = table.columns  # "dictionnaire" nom -> colonne
-            cols = {col: cols[col] for col in cols.keys() if not col.startswith("_")}  # Colonnes publiques
-            if table == Role:
-                cols["camp"] = Role.attrs["camp"]
-            elif table == BaseAction:
-                # BaseCiblages : au bout de la feuille
-                bc_cols = BaseCiblage.columns
-                bc_cols = {col: bc_cols[col] for col in bc_cols.keys() if not col.startswith("_")}
-                bc_cols_for_ith = []
-                for i in range(config.max_ciblages_per_action):
-                    prefix = f"c{i + 1}_"
-                    bc_cols_for_ith.append(
-                        {
-                            # colonne -> nom dans la table pour le ièmme
-                            col: f"{prefix}{col}"
-                            for col in bc_cols
-                        }
-                    )
-            primary_key = table.primary_col.key
-
-            # --- 3 : Localisation des colonnes (indices GSheet)
-            cols_index = {}
+    for table in [Camp, Role, BaseAction]:
+        await journey.final_message(f"Remplissage de la table {tools.code(table.__name__)}...")
+        # --- 1 : Récupération des valeurs
+        async with journey.channel.typing():
             try:
-                for key in cols.keys():
-                    cols_index[key] = values[0].index(key)
-                if table == BaseAction:
-                    key = "roles"
-                    roles_idx = values[0].index(key)
-                    # BaseCiblages : au bout de la feuille
-                    ciblages_idx = []
-                    for bc_cols_names in bc_cols_for_ith:
-                        idx = {}
-                        for col, key in bc_cols_names.items():
-                            idx[col] = values[0].index(key)
-                        ciblages_idx.append(idx)
-            except ValueError:
+                sheet = await workbook.worksheet(table.__tablename__)
+            except gsheets.WorksheetNotFound:
                 raise ValueError(
-                    f"!fillroles : colonne '{key}' non trouvée dans "
-                    f"la feuille '{table.__tablename__}' du GSheet "
+                    f"/fillroles : feuille '{table.__tablename__}' non trouvée dans le GSheet "
                     "*Rôles et actions* (`LGREZ_ROLES_SHEET_ID`)"
                 ) from None
 
-            # --- 4 : Constrution dictionnaires de comparaison
-            existants = {item.primary_key: item for item in table.query.all()}
-            new = {}
-            for row in values[1:]:
-                args = {key: transtype(row[cols_index[key]], col) for key, col in cols.items()}
+            values = await sheet.get_all_values()
+            # Liste de liste des valeurs des cellules
 
-                if table == BaseAction:
-                    # Many-to-many BaseAction <-> Rôle
-                    roles = row[roles_idx].strip()
-                    if roles.startswith("#"):
-                        args["roles"] = []
-                    else:
-                        args["roles"] = [transtype(slug.strip(), Role) for slug in roles.split(",") if slug]
-                    # BaseCiblages
-                    new_bcs = []
-                    for idx in ciblages_idx:
-                        if row[idx["slug"]]:  # ciblage défini
-                            bc_args = {key: transtype(row[idx[key]], col) for key, col in bc_cols.items()}
-                            new_bcs.append(bc_args)
-                    args["base_ciblages"] = new_bcs
+        # --- 2 : Détermination colonnes à récupérer
+        cols = table.columns  # "dictionnaire" nom -> colonne
+        cols = {col: cols[col] for col in cols.keys() if not col.startswith("_")}  # Colonnes publiques
+        if table == Role:
+            cols["camp"] = Role.attrs["camp"]
+        elif table == BaseAction:
+            # BaseCiblages : au bout de la feuille
+            bc_cols = BaseCiblage.columns
+            bc_cols = {col: bc_cols[col] for col in bc_cols.keys() if not col.startswith("_")}
+            bc_cols_for_ith = []
+            for i in range(config.max_ciblages_per_action):
+                prefix = f"c{i + 1}_"
+                bc_cols_for_ith.append(
+                    {
+                        # colonne -> nom dans la table pour le ièmme
+                        col: f"{prefix}{col}"
+                        for col in bc_cols
+                    }
+                )
+        primary_key = table.primary_col.key
 
-                new[args[primary_key]] = args
-
-            # --- 5 : Comparaison et MAJ
-            res = _compare_items(
-                existants, new, table, cols, primary_key, bc_cols=bc_cols if table == BaseAction else None
-            )
-            config.session.commit()
-
-            await ctx.send(f"> Table {tools.code(table.__name__)} remplie ! " + res.bilan)
-            await tools.log(f"`!fillroles` > {table.__name__}:\n{res.log}")
+        # --- 3 : Localisation des colonnes (indices GSheet)
+        cols_index = {}
+        try:
+            for key in cols.keys():
+                cols_index[key] = values[0].index(key)
             if table == BaseAction:
-                sub_res = res.sub_results
-                await ctx.send(f"> Table {tools.code('BaseCiblage')} remplie simultanément " + sub_res.bilan)
-                await tools.log(f"`!fillroles` > BaseCiblage:\n{sub_res.log}")
+                key = "roles"
+                roles_idx = values[0].index(key)
+                # BaseCiblages : au bout de la feuille
+                ciblages_idx = []
+                for bc_cols_names in bc_cols_for_ith:
+                    idx = {}
+                    for col, key in bc_cols_names.items():
+                        idx[col] = values[0].index(key)
+                    ciblages_idx.append(idx)
+        except ValueError:
+            raise ValueError(
+                f"!fillroles : colonne '{key}' non trouvée dans la feuille '{table.__tablename__}' du GSheet "
+                "*Rôles et actions* (`LGREZ_ROLES_SHEET_ID`)"
+            ) from None
 
-        # ==== Remplissage #rôles ===
-        chan_roles = config.Channel.roles
-        mess = await ctx.send(f"Purger et re-remplir {chan_roles.mention} ?")
-        if not await tools.yes_no(mess):
-            await ctx.send(f"Fini (voir {config.Channel.logs.mention}).")
-            return
+        # --- 4 : Construction dictionnaires de comparaison
+        existants = {item.primary_key: item for item in table.query.all()}
+        new = {}
+        for row in values[1:]:
+            args = {key: transtype(row[cols_index[key]], col) for key, col in cols.items()}
 
-        await ctx.send(f"Vidage de {chan_roles.mention}...")
-        async with ctx.typing():
-            await chan_roles.purge(limit=1000)
+            if table == BaseAction:
+                # Many-to-many BaseAction <-> Rôle
+                roles = row[roles_idx].strip()
+                if roles.startswith("#"):
+                    args["roles"] = []
+                else:
+                    args["roles"] = [transtype(slug.strip(), Role) for slug in roles.split(",") if slug]
+                # BaseCiblages
+                new_bcs = []
+                for idx in ciblages_idx:
+                    if row[idx["slug"]]:  # ciblage défini
+                        bc_args = {key: transtype(row[idx[key]], col) for key, col in bc_cols.items()}
+                        new_bcs.append(bc_args)
+                args["base_ciblages"] = new_bcs
 
-        camps = Camp.query.filter_by(public=True).all()
-        est = sum(len(camp.roles) + 2 for camp in camps) + 1
-        await ctx.send(f"Remplissage... (temps estimé : {est} secondes)")
+            new[args[primary_key]] = args
 
-        t0 = time.time()
-        await chan_roles.send("Voici la liste des rôles " f"(voir aussi {tools.code('!roles')}) :")
-        async with ctx.typing():
-            shortcuts = []
-            for camp in camps:
-                if not camp.roles:
-                    continue
+        # --- 5 : Comparaison et MAJ
+        res = _compare_items(existants, new, table, cols, primary_key, bc_cols=bc_cols if table == BaseAction else None)
+        config.session.commit()
 
-                mess = await chan_roles.send(camp.nom, embed=camp.embed)
-                shortcuts.append(mess)
+        await journey.final_message(f"> Table {tools.code(table.__name__)} remplie ! " + res.bilan)
+        await tools.log(f"`!fillroles` > {table.__name__}:\n{res.log}")
+        if table == BaseAction:
+            sub_res = res.sub_results
+            await journey.final_message(f"> Table {tools.code('BaseCiblage')} remplie simultanément " + sub_res.bilan)
+            await tools.log(f"`!fillroles` > BaseCiblage:\n{sub_res.log}")
 
-                for role in camp.roles:
-                    if role.actif:
-                        await chan_roles.send(embed=role.embed)
+    # ==== Remplissage #rôles ===
+    chan_roles = config.Channel.roles
+    if not await journey.yes_no(f"Purger et re-remplir {chan_roles.mention} ?"):
+        await journey.final_message(f"Fini (voir {config.Channel.logs.mention}).")
+        return
 
-            for mess in shortcuts:
-                await mess.reply("Accès rapide :             \N{UPWARDS BLACK ARROW}")
+    await journey.final_message(f"Vidage de {chan_roles.mention}...")
+    async with journey.channel.typing():
+        await chan_roles.purge(limit=1000)
 
-        rt = time.time() - t0
-        await ctx.send(f"{chan_roles.mention} rempli ! (en {rt:.4} secondes)")
+    camps = Camp.query.filter_by(public=True).all()
+    est = sum(len(camp.roles) + 2 for camp in camps) + 1
+    await journey.final_message(f"Remplissage... (temps estimé : {est} secondes)")
+
+    t0 = time.time()
+    await chan_roles.send("Voici la liste des rôles (voir aussi `/roles`) :")
+    async with journey.channel.typing():
+        shortcuts = []
+        for camp in camps:
+            if not camp.roles:
+                continue
+
+            mess = await chan_roles.send(camp.nom, embed=camp.embed)
+            shortcuts.append(mess)
+
+            for role in camp.roles:
+                if role.actif:
+                    await chan_roles.send(embed=role.embed)
+
+        for mess in shortcuts:
+            await mess.reply("Accès rapide :             \N{UPWARDS BLACK ARROW}")
+
+    rt = time.time() - t0
+    await journey.final_message(f"{chan_roles.mention} rempli ! (en {rt:.4} secondes)")

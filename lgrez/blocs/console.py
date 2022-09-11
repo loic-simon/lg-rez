@@ -127,13 +127,7 @@ class AdminConsole(asyncode.AsyncInteractiveConsole):
         if prompt:
             await self.write(prompt)
 
-        entree = await aioconsole.ainput()
-
-        if entree.startswith(config.bot.command_prefix):
-            # Exécution de commande
-            entree = await execute_command(entree)
-
-        return entree
+        return await aioconsole.ainput()
 
 
 async def run_admin_console(locals: dict) -> None:
@@ -143,7 +137,7 @@ async def run_admin_console(locals: dict) -> None:
         locals: the objects accessible from the console.
     """
     if os.isatty(sys.stdin.fileno()):  # Lancement depuis un terminal
-        await asyncio.sleep(1)
+        await asyncio.sleep(2)
         cons = AdminConsole(locals=locals)
         await cons.interact()
         await aioconsole.aprint("Admin console closed (bot still runs).")

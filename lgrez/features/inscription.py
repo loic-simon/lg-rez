@@ -11,6 +11,7 @@ import discord
 from lgrez import config
 from lgrez.blocs import tools, env, gsheets
 from lgrez.bdd import Joueur, Role, Camp, Statut
+from lgrez.blocs.journey import DiscordJourney
 
 
 async def new_channel(member: discord.Member) -> discord.TextChannel:
@@ -155,10 +156,10 @@ async def main(member: discord.Member) -> None:
         await chan.send(f"Saloww ! {member.mention} tu es déjà inscrit, viens un peu ici !")
         return
 
-    if chan := tools.get(config.guild.text_channels, topic=str(member.id)):
+    if chan := next((chan for chan in config.guild.text_channels if chan.topic == str(member.id)), None):
         # Inscription en cours (topic du chan = ID du membre)
         await chan.set_permissions(member, read_messages=True, send_messages=True)
-        await chan.send(f"Tu as déjà un channel à ton nom, {member.mention}, par ici !")
+        await chan.send(f"Tu as déjà un salon à ton nom, {member.mention}, par ici !")
 
     else:  # Pas d'inscription déjà en cours : création channel
         chan = await new_channel(member)
@@ -166,115 +167,83 @@ async def main(member: discord.Member) -> None:
     # Récupération nom et renommages
 
     await chan.send(
-        f"Bienvenue {member.mention} ! Je suis le bot à qui tu auras "
-        "affaire tout au long de la partie.\nTu es ici sur ton channel "
-        "privé, auquel seul toi et les MJ ont accès ! C'est ici que tu "
-        "lanceras toutes les commandes pour voter, te renseigner... mais "
-        "aussi que les MJ discuteront avec toi en cas de soucis.\n\nPas "
-        "de panique, je vais tout t'expliquer !"
+        f"Bienvenue {member.mention} ! Je suis le bot à qui tu auras affaire tout au long de la partie.\n"
+        "Tu es ici sur ton salon textuel privé, auquel seul toi et les MJ ont accès ! "
+        "C'est ici que tu lanceras toutes les commandes pour voter, te renseigner... "
+        "mais aussi que les MJ discuteront avec toi en cas de soucis.\n\n"
+        "Pas de panique, je vais tout t'expliquer !"
     )
 
-    await tools.sleep(chan, 5)
+    class InscriptionView(discord.ui.View):
+        @discord.ui.button(label="Terminer mon inscription", style=discord.ButtonStyle.success)
+        async def callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+            async with DiscordJourney(interaction) as journey:
+                await _inscription_process(journey, member, chan)
 
-    await chan.send(
-        "Avant toute chose, finalisons ton inscription !\nD'abord, un "
-        "point règles nécessaire :\n\n"
+    await chan.send("Avant toute chose, finalisons ton inscription !", view=InscriptionView())
+
+
+async def _inscription_process(journey: DiscordJourney, member: discord.Member, chan: discord.TextChannel) -> None:
+    await journey.final_message(
+        "Très bien !\nD'abord, un point règles nécessaire :\n\n"
         + tools.quote_bloc(
-            "En t'inscrivant au Loup-Garou de la Rez, tu garantis vouloir "
-            "participer à cette édition et t'engages à respecter les "
-            "règles du jeu. Si tu venais à entraver le bon déroulement de "
-            "la partie pour une raison ou une autre, les MJ "
-            "s'autorisent à te mute ou t'expulser du Discord sans préavis."
+            "En t'inscrivant au Loup-Garou de la Rez, tu garantis vouloir participer à cette édition et "
+            "t'engages à respecter les règles du jeu. Si tu venais à entraver le bon déroulement de la partie"
+            "pour une raison ou une autre, les MJ s'autorisent à te mute ou t'expulser du Discord sans préavis."
         )
     )
 
     await tools.sleep(chan, 5)
 
-    message = await chan.send(
-        "C'est bon pour toi ?\n"
-        + tools.ital(
-            "(Le bot te demandera souvent confirmation, en t'affichant "
-            "deux réactions comme ceci. Clique sur ✅ si ça te va, sur "
-            "❎ sinon. Tu peux aussi répondre (oui, non, ...) par écrit.)"
-        )
-    )
-    if not await tools.yes_no(message):
-        await chan.send(
+    if not await journey.yes_no("C'est bon pour toi ?"):
+        await journey.final_message(
             "Pas de soucis. Si tu changes d'avis ou que c'est un "
             f"missclick, appelle un MJ aled ({tools.code('@MJ')})."
         )
         return
 
-    await chan.send(
-        "Parfait. Je vais d'abord avoir besoin de ton (vrai) prénom, "
-        "celui par lequel on t'appelle au quotidien. Attention, tout "
-        "troll sera foudracanonné™ !"
+    await journey.buttons(
+        "Parfait. Je vais d'abord avoir besoin de ton (vrai) nom, celui par lequel on t'appelle au quotidien. "
+        "Attention, tout troll sera foudracanonné™ !",
+        {None: discord.ui.Button(label="Go !", style=discord.ButtonStyle.success)},
     )
-
-    def check_chan(m):
-        # Message de l'utilisateur dans son channel perso
-        return m.channel == chan and m.author != config.bot.user
 
     ok = False
     while not ok:
-        await chan.send(
-            "Quel est ton prénom, donc ?\n"
-            + tools.ital("(Répond simplement dans ce channel, à l'aide du champ de texte normal)")
-        )
-        prenom = await tools.wait_for_message(check=check_chan, chan=chan)
+        prenom, nom_famille = await journey.modal("À qui avons-nous l'honneur ?", "Prénom", "Nom")
+        nom = f"{prenom.title()} {nom_famille.title()}"
 
-        await chan.send("Très bien, et ton nom de famille ?")
-        nom_famille = await tools.wait_for_message(check=check_chan, chan=chan)
-        nom = f"{prenom.content.title()} {nom_famille.content.title()}"
-        # .title met en majuscule la permière lettre de chaque mot
-
-        message = await chan.send(
-            f"Tu me dis donc t'appeller {tools.bold(nom)}. C'est bon pour toi ? Pas d'erreur, pas de troll ?"
+        ok = await journey.yes_no(
+            f"Tu me dis donc t'appeler {tools.bold(nom)}. C'est bon pour toi ? Pas d'erreur, pas de troll ?"
         )
-        ok = await tools.yes_no(message)
 
     await chan.edit(name=config.private_chan_prefix + nom)  # Renommage conv
     if member.top_role < config.Role.mj:
         # Renommage joueur (ne peut pas renommer les MJ)
         await member.edit(nick=nom)
 
-    await chan.send(
+    await journey.final_message(
         "Parfait ! Je t'ai renommé(e) pour que tout le monde te reconnaisse, et j'ai renommé cette conversation."
     )
 
     if config.demande_chambre:
         await tools.sleep(chan, 3)
-        a_la_rez = await tools.yes_no(await chan.send("Bien, dernière chose : habites-tu à la Rez ?"))
-
-        if a_la_rez:
-
-            def sortie_num_rez(m):
-                # Longueur de chambre de rez maximale
-                return len(m.content) < Joueur.chambre.type.length
-
-            mess = await tools.boucle_message(
-                chan,
-                "Alors, quelle est ta chambre ?",
-                sortie_num_rez,
-                rep_message=("Désolé, ce n'est pas un numéro de chambre valide, réessaie..."),
-            )
-            chambre = mess.content
+        if await journey.yes_no("Bien, dernière chose : habites-tu à la Rez ?"):
+            (chambre,) = await journey.modal("Et où te trouve-t-on ?", "Numéro de chambre")
         else:
             chambre = config.chambre_mj
-
     else:
         chambre = None
 
-    res = await config.additional_inscription_step(member, chan)
+    res = await config.additional_inscription_step(journey, member, chan)
     if res is False:
         return
 
     if config.demande_chambre:
-        await chan.send(f"{nom}, en chambre {chambre}... Je t'inscris en base !")
+        await journey.final_message(f"{nom}, en chambre {chambre}... Je t'inscris en base !")
     else:
-        await chan.send(f"{nom}... Je t'inscris en base !")
+        await journey.final_message(f"{nom}... Je t'inscris en base !")
 
-    # Indicateur d'écriture pour informer le joueur que le bot fait des trucs
     async with chan.typing():
         # Enregistrement en base
 
@@ -304,35 +273,30 @@ async def main(member: discord.Member) -> None:
     # Conseiller d'ACTIVER TOUTES LES NOTIFS du chan
     # (et mentions only pour le reste, en activant @everyone)
     await chan.send(
-        f"Tu es maintenant inscrit(e) ! Je t'ai attribué le rôle "
-        f"{config.Role.joueur_en_vie.mention}, qui te donne l'accès à "
-        "tout plein de nouveaux channels à découvrir."
+        f"Tu es maintenant inscrit(e) ! Je t'ai attribué le rôle {config.Role.joueur_en_vie.mention}, "
+        "qui te donne l'accès à tout plein de nouveaux salons à découvrir."
     )
     await chan.send(
         "Juste quelques dernières choses :\n "
         "- Plein de commandes te sont d'ores et déjà accessibles ! "
-        f"Découvre les toutes en tapant {tools.code('!help')} ;\n "
-        "- Si tu as besoin d'aide, mentionne "
-        f"simplement les MJs ({tools.code('@' + config.Role.mj.name)}) "
+        f"Découvre les toutes en tapant {tools.code('/help')} ;\n "
+        f"- Si tu as besoin d'aide, mentionne simplement les MJs ({tools.code('@' + config.Role.mj.name)}) "
         "et on viendra voir ce qui se passe !\n "
-        "- Si ce n'est pas le cas, je te conseille fortement d'installer "
-        "Discord sur ton téléphone, "
-        f"et d'{tools.bold('activer toutes les notifications')} pour ce "
-        "channel ! Promis, pas de spam :innocent:\n"
-        'Pour le reste du serveur, tu peux le mettre en "mentions only", '
+        "- Si ce n'est pas le cas, je te conseille fortement d'installer Discord sur ton téléphone, et "
+        f"d'{tools.bold('activer toutes les notifications')} pour ce salon ! Promis, pas de spam :innocent:\n"
+        'Pour le reste du serveur, tu peux le mettre en "mentions only",'
         f"en activant le {tools.code('@everyone')} – il est limité ;\n\n"
-        "Enfin, n'hésite pas à me parler, j'ai toujours quelques réponses "
-        "en stock..."
+        "Enfin, n'hésite pas à me parler, j'ai toujours quelques réponses en stock..."
     )
 
     await tools.sleep(chan, 5)
     await chan.send(
-        "Voilà, c'est tout bon ! Installe toi bien confortablement, " f"la partie commence le {config.debut_saison}."
+        f"Voilà, c'est tout bon ! Installe toi bien confortablement, la partie commence le {config.debut_saison}."
     )
 
     # Log
     await tools.log(
-        f"Inscription de {member.name}#{member.discriminator} "
-        f"réussie\n - Nom : {nom}\n - Chambre : {chambre}\n"
+        f"Inscription de {member.name}#{member.discriminator} réussie\n"
+        f" - Nom : {nom}\n - Chambre : {chambre}\n"
         f" - Channel créé : {chan.mention}"
     )

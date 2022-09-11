@@ -63,7 +63,7 @@
       "color": "607d8b",
       "hoist": false,
       "mentionable": false,
-      "permissions": []
+      "permissions": ["priority_speaker"]
     }
   },
   "base_role": "@everyone",
@@ -74,7 +74,7 @@
     "use_external_emojis",
     "read_message_history",
     "send_tts_messages",
-    "use_slash_commands",
+    "use_application_commands",
     "connect",
     "speak",
     "stream",
