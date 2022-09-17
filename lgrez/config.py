@@ -13,6 +13,7 @@ import discord
 import readycheck
 import sqlalchemy
 import sqlalchemy.orm
+import sqlalchemy.ext.asyncio
 
 from lgrez.blocs import structure
 
@@ -354,7 +355,7 @@ set_config_from_server_structure()  # First deduction at import time
 guild: discord.Guild
 bot: "LGBot"
 engine: sqlalchemy.engine.Engine
-session: sqlalchemy.orm.Session
+session: sqlalchemy.ext.asyncio.AsyncSession
 webhook: discord.Webhook
 
 

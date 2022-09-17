@@ -312,11 +312,14 @@ class _TableTransformerMixin:
 
     async def _autocomplete(self, table: type[_Table], current: str, filtre=None) -> list[app_commands.Choice[str]]:
         return [
-            app_commands.Choice(name=elem.nom, value=elem.nom) for elem in self.get_elems(table, current, filtre=filtre)
+            app_commands.Choice(name=elem.nom, value=elem.nom)
+            for elem in await self.get_elems(table, current, filtre=filtre)
         ][:25]
 
-    def get_elems(self, table: type[_Table], current: str, filtre=None) -> typing.Iterator[_Table]:
-        for elem, _ in table.find_nearest(current, table.nom, sensi=0.25 if len(current) > 2 else 0, filtre=filtre):
+    async def get_elems(self, table: type[_Table], current: str, filtre=None) -> typing.Iterator[_Table]:
+        for elem, _ in await table.find_nearest(
+            current, table.nom, sensi=0.25 if len(current) > 2 else 0, filtre=filtre
+        ):
             yield elem
 
 
@@ -359,7 +362,7 @@ class _CandidHaroTransformerMixin(_TableTransformerMixin):
         if len(current) <= 2 and harotes:
             return [app_commands.Choice(name=f"{joueur.nom} ({ok_mark})", value=joueur.nom) for joueur in harotes][:25]
 
-        proches = super().get_elems(Joueur, current, filtre=Joueur.est_vivant)
+        proches = await self.get_elems(Joueur, current, filtre=Joueur.est_vivant)
         choix_proches = [app_commands.Choice(name=f"{joueur.nom} ({nok_mark})", value=joueur.nom) for joueur in proches]
         choix_harotes = [
             app_commands.Choice(name=f"{joueur.nom} ({ok_mark})", value=joueur.nom)

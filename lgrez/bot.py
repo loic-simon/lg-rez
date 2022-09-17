@@ -219,13 +219,13 @@ class LGBot(discord.Client):
         await tools.log("Just rebooted!")
 
         # Tâches planifiées
-        taches = bdd.Tache.query.all()
-        for tache in taches:
-            # Si action manquée, l'exécute immédiatement, sinon l'enregistre
-            tache.register()
+        # taches = bdd.Tache.query.all()
+        # for tache in taches:
+        #     # Si action manquée, l'exécute immédiatement, sinon l'enregistre
+        #     tache.register()
 
-        if taches:
-            await tools.log(f"{len(taches)} tâches planifiées récupérées en base et reprogrammées.")
+        # if taches:
+        #     await tools.log(f"{len(taches)} tâches planifiées récupérées en base et reprogrammées.")
 
         config.is_ready = True
         print("      Initialization complete.")
@@ -372,17 +372,22 @@ class LGBot(discord.Client):
         # Récupération du token du bot et de l'ID du serveur
         LGREZ_DISCORD_TOKEN = env.load("LGREZ_DISCORD_TOKEN")
 
-        # Connexion BDD
-        print("[1/4] Connecting to database...")
-        bdd.connect()
-        url = config.engine.url
-        print(f"      Connected to {url.host}/{url.database}!")
-
         # Enregistrement
         config.bot = self
 
         # Lancement du bot (bloquant)
-        print("[2/3] Connecting to Discord...")
-        super().run(LGREZ_DISCORD_TOKEN)
+        asyncio.run(self.main(LGREZ_DISCORD_TOKEN))
 
         print("\nDisconnected.")
+
+    async def main(self, token: str) -> None:
+        print("[1/4] Connecting to database...")
+        async_session = await bdd.connect()
+        async with async_session() as session:
+            config.session = session
+            print(f"     Connected to {config.engine.url}")
+
+            print("[2/4] Connecting to Discord...")
+            await self.start(token)
+
+        print("----------------------- EXITED CM -----------------------")

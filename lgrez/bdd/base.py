@@ -7,11 +7,15 @@ Métaclasse et classe de base des tables de données, fonction de connection
 from __future__ import annotations
 
 from collections import abc
+import json
 import re
 import difflib
 import typing
+from typing import Any, Callable, Generic
 
+import discord
 import sqlalchemy
+import sqlalchemy.ext.asyncio
 import sqlalchemy.orm
 import unidecode
 
@@ -29,6 +33,11 @@ def _remove_accents(text: str) -> str:
 
 
 # ---- Objets de base des classes de données
+# Dictionnaire {nom de la base -> table}, automatiquement rempli par
+# sqlalchemy.orm.declarative_base
+tables = {}
+
+mapper_registry = sqlalchemy.orm.registry(class_registry=tables)
 
 
 class TableMeta(sqlalchemy.orm.DeclarativeMeta):
@@ -53,7 +62,8 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
         if comment is None:
             comment = cls.__doc__
 
-        dic["registry"] = cls.registry  # un peu de magie noire...
+        cls.registry = mapper_registry
+        # dic["registry"] = mapper_registry  # un peu de magie noire...
         super().__init__(name, bases, dic, comment=comment, **kwargs)
 
         cls._attrs = {
@@ -79,16 +89,6 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
           :class:`sqlalchemy.orm.attributes.InstrumentedAttribute`
           pour la classe elle-même.
         """  # On adore la doc vraiment
-
-    @property
-    def query(cls) -> sqlalchemy.orm.query.Query:
-        """Raccourci pour ``.config.session.query(Table)``.
-
-        Raises:
-            :exc:`readycheck.NotReadyError`: session non initialisée
-                (:obj:`.config.session` vaut ``None``)
-        """
-        return config.session.query(cls)
 
     @property
     def columns(cls) -> sqlalchemy.sql.base.ImmutableColumnCollection:
@@ -131,7 +131,7 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
             raise ValueError("Plusieurs colonnes clés primaires pour " f"{cls.__name__} (clé composite)")
         return next(iter(cols))
 
-    def find_nearest(
+    async def find_nearest(
         cls,
         chaine: str,
         col: sqlalchemy.schema.Column | str | None = None,
@@ -145,41 +145,29 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
 
         Args:
             chaine: motif à rechercher
-            col: colonne selon laquelle rechercher (défaut : colonne
-                primaire). Doit être de type textuel.
+            col: colonne selon laquelle rechercher (défaut : colonne primaire). Doit être de type textuel.
             sensi: score\* minimal pour retenir une entrée
-            filtre: argument de :meth:`query.filter()
-                <sqlalchemy.orm.query.Query.filter>`
-                (ex. ``Table.colonne == valeur``)
-            solo_si_parfait: si ``True`` (défaut), renvoie
-                uniquement le premier élément de score\* ``1`` trouvé
-                s'il existe (ignore les autres éléments, même si
-                ``>= sensi`` ou même ``1``)
-            parfaits_only: si ``True`` (défaut), ne renvoie que
-                les éléments de score\* ``1`` si on en trouve au moins
-                un (ignore les autres éléments, même si ``>= sensi`` ;
+            filtre: clause de filtrage à appliquer (ex. ``Table.colonne == valeur``)
+            solo_si_parfait: si ``True`` (défaut), renvoie uniquement le premier élément de score\* ``1`` trouvé
+                s'il existe (ignore les autres éléments, même si ``>= sensi`` ou même ``1``)
+            parfaits_only: si ``True`` (défaut), ne renvoie que les éléments de score\* ``1`` si on en trouve
+                au moins un (ignore les autres éléments, même si ``>= sensi`` ;
                 pas d'effet si ``solo_si_parfait`` vaut ``True``)
-            match_first_word: si ``True``, teste aussi ``chaine`` vis
-                à vis du premier *mot* de chaque entrée (caractères
-                précédent la première espace), et conserve ce score
-                si il est supérieur.
+            match_first_word: si ``True``, teste aussi ``chaine`` vis à vis du premier *mot* de chaque entrée
+                (caractères précédent la première espace), et conserve ce score si il est supérieur.
 
         Returns:
-            Les entrées correspondant le mieux à ``chaine``, sous forme
-            de liste de tuples ``(element, score*)`` triés par score\*
-            décroissant (et ce même si un seul résultat).
+            Les entrées correspondant le mieux à ``chaine``, sous forme de liste de tuples ``(element, score*)``
+            triés par score\* décroissant (et ce même si un seul résultat).
 
         Raises:
             ValueError: ``col`` inexistante ou pas de type textuel
-            ~readycheck.NotReadyError: session non initialisée
-                (:attr:`.lgrez.config.session` vaut ``None``)
+            ~readycheck.NotReadyError: session non initialisée (:attr:`.lgrez.config.session` vaut ``None``)
 
-        *\*score* = ratio de :class:`difflib.SequenceMatcher`, i.e.
-        proportion de caractères communs aux deux chaînes.
+        *\*score* = ratio de :class:`difflib.SequenceMatcher` (proportion de caractères communs aux deux chaînes).
 
         Note:
-            Les chaînes sont comparées sans tenir compte de
-            l'accentuation ni de la casse.
+            Les chaînes sont comparées sans tenir compte de l'accentuation ni de la casse.
         """
         if not col:
             col = cls.primary_col
@@ -192,11 +180,11 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
         if not isinstance(col.type, sqlalchemy.String):
             raise ValueError(f"{cls.__name__}.find_nearest: " f"Colonne {col.key} pas de type textuel")
 
-        query = cls.query
+        select = Data.select(cls)
         if filtre is not None:
-            query = query.filter(filtre)
+            select = select.where(filtre)
 
-        results = query.all()
+        results = await select.all()
 
         SM = difflib.SequenceMatcher()
         # Première chaîne à comparer : cible, en minuscule et sans accents
@@ -237,14 +225,6 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
         return sorted(bests, key=lambda x: x[1], reverse=True)
 
 
-# Dictionnaire {nom de la base -> table}, automatiquement rempli par
-# sqlalchemy.orm.declarative_base
-tables = {}
-
-
-mapper_registry = sqlalchemy.orm.registry(class_registry=tables)
-
-
 @mapper_registry.as_declarative_base(metaclass=TableMeta)
 class TableBase:
     """Classe de base des tables de données.
@@ -265,78 +245,7 @@ class TableBase:
         key = type(self).primary_col.key
         return getattr(self, key)
 
-    @staticmethod
-    def update() -> None:
-        """Applique les modifications en attente en base (commit).
-
-        Toutes les modifications, y compris des autres instances,
-        seront enregistrées.
-
-        Globlament équivalent à::
-
-            config.session.commit()
-
-        """
-        config.session.commit()
-
     _T = typing.TypeVar("_T", bound="TableBase")
-
-    def add(self: _T, *other: _T) -> None:
-        """Enregistre l'instance dans la base de donnée et commit.
-
-        Semble équivalent à :meth:`update` si l'instance est déjà
-        présente en base.
-
-        Args:
-            \*other: autres instances à enregistrer dans le même commit,
-                éventuellement. Utilisation recommandée :
-                ``<Table>.add(*items)``.
-
-        Examples:
-            - ``item.add()``
-            - ``<Table>.add(*items)``
-
-        Globlament équivalent à::
-
-            config.session.add(self)
-            config.session.add_all(other)
-
-            config.session.commit()
-        """
-        config.session.add(self)
-        if other:
-            config.session.add_all(other)
-
-        self.update()
-
-    def delete(self: _T, *other: _T) -> None:
-        """Supprime l'instance de la base de données et commit.
-
-        Args:
-            \*other: autres instances à supprimer dans le même commit,
-                éventuellement.
-
-        Examples:
-            - ``item.delete()``
-            - ``<Table>.delete(*items)``
-
-        Raises:
-            sqlalchemy.exc.SAWarning: l'instance a déjà été supprimée
-                (Warning, pas exception : ne bloque pas l'exécution).
-
-        Globlament équivalent à::
-
-            config.session.delete(self)
-            for item in others:
-                config.session.delete(item)
-
-            config.session.commit()
-        """
-        config.session.delete(self)
-        for item in other:
-            config.session.delete(item)
-
-        self.update()
 
 
 # ---- Autodoc objects
@@ -385,7 +294,7 @@ def autodoc_Column(*args, doc: str = "", comment: str | None = None, **kwargs) -
 
 
 def autodoc_ManyToOne(
-    tablename: str, *args, doc: str = "", nullable: bool = False, **kwargs
+    tablename: str, *args, doc: str = "", nullable: bool = False, lazy="joined", **kwargs
 ) -> sqlalchemy.orm.RelationshipProperty:
     """Returns Python-side well documented many-to-one relationship.
 
@@ -417,7 +326,7 @@ def autodoc_ManyToOne(
     if rest:
         doc += sep + rest
 
-    return sqlalchemy.orm.relationship(tablename, *args, doc=doc, **kwargs)
+    return sqlalchemy.orm.relationship(tablename, *args, doc=doc, lazy=lazy, **kwargs)
 
 
 def autodoc_OneToMany(tablename: str, *args, doc: str = "", **kwargs) -> sqlalchemy.orm.RelationshipProperty:
@@ -510,7 +419,41 @@ def autodoc_ManyToMany(tablename: str, *args, doc: str = "", **kwargs) -> sqlalc
 # ---- Connection function
 
 
-def connect() -> None:
+class _DiscordObjectsEncoder(json.JSONEncoder):
+    def default(self, obj):
+        match obj:
+            case discord.abc.GuildChannel() | discord.app_commands.AppCommandChannel():
+                return {"__discord_type__": "channel", "__discord_id__": obj.id}
+            case discord.Member():
+                return {"__discord_type__": "member", "__discord_id__": obj.id}
+            case discord.Role():
+                return {"__discord_type__": "role", "__discord_id__": obj.id}
+            case _:
+                # Let the base class default method raise the TypeError
+                return super().default(obj)
+
+
+class _DiscordObjectsDecoder(json.JSONDecoder):
+    def __init__(self, *, object_hook: Callable[[dict[str, Any]], Any] | None = None, **kwargs) -> None:
+        self._object_hook = object_hook or (lambda dic: dic)
+        super().__init__(object_hook=self.discord_object_hook, **kwargs)
+
+    def discord_object_hook(self, dic: dict[str, Any]):
+        object_id = dic.get("__discord_id__", 0)
+        match dic.get("__discord_type__"):
+            case None:
+                return self._object_hook(dic)
+            case "channel":
+                return config.guild.get_channel(object_id)
+            case "member":
+                return config.guild.get_member(object_id)
+            case "role":
+                return config.guild.get_role(object_id)
+            case other:
+                raise ValueError(f"Unhandled __discord_type__ in custom JSON: {other}")
+
+
+async def connect() -> Callable[[], sqlalchemy.ext.asyncio.AsyncSession]:
     """Se connecte à la base de données et prépare les objets connectés.
 
     - Utilise la variable d'environment ``LGREZ_DATABASE_URI``
@@ -519,11 +462,68 @@ def connect() -> None:
     """
     LGREZ_DATABASE_URI = env.load("LGREZ_DATABASE_URI")
     # Moteur SQL : connexion avec le serveur
-    config.engine = sqlalchemy.create_engine(LGREZ_DATABASE_URI, pool_pre_ping=True)
+    config.engine = sqlalchemy.ext.asyncio.create_async_engine(
+        LGREZ_DATABASE_URI,
+        pool_pre_ping=True,
+        json_serializer=_DiscordObjectsEncoder().encode,
+        json_deserializer=_DiscordObjectsDecoder().decode,
+    )
+
+    async with config.engine.begin() as conn:
+        await conn.run_sync(TableBase.metadata.create_all)
 
     # Création des tables si elles n'existent pas déjà
-    TableBase.metadata.create_all(config.engine)
+    return sqlalchemy.orm.sessionmaker(
+        bind=config.engine, expire_on_commit=False, class_=sqlalchemy.ext.asyncio.AsyncSession
+    )
 
-    # Ouverture de la session
-    Session = sqlalchemy.orm.sessionmaker(bind=config.engine)
-    config.session = Session()
+
+_T = typing.TypeVar("_T", bound=TableMeta)
+
+
+class Select(Generic[_T]):
+    def __init__(self, table: type[_T]) -> None:
+        self.table = table
+        self.statement: sqlalchemy.sql.expression.Select = sqlalchemy.select(table)
+
+    def where(self, *clauses: sqlalchemy.sql.expression.BinaryExpression) -> Select[_T]:
+        self.statement.where(*clauses)
+        return self
+
+    def order_by(self, *columns: sqlalchemy.sql.expression.ColumnElement) -> Select[_T]:
+        self.statement.order_by(*columns)
+        return self
+
+    async def _scalars(self, statement: sqlalchemy.sql.expression.Select) -> sqlalchemy.engine.ScalarResult:
+        return await config.session.scalars(statement)
+
+    async def all(self) -> list[_T]:
+        result = await self._scalars(self.statement)
+        return result.all()
+
+
+class Data:
+    @staticmethod
+    def select(table: type[_T]) -> Select[_T]:
+        return Select(table)
+
+    @staticmethod
+    async def get(table: type[_T], id) -> _T | None:
+        return await config.session.get(table, id)
+
+    @staticmethod
+    async def commit() -> None:
+        await config.session.commit()
+
+    @staticmethod
+    async def add(*objects: _T, commit: bool = True) -> None:
+        config.session.add_all(objects)
+        if commit:
+            await Data.commit()
+
+    @staticmethod
+    async def delete(*objects: _T, commit: bool = True) -> None:
+        for object in objects:
+            await config.session.delete(object)
+        if commit:
+            await Data.commit()

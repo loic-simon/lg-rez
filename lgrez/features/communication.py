@@ -35,7 +35,7 @@ from lgrez.features.sync import transtype
 
 def _joueur_repl(mtch: re.Match) -> str:
     """Remplace @... par la mention d'un joueur, si possible"""
-    nearest = Joueur.find_nearest(mtch.group(1), col=Joueur.nom, sensi=0.8)
+    nearest = await Joueur.find_nearest(mtch.group(1), col=Joueur.nom, sensi=0.8)
     if nearest:
         joueur = nearest[0][0]
         try:

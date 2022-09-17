@@ -7,7 +7,7 @@ Déclaration de toutes les tables, colonnes, méthodes, et connection à la BDD
 from sqlalchemy.exc import SQLAlchemyError, OperationalError as DriverOperationalError
 
 from lgrez.bdd import base
-from lgrez.bdd.base import connect, tables
+from lgrez.bdd.base import connect, tables, Data
 from lgrez.bdd.enums import Statut, ActionTrigger, CandidHaroType, Vote, UtilEtat, CibleType
 from lgrez.bdd.model_joueurs import Joueur, CandidHaro, Boudoir, Bouderie
 from lgrez.bdd.model_jeu import Role, Camp, BaseAction, BaseCiblage

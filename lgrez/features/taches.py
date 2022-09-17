@@ -11,7 +11,7 @@ from discord import app_commands
 
 from lgrez import commons
 from lgrez.blocs import tools
-from lgrez.bdd import Tache, Action
+from lgrez.bdd import Data, Tache, Action
 from lgrez.blocs.journey import DiscordJourney, journey_command
 from lgrez.features import communication
 
@@ -61,7 +61,7 @@ async def taches(journey: DiscordJourney):
     Affiche les commandes en attente d'exécution et le timestamp d'exécution associé.
     Lorsque la tâche est liée à une action, affiche le nom de l'action et du joueur concerné.
     """
-    lst: list[Tache] = Tache.query.order_by(Tache.timestamp).all()
+    lst = await Data.select(Tache).order_by(Tache.timestamp).all()
     rep = ""
     for tache in lst:
         rep += f"\n{str(tache.id).ljust(5)} {tache.timestamp:%d/%m/%Y %H:%M:%S}    {tache.description.ljust(25)} "
@@ -104,10 +104,11 @@ async def planif_command(timestamp: datetime.datetime, command: app_commands.Com
     action = None
     # ID de l'action associée à la tâche le cas échéant
     if command.name == "action" and (id := parameters.get("id")):  # open / close / remind
-        action = Action.query.get(int(id))
+        action = await Data.get(Action, int(id))
 
     tache = Tache(timestamp=timestamp, commande=command.qualified_name, parameters=parameters, action=action)
-    tache.add()  # Planifie la tâche
+    tache.register()  # Planifie la tâche
+    await Data.add(tache)
     return tache
 
 
@@ -162,8 +163,8 @@ async def cancel(journey: DiscordJourney, *, id: int):
 
     Utiliser ``!taches`` pour voir la liste des IDs.
     """
-    if tache := Tache.query.get(int(id)):
-        tache.delete()
+    if tache := await Data.get(Tache, id):
+        await Data.delete(tache)
         await journey.final_message(
             f"Tâche annulée :\n```/planif command {tache.timestamp:%d/%m/%Y %X}\n{tache.description}```"
         )

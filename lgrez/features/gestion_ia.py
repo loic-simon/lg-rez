@@ -282,7 +282,7 @@ async def list_ia(journey: DiscordJourney, trigger: str | None = None, sensi: fl
         sensi: Sensibilité de détection (ratio des caractères correspondants, entre 0 et 1), défaut 0.5
     """
     if trigger:
-        trigs = Trigger.find_nearest(trigger, col=Trigger.trigger, sensi=sensi, solo_si_parfait=False)
+        trigs = await Trigger.find_nearest(trigger, col=Trigger.trigger, sensi=sensi, solo_si_parfait=False)
         if not trigs:
             await journey.final_message(f"Rien trouvé, pas de chance (sensi = {sensi})")
             return
@@ -338,7 +338,7 @@ async def modif_ia(journey: DiscordJourney, *, trigger: str):
     (construction d'une  séquence de réponses successives ou aléatoires)
     ou de supprimer la réaction.
     """
-    trigs = Trigger.find_nearest(trigger, col=Trigger.trigger)
+    trigs = await Trigger.find_nearest(trigger, col=Trigger.trigger)
     if not trigs:
         await journey.final_message("Rien trouvé.")
         return
@@ -448,7 +448,7 @@ async def trigger_roles(
     Returns:
         Si un rôle a été trouvé (sensibilité ``> sensi``) et qu'une réponse a été envoyée.
     """
-    roles = Role.find_nearest(message.content, col=Role.nom, filtre=(Role.actif.is_(True)), sensi=sensi)
+    roles = await Role.find_nearest(message.content, col=Role.nom, filtre=(Role.actif.is_(True)), sensi=sensi)
 
     if roles:  # Au moins un trigger trouvé à cette sensi
         await send_callable(embed=roles[0][0].embed)
@@ -480,7 +480,7 @@ async def trigger_reactions(
     """
     if not chain:  # Si pas précisé,
         chain = message.content  # contenu de message
-    trigs = Trigger.find_nearest(chain, col=Trigger.trigger, sensi=sensi)
+    trigs = await Trigger.find_nearest(chain, col=Trigger.trigger, sensi=sensi)
 
     if trigs:  # Au moins un trigger trouvé à cette sensi
         trig = trigs[0][0]  # Meilleur trigger (score max)
