@@ -27,6 +27,9 @@ class _FakeInteraction(discord.Interaction):
         def is_done(self):
             return True
 
+        async def defer(*args, **kwargs):
+            pass
+
     class _FakeInteractionFollowup:
         def __init__(self, message: discord.Message) -> None:
             self.send = message.reply

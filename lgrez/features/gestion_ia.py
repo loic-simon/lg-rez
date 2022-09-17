@@ -161,12 +161,10 @@ async def fals(journey: DiscordJourney, force: Literal["on", "off"] = None):
 
 
 class _FakeMessage:
-    def __init__(
-        self, channel: discord.TextChannel, content: str, author: discord.Member, interaction: discord.Interaction
-    ) -> None:
+    def __init__(self, channel: discord.TextChannel, author: discord.Member, content: str) -> None:
         self.channel = channel
-        self.content = content
         self.author = author
+        self.content = content
 
     async def add_reaction(emoji: discord.Emoji | str) -> None:
         pass
@@ -184,7 +182,7 @@ async def react(journey: DiscordJourney, *, trigger: str):
 
     Si utilisée par un MJ, active aussi le mode débug des évaluations Python (messages d'erreur).
     """
-    message = _FakeMessage(journey.channel, trigger, journey.member, journey.interaction)
+    message = _FakeMessage(journey.channel, journey.member, trigger)
     debug = journey.member.top_role >= config.Role.mj
     await process_ia(message, journey.final_message, debug=debug)
 

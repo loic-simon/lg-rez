@@ -54,6 +54,8 @@ async def do(journey: DiscordJourney, *, code: str):
     À utiliser avec parcimonie donc, et QUE pour du développement/debug !
     """
 
+    await journey.interaction.response.defer(thinking=True)
+
     class Answer:
         rep = None
 
