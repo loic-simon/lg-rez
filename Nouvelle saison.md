@@ -51,26 +51,29 @@ Le bot devrait alors changer de serveur et devrait alors poster un message dans 
 - Créer un dossier pour la dernière saison, si les flemmards de MJ passé l'ont pas déjà fait
 - Créer une copie (Clic doit > Créer une copie) des QUATRE sheets à la racine du Drive, et déplacer LES COPIES dans
   le dossier de l'ancienne saison pour archive. **NE PAS DÉPLACER LES ORIGINAUX**, c'est eux auquel le bot accèdera !
-- Ouvrir le [Tableau de bord](), cliquer sur `Extensions > Macros > Clean backup feuilles`
+- Ouvrir le [Tableau de bord](https://docs.google.com/spreadsheets/u/0/d/1pmpcWxxAx_u5bNRmJRtd876qj0ZT5GHZ-_IdQQGbN1Y),
+  cliquer sur `Extensions > Macros > Clean backup feuilles`
 - Nettoyer la feuille Journée en cours en **AFFICHANT LES COLONNES A-K** puis en effaçant (suppr) toutes les lignes
   joueurs SUR LES COLONNES A-S : attention, **ne PAS effacer les colonnes T et U** !
   (la colonne V par contre pas de problème)
 - Il restera quelques trucs à nettoyer (jor les premières feuilles), vous êtes grands
-- Ouvrir le fichier [Données brutes]() et supprimer les lignes des quatre premières feuilles (celles en `_brut`,
-  **PAS** les autres), **SAUF la première ligne** de chaque
+- Ouvrir les [Données brutes](https://docs.google.com/spreadsheets/u/0/d/1P_C_ixpEwQfMRa9jHjJS9QYGX3WjOnLW0KYZlu_MREs)
+  et supprimer les lignes des quatre premières feuilles (celles en `_brut`, **PAS** les autres),
+  **SAUF la première ligne** de chaque
 
 ## Invitation des joueurs et lancement du jeu
 
-- Une fois tout validé dans [Rôles et actions](), appeler `/fillroles`
+- Une fois les [Rôles et actions](https://docs.google.com/spreadsheets/u/0/d/1NR1NGM1LdjV4kWR4L9rI5HL_khUCPu8wixTtoazyzjA)
+  validés, lancer `/fillroles`
 - Mettre les (autres) messages de base dans tous les salons où il en faut
 - Si ça n'a pas été fait précédemment, modifier la date de début de saison et la chambre MJ dans start_bot.py
 - Les joueurs peuvent maintenant être invités !
 - À la fin de la période d'inscription, **RÉVOQUER TOUTES LES INVITATIONS**
-- Le jour du lancement après 10h, appeler `/cparti` et **BIEN LIRE TOUTES LES INSTRUCTIONS** pitié
+- Le jour du lancement après 10h, lancer `/cparti` et **BIEN LIRE TOUTES LES INSTRUCTIONS** pitié
 - Bon jeu !
 
 ## À la fin de la saison
 
 - Féliciter le camp nécro pour sa victoire
-- Appeler `/cfini` et **BIEN LIRE TOUTES LES INSTRUCTIONS** pitié
+- Lancer `/cfini` et **BIEN LIRE TOUTES LES INSTRUCTIONS** pitié
 - Bon repos !
