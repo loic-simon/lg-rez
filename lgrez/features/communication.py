@@ -95,50 +95,36 @@ async def send(journey: DiscordJourney, *, cibles: str, message: str):
     """Envoie un message à tous ou certains joueurs (COMMANDE MJ)
 
     Args:
-        cibles: Destinataires (all, vivants, morts, <crit>=<filtre>)
+        cibles: Destinataires (`all`, `vivants`, `morts`, `<crit>=<filtre>`, `<joueur`)
         message: Message, éventuellement formaté ({member.mention}, ...)
 
     ``cibles`` peut être :
         - ``all`` :             Tous les joueurs inscrits, vivants et morts
         - ``vivants`` :         Les joueurs en vie
         - ``morts`` :           Les joueurs morts
-        - ``<crit>=<filtre>`` : Les joueurs répondant au critère
-            ``Joueur.<crit> == <filtre>``. ``crit`` peut être ``"nom"``,
-            ``"chambre"``, ``"statut"``, ``"role"``, ``"camp"``...
-            L'ensemble doit être entouré de guillemets si ``filtre``
-            contient un espace. Les rôles/camps sont cherchés par slug.
-        - *le nom d'un joueur*  (raccourci pour ``nom=X``, doit être
-            entouré de guillemets si nom + prénom)
+        - ``<crit>=<filtre>`` : Les joueurs répondant au critère ``Joueur.<crit> == <filtre>``.
+            ``crit`` peut être ``"nom"``, ``"chambre"``, ``"statut"``, ``"role"``, ``"camp"``...
+            L'ensemble doit être entouré de guillemets si ``filtre`` contient un espace.
+            Les rôles/camps sont cherchés par slug.
+        - *le nom d'un joueur*  (raccourci pour ``nom=X``, doit être entouré de guillemets si nom + prénom)
 
-    ``message`` peut contenir un ou plusieurs bouts de code Python
-    à évaluer, entourés d'accolades.
+    ``message`` peut contenir un ou plusieurs bouts de code Python à évaluer, entourés d'accolades.
 
-    L'évaluation est faite séparément pour chaque joueur, ce qui
-    permet de personnaliser le message grâce aux variables
-    particulières dépendant du joueur :
+    L'évaluation est faite séparément pour chaque joueur, ce qui permet de personnaliser le message
+    grâce aux variables particulières dépendant du joueur :
 
-        - ``joueur`` :  objet BDD du joueur recevant le message
-            ==> ``joueur.nom``, ``joueur.role``...
-        - ``member`` :  objet :class:`discord.Member` associé
-            ==> ``member.mention``
-        - ``chan`` :    objet :class:`discord.TextChannel` du
-            chan privé du joueur
+        - ``joueur`` :  objet BDD du joueur recevant le message ==> ``joueur.nom``, ``joueur.role``...
+        - ``member`` :  objet :class:`discord.Member` associé ==> ``member.mention``
+        - ``chan``   :  objet :class:`discord.TextChannel` du chan privé du joueur
 
-    Attention :
-        - ``ctx`` :     objet :class:`discord.ext.commands.Context`
-            de ``!send``  ==> ``ctx.author`` = lanceur de la commande !!!
-
-    Les différentes tables de données sont accessibles sous leur nom
-    (``Joueur``, ``Role``...)
+    Les différentes tables de données sont accessibles sous leur nom (``Joueur``, ``Role``...)
 
     Il est impossible d'appeler des coroutines (await) dans le code à évaluer.
 
     Examples:
         - ``!send all Bonsoir à tous c'est Fanta``
-        - ``!send vivants Attention {member.mention},
-            derrière toi c'est affreux !``
-        - ``!send "role=servante" Ça va vous ?
-            Vous êtes bien {joueur.role.nom} ?``
+        - ``!send vivants Attention {member.mention}, derrière toi c'est affreux !``
+        - ``!send "role=servante" Ça va vous ? Vous êtes bien {joueur.role.nom} ?``
     """
     if cibles == "all":
         joueurs = Joueur.query.all()
@@ -161,10 +147,10 @@ async def send(journey: DiscordJourney, *, cibles: str, message: str):
     descr = f"Cibles : {cibles}\nMessage : {message}\n"
 
     if not joueurs:
-        await journey.final_message(f"{descr}:x: Aucun joueur trouvé.")
+        await journey.send(f"{descr}:x: Aucun joueur trouvé.")
         return
 
-    await journey.final_message(f"{descr}:arrow_forward: {len(joueurs)} trouvé(s), envoi...")
+    await journey.send(f"{descr}:arrow_forward: {len(joueurs)} trouvé(s), envoi...")
     for joueur in joueurs:
         member = joueur.member
         chan = joueur.private_chan
@@ -182,12 +168,12 @@ async def post(journey: DiscordJourney, *, chan: discord.TextChannel, message: s
     """Envoie un message dans un salon (COMMANDE MJ)
 
     Args:
-        chan: Salon ou poster le message
-        message: Message à envoyer (utiliser "\n" pour un saut de ligne)
+        chan: Salon ou poster le message.
+        message: Message à envoyer (utiliser "\n" pour un saut de ligne).
     """
     message = message.replace(r"\n", "\n")
     await chan.send(message)
-    await journey.final_message(f"Message posté sur {chan.mention} :\n" + tools.quote_bloc(message))
+    await journey.send(f"Message posté sur {chan.mention} :\n" + tools.quote_bloc(message))
 
 
 @app_commands.command()
@@ -196,17 +182,14 @@ async def post(journey: DiscordJourney, *, chan: discord.TextChannel, message: s
 async def plot(journey: DiscordJourney, *, quoi: Literal["cond", "maire"], depuis: str | None = None):
     """Trace le résultat du vote et l'envoie sur #annonces (COMMANDE MJ)
 
-    Warning:
-        Commande en bêta, non couverte par les tests unitaires
-
     Args:
         quoi: Vote pour le condamné ou pour l'élection à la Mairie ?
-        depuis: heure à partir de laquelle compter les votes (si plusieurs votes dans la journée, HHh / HHhMM)
+        depuis: Heure à partir de laquelle compter les votes (si plusieurs votes dans la journée, HHh / HHhMM).
             Compte tous les votes du jour par défaut.
             Si plus tard que l'heure actuelle, compte les votes de la veille.
 
-    Trace les votes sous forme d'histogramme à partir du Tableau de bord,
-    en fait un embed en précisant les résultats détaillés et l'envoie sur le chan ``#annonces``.
+    Trace les votes sous forme d'histogramme à partir du Tableau de bord, en fait un embed
+    en précisant les résultats détaillés et l'envoie sur le chan ``#annonces``.
 
     Si ``quoi == "cond"``, déclenche aussi les actions liées au mot des MJs (:attr:`.bdd.ActionTrigger.mot_mjs`).
     """
@@ -264,7 +247,7 @@ async def plot(journey: DiscordJourney, *, quoi: Literal["cond", "maire"], depui
 
             votant = util.ciblage("cible").valeur
             vote = util.ciblage("vote").valeur
-            log += f"{util.action.joueur.nom} : " f"{votant.nom} -> {vote.nom} / "
+            log += f"{util.action.joueur.nom} : {votant.nom} -> {vote.nom} / "
 
             initial_vote = votes.get(votant)
             if initial_vote:
@@ -430,7 +413,7 @@ async def plot(journey: DiscordJourney, *, quoi: Literal["cond", "maire"], depui
     # Un objet File ne peut servir qu'une fois, il faut le recréer
 
     await config.Channel.annonces.send("@everyone Résultat du vote ! :fire:", file=file, embed=embed)
-    await journey.final_message(f"Et c'est parti dans {config.Channel.annonces.mention} !")
+    await journey.send(f"Et c'est parti dans {config.Channel.annonces.mention} !")
 
     if quoi == "cond":
         # Actions au mot des MJs
@@ -455,11 +438,11 @@ async def annoncemort(
     """Annonce un ou plusieurs mort(s) hors-vote (COMMANDE MJ)
 
     Args:
-        victime: (premier) mort à annoncer
-        victime_2: Deuxième mort à annoncer
-        victime_3: Troisième mort à annoncer
-        victime_4: Quatrième mort à annoncer
-        victime_5: Cinquième mort à annoncer (pour plus, faire en 2 fois)
+        victime: (Premier) mort à annoncer.
+        victime_2: Deuxième mort à annoncer.
+        victime_3: Troisième mort à annoncer.
+        victime_4: Quatrième mort à annoncer.
+        victime_5: Cinquième mort à annoncer (pour plus, faire en 2 fois, merde)
 
     Envoie un embed par mort dans ``#annonces``
     """
@@ -499,7 +482,7 @@ async def annoncemort(
 
     await journey.ok_cancel("Ça part ?", embeds=embeds)
     await config.Channel.annonces.send("@everyone Il s'est passé quelque chose ! :scream:", embeds=embeds)
-    await journey.final_message(f"Et c'est parti dans {config.Channel.annonces.mention} !")
+    await journey.send(f"Et c'est parti dans {config.Channel.annonces.mention} !")
 
 
 @app_commands.command()
@@ -522,7 +505,7 @@ async def lore(journey: DiscordJourney, doc_id: str):
     récupérer la version formatée du texte (pour copier-coller).
 
     Args:
-        doc_id: ID ou URL du document (doit être public ou dans le Drive partagé avec le compte de service)
+        doc_id: ID ou URL du document (doit être public ou dans le Drive LG Rez).
     """
     if len(doc_id) < 44:
         raise commons.UserInputError("doc_id", "Doit être l'ID ou l'URL d'un document Google Docs")
@@ -533,7 +516,7 @@ async def lore(journey: DiscordJourney, doc_id: str):
         else:
             raise commons.UserInputError("doc_id", "Doit être l'ID ou l'URL d'un document Google Docs")
 
-    await journey.final_message("Récupération du document...")
+    await journey.send("Récupération du document...")
     async with journey.channel.typing():
         content = gsheets.get_doc_content(doc_id)
 
@@ -587,11 +570,11 @@ async def lore(journey: DiscordJourney, doc_id: str):
 
     if choice == "publish":
         await tools.send_blocs(config.Channel.annonces, formatted_text)
-        await journey.final_message("Fait !")
+        await journey.send("Fait !")
     elif choice == "get_raw":
-        await journey.final_message(formatted_text, code=True)
+        await journey.send(formatted_text, code=True)
     else:
-        await journey.final_message("Mission aborted.")
+        await journey.send("Mission aborted.")
 
 
 @app_commands.context_menu(name="Modifier ce message")
@@ -600,33 +583,20 @@ async def lore(journey: DiscordJourney, doc_id: str):
 async def modif(journey: DiscordJourney, message: discord.Message):
     """Modifie un message du bot (COMMANDE MJ)
 
-    Args:
-        ref: référence vers le message à modifier, peut être
-
-            - le lien du message,
-            - son couple d'IDs dans le serveur (salon-message),
-            - son ID seul (seulement si message dans ce salon),
-            - un nom/mention de salon (si le dernier message est du bot),
-            - rien, si on répond au message à modifier.
-
-        modifs: modifications à faire, sous la forme "avant > après"
-            (ou juste "> après" pour tout remplacer).
-
-    Il n'est pas possible (pour le moment ?) de modifier une image,
-    pièce jointe ou embed.
+    Il n'est pas possible (pour le moment ?) de modifier une image, pièce jointe ou embed.
     """
     if message.author == journey.member:
-        await journey.final_message(
-            "Pour modifier ton propre message, utilise le petit crayon\n(blaireau)", ephemeral=True
-        )
+        await journey.send("Pour modifier ton propre message, utilise le petit crayon\n(blaireau)", ephemeral=True)
         return
 
     if message.author != config.bot.user:
-        await journey.final_message("Les messages des autres membres ne sont pas modifiables !", ephemeral=True)
+        await journey.send(":x: Les messages des autres membres ne sont pas modifiables !", ephemeral=True)
         return
 
     (content,) = await journey.modal(
         "Modifier le message",
-        discord.ui.TextInput(label="Contenu", style=discord.TextStyle.paragraph, default=message.content),
+        discord.ui.TextInput(
+            label="Contenu", style=discord.TextStyle.paragraph, default=message.content, min_length=1, max_length=2000
+        ),
     )
     await message.edit(content=content)

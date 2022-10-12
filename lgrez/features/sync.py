@@ -13,14 +13,13 @@ import time
 import traceback
 from typing import Any
 
-from discord import Embed
-from discord.ext import commands
+from discord import app_commands
 import sqlalchemy
 import sqlalchemy.orm
 
 from lgrez import config, bdd
 from lgrez.blocs import tools, env, gsheets
-from lgrez.bdd import Joueur, Action, Role, Camp, BaseAction, BaseCiblage, Statut, ActionTrigger
+from lgrez.bdd import Joueur, Role, Camp, BaseAction, BaseCiblage, Statut, ActionTrigger
 from lgrez.blocs.journey import DiscordJourney, journey_command
 from lgrez.features import gestion_actions
 
@@ -108,7 +107,7 @@ class _ComparaisonResults:
         if self.add:
             r += f"- Nouvelles entrées ({self.n_add}) : {self.add}\n"
         if self.upd:
-            r += f"- Entrées modifiées ({self.n_upd}, total attrs " f"{self.n_tot_attr_upd}) : {self.upd}\n"
+            r += f"- Entrées modifiées ({self.n_upd}, total attrs {self.n_tot_attr_upd}) : {self.upd}\n"
         if self.suppr:
             r += f"- Entrées supprimées ({self.n_suppr}) : {self.suppr}\n"
         return r
@@ -188,31 +187,27 @@ def transtype(value: Any, cst) -> sqlalchemy.schema.Column | bdd.base.TableMeta 
 
     Args:
         value (Any): valeur à transtyper.
-        cst: colonne, table ou relationship (many-to-one) associée.
+        cst: Colonne, table ou relationship (many-to-one) associée.
 
     Types pris en charge dans le cas d'une colonne :
 
-        - :class:`sqlalchemy.types.String` et dérivés
-          (``Text``, ``Varchar``...)
-        - :class:`sqlalchemy.types.Integer` et dérivés
-          (``BigInteger``...)
+        - :class:`sqlalchemy.types.String` et dérivés (``Text``, ``Varchar``...)
+        - :class:`sqlalchemy.types.Integer` et dérivés (``BigInteger``...)
         - :class:`sqlalchemy.types.Boolean`
         - :class:`sqlalchemy.types.Time`
         - :class:`sqlalchemy.types.Enum`
 
-    Dans le cas d'une table ou d'une relation many-to-one vers une table,
-    ``value`` est interprété comme la clé primaire de la table / de la table
-    liée. Les valeurs interprétées ``None`` ne sont pas acceptées, même dans
-    le cas d'une relation avec contrainte One-to-many faite *nullable*.
+    Dans le cas d'une table ou d'une relation many-to-one vers une table, ``value`` est interprété
+    comme la clé primaire de la table / de la table liée.  Les valeurs interprétées ``None`` ne sont
+    pas acceptées, même dans le cas d'une relation avec contrainte One-to-many faite *nullable*.
 
     Returns:
-        L'objet Python correspondant au type de la colonne / table liée
-        (:class:`str`, :class:`int`, :class:`bool`, :class:`datetime.time`,
-        :class:`enum.Enum`, :class:`.bdd.base.TableBase`) ou ``None``
+        L'objet Python correspondant au type de la colonne / table liée (:class:`str`, :class:`int`,
+        :class:`bool`, :class:`datetime.time`, :class:`enum.Enum`, :class:`.bdd.base.TableBase`) ou ``None``
 
     Raises:
-        ValueError: la conversion n'est pas possible (ou ``value`` est
-            évaluée ``None`` et la colonne n'est pas *nullable*)
+        ValueError: la conversion n'est pas possible (ou ``value`` est évaluée ``None``
+            et la colonne n'est pas *nullable*).
         TypeError: type de colonne non pris en charge.
     """
     if isinstance(cst, sqlalchemy.orm.RelationshipProperty):
@@ -246,7 +241,7 @@ def transtype(value: Any, cst) -> sqlalchemy.schema.Column | bdd.base.TableMeta 
         inst = cst.query.get(value)
         if inst is None:
             raise ValueError(
-                f"Valeur '{value}' incorrecte pour la table '{cst.__name__}': " f"instance correspondante non trouvée."
+                f"Valeur '{value}' incorrecte pour la table '{cst.__name__}': instance correspondante non trouvée."
             )
 
         return inst
@@ -296,12 +291,11 @@ def transtype(value: Any, cst) -> sqlalchemy.schema.Column | bdd.base.TableMeta 
 async def get_sync() -> list[TDBModif]:
     """Récupère les modifications en attente sur le TDB.
 
-    Charge les données du Tableau de bord (variable d'environment
-    ``LGREZ_TDB_SHEET_ID``), compare les informations qui y figurent
-    avec celles de la base de données (:class:`.bdd.Joueur`).
+    Charge les données du Tableau de bord (variable d'environment ``LGREZ_TDB_SHEET_ID``),
+    compare les informations qui y figurent avec celles de la base de données (:class:`.bdd.Joueur`).
 
-    Supprime les joueurs en base absents du Tableau de bord, lève une
-    erreur dans le cas inverse, n'applique aucune autre modification.
+    Supprime les joueurs en base absents du Tableau de bord, lève une erreur dans le cas inverse,
+    n'applique aucune autre modification.
 
     Returns:
         La liste des modifications à apporter
@@ -426,9 +420,8 @@ async def validate_sync(modifs: list[TDBModif]) -> None:
     Args:
         modifs: liste des modifications à apporter.
 
-    Modifie sur le Tableau de bord (variable d'environment
-    ``LGREZ_TDB_SHEET_ID``) et applique les modifications contenues
-    dans ``modifs``.
+    Modifie sur le Tableau de bord (variable d'environment ``LGREZ_TDB_SHEET_ID``)
+    et applique les modifications contenues dans ``modifs``.
 
     Note:
         Fonction asynchrone depuis la version 2.2.2.
@@ -448,9 +441,9 @@ async def modif_joueur(joueur_id: int, modifs: list[TDBModif], silent: bool = Fa
     """Attribue les modifications demandées au joueur
 
     Args:
-        joueur_id: id Discord du joueur concerné.
-        modifs: liste des modifications à apporter.
-        silent: si ``True``, ne notifie pas le joueur des modifications.
+        joueur_id: ID Discord du joueur concerné.
+        modifs: Liste des modifications à apporter.
+        silent: Si ``True``, ne notifie pas le joueur des modifications.
 
     Returns:
         La liste des modifications appliquées et le changelog textuel associé (pour log global).
@@ -468,7 +461,7 @@ async def modif_joueur(joueur_id: int, modifs: list[TDBModif], silent: bool = Fa
     member = joueur.member
     chan = joueur.private_chan
 
-    changelog = f"\n- {member.display_name} " f"(@{member.name}#{member.discriminator}) :\n"
+    changelog = f"\n- {member.display_name} (@{member.name}#{member.discriminator}) :\n"
     notif = ""
     af = ":arrow_forward:"  # Flèche introduisant chaque modif
 
@@ -484,10 +477,10 @@ async def modif_joueur(joueur_id: int, modifs: list[TDBModif], silent: bool = Fa
             await member.edit(nick=modif.val)
             await chan.edit(name=f"{config.private_chan_prefix}{modif.val}")
             if not silent:
-                notif += f"{af} Tu t'appelles maintenant " f"{tools.bold(modif.val)}.\n"
+                notif += f"{af} Tu t'appelles maintenant {tools.bold(modif.val)}.\n"
 
         elif modif.col == "chambre" and not silent:  # Modification chambre
-            notif += f"{af} Tu habites maintenant " f"en chambre {tools.bold(modif.val)}.\n"
+            notif += f"{af} Tu habites maintenant en chambre {tools.bold(modif.val)}.\n"
 
         elif modif.col == "statut":
             if modif.val == Statut.vivant:  # Statut = vivant
@@ -542,7 +535,7 @@ async def modif_joueur(joueur_id: int, modifs: list[TDBModif], silent: bool = Fa
                 )
 
         elif modif.col == "camp" and not silent:  # Modification camp
-            notif += f"{af} Tu fais maintenant partie " f"du camp « {tools.bold(modif.val.nom)} ».\n"
+            notif += f"{af} Tu fais maintenant partie du camp « {tools.bold(modif.val.nom)} ».\n"
 
         elif modif.col == "votant_village" and not silent:
             if modif.val:  # votant_village = True
@@ -584,7 +577,7 @@ async def process_mort(joueur: Joueur) -> None:
         * Archivage des boudoirs devenus inutiles.
 
     Args:
-        joueur: le joueur qui vient de mourir.
+        joueur: Le joueur qui vient de mourir.
     """
     # Actions à la mort
     for action in joueur.actions_actives:
@@ -628,7 +621,7 @@ async def process_mort(joueur: Joueur) -> None:
 DESCRIPTION = """Commandes de synchronisation des GSheets vers la BDD et les joueurs"""
 
 
-@commands.command()
+@app_commands.command()
 @tools.mjs_only
 @journey_command
 async def sync(journey: DiscordJourney, *, silent: bool = False):
@@ -641,13 +634,15 @@ async def sync(journey: DiscordJourney, *, silent: bool = False):
     modifier la BDD, et appliquer les modifications dans Discord le cas échéant :
     renommage des utilisateurs, modification des rôles...
     """
+    await journey.interaction.response.defer()
+
     # Récupération de la liste des modifs
     modifs = await get_sync()
     silent = bool(silent)
     changelog = f"Synchronisation TDB (silencieux = {silent}) :"
 
     if not modifs:
-        await journey.final_message("Pas de nouvelles modifications.")
+        await journey.send("Pas de nouvelles modifications.")
         return
 
     dic = {}  # Dictionnaire {ID joueur: modifs}
@@ -682,32 +677,29 @@ async def sync(journey: DiscordJourney, *, silent: bool = False):
         await validate_sync(done)
 
     await tools.log(changelog, code=True)
-    await journey.final_message(mess + f":arrow_forward: Fait (voir {config.Channel.logs.mention} pour le détail)")
+    await journey.send(mess + f":arrow_forward: Fait (voir {config.Channel.logs.mention} pour le détail)")
 
 
-@commands.command()
+@app_commands.command()
 @tools.mjs_only
 @journey_command
 async def fillroles(journey: DiscordJourney):
     """Remplit les tables et #roles depuis le GSheet ad hoc (COMMANDE MJ)
 
-    - Remplit les tables :class:`.bdd.Camp`, :class:`.bdd.Role`,
-        :class:`.bdd.BaseAction` et :class:`.bdd.BaseCiblage` avec les
-        informations du Google Sheets "Rôles et actions" (variable
-        d'environnement ``LGREZ_ROLES_SHEET_ID``) ;
-    - Vide le chan ``#roles`` puis le remplit avec les descriptifs
-        de chaque rôle et camp.
+    - Remplit les tables :class:`.bdd.Camp`, :class:`.bdd.Role`, :class:`.bdd.BaseAction`
+        et :class:`.bdd.BaseCiblage` avec les informations du Google Sheets "Rôles et actions"
+        (variable d'environnement ``LGREZ_ROLES_SHEET_ID``) ;
+    - Vide le chan ``#roles`` puis le remplit avec les descriptifs de chaque rôle et camp.
 
     Utile à chaque début de saison / changement dans les rôles/actions.
-    Met à jour les entrées déjà en base, créé les nouvelles,
-    supprime celles obsolètes.
+    Met à jour les entrées déjà en base, créé les nouvelles, supprime celles obsolètes.
     """
     # ==== Mise à jour tables ===
     SHEET_ID = env.load("LGREZ_ROLES_SHEET_ID")
     workbook = await gsheets.connect(SHEET_ID)  # Rôles et actions
 
     for table in [Camp, Role, BaseAction]:
-        await journey.final_message(f"Remplissage de la table {tools.code(table.__name__)}...")
+        await journey.send(f"Remplissage de la table {tools.code(table.__name__)}...")
         # --- 1 : Récupération des valeurs
         async with journey.channel.typing():
             try:
@@ -723,13 +715,13 @@ async def fillroles(journey: DiscordJourney):
 
         # --- 2 : Détermination colonnes à récupérer
         cols = table.columns  # "dictionnaire" nom -> colonne
-        cols = {col: cols[col] for col in cols.keys() if not col.startswith("_")}  # Colonnes publiques
+        cols = {col: cols[col] for col in cols.keys() if col != "id" and not col.startswith("_")}  # Colonnes publiques
         if table == Role:
             cols["camp"] = Role.attrs["camp"]
         elif table == BaseAction:
             # BaseCiblages : au bout de la feuille
             bc_cols = BaseCiblage.columns
-            bc_cols = {col: bc_cols[col] for col in bc_cols.keys() if not col.startswith("_")}
+            bc_cols = {col: bc_cols[col] for col in bc_cols.keys() if col != "id" and not col.startswith("_")}
             bc_cols_for_ith = []
             for i in range(config.max_ciblages_per_action):
                 prefix = f"c{i + 1}_"
@@ -790,26 +782,26 @@ async def fillroles(journey: DiscordJourney):
         res = _compare_items(existants, new, table, cols, primary_key, bc_cols=bc_cols if table == BaseAction else None)
         config.session.commit()
 
-        await journey.final_message(f"> Table {tools.code(table.__name__)} remplie ! " + res.bilan)
+        await journey.send(f"> Table {tools.code(table.__name__)} remplie ! " + res.bilan)
         await tools.log(f"`!fillroles` > {table.__name__}:\n{res.log}")
         if table == BaseAction:
             sub_res = res.sub_results
-            await journey.final_message(f"> Table {tools.code('BaseCiblage')} remplie simultanément " + sub_res.bilan)
+            await journey.send(f"> Table {tools.code('BaseCiblage')} remplie simultanément " + sub_res.bilan)
             await tools.log(f"`!fillroles` > BaseCiblage:\n{sub_res.log}")
 
     # ==== Remplissage #rôles ===
     chan_roles = config.Channel.roles
     if not await journey.yes_no(f"Purger et re-remplir {chan_roles.mention} ?"):
-        await journey.final_message(f"Fini (voir {config.Channel.logs.mention}).")
+        await journey.send(f"Fini (voir {config.Channel.logs.mention}).")
         return
 
-    await journey.final_message(f"Vidage de {chan_roles.mention}...")
+    await journey.send(f"Vidage de {chan_roles.mention}...")
     async with journey.channel.typing():
         await chan_roles.purge(limit=1000)
 
     camps = Camp.query.filter_by(public=True).all()
     est = sum(len(camp.roles) + 2 for camp in camps) + 1
-    await journey.final_message(f"Remplissage... (temps estimé : {est} secondes)")
+    await journey.send(f"Remplissage... (temps estimé : {est} secondes)")
 
     t0 = time.time()
     await chan_roles.send("Voici la liste des rôles (voir aussi `/roles`) :")
@@ -830,4 +822,4 @@ async def fillroles(journey: DiscordJourney):
             await mess.reply("Accès rapide :             \N{UPWARDS BLACK ARROW}")
 
     rt = time.time() - t0
-    await journey.final_message(f"{chan_roles.mention} rempli ! (en {rt:.4} secondes)")
+    await journey.send(f"{chan_roles.mention} rempli ! (en {rt:.4} secondes)")

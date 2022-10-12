@@ -159,7 +159,7 @@ class Joueur(base.TableBase):
         """
         result = config.guild.get_channel(self.chan_id_)
         if not result:
-            raise ValueError("Joueur.private_chan : " f"pas de chan pour `{self}` !")
+            raise ValueError(f"Joueur.private_chan : pas de chan pour `{self}` !")
 
         return result
 
@@ -411,7 +411,7 @@ class Boudoir(base.TableBase):
         """
         boudoir = cls.query.get(channel.id)
         if not boudoir:
-            raise ValueError("Boudoir.from_channel : " f"pas de boudoir en base pour `{channel.mention}` !")
+            raise ValueError(f"Boudoir.from_channel : pas de boudoir en base pour `{channel.mention}` !")
 
         return boudoir
 

@@ -56,7 +56,7 @@ class TimestampTransformer(app_commands.Transformer):
 @tools.mjs_only
 @journey_command
 async def taches(journey: DiscordJourney):
-    """Liste les tâches en attente (COMMANDE MJ)
+    """Liste les tâches actuellement planifiées (COMMANDE MJ)
 
     Affiche les commandes en attente d'exécution et le timestamp d'exécution associé.
     Lorsque la tâche est liée à une action, affiche le nom de l'action et du joueur concerné.
@@ -79,7 +79,7 @@ async def taches(journey: DiscordJourney):
         prefix = "Aucune tâche en attente."
         mess = ""
 
-    await journey.final_message(mess, code=True, prefix=prefix)
+    await journey.send(mess, code=True, prefix=prefix)
 
 
 planif = app_commands.Group(name="planif", description="Planification de commandes")
@@ -93,7 +93,7 @@ async def _planif(journey: DiscordJourney, quand: datetime.datetime, command: ap
 
     tache = await planif_command(quand, command, **parameters)
 
-    await journey.final_message(
+    await journey.send(
         mess
         + f":arrow_forward: Commande `{tache.description}` planifiée pour le {quand:%d/%m/%Y} à {quand:%H:%M:%S}.\n"
         f"`/cancel {tache.id}` pour annuler."
@@ -121,12 +121,12 @@ async def post(
     chan: discord.TextChannel,
     message: str,
 ):
-    """Planifie l'envoi d'un message dans un salon (raccourci pour /post command, COMMANDE MJ)
+    """Planifie l'envoi d'un message dans un salon (raccourci pour /planif command, COMMANDE MJ)
 
     Args:
-        quand: Quand planifier la commande (date optionnelle, défaut aujourd’hui, année / minutes / secondes aussi)
-        chan: Salon ou poster le message
-        message: Message à envoyer (utiliser "\n" pour un saut de ligne)
+        quand: Quand planifier la commande (date optionnelle, défaut aujourd’hui, année / minutes / secondes aussi).
+        chan: Salon ou poster le message.
+        message: Message à envoyer (utiliser "\n" pour un saut de ligne).
 
     Si la date spécifiée est dans le passé, la commande est planifiée pour le lendemain.
     """
@@ -140,7 +140,7 @@ async def command(journey: DiscordJourney, *, quand: app_commands.Transform[date
     """Planifie l'exécution d'une commande quelconque (COMMANDE MJ)
 
     Args:
-        quand: Quand planifier la commande (date optionnelle, défaut aujourd’hui, année / minutes / secondes aussi)
+        quand: Quand planifier la commande (date optionnelle, défaut aujourd’hui, année / minutes / secondes aussi).
 
     Ne pas planifier de commandes avec confirmation / modale !
 
@@ -158,14 +158,12 @@ async def cancel(journey: DiscordJourney, *, id: int):
     """Annule une tâche planifiée (COMMANDE MJ)
 
     Args:
-        id: ID de la tâche à annuler (voir /taches)
+        id: ID de la tâche à annuler (voir /taches).
 
     Utiliser ``!taches`` pour voir la liste des IDs.
     """
     if tache := Tache.query.get(int(id)):
         tache.delete()
-        await journey.final_message(
-            f"Tâche annulée :\n```/planif command {tache.timestamp:%d/%m/%Y %X}\n{tache.description}```"
-        )
+        await journey.send(f"Tâche annulée :\n```/planif command {tache.timestamp:%d/%m/%Y %X}\n{tache.description}```")
     else:
-        await journey.final_message("Aucune tâche trouvée.")
+        await journey.send(f":x: Tâche #{id} introuvable.")

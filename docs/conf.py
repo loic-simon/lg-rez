@@ -300,7 +300,7 @@ def replace(match):
                     aliastext = f" (alias {aliases})"
 
                 # Anchor (:ref: links)
-                txt += f"{indent_in_in_in if i else indent_in_in}" f".. _{command.name}_{opt.name}:\n"
+                txt += f"{indent_in_in_in if i else indent_in_in}.. _{command.name}_{opt.name}:\n"
                 if i == 0:
                     txt += "\n"
 

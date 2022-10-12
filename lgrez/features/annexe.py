@@ -8,14 +8,12 @@ import random
 import requests
 import datetime
 
-import discord
 from discord import app_commands
 from akinator.async_aki import Akinator
 
-from lgrez import config
+from lgrez import config, commons
 from lgrez.blocs import tools
 from lgrez.blocs.journey import DiscordJourney, journey_command
-from lgrez.commons import UserInputError
 from lgrez.bdd import Joueur, Role, Camp
 
 
@@ -27,20 +25,15 @@ next_roll = None
 @app_commands.command()
 @journey_command
 async def roll(journey: DiscordJourney, *, pattern: str):
-    """Lance un ou plusieurs dés
+    """Lance un ou plusieurs dés, ou tire un nom dans un liste.
 
     Args:
-        pattern: Dés à lancer (XdY [+ ...] [+ Z ...])
-            OU roll spécial (joueur / vivant / mort / rôle / camp).
-            avec X le nombre de dés,
-            Y le nombre de faces et Z les modificateurs (constants) ;
+        pattern: Dés à lancer (XdY [+ ...] [+ Z ...]) OU roll spécial (joueur / vivant / mort / rôle / camp).
 
     Examples:
         - ``!roll 1d6``           -> lance un dé à 6 faces
-        - ``!roll 1d20 +3``       -> lance un dé à 20 faces,
-            ajoute 3 au résultat
-        - ``!roll 1d20 + 2d6 -8`` -> lance un dé 20 plus deux dés 6,
-            enlève 8 au résultat
+        - ``!roll 1d20 +3``       -> lance un dé à 20 faces, ajoute 3 au résultat
+        - ``!roll 1d20 + 2d6 -8`` -> lance un dé 20 plus deux dés 6, enlève 8 au résultat
         - ``!roll vivant``        -> choisit un joueur vivant
     """
     global next_roll
@@ -70,7 +63,7 @@ async def roll(journey: DiscordJourney, *, pattern: str):
         if next_roll is not None:
             result = next_roll
             next_roll = None
-        await journey.final_message(result)
+        await journey.send(result)
         return
 
     parts = inp.replace(" ", "").replace("-", "+-").split("+")
@@ -88,10 +81,10 @@ async def roll(journey: DiscordJourney, *, pattern: str):
                 if faces < 1:
                     raise ValueError
             except ValueError:
-                raise UserInputError("pattern", f"Pattern de dé non reconnu : {part}")
+                raise commons.UserInputError("pattern", f"Pattern de dé non reconnu : {part}")
             # Sécurité
             if abs(nb) > 1000 or faces > 1000000:
-                await journey.final_message.send_message(
+                await journey.send.send(
                     "Suite à des abus (coucou Gabin), il est "
                     "interdit de lancer plus de 1000 dés ou "
                     "des dés à plus de 1 million de faces."
@@ -115,14 +108,14 @@ async def roll(journey: DiscordJourney, *, pattern: str):
             try:
                 val = int(part)
             except ValueError:
-                raise UserInputError("pattern", f"Pattern fixe non reconnu : {part}")
+                raise commons.UserInputError("pattern", f"Pattern fixe non reconnu : {part}")
             sum += val
             rep += f" {'-' if val < 0 else '+'} {abs(val)}"
     # Total
     sig = "- " if sum < 0 else ""
     rep += f" = {sig}{tools.emoji_chiffre(abs(sum), True)}"
     rep = rep[3:] if rep.startswith(" +") else rep
-    await journey.final_message(rep)
+    await journey.send(rep)
 
 
 @app_commands.command()
@@ -135,7 +128,7 @@ async def nextroll(journey: DiscordJourney, *, next: str = None):
     """
     global next_roll
     next_roll = next
-    await journey.final_message("🤫", ephemeral=True)
+    await journey.send("🤫", ephemeral=True)
 
 
 @journey_command
@@ -145,25 +138,22 @@ async def coinflip(journey: DiscordJourney):
 
     Pile je gagne, face tu perds.
     """
-    await journey.final_message(random.choice(["Pile", "Face"]))
+    await journey.send(random.choice(["Pile", "Face"]))
 
 
 @app_commands.command()
 @journey_command
 async def ping(journey: DiscordJourney):
-    """Envoie un ping au bot
+    """Envoie un ping au bot, pour vérifier si il est réactif tout ça.
 
     Pong
-
-    Warning:
-        Commande en bêta, non couverte par les tests unitaires.
     """
     ts_rec = datetime.datetime.now(datetime.timezone.utc)
     delta_rec = ts_rec - journey.created_at
     # Temps de réception = temps entre création message et sa réception
 
     cont = f" Réception : {delta_rec.total_seconds()*1000:4.0f} ms\n Latence :   {config.bot.latency*1000:4.0f} ms\n"
-    *_, mess = await journey.final_message(f"pong\n" + tools.code_bloc(cont + " (...)"))
+    *_, mess = await journey.send(f"pong\n" + tools.code_bloc(cont + " (...)"))
 
     ts_ret = datetime.datetime.now(datetime.timezone.utc)
     delta_ret = ts_ret - mess.created_at
@@ -190,16 +180,13 @@ async def akinator(journey: DiscordJourney):
     """J'ai glissé chef
 
     Implémentation directe de https://pypi.org/project/akinator.py
-
-    Warning:
-        Commande en bêta, non couverte par les tests unitaires.
     """
     # Un jour mettre ça dans des embeds avec les https://fr.akinator.com/
     # bundles/elokencesite/images/akitudes_670x1096/<akitude>.png croppées,
     # <akitude> in ["defi", "serein", "inspiration_legere",
     # "inspiration_forte", "confiant", "mobile", "leger_decouragement",
     # "vrai_decouragement", "deception", "triomphe"]
-    await journey.final_message(
+    await journey.send(
         "Vous avez demandé à être mis en relation avec "
         + tools.ital("Akinator : Le Génie du web")
         + ".\nVeuillez patienter..."
@@ -233,21 +220,21 @@ async def akinator(journey: DiscordJourney):
 
 @app_commands.command()
 @journey_command
-async def xkcd(journey: DiscordJourney, n: int):
+async def xkcd(journey: DiscordJourney, num: int):
     """J'ai aussi glissé chef, mais un peu moins
 
     Args:
-        n: Numéro du comic
+        num: Numéro de la planche à récupérer.
     """
-    rep = requests.get(f"https://xkcd.com/{n}/info.0.json")
+    rep = requests.get(f"https://xkcd.com/{num}/info.0.json")
 
     if not rep:
-        await journey.final_message(":x: Paramètre incorrect ou service non accessible.")
+        await journey.send(":x: Paramètre incorrect ou service non accessible.")
         return
 
     url = rep.json().get("img")
     if not url:
-        await journey.final_message(":x: Paramètre incorrect ou service non accessible.")
+        await journey.send(":x: Paramètre incorrect ou service non accessible.")
         return
 
-    await journey.final_message(url)
+    await journey.send(url)

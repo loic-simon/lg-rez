@@ -4,8 +4,6 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/lg-rez)](https://pypi.org/project/lg-rez)
 [![PyPI - Wheel](https://img.shields.io/pypi/wheel/lg-rez)](https://pypi.org/project/lg-rez)
 [![Read the Docs](https://img.shields.io/readthedocs/lg-rez)](https://lg-rez.readthedocs.io)
-<!-- [![Travis CI](https://img.shields.io/travis/loic-simon/lg-rez)](https://travis-ci.org/github/loic-simon/lg-rez)
-[![codecov](https://codecov.io/gh/loic-simon/lg-rez/branch/master/graph/badge.svg?token=N8DTGYKG0U)](https://codecov.io/gh/loic-simon/lg-rez) -->
 
 Discord bot for organizing boisterous Werewolf RP games ESPCI-style.
 
@@ -14,11 +12,24 @@ exclusively in French. The bot itself uses only French language; no
 internationalization is available at this time.*
 
 
+## NOTE AUX GRIS / MJS
+
+Tout ce qui suit est du blabla READMEsque peu intéressant.
+
+Pour les trucs intéressants, c'est-à-dire les instructions pour lancer une 
+nouvelle saison, voir [`Nouvelle saison.md`](Nouvelle saison.md).
+
+
 ## What's New in LG-Rez
 
 Only major features are reported here; see [`CHANGELOG.md`](CHANGELOG.md)
 or in [the doc](https://lg-rez.readthedocs.io/fr/2.4.2/changelog.html) for
 details.
+
+# 3.0
+
+* Changed all commands to Discord builtin slash commands, using Discordpy 2.0
+* Several major commands changes
 
 ### 2.4
 

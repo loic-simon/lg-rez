@@ -52,7 +52,7 @@ class LGCommandTree(app_commands.CommandTree):
         self._add_module_commands(actions_publiques)
         # # Commandes MJs : gestion votes/actions, synchro GSheets, planifications, posts et embeds...
         self._add_module_commands(open_close)
-        # self.add_command(sync.Sync, guild=guild)
+        self._add_module_commands(sync)
         self._add_module_commands(taches)
         self._add_module_commands(communication)
         # # Commandes mixtes : comportement de l'IA et trucs divers
@@ -66,6 +66,8 @@ class LGCommandTree(app_commands.CommandTree):
         self.disable_command("vote")
         self.disable_command("votemaire")
         self.disable_command("voteloups")
+        self.disable_command("haro")
+        self.disable_command("candid")
 
     def _add_module_commands(self, module: types.ModuleType) -> None:
         for name, value in inspect.getmembers(module):
@@ -109,11 +111,7 @@ class LGCommandTree(app_commands.CommandTree):
     def get_command_by_name(self, name: str) -> app_commands.Command | None:
         return self.enabled_commands_and_subcommands.get(name)
 
-    async def on_error(
-        self,
-        interaction: discord.Interaction,
-        error: app_commands.AppCommandError,
-    ) -> None:
+    async def on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
         """Méthode appelée par Discord à un exception dans une commande.
 
         Analyse l'erreur survenue et informe le joueur de manière
@@ -135,14 +133,14 @@ class LGCommandTree(app_commands.CommandTree):
             case app_commands.CommandInvokeError():
                 if isinstance(error.original, (bdd.SQLAlchemyError, bdd.DriverOperationalError)):  # Erreur BDD
                     try:
-                        await config.session.rollback()  # On rollback la session
+                        config.session.rollback()  # On rollback la session
                         await tools.log("Rollback session")
                     except readycheck.NotReadyError:
                         pass
 
                 # Dans tous les cas, si erreur à l'exécution
                 command = interaction.command.name
-                prefix = f"Oups ! Un problème est survenu à l'exécution de la commande `{command}` :grimacing: :"
+                prefix = f":x: Oups ! Un problème est survenu à l'exécution de la commande `{command}` :grimacing: :"
 
                 if not config.is_setup or (
                     isinstance(interaction.user, discord.Member) and interaction.user.top_role >= config.Role.mj
@@ -157,38 +155,38 @@ class LGCommandTree(app_commands.CommandTree):
 
             case app_commands.CommandNotFound():
                 message = (
-                    "Hum, je ne connais pas cette commande  :thinking:\n"
+                    ":x: Hum, je ne connais pas cette commande  :thinking:\n"
                     f"Utilise {tools.code('!help')} pour voir la liste des commandes."
                 )
 
             case app_commands.MissingRole() if error.missing_role == config.Role.get_raw("mj"):
-                message = "Hé ho toi, cette commande est réservée aux MJs !  :angry:"
+                message = ":x: Hé ho toi, cette commande est réservée aux MJs !  :angry:"
 
             case app_commands.MissingRole() if error.missing_role == config.Role.get_raw("joueur_en_vie"):
-                message = "Désolé, cette commande est réservée aux joueurs en vie !"
+                message = ":x: Désolé, cette commande est réservée aux joueurs en vie !"
 
             case app_commands.MissingAnyRole():
                 message = (
-                    "Cette commande est réservée aux joueurs ! (parce qu'ils doivent être inscrits en base, toussa) "
+                    ":x: Cette commande est réservée aux joueurs ! (parce qu'ils doivent être inscrits en base) "
                     f"({tools.code('/doas')} est là en cas de besoin)"
                 )
 
             case UserInputError():
                 # Autre check non vérifié
-                message = f"UserInputError: {error.param} / {error.message}"
+                message = f':x: Argument "{error.param}" invalide : {error.message}'
 
             case app_commands.CheckFailure():
                 # Autre check non vérifié
                 if interaction.response.is_done():  # Déjà géré
                     return
                 message = (
-                    "Tiens, il semblerait que cette commande ne puisse pas être exécutée ! "
+                    ":x: Tiens, il semblerait que cette commande ne puisse pas être exécutée ! "
                     f"{tools.mention_MJ(interaction)} ?\n({tools.ital(_showexc(error))})"
                 )
 
             case _:
                 message = (
-                    f"Oups ! Une erreur inattendue est survenue  :grimacing:\n"
+                    f":x: Oups ! Une erreur inattendue est survenue  :grimacing:\n"
                     f"{tools.mention_MJ(interaction)} ALED – {tools.ital(_showexc(error))}"
                 )
 

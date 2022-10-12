@@ -5,6 +5,7 @@ Liste, création, suppression, ouverture, fermeture d'actions
 """
 
 import datetime
+from typing import Literal
 
 from lgrez import config, commons
 from lgrez.blocs import tools
@@ -16,11 +17,10 @@ def add_action(
 ) -> Action:
     """Enregistre une action et programme son ouverture le cas échéant.
 
-    Si une action existe déjà pour ce joueur et cette base, la modifie ;
-    sinon, en crée une nouvelle.
+    Si une action existe déjà pour ce joueur et cette base, la modifie ; sinon, en crée une nouvelle.
 
     Args:
-        joueur, base, cooldown, charges, active: Paramètre de l'action
+        joueur, base, cooldown, charges, active: Paramètres de l'action.
     """
     action = Action.query.filter_by(joueur=joueur, base=base).first()
     if action:
@@ -49,11 +49,10 @@ def add_action(
 def delete_action(action: Action) -> None:
     """Archive une action et annule les tâches en cours liées.
 
-    Depuis la version 2.1, l'action n'est plus supprimée mais est
-    passée à :attr:`~.bdd.Action.active` = ``False``.
+    Depuis la version 2.1, l'action n'est plus supprimée mais est passée à :attr:`~.bdd.Action.active` = ``False``.
 
     Args:
-        action: l'action à supprimer.
+        action: L'action à supprimer.
     """
     # Suppression tâches liées à l'action
     if action.taches:
@@ -71,7 +70,7 @@ async def open_action(action: Action) -> None:
     """Ouvre l'action.
 
     Args:
-        action: l'action à ouvrir.
+        action: L'action à ouvrir.
 
     Opérations réalisées :
         - Vérification des conditions (cooldown, charges...) et reprogrammation si nécessaire ;
@@ -187,7 +186,7 @@ async def close_action(action: Action) -> None:
     """Ferme l'action.
 
     Args:
-        action: l'action à enregistrer.
+        action: L'action à enregistrer.
 
     Opérations réalisées :
         - Archivage si nécessaire ;
@@ -244,7 +243,9 @@ async def close_action(action: Action) -> None:
     config.session.commit()
 
 
-def get_actions(quoi: str, trigger: ActionTrigger, heure: datetime.time | None = None) -> list[Action]:
+def get_actions(
+    quoi: Literal["open", "close", "remind"], trigger: ActionTrigger, heure: datetime.time | None = None
+) -> list[Action]:
     """Renvoie les actions répondant à un déclencheur donné.
 
     Args:
@@ -260,14 +261,14 @@ def get_actions(quoi: str, trigger: ActionTrigger, heure: datetime.time | None =
     Returns:
         La liste des actions correspondantes.
     """
-    criteres = Action.active.is_(True)
+    filter = Action.active.is_(True)
 
     if quoi == "open":
-        criteres &= Action.base.has(trigger_debut=trigger) & ~Action.is_open
+        filter &= Action.base.has(trigger_debut=trigger) & ~Action.is_open
     elif quoi == "close":
-        criteres &= Action.base.has(trigger_fin=trigger) & Action.is_open
+        filter &= Action.base.has(trigger_fin=trigger) & Action.is_open
     elif quoi == "remind":
-        criteres &= Action.base.has(trigger_fin=trigger) & Action.is_waiting
+        filter &= Action.base.has(trigger_fin=trigger) & Action.is_waiting
     else:
         raise commons.UserInputError("quoi", f"bad value: '{quoi}'")
 
@@ -276,8 +277,8 @@ def get_actions(quoi: str, trigger: ActionTrigger, heure: datetime.time | None =
             raise commons.UserInputError("quand", "merci de préciser une heure")
 
         if quoi == "open":
-            criteres &= Action.base.has(heure_debut=heure)
+            filter &= Action.base.has(heure_debut=heure)
         else:  # close / remind
-            criteres &= Action.base.has(heure_fin=heure)
+            filter &= Action.base.has(heure_fin=heure)
 
-    return Action.query.filter(criteres).all()
+    return Action.query.filter(filter).all()

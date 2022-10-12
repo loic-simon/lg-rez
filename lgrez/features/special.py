@@ -42,8 +42,7 @@ async def do(journey: DiscordJourney, *, code: str):
     """Exécute du code Python et affiche le résultat (COMMANDE MJ)
 
     Args:
-        code: Instruction Python évaluable dans le contexte d'une commande du bot
-            (utilisables notamment : ``journey``, ``config``, ``blocs``, ``features``, ``bdd``, ``<table>``...)
+        code: Instruction Python évaluable (dispo : `journey`, `config`, `blocs`, `features`, `bdd`, `<table>`...)
 
     Si ``code`` est une coroutine, elle sera awaited (ne pas inclure ``await`` dans ``code``).
 
@@ -53,7 +52,6 @@ async def do(journey: DiscordJourney, *, code: str):
 
     À utiliser avec parcimonie donc, et QUE pour du développement/debug !
     """
-
     await journey.interaction.response.defer(thinking=True)
 
     class Answer:
@@ -70,7 +68,7 @@ async def do(journey: DiscordJourney, *, code: str):
             _a.rep = await _a.rep
     except Exception:
         _a.rep = traceback.format_exc()
-    await journey.final_message(f">>> {code}\n{_a.rep}", code=True, langage="py")
+    await journey.send(f">>> {code}\n{_a.rep}", code=True, langage="py")
 
 
 @app_commands.command()
@@ -102,13 +100,13 @@ async def co(journey: DiscordJourney, member: discord.Member):
     Fat comme si on se connectait au serveur pour la première fois.
 
     Args:
-        member: Le membre à inscrire.
+        member: Le membre à inscrire (si son inscription a foiré).
 
     Cette commande est principalement destinée aux tests de développement,
     mais peut être utile si un joueur chibre son inscription
     (à utiliser dans son channel, ou ``#bienvenue`` si même le début a chibré).
     """
-    await journey.final_message(f"Lancement du processus d'inscription pour {member.mention}", ephemeral=True)
+    await journey.send(f"Lancement du processus d'inscription pour {member.mention}", ephemeral=True)
     await features.inscription.main(member)
 
 
@@ -134,7 +132,7 @@ async def doas(journey: DiscordJourney, *, joueur: app_commands.Transform[Joueur
 @tools.mjs_only
 @journey_command
 async def secret(journey: DiscordJourney):
-    """Exécute la prochaine commande en mode "éphémère" (les messages ne s'affichent que pour le lanceur)
+    """Exécute la prochaine commande en mode "éphémère" (les messages ne s'affichent que pour le lanceur).
 
     Utile notamment pour faire des commandes dans un channel public, pour que la commande soit invisible.
     """
@@ -146,7 +144,7 @@ async def secret(journey: DiscordJourney):
 @app_commands.command()
 @journey_command
 async def apropos(journey: DiscordJourney):
-    """Informations et mentions légales du projet
+    """Informations et mentions légales du projet.
 
     N'hésitez-pas à nous contacter pour en savoir plus !
     """
@@ -166,7 +164,7 @@ async def apropos(journey: DiscordJourney):
     embed.add_field(name="Copyright :", value=":copyright: 2022 Club BD-Jeux × GRIs – ESPCI Paris - PSL", inline=False)
     embed.set_footer(text="Retrouvez-nous sur Discord : LaCarpe#1674, TaupeOrAfk#3218")
 
-    await journey.final_message(embed=embed)
+    await journey.send(embed=embed)
 
 
 @app_commands.command()
@@ -175,8 +173,7 @@ async def apropos(journey: DiscordJourney):
 async def setup(journey: DiscordJourney):
     """✨ Prépare un serveur nouvellement crée (COMMANDE MJ)
 
-    À n'utiliser que dans un nouveau serveur, pour créer les rôles,
-    catégories, salons et emojis nécessaires.
+    À n'utiliser que dans un nouveau serveur, pour créer les rôles, catégories, salons et emojis nécessaires.
     """
     await journey.ok_cancel("Setup le serveur ?")
 
@@ -185,7 +182,7 @@ async def setup(journey: DiscordJourney):
     structure = config.server_structure
 
     # Création rôles
-    await journey.final_message("Création des rôles...")
+    await journey.send("Création des rôles...")
     roles = {}
     for slug, role in structure["roles"].items():
         roles[slug] = tools.role(role["name"], must_be_found=False)
@@ -207,14 +204,14 @@ async def setup(journey: DiscordJourney):
     await roles["@everyone"].edit(
         permissions=discord.Permissions(**{perm: True for perm in structure["everyone_permissions"]})
     )
-    await journey.final_message(f"{len(roles)} rôles créés.")
+    await journey.send(f"{len(roles)} rôles créés.")
 
     # Assignation rôles
     for member in config.guild.members:
         await member.add_roles(roles["bot"] if member == config.bot.user else roles["mj"])
 
     # Création catégories et channels
-    await journey.final_message("Création des salons...")
+    await journey.send("Création des salons...")
     categs = {}
     channels = {}
     for slug, categ in structure["categories"].items():
@@ -247,10 +244,10 @@ async def setup(journey: DiscordJourney):
                 position=position,
                 overwrites={roles[role]: discord.PermissionOverwrite(**perms) for role, perms in channel["overwrites"]},
             )
-    await journey.final_message(f"{len(channels)} salons créés dans {len(categs)} catégories.")
+    await journey.send(f"{len(channels)} salons créés dans {len(categs)} catégories.")
 
     # Création emojis
-    await journey.final_message("Import des emojis... (oui c'est très long)")
+    await journey.send("Import des emojis... (oui c'est très long)")
 
     async def _create_emoji(name: str, data: bytes):
         can_use = None
@@ -286,10 +283,10 @@ async def setup(journey: DiscordJourney):
                 data = fh.read()
             await _create_emoji(name, data)
             n_emojis += 1
-    await journey.final_message(f"{n_emojis} emojis importés.")
+    await journey.send(f"{n_emojis} emojis importés.")
 
     # Paramètres généraux du serveur
-    await journey.final_message("Configuration du serveur...")
+    await journey.send("Configuration du serveur...")
     if not structure["icon"]:
         icon_data = None
     elif structure["icon"]["drive"]:
@@ -312,7 +309,7 @@ async def setup(journey: DiscordJourney):
         preferred_locale=structure["preferred_locale"],
         reason="Guild set up!",
     )
-    await journey.final_message(f"Fin de la configuration !")
+    await journey.send(f"Fin de la configuration !")
 
     config.is_setup = True
 
@@ -323,25 +320,17 @@ async def setup(journey: DiscordJourney):
 
 
 class CommandTransformer(app_commands.Transformer):
-    async def transform(self, interaction: discord.Interaction, value: str) -> app_commands.Command:
+    def _get_commands(interaction: discord.Interaction) -> dict[str, app_commands.Command]:
         if interaction.namespace.mode == "enable":
-            return config.bot.tree.disabled_commands[value]
+            return config.bot.tree.disabled_commands
         else:
-            return config.bot.tree.enabled_commands[value]
+            return config.bot.tree.enabled_commands
+
+    async def transform(self, interaction: discord.Interaction, value: str) -> app_commands.Command:
+        return self._get_commands()[value]
 
     async def autocomplete(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-        if interaction.namespace.mode == "enable":
-            return [
-                app_commands.Choice(name=name, value=name)
-                for name in config.bot.tree.disabled_commands
-                if current in name
-            ][:25]
-        else:
-            return [
-                app_commands.Choice(name=name, value=name)
-                for name in config.bot.tree.enabled_commands
-                if current in name
-            ][:25]
+        return [app_commands.Choice(name=name, value=name) for name in self._get_commands() if current in name][:25]
 
 
 @app_commands.command()
@@ -354,14 +343,14 @@ async def command(
     """✨ Active ou désactive une commande (COMMANDE MJ)
 
     Args:
-        mode: Opération à réaliser
-        command: Commande à activer/désactiver
+        mode: Opération à réaliser.
+        command: Commande à activer/désactiver (Y COMPRIS POUR LES MJS !).
     """
     if mode == "enable":
         if config.bot.tree.enable_command(command.qualified_name):
             await config.bot.tree.sync(guild=config.guild)
-        await journey.final_message(f"Commande `/{command.qualified_name}` activée.")
+        await journey.send(f"Commande `/{command.qualified_name}` activée.")
     else:
         if config.bot.tree.disable_command(command.qualified_name):
             await config.bot.tree.sync(guild=config.guild)
-        await journey.final_message(f"Commande `/{command.qualified_name}` désactivée.")
+        await journey.send(f"Commande `/{command.qualified_name}` désactivée.")

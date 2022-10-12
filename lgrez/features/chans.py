@@ -29,13 +29,13 @@ def in_boudoir(callback: Callable) -> Callable:
     """
 
     @functools.wraps(callback)
-    async def new_callback(interaction: discord.Interaction, **kwargs):
+    async def new_callback(journey: DiscordJourney, **kwargs):
         try:
-            Boudoir.from_channel(interaction.channel)
+            Boudoir.from_channel(journey.channel)
         except ValueError:
-            await interaction.response.send_message("Cette commande est invalide en dehors d'un boudoir.")
+            await journey.send(":x: Cette commande est invalide en dehors d'un boudoir.", ephemeral=True)
         else:
-            return await callback(interaction, **kwargs)
+            await callback(journey, **kwargs)
 
     return new_callback
 
@@ -53,13 +53,13 @@ def gerant_only(callback: Callable) -> Callable:
     """
 
     @functools.wraps(callback)
-    async def new_callback(interaction: discord.Interaction, **kwargs):
-        boudoir = Boudoir.from_channel(interaction.channel)
-        gerant = Joueur.from_member(interaction.user)
+    async def new_callback(journey: DiscordJourney, **kwargs):
+        boudoir = Boudoir.from_channel(journey.channel)
+        gerant = Joueur.from_member(journey.member)
         if boudoir.gerant != gerant:
-            await interaction.response.send_message("Seul le gérant du boudoir peut utiliser cette commande.")
+            await journey.send(":x: Seul le gérant du boudoir peut utiliser cette commande.", ephemeral=True)
         else:
-            return await callback(interaction, **kwargs)
+            await callback(journey, **kwargs)
 
     return new_callback
 
@@ -127,7 +127,7 @@ async def _create_boudoir(gerant: Joueur, nom: str) -> Boudoir:
     categ = await tools.multicateg(config.boudoirs_category_name)
     chan = await config.guild.create_text_channel(
         nom,
-        topic=f"Boudoir crée le {now:%d/%m à %H:%M}. " f"Gérant(e) : {gerant.nom}",
+        topic=f"Boudoir crée le {now:%d/%m à %H:%M}. Gérant(e) : {gerant.nom}",
         category=categ,
     )
 
@@ -154,15 +154,15 @@ async def _invite(joueur: Joueur, boudoir: Boudoir, invite_msg: discord.Message)
             async with DiscordJourney(vote_interaction) as journey:
                 if await add_joueur_to_boudoir(boudoir, joueur):
                     await ack_invitation_response(f"{joueur.nom} a rejoint le boudoir !")
-                    await journey.final_message(f"Tu as bien rejoint {boudoir.chan.mention} !")
+                    await journey.send(f"Tu as bien rejoint {boudoir.chan.mention} !")
                 else:
-                    await journey.final_message("Impossible de rejoindre le boudoir :(")
+                    await journey.send("Impossible de rejoindre le boudoir :(")
 
         @discord.ui.button(style=discord.ButtonStyle.secondary, emoji="❌")
         async def c_non(self, contre_haro_interaction: discord.Interaction, button: discord.ui.Button):
             async with DiscordJourney(contre_haro_interaction) as journey:
                 await ack_invitation_response(f"{joueur.nom} a refusé l'invitation à rejoindre ce boudoir.")
-                await journey.final_message("Invitation refusée.")
+                await journey.send("Invitation refusée.")
 
     await joueur.private_chan.send(
         f"{joueur.member.mention} {boudoir.gerant.nom} t'as invité(e) à "
@@ -187,12 +187,12 @@ gérant dudit boudoir.
 @tools.private()
 @journey_command
 async def list(journey: DiscordJourney):
-    """Liste les boudoirs dans lesquels tu es"""
+    """Liste les boudoirs dans lesquels tu es."""
     joueur = Joueur.from_member(journey.member)
     bouderies = joueur.bouderies
 
     if not bouderies:
-        await journey.final_message("Tu n'es dans aucun boudoir pour le moment.\n`/boudoir create` pour en créer un.")
+        await journey.send("Tu n'es dans aucun boudoir pour le moment.\nUtilise `/boudoir create` pour en créer un.")
         return
 
     rep = "Tu es dans les boudoirs suivants :"
@@ -203,7 +203,7 @@ async def list(journey: DiscordJourney):
 
     rep += "\n\nUtilise `/boudoir leave` dans un boudoir pour le quitter."
 
-    await journey.final_message(rep)
+    await journey.send(rep)
 
 
 @boudoir.command()
@@ -211,10 +211,10 @@ async def list(journey: DiscordJourney):
 @tools.private()
 @journey_command
 async def create(journey: DiscordJourney, *, nom: app_commands.Range[str, 1, 32]):
-    """Crée un nouveau boudoir dont tu es gérant
+    """Crée un nouveau boudoir dont tu es gérant(e).
 
     Args:
-        nom: Nom du boudoir à créer. Doit faire moins de 32 caractères.
+        nom: Le nom du boudoir à créer (doit faire moins de 32 caractères).
     """
     member = journey.member
     joueur = Joueur.from_member(member)
@@ -225,155 +225,154 @@ async def create(journey: DiscordJourney, *, nom: app_commands.Range[str, 1, 32]
         "Tu peux maintenant y inviter des gens avec la commande `/boudoir invite`."
     )
 
-    await journey.final_message(f"Ton boudoir a bien été créé : {boudoir.chan.mention}")
+    await journey.send(f"Ton boudoir a bien été créé : {boudoir.chan.mention}")
 
 
 @boudoir.command()
 @tools.joueurs_only
+@journey_command
 @in_boudoir
 @gerant_only
-@journey_command
 async def invite(journey: DiscordJourney, *, joueur: app_commands.Transform[Joueur, tools.VivantTransformer]):
-    """Invite un joueur à rejoindre ce boudoir
+    """Invite un joueur à rejoindre ce boudoir (utilisable dans un boudoir que tu gères uniquement).
 
     Args:
-        joueur: Le joueur à inviter
+        joueur: Le joueur à inviter dans ce boudoir.
     """
     boudoir = Boudoir.from_channel(journey.channel)
     if joueur in boudoir.joueurs:
-        await journey.final_message(f":x: {joueur.nom} est déjà dans ce boudoir !")
+        await journey.send(f":x: {joueur.nom} est déjà dans ce boudoir !")
         return
 
-    mess = await journey.final_message(f"Invitation envoyée à {joueur.nom}.")
+    mess = await journey.send(f"Invitation envoyée à {joueur.nom}.")
     asyncio.create_task(_invite(joueur, boudoir, mess))
     # On envoie l'invitation en arrière-plan (libération du chan).
 
 
 @boudoir.command()
 @tools.joueurs_only
+@journey_command
 @in_boudoir
 @gerant_only
-@journey_command
 async def expulse(journey: DiscordJourney, *, joueur: app_commands.Transform[Joueur, tools.VivantTransformer]):
-    """Expulse un membre de ce boudoir
+    """Expulse un membre de ce boudoir (utilisable dans un boudoir que tu gères uniquement).
 
     Args:
-        joueur: Le joueur à expulser
+        joueur: Le joueur à expulser de ce boudoir.
     """
     boudoir = Boudoir.from_channel(journey.channel)
     if joueur not in boudoir.joueurs:
-        await journey.final_message(f":x: {joueur.nom} n'est pas membre du boudoir !")
+        await journey.send(f":x: {joueur.nom} n'est pas membre du boudoir !")
         return
 
     await remove_joueur_from_boudoir(boudoir, joueur)
-    await joueur.private_chan.send(f"Tu as été expulsé(e) du boudoir " f"« {boudoir.nom} ».")
-    await journey.final_message(f"{joueur.nom} a bien été expulsé de ce boudoir.")
+    await joueur.private_chan.send(f"Tu as été expulsé(e) du boudoir « {boudoir.nom} ».")
+    await journey.send(f"{joueur.nom} a bien été expulsé de ce boudoir.")
 
 
 @boudoir.command()
 @tools.joueurs_only
-@in_boudoir
 @journey_command
+@in_boudoir
 async def leave(journey: DiscordJourney):
-    """Quitte ce boudoir"""
+    """Quitte ce boudoir (utilisable dans un boudoir uniquement)."""
     joueur = Joueur.from_member(journey.member)
     boudoir = Boudoir.from_channel(journey.channel)
 
     if boudoir.gerant == joueur:
-        await journey.final_message(
-            "Tu ne peux pas quitter un boudoir que tu gères. "
-            "Utilise `/boudoir transfer` pour passer les droits "
-            "de gestion ou `/boudoir delete` pour le supprimer."
+        await journey.send(
+            "Tu ne peux pas quitter un boudoir que tu gères.\n"
+            "Utilise `/boudoir transfer` pour passer les droits de gestion ou `/boudoir delete` pour le supprimer."
         )
         return
 
     await journey.ok_cancel("Veux-tu vraiment quitter ce boudoir ? Tu ne pourras pas y retourner sans invitation.")
 
     await remove_joueur_from_boudoir(boudoir, joueur)
-    await journey.final_message(tools.ital(f"{joueur.nom} a quitté ce boudoir."))
+    await journey.send(tools.ital(f"{joueur.nom} a quitté ce boudoir."))
 
 
 @boudoir.command()
 @tools.joueurs_only
+@journey_command
 @in_boudoir
 @gerant_only
-@journey_command
 async def transfer(journey: DiscordJourney, *, joueur: app_commands.Transform[Joueur, tools.VivantTransformer]):
-    """Transfère les droits de gestion de ce boudoir
+    """Transfère les droits de gestion de ce boudoir (utilisable dans un boudoir que tu gères uniquement).
 
     Args:
-        joueur: Le joueur à qui transférer le boudoir
+        joueur: Le joueur à qui transférer ce boudoir. Doit en être membre.
     """
     boudoir = Boudoir.from_channel(journey.channel)
     if joueur not in boudoir.joueurs:
-        await journey.final_message(f"{joueur.nom} n'est pas membre de ce boudoir !")
+        await journey.send(f"{joueur.nom} n'est pas membre de ce boudoir !")
         return
 
     if not await journey.yes_no(
         "Veux-tu vraiment transférer les droits de ce boudoir ? Tu ne pourras pas les récupérer par toi-même."
     ):
-        await journey.final_message("Mission aborted.")
+        await journey.send("Mission aborted.")
         return
 
     boudoir.gerant = joueur
     boudoir.update()
-    await boudoir.chan.edit(topic=f"Boudoir crée le {boudoir.ts_created:%d/%m à %H:%M}. " f"Gérant(e) : {joueur.nom}")
+    await boudoir.chan.edit(topic=f"Boudoir crée le {boudoir.ts_created:%d/%m à %H:%M}. Gérant(e) : {joueur.nom}")
 
-    await journey.final_message(f"Boudoir transféré à {joueur.nom}.")
+    await journey.send(f"Boudoir transféré à {joueur.nom}.")
 
 
 @boudoir.command()
 @tools.joueurs_only
+@journey_command
 @in_boudoir
 @gerant_only
-@journey_command
 async def delete(journey: DiscordJourney):
-    """Supprime ce boudoir"""
+    """Supprime ce boudoir (utilisable dans un boudoir que tu gères uniquement)."""
     boudoir = Boudoir.from_channel(journey.channel)
     await journey.ok_cancel("Veux-tu vraiment supprimer ce boudoir ? Cette action est irréversible.")
 
-    await journey.final_message("Suppression...")
+    await journey.send("Suppression...")
     for joueur in boudoir.joueurs:
         await remove_joueur_from_boudoir(boudoir, joueur)
         await joueur.private_chan.send(f"Le boudoir « {boudoir.nom } » a été supprimé.")
 
     await boudoir.chan.edit(name=f"\N{CROSS MARK} {boudoir.nom}")
-    await journey.final_message(
+    await journey.send(
         tools.ital("[Tous les joueurs ont été exclus de ce boudoir ; le channel reste présent pour archive.]")
     )
 
 
 @boudoir.command()
 @tools.joueurs_only
+@journey_command
 @in_boudoir
 @gerant_only
-@journey_command
 async def rename(journey: DiscordJourney, *, nom: app_commands.Range[str, 1, 32]):
-    """Renomme ce boudoir
+    """Renomme ce boudoir (utilisable dans un boudoir que tu gères uniquement).
 
     Args:
-        nom: Le nouveau nom du boudoir. Doit faire moins de 32 caractères.
+        nom: Le nouveau nom de ce boudoir (doit faire moins de 32 caractères).
     """
     boudoir = Boudoir.from_channel(journey.channel)
 
     boudoir.nom = nom
     boudoir.update()
     await boudoir.chan.edit(name=nom)
-    await journey.final_message("Boudoir renommé avec succès.")
+    await journey.send("Boudoir renommé avec succès.")
 
 
 @boudoir.command()
 @tools.joueurs_only
+@journey_command
 @in_boudoir
 @gerant_only
-@journey_command
 async def ping(journey: DiscordJourney, *, message: str = ""):
-    """Mentionne tous les joueurs vivants dans le boudoir.
+    """Mentionne tous les joueurs vivants dans le boudoir (utilisable dans un boudoir que tu gères uniquement).
 
     Args:
-        message: Message à faire passer
+        message: Le message à faire passer, optionnel
     """
-    await journey.final_message(f"{config.Role.joueur_en_vie.mention} {message}")
+    await journey.send(f"{config.Role.joueur_en_vie.mention} {message}")
 
 
 @boudoir.command()
@@ -385,7 +384,7 @@ async def find(
     joueur2: app_commands.Transform[Joueur, tools.VivantTransformer] | None = None,
     joueur3: app_commands.Transform[Joueur, tools.VivantTransformer] | None = None,
 ):
-    """✨ Trouve le(s) boudoir(s) réunissant certains joueurs (COMMANDE MJ)
+    """Trouve le(s) boudoir(s) réunissant certains joueurs (COMMANDE MJ)
 
     Args:
         joueur1: Premier joueur
@@ -400,10 +399,10 @@ async def find(
     boudoirs = [boudoir for boudoir in Boudoir.query.all() if all(joueur in boudoir.joueurs for joueur in joueurs)]
 
     if not boudoirs:
-        await journey.final_message(f":x: Pas de boudoir(s) réunissant {joueurs}.")
+        await journey.send(f":x: Pas de boudoir(s) réunissant {joueurs}.")
     else:
         liste = "\n".join(f"- {boudoir.chan.mention} ({len(boudoir.joueurs)} joueurs)" for boudoir in boudoirs)
-        await journey.final_message(f"{len(boudoirs)} boudoirs :\n{liste}")
+        await journey.send(f"{len(boudoirs)} boudoirs :\n{liste}")
 
 
 async def _mp(journey: DiscordJourney, *, joueur: Joueur):
@@ -411,19 +410,19 @@ async def _mp(journey: DiscordJourney, *, joueur: Joueur):
     moi = Joueur.from_member(member)
 
     if moi == joueur:
-        await journey.final_message(f"Ton boudoir a bien été créé : {moi.private_chan.mention}\n(tocard)")
+        await journey.send(f"Ton boudoir a bien été créé : {moi.private_chan.mention}\n(tocard)")
         return
 
     # Recherche si boudoir existant
     boudoir = next((boudoir for boudoir in moi.boudoirs if set(boudoir.joueurs) == {moi, joueur}), None)
     if boudoir:
-        await journey.final_message(f":x: Ce boudoir existe déjà : {boudoir.chan.mention}")
+        await journey.send(f":x: Ce boudoir existe déjà : {boudoir.chan.mention}")
         return
 
     boudoir = await _create_boudoir(moi, f"{moi.nom} × {joueur.nom}")
     await boudoir.chan.send(f"{member.mention}, voici ton boudoir !")
 
-    await journey.final_message(f":sunglasses: Ton boudoir a bien été créé : {boudoir.chan.mention}")
+    await journey.send(f":sunglasses: Ton boudoir a bien été créé : {boudoir.chan.mention}")
 
     mess = await boudoir.chan.send(f"Invitation envoyée à {joueur.nom}.")
     asyncio.create_task(_invite(joueur, boudoir, mess))
@@ -435,7 +434,7 @@ async def _mp(journey: DiscordJourney, *, joueur: Joueur):
 @tools.private()
 @journey_command
 async def mp(journey: DiscordJourney, *, joueur: app_commands.Transform[Joueur, tools.VivantTransformer]):
-    """✨ Raccourci pour créer un boudoir et y ajouter un joueur.
+    """Raccourci pour créer un boudoir et y ajouter un joueur.
 
     Si un boudoir existe déjà avec uniquement ce joueur et toi, n'en crée pas un nouveau.
 
@@ -450,17 +449,17 @@ async def mp(journey: DiscordJourney, *, joueur: app_commands.Transform[Joueur, 
 @journey_context_menu
 async def mp_menu(journey: DiscordJourney, member: discord.Member):
     if member.top_role >= config.Role.mj:
-        await journey.final_message(":x: Tu ne peux pas créer de boudoir avec un MJ, sacrebleu !", ephemeral=True)
+        await journey.send(":x: Tu ne peux pas créer de boudoir avec un MJ. Ta conversation privée est là pour ça !")
         return
 
     if member == config.bot.user:
-        await journey.final_message(":x: Tu ne peux pas créer de boudoir avec le bot, enfin !!!", ephemeral=True)
+        await journey.send(":x: Tu ne peux pas créer de boudoir avec le bot, sacrebleu !")
         return
 
     try:
         joueur = Joueur.from_member(member)
     except ValueError:
-        await journey.final_message(":x: Hmm, ce joueur n'a pas l'air inscrit, réessaye plus tard !", ephemeral=True)
+        await journey.send(":x: Hmm, ce joueur n'a pas l'air inscrit, réessaye plus tard !")
         return
 
     await _mp(journey, joueur=joueur)
@@ -477,11 +476,8 @@ async def addhere(
     """Ajoute les membres au chan courant (COMMANDE MJ)
 
     Args:
-        crit: Critère sur lequel filtrer les joueurs à ajouter
-        filtre: Valeur de `crit` à récupérer
-
-    Si ``*joueurs`` est un seul élément, il peut être de la forme
-    ``<crit>=<filtre>`` tel que décrit dans l'aide de ``!send``.
+        crit: Critère sur lequel filtrer les joueurs à ajouter.
+        filtre: Valeur de `crit` à récupérer.
     """
     ts_debut = journey.created_at - datetime.timedelta(microseconds=1)
 
@@ -504,7 +500,7 @@ async def purge(journey: DiscordJourney, limit: int | None = None):
     """Supprime tous les messages de ce chan (COMMANDE MJ)
 
     Args:
-        limit: Nombre de messages à supprimer (défaut : tous)
+        limit: Nombre de messages à supprimer (défaut : tous).
     """
     if limit:
         mess = f"Supprimer les {limit} messages les plus récents de ce chan ?"
@@ -513,4 +509,4 @@ async def purge(journey: DiscordJourney, limit: int | None = None):
 
     await journey.ok_cancel(mess, ephemeral=True)
     await journey.channel.purge(limit=limit)
-    await journey.final_message(content="Fait.", ephemeral=True)
+    await journey.send(content="Fait.", ephemeral=True)

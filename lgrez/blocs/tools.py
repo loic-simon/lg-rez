@@ -810,7 +810,9 @@ class _UpFollower:
             if view:
                 return await self.followup.send(content, view=view, **kwargs)
             else:
-                return await self.followup.send(content, **kwargs)
+                fol = self.followup
+                co = fol.send(content, **kwargs)
+                return await co
         except discord.HTTPException:
             if view:
                 return await self.channel.send(content, view=view, **kwargs)
@@ -830,7 +832,7 @@ async def _send_messages(
     messages = []
     if isinstance(messageable, discord.Interaction):
         # first message -> interaction reply, if possible
-        if not messageable.is_expired and not messageable.response.is_done():
+        if not messageable.is_expired() and not messageable.response.is_done():
             try:
                 if view and len(contents) == 1:  # sole message -> display view, if applicable
                     await messageable.response.send_message(contents[0], view=view, **kwargs)

@@ -100,7 +100,7 @@ class RealShell(asyncode.AsyncInteractiveConsole):
         (see :meth:`asyncode.AsyncInteractiveConsole.interact`)
         """
         wait = _py_bloc("Launching Python shell...\n")
-        *_, self.message = await self.journey.final_message(wait)
+        *_, self.message = await self.journey.send(wait)
 
         if banner is None:
             base = (
@@ -305,7 +305,7 @@ class RealShell(asyncode.AsyncInteractiveConsole):
             blocs[-1] += insert
 
             for bloc in blocs:
-                message = await self.journey.final_message(_py_bloc(bloc))
+                message = await self.journey.send(_py_bloc(bloc))
 
             # On modifie le message actuel = dernier envoyé
             self.message = message

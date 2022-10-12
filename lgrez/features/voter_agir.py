@@ -133,29 +133,29 @@ async def do_vote(journey: DiscordJourney, vote: Vote, votant: Joueur, cible: Jo
     try:
         vaction = votant.action_vote(vote)
     except RuntimeError:
-        await journey.final_message(":x: Minute papillon, le jeu n'est pas encore lancé !", ephemeral=ephemeral)
+        await journey.send(":x: Minute papillon, le jeu n'est pas encore lancé !", ephemeral=ephemeral)
         return
 
     # Vérification vote en cours
     if not votant.votant_village:
-        await journey.final_message(":x: Tu n'as pas le droit de participer à ce vote.", ephemeral=ephemeral)
+        await journey.send(":x: Tu n'as pas le droit de participer à ce vote.", ephemeral=ephemeral)
         return
     if not vaction.is_open:
-        await journey.final_message(f":x: Pas de vote pour {vote_name} en cours !", ephemeral=ephemeral)
+        await journey.send(f":x: Pas de vote pour {vote_name} en cours !", ephemeral=ephemeral)
         return
 
     util = vaction.derniere_utilisation
 
     # Test si la cible est sous le coup d'un haro / candidate
     if vote == Vote.cond and not CandidHaro.query.filter_by(joueur=cible, type=CandidHaroType.haro).first():
-        await journey.final_message(
+        await journey.send(
             f"{cible.nom} n'a pas (encore) subi ou posté de haro ! "
             "Si c'est toujours le cas à la fin du vote, ton vote sera compté comme blanc... \n"
             "Veux-tu continuer ?",
             ephemeral=ephemeral,
         )
     elif vote == Vote.maire and not CandidHaro.query.filter_by(joueur=cible, type=CandidHaroType.candidature).first():
-        await journey.final_message(
+        await journey.send(
             f"{cible.nom} ne s'est pas (encore) présenté(e) ! "
             "Si c'est toujours le cas à la fin de l'élection, ton vote sera compté comme blanc... \n"
             "Veux-tu continuer ?",
@@ -164,9 +164,7 @@ async def do_vote(journey: DiscordJourney, vote: Vote, votant: Joueur, cible: Jo
 
     if not vaction.is_open:
         # On revérifie, si ça a fermé entre temps !!
-        await journey.final_message(
-            f":x: Le vote pour {vote_name} a fermé entre temps, pas de chance !", ephemeral=ephemeral
-        )
+        await journey.send(f":x: Le vote pour {vote_name} a fermé entre temps, pas de chance !", ephemeral=ephemeral)
         return
 
     # Modification en base
@@ -180,7 +178,7 @@ async def do_vote(journey: DiscordJourney, vote: Vote, votant: Joueur, cible: Jo
     # Écriture dans sheet Données brutes
     await export_vote(vote, util)
 
-    await journey.final_message(
+    await journey.send(
         f"Vote {pour_contre} {tools.bold(cible.nom)} bien pris en compte.\n"
         + tools.ital("Tu peux modifier ton vote autant que nécessaire avant sa fermeture."),
         ephemeral=ephemeral,
@@ -194,10 +192,10 @@ async def do_vote(journey: DiscordJourney, vote: Vote, votant: Joueur, cible: Jo
 @tools.private()
 @journey_command
 async def vote(journey: DiscordJourney, *, joueur: app_commands.Transform[Joueur, tools.HaroteTransformer]):
-    """Vote pour le condamné du jour
+    """Vote pour le condamné du jour.
 
     Args:
-        joueur: Le joueur contre qui tu veux diriger ton vote
+        joueur: Le joueur contre qui tu veux diriger ton vote.
 
     Cette commande n'est utilisable que lorsqu'un vote pour le condamné est en cours,
     pour les joueurs ayant le droit de voter.
@@ -215,10 +213,10 @@ async def vote(journey: DiscordJourney, *, joueur: app_commands.Transform[Joueur
 @tools.private()
 @journey_command
 async def votemaire(journey: DiscordJourney, *, joueur: app_commands.Transform[Joueur, tools.CandidatTransformer]):
-    """Vote pour le nouveau maire
+    """Vote pour le nouveau maire.
 
     Args:
-        joueur: Le joueur pour lequel tu souhaites voter
+        joueur: Le joueur pour lequel tu souhaites voter.
 
     Cette commande n'est utilisable que lorsqu'une élection pour le maire est en cours,
     pour les joueurs ayant le droit de voter.
@@ -236,10 +234,10 @@ async def votemaire(journey: DiscordJourney, *, joueur: app_commands.Transform[J
 @tools.private()
 @journey_command
 async def voteloups(journey: DiscordJourney, *, joueur: app_commands.Transform[Joueur, tools.VivantTransformer]):
-    """Vote pour la victime de l'attaque des loups
+    """Vote pour la victime de l'attaque des loups (si tu es un loup, évidemment...)
 
     Args:
-        joueur: Le joueur que tu souhaites éliminer
+        joueur: Le joueur que tu souhaites éliminer.
 
     Cette commande n'est utilisable que lorsqu'une vote pour la victime du soir est en cours,
     pour les joueurs concernés.
@@ -327,7 +325,7 @@ class CibleTransformer(app_commands.Transformer):
             case CibleType.booleen:
                 choices = [app_commands.Choice(name="Oui", value="yes"), app_commands.Choice(name="Non", value="no")]
             case CibleType.texte:
-                choices = [app_commands.Choice(name="[Texte libre]", value="free")]
+                choices = [app_commands.Choice(name="[Texte libre]", value=current)]
 
         return [app_commands.Choice(name=f"🔽  {base_ciblage.phrase} 🔽"[:100], value="__PHRASE"), *choices]
 
@@ -352,7 +350,7 @@ async def action_(
     cible_2: app_commands.Transform[Joueur | Role | Camp | bool | str | None, Cible2Transformer] | None = None,
     cible_3: app_commands.Transform[Joueur | Role | Camp | bool | str | None, Cible3Transformer] | None = None,
 ):
-    """Utilise l'action de ton rôle / une des actions associées
+    """Utilise l'action de ton rôle / une des actions associées.
 
     Args:
         action: L'action pour laquelle agir (si il n'y a pas de suggestions, c'est que tu ne peux pas agir !)
@@ -372,13 +370,13 @@ async def action_(
 
     # Vérification rôle actif
     if not joueur.role_actif:
-        await journey.final_message(":x: Tu ne peux pas utiliser tes pouvoirs pour le moment !")
+        await journey.send(":x: Tu ne peux pas utiliser tes pouvoirs pour le moment !")
         return
 
     # Détermine la/les actions en cours pour le joueur
     actions = [ac for ac in joueur.actions_actives if ac.is_open]
     if not actions:
-        await journey.final_message(":x: Aucune action en cours pour toi.")
+        await journey.send(":x: Aucune action en cours pour toi.")
         return
 
     util = action.derniere_utilisation
@@ -391,9 +389,9 @@ async def action_(
             util.ts_decision = datetime.datetime.now()
             util.etat = UtilEtat.ignoree
             util.update()
-            await journey.final_message("Utilisation de l'action annulée.")
+            await journey.send("Utilisation de l'action annulée.")
         else:
-            await journey.final_message('Action non utilisée pour le moment. Remplir le paramètre "cible" pour agir !')
+            await journey.send('Action non utilisée pour le moment. Remplir le paramètre "cible" pour agir !')
         return
 
     # Vérification nombre de cibles
@@ -416,7 +414,7 @@ async def action_(
 
     if not action.is_open:
         # On revérifie, si ça a fermé entre temps !!
-        await journey.final_message("L'action a fermé entre temps, pas de chance !")
+        await journey.send("L'action a fermé entre temps, pas de chance !")
         return
 
     # Avertissement si action a conséquence instantanée (barbier...)
@@ -440,15 +438,15 @@ async def action_(
 
     # Écriture dans sheet Données brutes
     await export_vote(None, util)
-    await journey.final_message("Salut")
+    await journey.send("Salut")
 
     # Conséquences si action instantanée
     if action.base.instant:
         await gestion_actions.close_action(action)
-        await journey.final_message(tools.ital(f"[Allô {config.Role.mj.mention}, conséquence instantanée ici !]"))
+        await journey.send(tools.ital(f"[Allô {config.Role.mj.mention}, conséquence instantanée ici !]"))
 
     else:
-        await journey.final_message(
+        await journey.send(
             f"Action « {tools.bold(action.decision)} » bien prise en compte pour {tools.code(action.base.slug)}.\n"
             + tools.ital("Tu peux modifier ta décision autant que nécessaire avant la fin du créneau.")
         )

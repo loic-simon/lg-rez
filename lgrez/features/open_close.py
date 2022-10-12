@@ -132,9 +132,9 @@ async def open_vote(journey: DiscordJourney, *, qui: Vote, heure: str | None = N
     """Lance un vote (COMMANDE BOT / MJ)
 
     Args:
-        qui: Type de vote à lancer (vote pour le condamné du jour, le nouveau maire ou la victime des loups)
-        heure: Heure à laquelle programmer la fermeture du vote, optionnel (HHh / HHhMM)
-        heure_chain: Heure à laquelle programmer une ré-ouverture, pour boucler à l'infini (HHh / HHhMM)
+        qui: Type de vote à lancer (vote pour le condamné du jour, le nouveau maire ou la victime des loups).
+        heure: Heure à laquelle programmer la fermeture du vote, optionnel (HHh / HHhMM).
+        heure_chain: Heure à laquelle programmer une ré-ouverture, pour boucler à l'infini (HHh / HHhMM).
 
     Une sécurité empêche de lancer un vote ou une action déjà en cours.
 
@@ -150,7 +150,7 @@ async def open_vote(journey: DiscordJourney, *, qui: Vote, heure: str | None = N
     """
     joueurs = await _get_joueurs("open", qui)
 
-    await journey.final_message(
+    await journey.send(
         "\n - ".join(joueur.nom for joueur in joueurs),
         code=True,
         prefix=f"Utilisateur(s) répondant aux critères ({len(joueurs)}) :",
@@ -164,6 +164,7 @@ async def open_vote(journey: DiscordJourney, *, qui: Vote, heure: str | None = N
                 + tools.ital(f"Tape {tools.code('/vote <joueur>')} pour voter.")
             )
             vote_command = "vote"
+            haro_command = "haro"
 
         case Vote.maire:
             content = (
@@ -172,6 +173,7 @@ async def open_vote(journey: DiscordJourney, *, qui: Vote, heure: str | None = N
                 + tools.ital(f"Tape {tools.code('/votemaire <joueur>')} pour voter.")
             )
             vote_command = "votemaire"
+            haro_command = "candid"
 
         case Vote.loups:
             content = (
@@ -180,9 +182,10 @@ async def open_vote(journey: DiscordJourney, *, qui: Vote, heure: str | None = N
                 + tools.ital(f"Tape {tools.code('/voteloups <joueur>')} pour voter.")
             )
             vote_command = "voteloups"
+            haro_command = None
 
     # Activation commande de vote
-    if config.bot.tree.enable_command(vote_command):
+    if config.bot.tree.enable_command(vote_command) or (haro_command and config.bot.tree.enable_command(haro_command)):
         await config.bot.tree.sync(guild=config.guild)
 
     # Création utilisations & envoi messages
@@ -246,7 +249,7 @@ async def open_actions(journey: DiscordJourney, heure: str):
     """Ouvre les actions commençant à une heure donnée (COMMANDE BOT / MJ)
 
     Args:
-        heure: Heure de début des actions à lancer
+        heure: Heure de début des actions à lancer.
 
     Une sécurité empêche d'ouvrir une action déjà en cours.
 
@@ -256,7 +259,7 @@ async def open_actions(journey: DiscordJourney, heure: str):
     """
     actions = await _get_actions("open", heure)
 
-    await journey.final_message(
+    await journey.send(
         "\n - ".join(f"{action.base.slug} - {action.joueur.nom}" for action in actions),
         code=True,
         prefix=f"Action(s) répondant aux critères ({len(actions)}) :",
@@ -272,7 +275,7 @@ async def open_action(journey: DiscordJourney, id: int):
     """Lance une action donnée (COMMANDE BOT / MJ)
 
     Args:
-        id: ID de l'action à ouvrir
+        id: ID de l'action à ouvrir.
 
     Une sécurité empêche d'ouvrir une action déjà en cours.
 
@@ -282,9 +285,9 @@ async def open_action(journey: DiscordJourney, id: int):
     """
     action = await _get_action("open", id)
     if not action:
-        await journey.final_message(f"L'action #{id} est déjà ouverte !")
+        await journey.send(f"L'action #{id} est déjà ouverte !")
 
-    await journey.final_message(f"Joueur concerné : {action.joueur}")
+    await journey.send(f"Joueur concerné : {action.joueur}")
     await gestion_actions.open_action(action)
 
 
@@ -298,9 +301,9 @@ async def close_vote(journey: DiscordJourney, *, qui: Vote, heure: str | None = 
     """Ferme un vote (COMMANDE BOT / MJ)
 
     Args:
-        qui: Type de vote à fermer (vote pour le condamné du jour, le nouveau maire ou la victime des loups)
-        heure: Heure à laquelle programmer une prochaine ouverture du vote, optionnel (HHh / HHhMM)
-        heure_chain: Heure à laquelle programmer une re-fermeture, pour boucler à l'infini (HHh / HHhMM)
+        qui: Type de vote à fermer (vote pour le condamné du jour, le nouveau maire ou la victime des loups).
+        heure: Heure à laquelle programmer une prochaine ouverture du vote, optionnel (HHh / HHhMM).
+        heure_chain: Heure à laquelle programmer une re-fermeture, pour boucler à l'infini (HHh / HHhMM).
 
     Une sécurité empêche de fermer un vote ou une action qui n'est pas en cours.
 
@@ -316,7 +319,7 @@ async def close_vote(journey: DiscordJourney, *, qui: Vote, heure: str | None = 
     """
     joueurs = await _get_joueurs("close", qui)
 
-    await journey.final_message(
+    await journey.send(
         "\n - ".join(joueur.nom for joueur in joueurs),
         code=True,
         prefix=f"Utilisateur(s) répondant aux critères ({len(joueurs)}) :",
@@ -329,17 +332,20 @@ async def close_vote(journey: DiscordJourney, *, qui: Vote, heure: str | None = 
                 f"Les résultats arrivent dans l'heure !\n"
             )
             vote_command = "vote"
+            haro_command = "haro"
 
         case Vote.maire:
-            content = f"{tools.montre()}  Fin du vote pour le maire ! \n" f"Vote définitif : {nom_cible}"
+            content = f"{tools.montre()}  Fin du vote pour le maire ! \nVote définitif : {nom_cible}"
             vote_command = "votemaire"
+            haro_command = "candid"
 
         case Vote.loups:
-            content = f"{tools.montre()}  Fin du vote pour la victime du soir !" f"\nVote définitif : {nom_cible}"
+            content = f"{tools.montre()}  Fin du vote pour la victime du soir !\nVote définitif : {nom_cible}"
             vote_command = "voteloups"
+            haro_command = None
 
     # Activation commande de vote
-    if config.bot.tree.disable_command(vote_command):
+    if config.bot.tree.disable_command(vote_command) or (haro_command and config.bot.tree.enable_command(haro_command)):
         await config.bot.tree.sync(guild=config.guild)
 
     # Fermeture utilisations et envoi messages
@@ -391,7 +397,7 @@ async def close_actions(journey: DiscordJourney, heure: str):
     """Clôture les actions terminant à une heure donnée (COMMANDE BOT / MJ)
 
     Args:
-        heure: Heure de début des actions à clôturer
+        heure: Heure de début des actions à clôturer.
 
     Une sécurité empêche de fermer une action déjà en cours.
 
@@ -401,7 +407,7 @@ async def close_actions(journey: DiscordJourney, heure: str):
     """
     actions = await _get_actions("close", heure)
 
-    await journey.final_message(
+    await journey.send(
         "\n - ".join(f"{action.base.slug} - {action.joueur.nom}" for action in actions),
         code=True,
         prefix=f"Action(s) répondant aux critères ({len(actions)}) :",
@@ -417,7 +423,7 @@ async def close_action(journey: DiscordJourney, id: int):
     """Clôture un action (COMMANDE BOT / MJ)
 
     Args:
-        id: ID de l'action à clôturer
+        id: ID de l'action à clôturer.
 
     Une sécurité empêche de fermer une action déjà en cours.
 
@@ -427,9 +433,9 @@ async def close_action(journey: DiscordJourney, id: int):
     """
     action = await _get_action("close", id)
     if not action:
-        await journey.final_message(f"L'action #{id} n'est pas ouverte !")
+        await journey.send(f"L'action #{id} n'est pas ouverte !")
 
-    await journey.final_message(f"Joueur concerné : {action.joueur}")
+    await journey.send(f"Joueur concerné : {action.joueur}")
     await _close_action(action)
 
 
@@ -443,7 +449,7 @@ async def remind_vote(journey: DiscordJourney, *, qui: Vote):
     """Envoi un rappel de vote / actions de rôle (COMMANDE BOT / MJ)
 
     Args:
-        qui: Type de vote à rappeler (vote pour le condamné du jour, le nouveau maire ou la victime des loups)
+        qui: Type de vote à rappeler (vote pour le condamné du jour, le nouveau maire ou la victime des loups).
 
     Le bot n'envoie un message qu'aux joueurs n'ayant pas encore voté / agi,
     si le vote ou l'action est bien en cours.
@@ -456,7 +462,7 @@ async def remind_vote(journey: DiscordJourney, *, qui: Vote):
     """
     joueurs = await _get_joueurs("remind", qui)
 
-    await journey.final_message(
+    await journey.send(
         "\n - ".join(joueur.nom for joueur in joueurs),
         code=True,
         prefix=f"Utilisateur(s) répondant aux critères ({len(joueurs)}) :",
@@ -492,14 +498,14 @@ async def remind_actions(journey: DiscordJourney, heure: str):
     """Rappelle d'utiliser les actions terminant à une heure donnée (COMMANDE BOT / MJ)
 
     Args:
-        heure: Heure de début des actions à rappeler
+        heure: Heure de début des actions à rappeler.
 
     Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
     Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi !
     """
     actions = await _get_actions("remind", heure)
 
-    await journey.final_message(
+    await journey.send(
         "\n - ".join(f"{action.base.slug} - {action.joueur.nom}" for action in actions),
         code=True,
         prefix=f"Action(s) répondant aux critères ({len(actions)}) :",
@@ -515,16 +521,16 @@ async def remind_action(journey: DiscordJourney, id: int):
     """Rappelle d'utiliser une action précise (COMMANDE BOT / MJ)
 
     Args:
-        id: ID de l'action à rappeler
+        id: ID de l'action à rappeler.
 
     Cette commande a pour vocation première d'être exécutée automatiquement par des tâches planifiées.
     Elle peut être utilisée à la main, mais attention à ne pas faire n'importe quoi !
     """
     action = await _get_action("remind", id)
     if not action:
-        await journey.final_message(f"L'action #{id} n'est pas ouverte !")
+        await journey.send(f"L'action #{id} n'est pas ouverte !")
 
-    await journey.final_message(f"Joueur concerné : {action.joueur}")
+    await journey.send(f"Joueur concerné : {action.joueur}")
     await _remind_action(action)
 
 
@@ -543,8 +549,8 @@ async def refill(
     """Recharger un/des pouvoirs rechargeables (COMMANDE BOT / MJ)
 
     Args:
-        motif: Raison de rechargement (divin = forcer le refill car les MJs tout-puissants l'ont décidé)
-        joueur: Si omis, recharge TOUS les joueurs
+        motif: Raison de rechargement (divin = forcer le refill car les MJs tout-puissants l'ont décidé).
+        joueur: Si omis, recharge TOUS les joueurs.
     """
     motif: str = motif.name
 
@@ -571,7 +577,7 @@ async def refill(
 
     for action in refillable:
         await _do_refill(motif, action)
-    await journey.final_message("Fait.")
+    await journey.send("Fait.")
 
 
 @app_commands.command()
@@ -607,36 +613,35 @@ async def cparti(journey: DiscordJourney):
         "(pas plus tard car les votes du jour changent à 3h)."
     )
 
-    taches = []
-    r = "C'est parti !\n"
+    rep = "C'est parti !\n"
 
     n10 = tools.next_occurrence(datetime.time(hour=10))
     n19 = tools.next_occurrence(datetime.time(hour=19))
 
     # Programmation votes condamnés chainés 10h-18h
-    r += "\nProgrammation des votes :\n"
+    rep += "\nProgrammation des votes :\n"
     await planif_command(n10, open_vote, qui=Vote.cond, heure="18h", heure_chain="10h")
-    r += " - À 10h : /open cond 18h 10h\n"
+    rep += " - À 10h : /open cond 18h 10h\n"
 
     # Programmation votes loups chainés 19h-23h
     await planif_command(n19, open_vote, qui=Vote.loups, heure="23h", heure_chain="19h")
-    r += " - À 19h : /open loups 23h 19h\n"
+    rep += " - À 19h : /open loups 23h 19h\n"
 
     # Programmation premier vote maire 10h-17h
     await planif_command(n10, open_vote, qui=Vote.maire, heure="17h")
-    r += " - À 10h : /open maire 17h\n"
+    rep += " - À 10h : /open maire 17h\n"
 
     # Programmation actions au lancement et actions permanentes
-    r += "\nProgrammation des actions start / perma :\n"
+    rep += "\nProgrammation des actions start / perma :\n"
     start_perma = Action.query.filter(
         Action.base.has(BaseAction.trigger_debut.in_([ActionTrigger.start, ActionTrigger.perma]))
     ).all()
     for action in start_perma:
-        r += f" - À 19h : /open {action.id} " f"(trigger_debut == {action.base.trigger_debut})\n"
+        rep += f" - À 19h : /open {action.id} (trigger_debut == {action.base.trigger_debut})\n"
         await planif_command(n19, open_action, id=action.id)
 
     # Programmation envoi d'un message aux connards
-    r += "\nEt, à 18h50 : /send all [message de hype oue oue c'est génial]\n"
+    rep += "\nEt, à 18h50 : /send all [message de hype oue oue c'est génial]\n"
     await planif_command(
         n19 - datetime.timedelta(minutes=10),
         communication.send,
@@ -646,18 +651,14 @@ async def cparti(journey: DiscordJourney):
             "https://tenor.com/view/thehungergames-hungergames-thggifs-effie-gif-5114734"
         ),
     )
-    await tools.log(r, code=True)
+    await tools.log(rep, code=True)
 
     # Drop (éventuel) et (re-)création actions de vote
     Action.query.filter_by(base=None).delete()
-    actions = []
-    for joueur in Joueur.query.all():
-        for vote in Vote:
-            actions.append(Action(joueur=joueur, vote=vote))
+    Action.add(*(Action(joueur=joueur, vote=vote) for joueur in Joueur.query.all() for vote in Vote))
+    Action.query
 
-    Action.add(*actions)
-
-    await journey.final_message(f"C'est tout bon ! (détails dans {config.Channel.logs.mention})")
+    await journey.send(f"C'est tout bon ! (détails dans {config.Channel.logs.mention})")
 
 
 @app_commands.command()
@@ -673,12 +674,12 @@ async def cfini(journey: DiscordJourney):
         "ATTENTION : Confirmer supprimera TOUTES LES TÂCHES EN ATTENTE, ce qui est compliqué à annuler !"
     )
 
-    await journey.final_message("Suppression des tâches...")
+    await journey.send("Suppression des tâches...")
     async with journey.channel.typing():
         taches = Tache.query.all()
         Tache.delete(*taches)  # On supprime et déprogramme le tout !
 
-    await journey.final_message(
+    await journey.send(
         "C'est tout bon !\n"
         "Dernière chose : penser à désactiver le backup automatique du Tableau de bord !. "
         "Pour ce faire, l'ouvrir et aller dans `Extensions > Apps Script` puis dans le panel "

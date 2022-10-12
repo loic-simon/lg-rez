@@ -9,6 +9,14 @@ to benefit Sphinx internal links to Python objects:*
 https://lg-rez.readthedocs.io/fr/2.2.0/changelog.html
 
 
+## 3.0.0 - 2022-10-12
+
+  - Biggest update to date, switching from "bot commands" to Discord built-in
+    application commands, using Discordpy 2.0.
+  - A lot of major, breaking changes. Sorry, no time for changelog.
+  - Who matters anyway?
+
+
 ## 2.4.4 - 2022-05-27
 
 ### Fixed

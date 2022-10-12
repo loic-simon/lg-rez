@@ -26,12 +26,7 @@ async def _check_and_prepare_objects(bot: LGBot) -> None:
     if not config.is_setup:
         return
 
-    async for entry in config.guild.audit_logs(
-        oldest_first=True, user=config.bot.user, action=discord.AuditLogAction.guild_update
-    ):
-        if entry.reason == "Guild set up!":
-            break
-    else:
+    if len(config.guild.channels) < 20:
         config.is_setup = False
         # *really* needed objects, even if nothing is setup
         config.Channel.logs = config.guild.text_channels[0]
@@ -206,7 +201,7 @@ class LGBot(discord.Client):
         if not guild:
             raise RuntimeError(f"on_ready : Serveur d'ID {self.GUILD_ID} (``LGREZ_SERVER_ID``) introuvable")
 
-        print(f"      Connected to '{guild.name}'! " f"({len(guild.channels)} channels, {len(guild.members)} members)")
+        print(f"      Connected to '{guild.name}'! ({len(guild.channels)} channels, {len(guild.members)} members)")
         config.guild = guild
 
         # Start liveness regular output

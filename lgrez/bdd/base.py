@@ -128,7 +128,7 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
         if not cols:
             raise ValueError(f"Pas de clé primaire pour {cls.__name__}")
         if len(cols) > 1:
-            raise ValueError("Plusieurs colonnes clés primaires pour " f"{cls.__name__} (clé composite)")
+            raise ValueError("Plusieurs colonnes clés primaires pour {cls.__name__} (clé composite)")
         return next(iter(cols))
 
     def find_nearest(
@@ -190,7 +190,7 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
                 raise ValueError(f"{cls.__name__}.find_nearest: Colonne '{col}' invalide") from None
 
         if not isinstance(col.type, sqlalchemy.String):
-            raise ValueError(f"{cls.__name__}.find_nearest: " f"Colonne {col.key} pas de type textuel")
+            raise ValueError(f"{cls.__name__}.find_nearest: Colonne {col.key} pas de type textuel")
 
         query = cls.query
         if filtre is not None:
@@ -237,16 +237,7 @@ class TableMeta(sqlalchemy.orm.DeclarativeMeta):
         return sorted(bests, key=lambda x: x[1], reverse=True)
 
 
-# Dictionnaire {nom de la base -> table}, automatiquement rempli par
-# sqlalchemy.orm.declarative_base
-tables = {}
-
-
-mapper_registry = sqlalchemy.orm.registry(class_registry=tables)
-
-
-@mapper_registry.as_declarative_base(metaclass=TableMeta)
-class TableBase:
+class TableBase_:
     """Classe de base des tables de données.
 
     (construite par :func:`sqlalchemy.orm.registry.generate_base`)
@@ -339,6 +330,13 @@ class TableBase:
         self.update()
 
 
+# Dictionnaire {nom de la base -> table}, automatiquement rempli par sqlalchemy.orm.declarative_base
+tables = {}
+
+mapper_registry = sqlalchemy.orm.registry(class_registry=tables)
+TableBase: type[TableBase_] = mapper_registry.as_declarative_base(metaclass=TableMeta)(TableBase_)
+
+
 # ---- Autodoc objects
 
 
@@ -361,7 +359,7 @@ def autodoc_Column(*args, doc: str = "", comment: str | None = None, **kwargs) -
     if comment is None:
         comment = doc
     col = sqlalchemy.Column(*args, **kwargs, comment=comment)
-    sa_type = f":class:`{col.type!r} " f"<sqlalchemy.types.{type(col.type).__name__}>`"
+    sa_type = f":class:`{col.type!r} <sqlalchemy.types.{type(col.type).__name__}>`"
     py_type = col.type.python_type
     if py_type.__module__ in ("builtins", "lgrez.bdd.enums"):
         py_type_str = py_type.__name__

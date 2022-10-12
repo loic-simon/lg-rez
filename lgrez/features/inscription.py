@@ -21,7 +21,7 @@ async def new_channel(member: discord.Member) -> discord.TextChannel:
     au risque d'altérer le fonctionnement normal du bot.
 
     Args:
-        member: le membre pour qui créer le salon.
+        member: Le membre pour qui créer le salon.
 
     Returns:
         Le salon créé.
@@ -43,7 +43,7 @@ async def register_on_tdb(joueur: Joueur) -> None:
     Peut être personnalisé à un autre système de gestion des joueurs.
 
     Args:
-        joueur: le joueur à enregistrer.
+        joueur: Le joueur à enregistrer.
 
     Note:
         Fonction asynchrone depuis la version 2.2.2.
@@ -136,12 +136,10 @@ async def main(member: discord.Member) -> None:
     Args:
         member: Le joueur à inscrire.
 
-    Crée et paramètre le salon privé du joueur, lui pose des questions
-    et l'inscrit en base.
+    Crée et paramètre le salon privé du joueur, lui pose des questions et l'inscrit en base.
 
-    Personnalisation : voir :obj:`.config.demande_chambre`,
-    :obj:`.config.chambre_mj`, :func:`.config.additional_inscription_step`
-    et :obj:`.config.debut_saison`.
+    Personnalisation : voir :obj:`.config.demande_chambre`, :obj:`.config.chambre_mj`,
+    :func:`.config.additional_inscription_step` et :obj:`.config.debut_saison`.
 
     Commande appelée à l'arrivée sur le serveur, utiliser :meth:`\!co <.bot.Special.Special.co.callback>`
     pour trigger cette commande depuis Discord.
@@ -184,7 +182,7 @@ async def main(member: discord.Member) -> None:
 
 
 async def _inscription_process(journey: DiscordJourney, member: discord.Member, chan: discord.TextChannel) -> None:
-    await journey.final_message(
+    await journey.send(
         "Très bien !\nD'abord, un point règles nécessaire :\n\n"
         + tools.quote_bloc(
             "En t'inscrivant au Loup-Garou de la Rez, tu garantis vouloir participer à cette édition et "
@@ -196,9 +194,8 @@ async def _inscription_process(journey: DiscordJourney, member: discord.Member, 
     await tools.sleep(chan, 5)
 
     if not await journey.yes_no("C'est bon pour toi ?"):
-        await journey.final_message(
-            "Pas de soucis. Si tu changes d'avis ou que c'est un "
-            f"missclick, appelle un MJ aled ({tools.code('@MJ')})."
+        await journey.send(
+            f"Pas de soucis. Si tu changes d'avis ou que c'est un missclick, appelle un MJ aled ({tools.code('@MJ')})."
         )
         return
 
@@ -222,7 +219,7 @@ async def _inscription_process(journey: DiscordJourney, member: discord.Member, 
         # Renommage joueur (ne peut pas renommer les MJ)
         await member.edit(nick=nom)
 
-    await journey.final_message(
+    await journey.send(
         "Parfait ! Je t'ai renommé(e) pour que tout le monde te reconnaisse, et j'ai renommé cette conversation."
     )
 
@@ -240,9 +237,9 @@ async def _inscription_process(journey: DiscordJourney, member: discord.Member, 
         return
 
     if config.demande_chambre:
-        await journey.final_message(f"{nom}, en chambre {chambre}... Je t'inscris en base !")
+        await journey.send(f"{nom}, en chambre {chambre}... Je t'inscris en base !")
     else:
-        await journey.final_message(f"{nom}... Je t'inscris en base !")
+        await journey.send(f"{nom}... Je t'inscris en base !")
 
     async with chan.typing():
         # Enregistrement en base

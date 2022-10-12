@@ -4,7 +4,6 @@ Personnalisation de différents paramètres et accès global
 
 """
 
-import asyncio
 import json
 import pkgutil
 import typing

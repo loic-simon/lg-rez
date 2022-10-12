@@ -29,20 +29,19 @@ DESCRIPTION = """Commandes pour en savoir plus sur soi et les autres"""
 @app_commands.command()
 @journey_command
 async def roles(journey: DiscordJourney, *, role: app_commands.Transform[Role, tools.RoleTransformer] | None = None):
-    """Affiche la liste des rôles / des informations sur un rôle
+    """Affiche la liste des rôles / des informations sur un rôle.
 
     Args:
-        role: Le rôle pour lequel avoir les informations détaillées
+        role: Le rôle pour lequel avoir les informations détaillées (liste tous les rôles par défaut).
 
-    Sans argument, liste tous les rôles existants.
     Voir aussi la commande `/camps`.
     """
     if role:
-        await journey.final_message(embed=role.embed)
+        await journey.send(embed=role.embed)
         return
 
     roles = Role.query.filter_by(actif=True).order_by(Role.nom).all()
-    await journey.final_message(
+    await journey.send(
         f"Rôles trouvés :\n{_roles_list(roles)}\n"
         + tools.ital(f"({tools.code('/role <role>')} pour plus d'informations sur un rôle.)"),
     )
@@ -51,24 +50,23 @@ async def roles(journey: DiscordJourney, *, role: app_commands.Transform[Role, t
 @app_commands.command()
 @journey_command
 async def camps(journey: DiscordJourney, *, camp: app_commands.Transform[Camp, tools.CampTransformer] | None = None):
-    """Affiche la liste des camps / les rôles d'un camp
+    """Affiche la liste des camps / les rôles d'un camp.
 
     Args:
-        camp: Le camp pour lequel avoir les informations détaillées et la liste des rôles
+        camp: Le camp pour lequel avoir les informations détaillées et la liste des rôles.
 
-    Sans argument, liste tous les camps existants.
     Voir aussi la commande `/roles`.
     """
     if camp:
-        await journey.final_message(embed=camp.embed)
-        await journey.final_message(
+        await journey.send(embed=camp.embed)
+        await journey.send(
             f"Rôles dans ce camp :\n{_roles_list(camp.roles)}\n"
             + tools.ital(f"({tools.code('/roles <role>')} pour plus d'informations sur un rôle.)"),
         )
         return
 
     camps = Camp.query.filter_by(public=True).order_by(Camp.nom).all()
-    await journey.final_message(
+    await journey.send(
         "Camps trouvés :\n"
         + "\n".join(f"{camp.discord_emoji_or_none or ''} {camp.nom}" for camp in camps if not camp.nom.startswith("("))
         + "\n"
@@ -83,9 +81,9 @@ async def rolede(journey: DiscordJourney, *, joueur: app_commands.Transform[Joue
     """Donne le rôle d'un joueur (COMMANDE MJ)
 
     Args:
-        joueur: Le joueur dont on veut connaître le rôle
+        joueur: Le joueur dont on veut connaître le rôle.
     """
-    await journey.final_message(f"Rôle de {joueur.nom} : {joueur.role.nom_complet}")
+    await journey.send(f"Rôle de {joueur.nom} : {joueur.role.nom_complet}")
 
 
 @app_commands.command()
@@ -95,13 +93,13 @@ async def quiest(journey: DiscordJourney, *, role: app_commands.Transform[Role, 
     """Liste les joueurs ayant un rôle donné (COMMANDE MJ)
 
     Args:
-        role: Le rôle qu'on cherche
+        role: Le rôle qu'on cherche.
     """
     joueurs = Joueur.query.filter_by(role=role).filter(Joueur.est_vivant).all()
     if joueurs:
-        await journey.final_message(f"{role.nom_complet} : " + ", ".join(joueur.nom for joueur in joueurs))
+        await journey.send(f"{role.nom_complet} : " + ", ".join(joueur.nom for joueur in joueurs))
     else:
-        await journey.final_message(f"{role.nom_complet} : Personne.")
+        await journey.send(f"{role.nom_complet} : Personne.")
 
 
 @app_commands.command()
@@ -109,7 +107,7 @@ async def quiest(journey: DiscordJourney, *, role: app_commands.Transform[Role, 
 @tools.private()
 @journey_command
 async def menu(journey: DiscordJourney):
-    """Affiche des informations et boutons sur les votes / actions en cours
+    """Affiche des informations et boutons sur les votes / actions en cours.
 
     Le menu a une place beaucoup moins importante ici que sur Messenger, vu que tout est accessible par commandes.
     """
@@ -120,7 +118,7 @@ async def menu(journey: DiscordJourney):
     try:
         vaction = joueur.action_vote(Vote.cond)
     except RuntimeError:
-        await journey.final_message("Minute papillon, le jeu n'est pas encore lancé !")
+        await journey.send("Minute papillon, le jeu n'est pas encore lancé !")
         return
 
     if vaction.is_open:
@@ -156,9 +154,7 @@ async def menu(journey: DiscordJourney):
     else:
         rep += "Aucune action en cours.\n"
 
-    await journey.final_message(
-        f"––– MENU –––\n\n{rep}\n`/infos` pour voir ton rôle et tes actions, `@MJ` en cas de problème"
-    )
+    await journey.send(f"––– MENU –––\n\n{rep}\n`/infos` pour voir ton rôle et tes actions, `@MJ` en cas de problème")
 
 
 @app_commands.command()
@@ -166,7 +162,7 @@ async def menu(journey: DiscordJourney):
 @tools.private()
 @journey_command
 async def infos(journey: DiscordJourney):
-    """Affiche tes informations de rôle / actions
+    """Affiche tes informations de rôle / actions.
 
     Toutes les actions liées à ton rôle (et parfois d'autres) sont indiquées,
     même celles que tu ne peux pas utiliser pour l'instant (plus de charges, déclenchées automatiquement...)
@@ -181,15 +177,13 @@ async def infos(journey: DiscordJourney):
         rep += "\n\nActions :"
         rep += tools.code_bloc(
             "\n".join(
-                (
-                    f" - {action.base.slug.ljust(20)} "
-                    + (f"Cooldown : {action.cooldown}" if action.cooldown else action.base.temporalite).ljust(22)
-                    + (
-                        f"   {action.charges} charge(s)"
-                        + (" pour cette semaine" if "weekends" in action.base.refill else "")
-                        if isinstance(action.charges, int)
-                        else "Illimitée"
-                    )
+                f" - {action.base.slug.ljust(20)} "
+                + (f"Cooldown : {action.cooldown}" if action.cooldown else action.base.temporalite).ljust(22)
+                + (
+                    f"   {action.charges} charge(s)"
+                    + (" pour cette semaine" if "weekends" in action.base.refill else "")
+                    if isinstance(action.charges, int)
+                    else "Illimitée"
                 )
                 for action in joueur.actions_actives
             )
@@ -198,7 +192,7 @@ async def infos(journey: DiscordJourney):
     else:
         rep += "\n\nAucune action disponible."
 
-    await journey.final_message(
+    await journey.send(
         f"{rep}\n{tools.code('/menu')} pour voir les votes et "
         f"actions en cours, {tools.code('@MJ')} en cas de problème"
     )
@@ -211,7 +205,7 @@ async def actions(journey: DiscordJourney, *, joueur: app_commands.Transform[Jou
     """Affiche et modifie les actions d'un joueur (COMMANDE MJ)
 
     Args:
-        joueur: Le joueur dont on veut voir ou modifier les actions
+        joueur: Le joueur dont on veut voir ou modifier les actions.
     """
     actions = [ac for ac in joueur.actions if ac.base]
 
@@ -222,24 +216,22 @@ async def actions(journey: DiscordJourney, *, joueur: app_commands.Transform[Jou
         "id   active  baseaction               début     fin       cd   charges   refill\n"
         "--------------------------------------------------------------------------------------\n"
         + "\n".join(
-            (
-                str(action.id).ljust(5)
-                + str(action.active).ljust(8)
-                + action.base.slug.ljust(25)
-                + str(
-                    action.base.heure_debut
-                    if action.base.trigger_debut == ActionTrigger.temporel
-                    else action.base.trigger_debut.name
-                ).ljust(10)
-                + str(
-                    action.base.heure_fin
-                    if action.base.trigger_fin == ActionTrigger.temporel
-                    else action.base.trigger_fin.name
-                ).ljust(10)
-                + str(action.cooldown).ljust(5)
-                + str(action.charges).ljust(10)
-                + str(action.base.refill)
-            )
+            str(action.id).ljust(5)
+            + str(action.active).ljust(8)
+            + action.base.slug.ljust(25)
+            + str(
+                action.base.heure_debut
+                if action.base.trigger_debut == ActionTrigger.temporel
+                else action.base.trigger_debut.name
+            ).ljust(10)
+            + str(
+                action.base.heure_fin
+                if action.base.trigger_fin == ActionTrigger.temporel
+                else action.base.trigger_fin.name
+            ).ljust(10)
+            + str(action.cooldown).ljust(5)
+            + str(action.charges).ljust(10)
+            + str(action.base.refill)
             for action in actions
         )
     )
@@ -259,17 +251,17 @@ async def actions(journey: DiscordJourney, *, joueur: app_commands.Transform[Jou
             discord.ui.TextInput(label="Charges (vide = illimité)", required=False),
         )
         if not (base := BaseAction.query.filter_by(slug=base_slug).one_or_none()):
-            await journey.final_message(f"Action `{base_slug}` invalide, vérifier dans le Gsheet Rôles et actions")
+            await journey.send(f"Action `{base_slug}` invalide, vérifier dans le Gsheet Rôles et actions")
             return
         cooldown = int(cooldown)
         charges = int(charges) if charges else None
 
         action = gestion_actions.add_action(joueur=joueur, base=base, cooldown=cooldown, charges=charges)
-        await journey.final_message(f"Action ajoutée (id {action.id}).")
+        await journey.send(f"Action ajoutée (id {action.id}).")
         return
 
     elif choix == "stop":
-        await journey.final_message("Au revoir.")
+        await journey.send("Au revoir.")
         return
 
     # Modifier
@@ -305,22 +297,22 @@ async def actions(journey: DiscordJourney, *, joueur: app_commands.Transform[Jou
 
         elif choix == "validate":
             action.update()
-            await journey.final_message("Modifications enregistrées.")
+            await journey.send("Modifications enregistrées.")
             return
 
         elif choix == "cancel":
-            await journey.final_message("Modifications annulées.")
+            await journey.send("Modifications annulées.")
             return
 
         else:
-            await journey.final_message(f"C'est possible ça ? {choix}")
+            await journey.send(f"C'est possible ça ? {choix}")
             return
 
 
 @app_commands.command()
 @journey_command
 async def vivants(journey: DiscordJourney):
-    """Affiche la liste des joueurs vivants
+    """Affiche la liste des joueurs vivants.
 
     Aussi dite : « liste des joueurs qui seront bientôt morts »
     """
@@ -335,13 +327,13 @@ async def vivants(journey: DiscordJourney):
         for joueur in joueurs:
             mess += f" {joueur.nom}\n"
 
-    await journey.final_message(mess, code=True, prefix=f"Les {len(joueurs)} joueurs vivants sont :")
+    await journey.send(mess, code=True, prefix=f"Les {len(joueurs)} joueurs vivants sont :")
 
 
 @app_commands.command()
 @journey_command
 async def morts(journey: DiscordJourney):
-    """Affiche la liste des joueurs morts
+    """Affiche la liste des joueurs morts.
 
     Aussi dite : « liste des joueurs qui mangent leurs morts »
     """
@@ -354,4 +346,4 @@ async def morts(journey: DiscordJourney):
     else:
         mess = "Toi (mais tu ne le sais pas encore)"
 
-    await journey.final_message(mess, code=True, prefix=f"Les {len(joueurs) or ''} morts sont :")
+    await journey.send(mess, code=True, prefix=f"Les {len(joueurs) or ''} morts sont :")

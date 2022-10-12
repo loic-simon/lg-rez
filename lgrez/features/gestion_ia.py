@@ -109,16 +109,12 @@ DESCRIPTION = """Commandes relatives à l'IA (réponses automatiques du bot)"""
 @tools.private()
 @journey_command
 async def stfu(journey: DiscordJourney, *, force: Literal["on", "off"] = None):
-    """Active/désactive la réponse automatique du bot sur ton channel privé
+    """Active/désactive la réponse automatique du bot sur ton channel privé.
 
     Args:
-        force: Forcer l'activation / la désactivation
+        force: Forcer l'activation / la désactivation (toggle par défaut).
 
-    Sans argument, la commande active les réactions si désactivées
-    et vice-versa ; avec un autre argument, elle le fait silencieusment.
-
-    N'agit que sur les messages classiques envoyés dans le channel :
-    les commandes restent reconnues.
+    N'agit que sur les messages classiques envoyés dans le channel : les commandes restent reconnues.
 
     Si vous ne comprenez pas le nom de la commande, demandez à Google.
     """
@@ -126,26 +122,23 @@ async def stfu(journey: DiscordJourney, *, force: Literal["on", "off"] = None):
 
     if force in [None, "on"] and id not in config.bot.in_stfu:
         config.bot.in_stfu.append(id)
-        await journey.final_message("Okay, je me tais ! Tape !stfu quand tu voudras de nouveau de moi :cry:")
+        await journey.send("Okay, je me tais ! Tape !stfu quand tu voudras de nouveau de moi :cry:")
 
     elif force in [None, "off"] and id in config.bot.in_stfu:
         config.bot.in_stfu.remove(id)
-        await journey.final_message("Ahhh, ça fait plaisir de pouvoir reparler !")
+        await journey.send("Ahhh, ça fait plaisir de pouvoir reparler !")
 
 
 @app_commands.command()
 @journey_command
 async def fals(journey: DiscordJourney, force: Literal["on", "off"] = None):
-    """Active/désactive le mode « foire à la saucisse »
+    """Active/désactive le mode « foire à la saucisse ».
 
     Args:
-        force: Forcer l'activation / la désactivation.
+        force: Forcer l'activation / la désactivation (toggle par défaut).
 
-    Sans argument, la commande active le mode si désactivé
-    et vice-versa.
-
-    En mode « foire à la saucisse », le bot réagira à (presque) tous
-    les messages, pas seulement sur les motifs qu'on lui a appris.
+    En mode « foire à la saucisse », le bot réagira à (presque) tous les messages,
+    pas seulement sur les motifs qu'on lui a appris.
 
     À utiliser à vos risques et périls !
     """
@@ -153,11 +146,11 @@ async def fals(journey: DiscordJourney, force: Literal["on", "off"] = None):
 
     if force in [None, "on"] and id not in config.bot.in_fals:
         config.bot.in_fals.append(id)
-        await journey.final_message("https://tenor.com/view/saucisse-sausage-gif-5426973")
+        await journey.send("https://tenor.com/view/saucisse-sausage-gif-5426973")
 
     elif force in [None, "off"] and id in config.bot.in_fals:
         config.bot.in_fals.remove(id)
-        await journey.final_message("T'as raison, faut pas abuser des bonnes choses")
+        await journey.send("T'as raison, faut pas abuser des bonnes choses")
 
 
 class _FakeMessage:
@@ -173,10 +166,10 @@ class _FakeMessage:
 @app_commands.command()
 @journey_command
 async def react(journey: DiscordJourney, *, trigger: str):
-    """Force le bot à réagir à un message
+    """Force le bot à réagir à un message (sur un chan public, en mode STFU...)
 
     Args:
-        trigger: Texte auquel le bot doit réagir
+        trigger: Texte auquel le bot doit réagir.
 
     Permet de faire appel à l'IA du bot même sur les chans publics,ou en mode STFU, etc.
 
@@ -184,22 +177,22 @@ async def react(journey: DiscordJourney, *, trigger: str):
     """
     message = _FakeMessage(journey.channel, journey.member, trigger)
     debug = journey.member.top_role >= config.Role.mj
-    await process_ia(message, journey.final_message, debug=debug)
+    await process_ia(message, journey.send, debug=debug)
 
 
 @app_commands.command()
 @journey_command
 async def reactfals(journey: DiscordJourney, *, trigger: str):
-    """Force le bot à réagir à un message comme en mode Foire à la saucisse
+    """Force le bot à réagir à un message comme en mode Foire à la saucisse.
 
     Args:
-        trigger: texte auquel le bot doit réagir
+        trigger: Texte auquel le bot doit réagir.
 
     Permet de faire appel directement au mode Foire à la saucisse,
     même si il n'est pas activé / sur un chan public.
     """
     gif = fetch_tenor(trigger)
-    await journey.final_message(gif or "Palaref")
+    await journey.send(gif or "Palaref")
 
 
 async def _add_ia(journey: DiscordJourney, *, triggers: str, reponse: str | None):
@@ -217,10 +210,10 @@ async def _add_ia(journey: DiscordJourney, *, triggers: str, reponse: str | None
     avoided = f"Trigger(s) déjà associé(s) à une réaction et ignorés : {avoided}\n\n" if avoided else ""
 
     if not triggers:
-        await journey.final_message(avoided + ":x: Aucun trigger valide, abort")
+        await journey.send(avoided + ":x: Aucun trigger valide, abort")
         return
 
-    await journey.final_message(avoided + f":arrow_forward: Triggers : `{'` – `'.join(triggers)}`")
+    await journey.send(avoided + f":arrow_forward: Triggers : `{'` – `'.join(triggers)}`")
 
     if reponse:
         reponse = reponse.strip()
@@ -251,13 +244,12 @@ async def add_ia(journey: DiscordJourney, *, triggers: str, reponse: str | None 
     """Ajoute une règle d'IA (COMMANDE MJ/RÉDACTEURS)
 
     Args:
-        triggers: Mot(s), phrase(s) ou expression(s) séparées par des ";"
-        reponse: Si réponse textuelle simple, pour ajout rapide
+        triggers: Mot(s), phrase(s) ou expression(s) séparées par des ";".
+        reponse: Si réponse textuelle simple, pour ajout rapide.
 
     Une sécurité empêche d'ajouter un trigger déjà existant.
 
-    Dans le cas où plusieurs expressions sont spécifiées, toutes
-    déclencheront l'action demandée.
+    Dans le cas où plusieurs expressions sont spécifiées, toutes déclencheront l'action demandée.
     """
     await _add_ia(journey, triggers=triggers, reponse=reponse)
 
@@ -276,13 +268,13 @@ async def list_ia(journey: DiscordJourney, trigger: str | None = None, sensi: fl
     """Liste les règles d'IA reconnues par le bot (COMMANDE MJ/RÉDACTEURS)
 
     Args
-        trigger: Mot/expression permettant de filter et trier les résultats
-        sensi: Sensibilité de détection (ratio des caractères correspondants, entre 0 et 1), défaut 0.5
+        trigger: Mot/expression permettant de filter et trier les résultats.
+        sensi: Sensibilité de détection (ratio des caractères correspondants, entre 0 et 1), défaut 0.5.
     """
     if trigger:
         trigs = Trigger.find_nearest(trigger, col=Trigger.trigger, sensi=sensi, solo_si_parfait=False)
         if not trigs:
-            await journey.final_message(f"Rien trouvé, pas de chance (sensi = {sensi})")
+            await journey.send(f"Rien trouvé, pas de chance (sensi = {sensi})")
             return
     else:
         raw_trigs = Trigger.query.order_by(Trigger.id).all()
@@ -320,7 +312,7 @@ async def list_ia(journey: DiscordJourney, trigger: str | None = None, sensi: fl
 
     rep += "\nPour modifier une réaction, utiliser `/modif_ia <trigger>`."
 
-    await journey.final_message(rep, code=True)
+    await journey.send(rep, code=True)
 
 
 @app_commands.command()
@@ -330,7 +322,7 @@ async def modif_ia(journey: DiscordJourney, *, trigger: str):
     """Modifie/supprime une règle d'IA (COMMANDE MJ/RÉDACTEURS)
 
     Args:
-        trigger: Mot/expression déclenchant la réaction à modifier/supprimer
+        trigger: Mot/expression déclenchant la réaction à modifier/supprimer.
 
     Permet d'ajouter et supprimer des triggers, de modifier la réaction du bot
     (construction d'une  séquence de réponses successives ou aléatoires)
@@ -338,7 +330,7 @@ async def modif_ia(journey: DiscordJourney, *, trigger: str):
     """
     trigs = Trigger.find_nearest(trigger, col=Trigger.trigger)
     if not trigs:
-        await journey.final_message("Rien trouvé.")
+        await journey.send("Rien trouvé.")
         return
 
     trig = trigs[0][0]
@@ -383,7 +375,7 @@ async def modif_ia(journey: DiscordJourney, *, trigger: str):
                 config.session.commit()
 
         if not trigs:  # on a tout supprimé !
-            await journey.final_message("Tous les triggers supprimés, suppression de la réaction")
+            await journey.send("Tous les triggers supprimés, suppression de la réaction")
             config.session.delete(reac)
             config.session.commit()
             return
@@ -391,7 +383,7 @@ async def modif_ia(journey: DiscordJourney, *, trigger: str):
     elif choix == "response":  # Modification de la réponse
         if any([mark in reac.reponse for mark in MARKS]):
             # Séquence compliquée
-            await journey.final_message(
+            await journey.send(
                 "\nLa séquence-réponse peut être refaite manuellement "
                 "ou modifiée rapidement en envoyant directement la "
                 "séquence ci-dessus modifiée (avec les marqueurs : "
@@ -402,7 +394,7 @@ async def modif_ia(journey: DiscordJourney, *, trigger: str):
 
         reponse = await _build_sequence(journey)
         if not reponse:
-            await journey.final_message("Réponse textuelle vide interdite, abort.")
+            await journey.send("Réponse textuelle vide interdite, abort.")
 
         reac.reponse = reponse
 
@@ -413,14 +405,14 @@ async def modif_ia(journey: DiscordJourney, *, trigger: str):
 
     config.session.commit()
 
-    await journey.final_message("Fini.")
+    await journey.send("Fini.")
 
 
 async def trigger_at_mj(message: discord.Message, send_callable: Callable[[str], Coroutine]) -> bool:
     """Règle d'IA : réaction si le message mentionne les MJs.
 
     Args:
-        message: message auquel réagir.
+        message: Message auquel réagir.
 
     Returns:
         Si le message mentionne les MJ et qu'une réponse a été envoyée
@@ -438,8 +430,8 @@ async def trigger_roles(
     """Règle d'IA : réaction si un nom de rôle est donné.
 
     Args:
-        message: message auquel réagir.
-        sensi: sensibilité de la recherche (voir :meth:`.bdd.base.TableMeta.find_nearest`).
+        message: Message auquel réagir.
+        sensi: Sensibilité de la recherche (voir :meth:`.bdd.base.TableMeta.find_nearest`).
 
     Trouve l'entrée la plus proche de ``message.content`` dans la table :class:`.bdd.Role`.
 
@@ -465,10 +457,10 @@ async def trigger_reactions(
     """Règle d'IA : réaction à partir de la table :class:`.bdd.Reaction`.
 
     Args:
-        message: message auquel réagir.
-        chain: contenu auquel réagir (défaut : contenu de ``message``).
-        sensi: sensibilité de la recherche (cf :meth:`.bdd.base.TableMeta.find_nearest`).
-        debug: si ``True``, affiche les erreurs lors de l'évaluation des messages (voir :func:`.tools.eval_accols`).
+        message: Message auquel réagir.
+        chain: Contenu auquel réagir (défaut : contenu de ``message``).
+        sensi: Sensibilité de la recherche (cf :meth:`.bdd.base.TableMeta.find_nearest`).
+        debug: Si ``True``, affiche les erreurs lors de l'évaluation des messages (voir :func:`.tools.eval_accols`).
 
     Trouve l'entrée la plus proche de ``chain`` dans la table :class:`.bdd.Reaction` ;
     si il contient des accolades, évalue le message selon le contexte de ``message``.
@@ -514,9 +506,9 @@ async def trigger_sub_reactions(
     testés des plus longs aux plus courts).
 
     Args:
-        message: message auquel réagir.
-        sensi: sensibilité de la recherche (cf :meth:`.bdd.base.TableMeta.find_nearest`).
-        debug: si ``True``, affiche les erreurs lors de l'évaluation des messages (voir :func:`.tools.eval_accols`).
+        message: Message auquel réagir.
+        sensi: Sensibilité de la recherche (cf :meth:`.bdd.base.TableMeta.find_nearest`).
+        debug: Si ``True``, affiche les erreurs lors de l'évaluation des messages (voir :func:`.tools.eval_accols`).
 
     Returns:
         Si une réaction a été trouvé (sensibilité ``> sensi``) et qu'une réponse a été envoyée.
@@ -537,7 +529,7 @@ async def trigger_di(message: discord.Message, send_callable: Callable[[str], Co
     """Règle d'IA : réaction aux messages en di... / cri...
 
     Args:
-        message: message auquel réagir.
+        message: Message auquel réagir.
 
     Returns:
         Si le message correspond et qu'une réponse a été envoyée.
@@ -566,7 +558,7 @@ async def trigger_gif(message: discord.Message, send_callable: Callable[[str], C
     """Règle d'IA : réaction par GIF en mode Foire à la saucisse.
 
     Args:
-        message: message auquel réagir
+        message: Message auquel réagir.
 
     Returns:
         Si le message correspond et qu'une réponse a été envoyée.
@@ -586,7 +578,7 @@ async def trigger_mot_unique(message: discord.Message, send_callable: Callable[[
     """Règle d'IA : réaction à un mot unique (le répète).
 
     Args:
-        message: message auquel réagir.
+        message: Message auquel réagir.
 
     Returns:
         Si le message correspond et qu'une réponse a été envoyée
@@ -604,7 +596,7 @@ async def trigger_a_ou_b(message: discord.Message, send_callable: Callable[[str]
     """Règle d'IA : réaction à un motif type « a ou b » (répond « b »).
 
     Args:
-        message: message auquel réagir.
+        message: Message auquel réagir.
 
     Returns:
         Si le message correspond et qu'une réponse a été envoyée.
@@ -621,7 +613,7 @@ async def default(message: discord.Message, send_callable: Callable[[str], Corou
     """Règle d'IA : réponse par défaut
 
     Args:
-        message: message auquel réagir.
+        message: Message auquel réagir.
 
     Returns:
         Si le message correspond et qu'une réponse a été envoyée.
@@ -637,8 +629,8 @@ async def process_ia(message: discord.Message, send_callable: Callable[[str], Co
     """Exécute les règles d'IA.
 
     Args:
-        message: message auquel réagir.
-        debug: si ``True``, affiche les erreurs lors de l'évaluation des messages (voir :func:`.tools.eval_accols`).
+        message: Message auquel réagir.
+        debug: Si ``True``, affiche les erreurs lors de l'évaluation des messages (voir :func:`.tools.eval_accols`).
     """
     (
         await trigger_at_mj(message, send_callable)  # @MJ (aled)
