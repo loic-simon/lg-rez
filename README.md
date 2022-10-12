@@ -1,5 +1,24 @@
 # lg-rez
 
+**PROJECT ARCHIVED - Development continues on https://github.com/GRI-ESPCI/lg-rez!**
+
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+
 [![PyPI](https://img.shields.io/pypi/v/lg-rez)](https://pypi.org/project/lg-rez)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/lg-rez)](https://pypi.org/project/lg-rez)
 [![PyPI - Wheel](https://img.shields.io/pypi/wheel/lg-rez)](https://pypi.org/project/lg-rez)
